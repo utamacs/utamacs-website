@@ -8,59 +8,80 @@ export interface CommitteeMember {
   colorVariant: 'primary' | 'secondary' | 'accent';
 }
 
+export interface ExecutiveMember {
+  name: string;
+  portfolio: string;
+  initials: string;
+}
+
 export const committeeMembers: CommitteeMember[] = [
   {
-    name: 'Rajesh Kumar',
+    name: 'Sri K. Bal Reddy',
     role: 'President',
-    description: 'Leading the association with 8+ years of community service experience. Focused on improving infrastructure and resident welfare.',
-    phone: '+91 98765 43210',
+    description: 'Leading the association with a focus on community welfare, infrastructure, and transparent governance for all residents.',
     email: 'president@utamacs.org',
-    initials: 'RK',
+    initials: 'KR',
     colorVariant: 'primary',
   },
   {
-    name: 'Priya Sharma',
-    role: 'Secretary',
-    description: 'Managing all administrative functions, correspondence, and meeting minutes. Ensuring smooth operations of the association.',
-    phone: '+91 98765 43211',
-    email: 'secretary@utamacs.org',
-    initials: 'PS',
+    name: 'Smt. Rama Ananth',
+    role: 'Working President',
+    description: 'Overseeing day-to-day operations of the association and coordinating between all committee members and residents.',
+    email: 'workingpresident@utamacs.org',
+    initials: 'RA',
     colorVariant: 'secondary',
   },
   {
-    name: 'Amit Patel',
+    name: 'Sri T V Subramanyam',
+    role: 'Vice President',
+    description: 'Supporting the President in all administrative matters and representing the association in official capacities.',
+    initials: 'TS',
+    colorVariant: 'accent',
+  },
+  {
+    name: 'Sri Prashanth',
+    role: 'General Secretary',
+    description: 'Managing all administrative functions, correspondence, meeting minutes, and ensuring smooth operations of the association.',
+    email: 'secretary@utamacs.org',
+    initials: 'PR',
+    colorVariant: 'primary',
+  },
+  {
+    name: 'Sri Suresh Kumar',
     role: 'Treasurer',
     description: 'Overseeing financial management, maintenance fund collection, and annual budget planning for community projects.',
-    phone: '+91 98765 43212',
     email: 'treasurer@utamacs.org',
-    initials: 'AP',
-    colorVariant: 'accent',
-  },
-  {
-    name: 'Suresh Reddy',
-    role: 'Maintenance Convenor',
-    description: 'Coordinating all maintenance activities, vendor management, and infrastructure upkeep across the community.',
-    phone: '+91 98765 43213',
-    email: 'maintenance@utamacs.org',
-    initials: 'SR',
-    colorVariant: 'primary',
-  },
-  {
-    name: 'Meera Singh',
-    role: 'Events Coordinator',
-    description: 'Planning and organizing community events, festivals, and social gatherings that bring residents together.',
-    phone: '+91 98765 43214',
-    email: 'events@utamacs.org',
-    initials: 'MS',
+    initials: 'SK',
     colorVariant: 'secondary',
   },
   {
-    name: 'Vijay Kumar',
-    role: 'Member Representative',
-    description: 'Acting as the voice of residents, gathering feedback and ensuring member concerns are addressed by the committee.',
-    phone: '+91 98765 43215',
-    email: 'representative@utamacs.org',
-    initials: 'VK',
+    name: 'Sri Eaga Rajesh Reddy',
+    role: 'Joint Secretary',
+    description: 'Assisting the General Secretary in administrative duties and managing communications with residents.',
+    initials: 'ER',
     colorVariant: 'accent',
   },
+  {
+    name: 'Sri Dande Nitin',
+    role: 'Organising Secretary',
+    description: 'Planning and coordinating community events, meetings, and organizational activities across the society.',
+    initials: 'DN',
+    colorVariant: 'primary',
+  },
+  {
+    name: 'Smt. Geetha Nambiar',
+    role: 'Cultural Secretary',
+    description: 'Organizing cultural programs, festivals, and social activities that celebrate diversity and build community bonds.',
+    initials: 'GN',
+    colorVariant: 'secondary',
+  },
+];
+
+export const executiveMembers: ExecutiveMember[] = [
+  { name: 'Sri Geerish Kumar', portfolio: 'Maintenance & Club House', initials: 'GK' },
+  { name: 'Sri Praseed K. V.', portfolio: 'WTP, STP', initials: 'PK' },
+  { name: 'Smt. Jhansi', portfolio: 'Temple & Play Area', initials: 'JH' },
+  { name: 'Smt. G. Sindhu', portfolio: 'Games', initials: 'GS' },
+  { name: 'Sri Sharath Chandra', portfolio: 'Security', initials: 'SC' },
+  { name: 'Sri D. Harsha', portfolio: 'Executive Member', initials: 'DH' },
 ];
