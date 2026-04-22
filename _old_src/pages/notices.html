@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notices & Circulars - UTA MACS</title>
+  <meta name="description" content="Stay updated with the latest notices, circulars, and announcements from UTA MACS.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
+              400: '#60a5fa', 500: '#3b82f6', 600: '#1E3A8A', 700: '#1d4ed8',
+              800: '#1e40af', 900: '#1e3a8a', 950: '#172554',
+            },
+            secondary: {
+              50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7',
+              400: '#34d399', 500: '#10B981', 600: '#059669', 700: '#047857',
+              800: '#065f46', 900: '#064e3b', 950: '#022c22',
+            },
+            accent: {
+              50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d',
+              400: '#fbbf24', 500: '#F59E0B', 600: '#d97706', 700: '#b45309',
+              800: '#92400e', 900: '#78350f', 950: '#451a03',
+            },
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://kit.fontawesome.com/5a2b2f0b4f.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header id="header-placeholder"></header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-r from-primary-600 to-primary-800 text-white py-16">
+      <div class="container mx-auto px-4 text-center">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4">Notices & Circulars</h1>
+        <p class="text-xl max-w-2xl mx-auto">
+          Stay informed with the latest announcements and important communications.
+        </p>
+      </div>
+    </section>
+
+    <!-- Search and Filter -->
+    <section class="py-8 bg-white border-b">
+      <div class="container mx-auto px-4">
+        <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div class="flex-1 max-w-md">
+            <input type="text" placeholder="Search notices..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+          </div>
+          <div class="flex gap-2">
+            <select class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option>All Categories</option>
+              <option>General</option>
+              <option>Maintenance</option>
+              <option>Events</option>
+              <option>Financial</option>
+            </select>
+            <select class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option>All Time</option>
+              <option>Last 7 days</option>
+              <option>Last 30 days</option>
+              <option>Last 3 months</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Notices List -->
+    <section class="py-16 bg-gray-50">
+      <div class="container mx-auto px-4">
+        <div class="space-y-6">
+          <!-- Important Notice -->
+          <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-lg">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center mb-2">
+                  <span class="bg-red-500 text-white text-xs px-2 py-1 rounded mr-2">IMPORTANT</span>
+                  <span class="text-sm text-gray-500">March 20, 2026</span>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Water Supply Interruption Notice</h3>
+                <p class="text-gray-700 mb-4">Due to scheduled maintenance work, water supply will be interrupted from 10:00 AM to 2:00 PM on March 25, 2026. Please store adequate water for the mentioned period.</p>
+              </div>
+              <a href="#" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded font-medium transition duration-300">
+                <i class="fas fa-download mr-2"></i>Download
+              </a>
+            </div>
+          </div>
+
+          <!-- Regular Notices -->
+          <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center mb-2">
+                  <span class="bg-primary-500 text-white text-xs px-2 py-1 rounded mr-2">GENERAL</span>
+                  <span class="text-sm text-gray-500">March 15, 2026</span>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Annual General Meeting Notice</h3>
+                <p class="text-gray-700 mb-4">The Annual General Meeting of Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited will be held on March 30, 2026 at 10:00 AM in the community hall.</p>
+              </div>
+              <a href="#" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded font-medium transition duration-300">
+                <i class="fas fa-download mr-2"></i>Download
+              </a>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center mb-2">
+                  <span class="bg-secondary-500 text-white text-xs px-2 py-1 rounded mr-2">MAINTENANCE</span>
+                  <span class="text-sm text-gray-500">March 10, 2026</span>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Elevator Maintenance Schedule</h3>
+                <p class="text-gray-700 mb-4">Routine maintenance of building elevators will be conducted on March 18, 2026 from 9:00 AM to 5:00 PM. Elevators may be out of service during this period.</p>
+              </div>
+              <a href="#" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded font-medium transition duration-300">
+                <i class="fas fa-download mr-2"></i>Download
+              </a>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center mb-2">
+                  <span class="bg-green-500 text-white text-xs px-2 py-1 rounded mr-2">EVENTS</span>
+                  <span class="text-sm text-gray-500">March 5, 2026</span>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Spring Festival Registration Open</h3>
+                <p class="text-gray-700 mb-4">Registration for the annual Spring Festival is now open. The event will feature cultural programs, games, and community dining on March 28, 2026.</p>
+              </div>
+              <a href="#" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded font-medium transition duration-300">
+                <i class="fas fa-download mr-2"></i>Download
+              </a>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center mb-2">
+                  <span class="bg-blue-500 text-white text-xs px-2 py-1 rounded mr-2">FINANCIAL</span>
+                  <span class="text-sm text-gray-500">February 28, 2026</span>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Maintenance Fee Payment Reminder</h3>
+                <p class="text-gray-700 mb-4">This is a reminder that maintenance fees for March 2026 are due by March 10, 2026. Please ensure timely payment to avoid any inconvenience.</p>
+              </div>
+              <a href="#" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded font-medium transition duration-300">
+                <i class="fas fa-download mr-2"></i>Download
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex justify-center mt-12">
+          <nav class="flex items-center space-x-2">
+            <a href="#" class="px-3 py-2 rounded-md text-gray-500 hover:text-primary-600 hover:bg-gray-100">Previous</a>
+            <a href="#" class="px-3 py-2 rounded-md bg-primary-600 text-white">1</a>
+            <a href="#" class="px-3 py-2 rounded-md text-gray-500 hover:text-primary-600 hover:bg-gray-100">2</a>
+            <a href="#" class="px-3 py-2 rounded-md text-gray-500 hover:text-primary-600 hover:bg-gray-100">3</a>
+            <a href="#" class="px-3 py-2 rounded-md text-gray-500 hover:text-primary-600 hover:bg-gray-100">Next</a>
+          </nav>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="footer-placeholder"></footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

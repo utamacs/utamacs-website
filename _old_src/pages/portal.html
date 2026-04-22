@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Member Portal - UTA MACS</title>
+  <meta name="description" content="Access your member dashboard, pay maintenance fees, raise complaints, and manage your account with Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
+              400: '#60a5fa', 500: '#3b82f6', 600: '#1E3A8A', 700: '#1d4ed8',
+              800: '#1e40af', 900: '#1e3a8a', 950: '#172554',
+            },
+            secondary: {
+              50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7',
+              400: '#34d399', 500: '#10B981', 600: '#059669', 700: '#047857',
+              800: '#065f46', 900: '#064e3b', 950: '#022c22',
+            },
+            accent: {
+              50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d',
+              400: '#fbbf24', 500: '#F59E0B', 600: '#d97706', 700: '#b45309',
+              800: '#92400e', 900: '#78350f', 950: '#451a03',
+            },
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://kit.fontawesome.com/5a2b2f0b4f.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header id="header-placeholder"></header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-r from-primary-600 to-primary-800 text-white py-16">
+      <div class="container mx-auto px-4 text-center">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4">Member Portal</h1>
+        <p class="text-xl max-w-2xl mx-auto">
+          Access your personalized dashboard and manage your association services.
+        </p>
+      </div>
+    </section>
+
+    <!-- Login Section -->
+    <section class="py-16 bg-white">
+      <div class="container mx-auto px-4 max-w-md">
+        <div class="bg-gray-50 p-8 rounded-lg shadow-md">
+          <h2 class="text-2xl font-bold text-center mb-6">Member Login</h2>
+          <form class="space-y-6">
+            <div>
+              <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input type="email" id="email" name="email" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" required>
+            </div>
+            <div>
+              <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input type="password" id="password" name="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" required>
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="flex items-center">
+                <input type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                <span class="ml-2 text-sm text-gray-600">Remember me</span>
+              </label>
+              <a href="#" class="text-sm text-primary-600 hover:text-primary-800">Forgot password?</a>
+            </div>
+            <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-semibold transition duration-300">
+              Sign In
+            </button>
+          </form>
+          <div class="mt-6 text-center">
+            <p class="text-gray-600">Don't have an account?</p>
+            <a href="pages/contact.html" class="text-primary-600 hover:text-primary-800 font-medium">Contact us to join</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Portal Features Preview -->
+    <section class="py-16 bg-gray-50">
+      <div class="container mx-auto px-4">
+        <h2 class="text-3xl font-bold text-center mb-12">Portal Features</h2>
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <!-- Pay Maintenance -->
+          <div class="bg-white p-6 rounded-lg shadow-md text-center">
+            <div class="bg-primary-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-credit-card text-primary-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-semibold mb-3">Pay Maintenance</h3>
+            <p class="text-gray-600 mb-4">Secure online payment for maintenance fees and dues.</p>
+            <span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-sm">Coming Soon</span>
+          </div>
+
+          <!-- Raise Complaint -->
+          <div class="bg-white p-6 rounded-lg shadow-md text-center">
+            <div class="bg-red-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-semibold mb-3">Raise Complaint</h3>
+            <p class="text-gray-600 mb-4">Submit maintenance issues and track resolution status.</p>
+            <span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-sm">Coming Soon</span>
+          </div>
+
+          <!-- Service Requests -->
+          <div class="bg-white p-6 rounded-lg shadow-md text-center">
+            <div class="bg-secondary-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-tools text-secondary-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-semibold mb-3">Service Requests</h3>
+            <p class="text-gray-600 mb-4">Request repairs, maintenance, and other services.</p>
+            <span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-sm">Coming Soon</span>
+          </div>
+
+          <!-- Community Posts -->
+          <div class="bg-white p-6 rounded-lg shadow-md text-center">
+            <div class="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-bullhorn text-green-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-semibold mb-3">Community Posts</h3>
+            <p class="text-gray-600 mb-4">Share updates, events, and connect with neighbors.</p>
+            <span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-sm">Coming Soon</span>
+          </div>
+
+          <!-- Finance Dashboard -->
+          <div class="bg-white p-6 rounded-lg shadow-md text-center">
+            <div class="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-chart-bar text-blue-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-semibold mb-3">Finance Dashboard</h3>
+            <p class="text-gray-600 mb-4">View payment history, outstanding dues, and financial reports.</p>
+            <span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-sm">Coming Soon</span>
+          </div>
+
+          <!-- Event Registrations -->
+          <div class="bg-white p-6 rounded-lg shadow-md text-center">
+            <div class="bg-purple-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-calendar-check text-purple-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-semibold mb-3">Event Registrations</h3>
+            <p class="text-gray-600 mb-4">Register for community events and track your participation.</p>
+            <span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-sm">Coming Soon</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Future Integration Note -->
+    <section class="py-16 bg-primary-50">
+      <div class="container mx-auto px-4 text-center">
+        <h2 class="text-3xl font-bold mb-4">Future Enhancements</h2>
+        <p class="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+          We're working on integrating advanced features including secure payment processing, real-time notifications, and comprehensive member management through Supabase.
+        </p>
+        <div class="bg-white p-6 rounded-lg shadow-md max-w-2xl mx-auto">
+          <h3 class="text-xl font-semibold mb-4">Planned Features</h3>
+          <ul class="text-left space-y-2 text-gray-600">
+            <li><i class="fas fa-check text-green-500 mr-2"></i>Secure online payments and financial tracking</li>
+            <li><i class="fas fa-check text-green-500 mr-2"></i>Real-time maintenance request tracking</li>
+            <li><i class="fas fa-check text-green-500 mr-2"></i>Community discussion forums</li>
+            <li><i class="fas fa-check text-green-500 mr-2"></i>Automated notifications and reminders</li>
+            <li><i class="fas fa-check text-green-500 mr-2"></i>Mobile app integration</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="footer-placeholder"></footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
