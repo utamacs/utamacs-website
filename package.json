@@ -1,0 +1,17 @@
+{
+  "name": "utamacs-website",
+  "version": "1.0.0",
+  "description": "Urban Trilla Apartments Residents Association Website",
+  "main": "index.html",
+  "scripts": {
+    "build": "cp -r src/* dist/ && echo 'Build complete'",
+    "dev": "npx live-server src --port=3000",
+    "deploy": "npm run build && git add dist && git commit -m 'Deploy to GitHub Pages' && git push origin main"
+  },
+  "keywords": ["nonprofit", "association", "community", "tailwindcss"],
+  "author": "Urban Trilla Apartments Residents Association",
+  "license": "MIT",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
