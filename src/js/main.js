@@ -1,261 +1,467 @@
-// Main JavaScript file for the website
+/**
+ * Main JavaScript file for UTA MACS website
+ * Enhanced with accessibility, performance, and modern UX features
+ */
+
+// Global state management
+const AppState = {
+  theme: localStorage.getItem('theme') || 'light',
+  mobileMenuOpen: false,
+  componentsLoaded: false
+};
+
+// DOM Content Loaded
 document.addEventListener('DOMContentLoaded', function() {
-  // Load header and footer components
+  console.log('🚀 UTA MACS Website Initialized');
+
+  // Initialize core functionality
+  initializeComponents();
+  initializeTheme();
+  initializeMobileMenu();
+  initializeScrollEffects();
+  initializeAccessibility();
+  initializePerformance();
+
+  // Mark initialization complete
+  console.log('✅ All systems initialized');
+});
+
+/**
+ * Load and initialize header/footer components
+ */
+function initializeComponents() {
   loadComponent('header-placeholder', 'components/nav.html');
   loadComponent('footer-placeholder', 'components/footer.html');
 
-  // Theme toggle functionality
-  const themeToggle = document.getElementById('theme-toggle');
-  if (themeToggle) {
-    themeToggle.addEventListener('click', toggleTheme);
+  // Wait for components to load, then initialize dependent features
+  setTimeout(() => {
+    AppState.componentsLoaded = true;
+    initializePostLoadFeatures();
+  }, 100);
+}
+
+/**
+ * Features that require components to be loaded first
+ */
+function initializePostLoadFeatures() {
+  initializeNavigation();
+  initializeKeyboardNavigation();
+}
+
+/**
+ * Enhanced component loading with error handling
+ */
+function loadComponent(placeholderId, componentPath) {
+  const placeholder = document.getElementById(placeholderId);
+  if (!placeholder) {
+    console.warn(`Placeholder ${placeholderId} not found`);
+    return;
   }
 
-  // Mobile menu toggle
+  fetch(componentPath)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.text();
+    })
+    .then(html => {
+      placeholder.innerHTML = html;
+      placeholder.id = ''; // Remove placeholder ID
+
+      // Dispatch custom event for component loaded
+      const event = new CustomEvent('componentLoaded', {
+        detail: { id: placeholderId, path: componentPath }
+      });
+      document.dispatchEvent(event);
+    })
+    .catch(error => {
+      console.error(`Failed to load component ${componentPath}:`, error);
+      placeholder.innerHTML = `
+        <div class="text-center py-8 text-red-600">
+          <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+          <p>Failed to load component. Please refresh the page.</p>
+        </div>
+      `;
+    });
+}
+
+/**
+ * Theme management system
+ */
+function initializeTheme() {
+  const themeToggle = document.getElementById('theme-toggle');
+
+  // Apply saved theme
+  applyTheme(AppState.theme);
+
+  // Theme toggle event listener
+  if (themeToggle) {
+    themeToggle.addEventListener('click', function(e) {
+      e.preventDefault();
+      toggleTheme();
+    });
+
+    // Update toggle button icon
+    updateThemeToggleIcon();
+  }
+
+  // Listen for system theme changes
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (!localStorage.getItem('theme')) {
+      AppState.theme = e.matches ? 'dark' : 'light';
+      applyTheme(AppState.theme);
+    }
+  });
+}
+
+function toggleTheme() {
+  AppState.theme = AppState.theme === 'light' ? 'dark' : 'light';
+  localStorage.setItem('theme', AppState.theme);
+  applyTheme(AppState.theme);
+  updateThemeToggleIcon();
+
+  // Announce theme change to screen readers
+  announceToScreenReader(`Theme changed to ${AppState.theme} mode`);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+
+  if (theme === 'dark') {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+}
+
+function updateThemeToggleIcon() {
+  const themeToggle = document.getElementById('theme-toggle');
+  if (!themeToggle) return;
+
+  const icon = themeToggle.querySelector('i');
+  if (!icon) return;
+
+  if (AppState.theme === 'dark') {
+    icon.className = 'fas fa-sun text-lg';
+    themeToggle.setAttribute('aria-label', 'Switch to light mode');
+  } else {
+    icon.className = 'fas fa-moon text-lg';
+    themeToggle.setAttribute('aria-label', 'Switch to dark mode');
+  }
+}
+
+/**
+ * Enhanced mobile menu system
+ */
+function initializeMobileMenu() {
   const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
   const mobileMenu = document.getElementById('mobile-menu');
-  if (mobileMenuToggle && mobileMenu) {
-    mobileMenuToggle.addEventListener('click', function() {
-      mobileMenu.classList.toggle('hidden');
+  const mobileMenuClose = document.getElementById('mobile-menu-close');
+
+  if (!mobileMenuToggle || !mobileMenu) return;
+
+  // Toggle menu
+  mobileMenuToggle.addEventListener('click', function(e) {
+    e.preventDefault();
+    toggleMobileMenu();
+  });
+
+  // Close menu button
+  if (mobileMenuClose) {
+    mobileMenuClose.addEventListener('click', function(e) {
+      e.preventDefault();
+      closeMobileMenu();
     });
   }
 
-  // Smooth scrolling for anchor links
+  // Close on overlay click
+  mobileMenu.addEventListener('click', function(e) {
+    if (e.target === mobileMenu) {
+      closeMobileMenu();
+    }
+  });
+
+  // Close on escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && AppState.mobileMenuOpen) {
+      closeMobileMenu();
+    }
+  });
+
+  // Close on window resize (if desktop size)
+  window.addEventListener('resize', function() {
+    if (window.innerWidth >= 1024 && AppState.mobileMenuOpen) {
+      closeMobileMenu();
+    }
+  });
+}
+
+function toggleMobileMenu() {
+  if (AppState.mobileMenuOpen) {
+    closeMobileMenu();
+  } else {
+    openMobileMenu();
+  }
+}
+
+function openMobileMenu() {
+  const mobileMenu = document.getElementById('mobile-menu');
+  const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+
+  if (!mobileMenu || !mobileMenuToggle) return;
+
+  AppState.mobileMenuOpen = true;
+  mobileMenu.classList.remove('hidden');
+  mobileMenuToggle.setAttribute('aria-expanded', 'true');
+
+  // Prevent body scroll
+  document.body.style.overflow = 'hidden';
+
+  // Focus management
+  const firstFocusable = mobileMenu.querySelector('a, button');
+  if (firstFocusable) {
+    firstFocusable.focus();
+  }
+
+  // Announce to screen readers
+  announceToScreenReader('Mobile menu opened');
+}
+
+function closeMobileMenu() {
+  const mobileMenu = document.getElementById('mobile-menu');
+  const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+
+  if (!mobileMenu || !mobileMenuToggle) return;
+
+  AppState.mobileMenuOpen = false;
+  mobileMenu.classList.add('hidden');
+  mobileMenuToggle.setAttribute('aria-expanded', 'false');
+
+  // Restore body scroll
+  document.body.style.overflow = '';
+
+  // Return focus to toggle button
+  mobileMenuToggle.focus();
+
+  // Announce to screen readers
+  announceToScreenReader('Mobile menu closed');
+}
+
+/**
+ * Navigation enhancements
+ */
+function initializeNavigation() {
+  // Active link highlighting
+  updateActiveNavLink();
+
+  // Smooth scroll for anchor links
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-      e.preventDefault();
-      const target = document.querySelector(this.getAttribute('href'));
-      if (target) {
-        target.scrollIntoView({
-          behavior: 'smooth'
-        });
+    anchor.addEventListener('click', function(e) {
+      const href = this.getAttribute('href');
+
+      // Only prevent default for same-page anchors
+      if (href.startsWith('#')) {
+        e.preventDefault();
+        const target = document.querySelector(href);
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+
+          // Close mobile menu if open
+          if (AppState.mobileMenuOpen) {
+            closeMobileMenu();
+          }
+        }
       }
     });
   });
 
-  // Enhanced Intersection Observer for scroll animations
+  // Update active link on scroll
+  window.addEventListener('scroll', debounce(updateActiveNavLink, 100));
+}
+
+function updateActiveNavLink() {
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-link');
+
+  let current = '';
+
+  sections.forEach(section => {
+    const sectionTop = section.offsetTop;
+    const sectionHeight = section.clientHeight;
+
+    if (window.pageYOffset >= sectionTop - sectionHeight / 3) {
+      current = section.getAttribute('id');
+    }
+  });
+
+  navLinks.forEach(link => {
+    link.classList.remove('active');
+    const href = link.getAttribute('href');
+
+    if (href === `#${current}` || (href === 'index.html' && current === '')) {
+      link.classList.add('active');
+    }
+  });
+}
+
+/**
+ * Scroll effects and animations
+ */
+function initializeScrollEffects() {
+  // Intersection Observer for animations
   const observerOptions = {
     threshold: 0.1,
     rootMargin: '0px 0px -50px 0px'
   };
 
-  const observer = new IntersectionObserver(function(entries) {
+  const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        entry.target.classList.add('revealed');
-        entry.target.style.animationDelay = Math.random() * 0.3 + 's';
+        entry.target.classList.add('animate');
       }
     });
   }, observerOptions);
 
-  // Observe elements with scroll-reveal class
-  document.querySelectorAll('.scroll-reveal').forEach(el => {
+  // Observe all animate-on-scroll elements
+  document.querySelectorAll('.animate-on-scroll').forEach(el => {
     observer.observe(el);
   });
 
-  // Add floating particles to hero section
-  createFloatingParticles();
-
-  // Add morphing shapes to background
-  createMorphingShapes();
-
-  // Enhanced card hover effects
-  document.querySelectorAll('.card-hover').forEach(card => {
-    card.addEventListener('mouseenter', function() {
-      this.style.transform = 'translateY(-8px) scale(1.02)';
+  // Parallax effect for hero section (if exists)
+  const heroSection = document.querySelector('.section-hero');
+  if (heroSection) {
+    window.addEventListener('scroll', function() {
+      const scrolled = window.pageYOffset;
+      const rate = scrolled * -0.5;
+      heroSection.style.transform = `translateY(${rate}px)`;
     });
-
-    card.addEventListener('mouseleave', function() {
-      this.style.transform = 'translateY(0) scale(1)';
-    });
-  });
-
-  // Parallax effect for hero section
-  window.addEventListener('scroll', function() {
-    const scrolled = window.pageYOffset;
-    const hero = document.querySelector('.hero-section');
-    if (hero) {
-      hero.style.transform = `translateY(${scrolled * 0.5}px)`;
-    }
-  });
-
-  // Typing effect for hero text
-  const heroText = document.querySelector('.hero-text');
-  if (heroText) {
-    typeWriter(heroText, "Welcome to Urban Trilla Apartments Residents Association", 50);
   }
+}
 
-  // Counter animation for statistics
-  const counters = document.querySelectorAll('.counter');
-  counters.forEach(counter => {
-    const target = parseInt(counter.getAttribute('data-target'));
-    animateCounter(counter, target);
-  });
+/**
+ * Accessibility enhancements
+ */
+function initializeAccessibility() {
+  // Skip to main content link
+  const skipLink = document.createElement('a');
+  skipLink.href = '#main';
+  skipLink.className = 'sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary-600 text-white px-4 py-2 rounded z-50';
+  skipLink.textContent = 'Skip to main content';
+  document.body.insertBefore(skipLink, document.body.firstChild);
 
-  // Add shimmer effect to buttons on hover
-  document.querySelectorAll('.btn-modern').forEach(btn => {
-    btn.addEventListener('mouseenter', function() {
-      this.classList.add('shimmer-effect');
-    });
+  // Focus trap for mobile menu
+  document.addEventListener('keydown', function(e) {
+    if (!AppState.mobileMenuOpen) return;
 
-    btn.addEventListener('mouseleave', function() {
-      this.classList.remove('shimmer-effect');
-    });
-  });
+    const mobileMenu = document.getElementById('mobile-menu');
+    if (!mobileMenu) return;
 
-  // Enhanced mobile menu with slide animation
-  const mobileMenuLinks = document.querySelectorAll('#mobile-menu a');
-  mobileMenuLinks.forEach(link => {
-    link.addEventListener('click', function() {
-      mobileMenu.classList.add('hidden');
-    });
-  });
+    const focusableElements = mobileMenu.querySelectorAll('a, button, input, select, textarea');
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
 
-  // Add loading animation for page transitions
-  document.querySelectorAll('a:not([href^="#"])').forEach(link => {
-    link.addEventListener('click', function(e) {
-      if (!e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        document.body.classList.add('page-transition');
-        setTimeout(() => {
-          window.location.href = this.href;
-        }, 300);
-      }
-    });
-  });
-});
-
-// Function to load HTML components
-function loadComponent(placeholderId, componentPath) {
-  fetch(componentPath)
-    .then(response => response.text())
-    .then(data => {
-      document.getElementById(placeholderId).innerHTML = data;
-      // Re-initialize theme toggle after loading nav
-      if (componentPath.includes('nav.html')) {
-        const themeToggle = document.getElementById('theme-toggle');
-        if (themeToggle) {
-          themeToggle.addEventListener('click', toggleTheme);
+    if (e.key === 'Tab') {
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          lastElement.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          firstElement.focus();
+          e.preventDefault();
         }
       }
-    })
-    .catch(error => console.error('Error loading component:', error));
+    }
+  });
 }
 
-// Theme toggle function with enhanced animation
-function toggleTheme() {
-  document.documentElement.classList.toggle('dark');
-  const themeIcon = document.querySelector('#theme-toggle i');
-  if (themeIcon) {
-    themeIcon.style.transform = 'rotate(360deg)';
-    setTimeout(() => {
-      if (document.documentElement.classList.contains('dark')) {
-        themeIcon.className = 'fas fa-sun';
-      } else {
-        themeIcon.className = 'fas fa-moon';
+function initializeKeyboardNavigation() {
+  // Enhanced keyboard navigation for custom components
+  document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + / for search (if search exists)
+    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+      const searchInput = document.querySelector('input[type="search"], input[placeholder*="search" i]');
+      if (searchInput) {
+        e.preventDefault();
+        searchInput.focus();
       }
-      themeIcon.style.transform = 'rotate(0deg)';
-    }, 150);
-  }
-  // Save theme preference to localStorage
-  localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-}
-
-// Load saved theme on page load
-if (localStorage.getItem('theme') === 'dark') {
-  document.documentElement.classList.add('dark');
-}
-
-// Create floating particles for hero section
-function createFloatingParticles() {
-  const hero = document.querySelector('.hero-section');
-  if (!hero) return;
-
-  const particlesContainer = document.createElement('div');
-  particlesContainer.className = 'particles';
-  hero.appendChild(particlesContainer);
-
-  for (let i = 0; i < 20; i++) {
-    const particle = document.createElement('div');
-    particle.className = 'particle';
-    particle.style.left = Math.random() * 100 + '%';
-    particle.style.top = Math.random() * 100 + '%';
-    particle.style.animationDelay = Math.random() * 6 + 's';
-    particle.style.animationDuration = (Math.random() * 4 + 4) + 's';
-    particlesContainer.appendChild(particle);
-  }
-}
-
-// Create morphing shapes for background
-function createMorphingShapes() {
-  const body = document.body;
-  for (let i = 0; i < 3; i++) {
-    const shape = document.createElement('div');
-    shape.className = 'morphing-shape';
-    shape.style.position = 'fixed';
-    shape.style.width = '200px';
-    shape.style.height = '200px';
-    shape.style.borderRadius = '50%';
-    shape.style.left = Math.random() * 80 + '%';
-    shape.style.top = Math.random() * 80 + '%';
-    shape.style.zIndex = '-1';
-    shape.style.opacity = '0.1';
-    shape.style.animationDelay = i * 2 + 's';
-    body.appendChild(shape);
-  }
-}
-
-// Typewriter effect
-function typeWriter(element, text, speed) {
-  let i = 0;
-  element.textContent = '';
-  function type() {
-    if (i < text.length) {
-      element.textContent += text.charAt(i);
-      i++;
-      setTimeout(type, speed);
     }
-  }
-  type();
+  });
 }
 
-// Counter animation
-function animateCounter(element, target) {
-  let current = 0;
-  const increment = target / 100;
-  const timer = setInterval(() => {
-    current += increment;
-    if (current >= target) {
-      element.textContent = target;
-      clearInterval(timer);
-    } else {
-      element.textContent = Math.floor(current);
-    }
-  }, 30);
+/**
+ * Performance optimizations
+ */
+function initializePerformance() {
+  // Lazy load images
+  const images = document.querySelectorAll('img[data-src]');
+  if ('IntersectionObserver' in window) {
+    const imageObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          img.src = img.dataset.src;
+          img.classList.remove('lazy');
+          imageObserver.unobserve(img);
+        }
+      });
+    });
+
+    images.forEach(img => imageObserver.observe(img));
+  }
+
+  // Preload critical resources
+  const criticalResources = [
+    'css/styles.css',
+    'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
+  ];
+
+  criticalResources.forEach(resource => {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.href = resource;
+    link.as = 'style';
+    document.head.appendChild(link);
+  });
 }
 
-// Add page transition styles
-const style = document.createElement('style');
-style.textContent = `
-  .page-transition {
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
+/**
+ * Utility functions
+ */
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
-  @keyframes morph {
-    0%, 100% { border-radius: 50%; transform: scale(1); }
-    25% { border-radius: 25%; transform: scale(1.1); }
-    50% { border-radius: 0%; transform: scale(0.9); }
-    75% { border-radius: 75%; transform: scale(1.05); }
-  }
+function announceToScreenReader(message) {
+  const announcement = document.createElement('div');
+  announcement.setAttribute('aria-live', 'polite');
+  announcement.setAttribute('aria-atomic', 'true');
+  announcement.className = 'sr-only';
+  announcement.textContent = message;
 
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
-  }
+  document.body.appendChild(announcement);
 
-  @keyframes shimmer {
-    0% { left: -100%; }
-    100% { left: 100%; }
-  }
-`;
-document.head.appendChild(style);
+  setTimeout(() => {
+    document.body.removeChild(announcement);
+  }, 1000);
+}
+
+// Export for potential use in other scripts
+window.UTAMACS = {
+  toggleTheme,
+  toggleMobileMenu,
+  announceToScreenReader
+};
