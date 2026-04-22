@@ -1,25 +1,22 @@
 {
   "name": "utamacs-website",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Urban Trilla Apartments Residents Association Website",
-  "main": "index.html",
+  "type": "module",
   "scripts": {
-    "build": "cp -r src/* dist/ && echo 'Build complete'",
-    "dev": "npx live-server src --port=3000",
-    "deploy": "npm run build && git add dist && git commit -m 'Deploy to GitHub Pages' && git push origin main"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
   },
-  "keywords": [
-    "nonprofit",
-    "association",
-    "community",
-    "tailwindcss"
-  ],
-  "author": "Urban Trilla Apartments Residents Association",
-  "license": "MIT",
   "devDependencies": {
-    "autoprefixer": "^10.5.0",
-    "live-server": "^1.2.2",
-    "postcss": "^8.5.10",
-    "tailwindcss": "^3.4.4"
-  }
+    "@astrojs/tailwind": "^5.1.0",
+    "astro": "^4.16.0",
+    "autoprefixer": "^10.4.20",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.5.0"
+  },
+  "keywords": ["nonprofit", "association", "community", "tailwindcss"],
+  "author": "Urban Trilla Apartments Residents Association",
+  "license": "MIT"
 }

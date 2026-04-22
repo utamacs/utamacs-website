@@ -1,0 +1,135 @@
+---
+const quickLinks = [
+  { href: '/about', label: 'About Us' },
+  { href: '/committee', label: 'Committee' },
+  { href: '/notices', label: 'Notices' },
+  { href: '/events', label: 'Events' },
+];
+
+const resourceLinks = [
+  { href: '/downloads', label: 'Downloads' },
+  { href: '/contact', label: 'Contact' },
+  { href: '/portal', label: 'Member Portal' },
+  { href: '/login', label: 'Login' },
+];
+---
+<footer class="bg-text-primary text-white" role="contentinfo">
+  <div class="container-custom py-16">
+    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-10">
+      <!-- Brand Column -->
+      <div class="lg:col-span-1">
+        <div class="flex items-center space-x-2 mb-4">
+          <i class="fas fa-building text-secondary-400 text-2xl" aria-hidden="true"></i>
+          <span class="text-card-lg font-bold text-white">UTA MACS</span>
+        </div>
+        <p class="text-small text-white/70 leading-relaxed mb-6">
+          Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited.
+          Building a stronger community in Kondakal, Telangana.
+        </p>
+        <div class="flex space-x-4">
+          <a
+            href="#"
+            class="w-9 h-9 bg-white/10 hover:bg-secondary-500 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+            aria-label="Facebook"
+          >
+            <i class="fab fa-facebook-f text-sm" aria-hidden="true"></i>
+          </a>
+          <a
+            href="#"
+            class="w-9 h-9 bg-white/10 hover:bg-secondary-500 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+            aria-label="Twitter"
+          >
+            <i class="fab fa-twitter text-sm" aria-hidden="true"></i>
+          </a>
+          <a
+            href="#"
+            class="w-9 h-9 bg-white/10 hover:bg-secondary-500 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+            aria-label="Instagram"
+          >
+            <i class="fab fa-instagram text-sm" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+
+      <!-- Quick Links -->
+      <div>
+        <h3 class="text-body font-semibold text-white mb-5 uppercase tracking-wide">Quick Links</h3>
+        <ul class="space-y-3">
+          {quickLinks.map(({ href, label }) => (
+            <li>
+              <a
+                href={href}
+                class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"
+              >
+                <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i>
+                <span>{label}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <!-- Resources -->
+      <div>
+        <h3 class="text-body font-semibold text-white mb-5 uppercase tracking-wide">Resources</h3>
+        <ul class="space-y-3">
+          {resourceLinks.map(({ href, label }) => (
+            <li>
+              <a
+                href={href}
+                class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"
+              >
+                <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i>
+                <span>{label}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <!-- Contact -->
+      <div>
+        <h3 class="text-body font-semibold text-white mb-5 uppercase tracking-wide">Contact Us</h3>
+        <ul class="space-y-4">
+          <li class="flex items-start space-x-3">
+            <i class="fas fa-envelope text-secondary-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+            <a
+              href="mailto:urbantrillaresidents@gmail.com"
+              class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 break-all"
+            >
+              urbantrillaresidents@gmail.com
+            </a>
+          </li>
+          <li class="flex items-start space-x-3">
+            <i class="fas fa-phone text-secondary-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+            <span class="text-small text-white/70">+91 XXXXX XXXXX</span>
+          </li>
+          <li class="flex items-start space-x-3">
+            <i class="fas fa-map-marker-alt text-secondary-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+            <address class="text-small text-white/70 not-italic leading-relaxed">
+              Kondakal, Shankarpalle,<br />
+              Ranga Reddy District,<br />
+              Telangana 501203
+            </address>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Bottom -->
+  <div class="border-t border-white/10">
+    <div class="container-custom py-6">
+      <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <p class="text-small text-white/60 text-center sm:text-left">
+          © 2026 UTA MACS — Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited. All rights reserved.
+        </p>
+        <div class="flex space-x-6">
+          <a href="#" class="text-small text-white/60 hover:text-white transition-colors duration-200">Privacy Policy</a>
+          <a href="#" class="text-small text-white/60 hover:text-white transition-colors duration-200">Terms of Service</a>
+          <a href="#" class="text-small text-white/60 hover:text-white transition-colors duration-200">Accessibility</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>

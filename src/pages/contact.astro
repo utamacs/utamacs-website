@@ -1,0 +1,189 @@
+---
+import Layout from '@components/layout/Layout.astro';
+import SectionHero from '@components/ui/SectionHero.astro';
+import SectionHeader from '@components/ui/SectionHeader.astro';
+import FAQAccordion from '@components/ui/FAQAccordion.astro';
+
+const faqs = [
+  {
+    question: 'How do I pay my maintenance dues?',
+    answer: 'Maintenance dues can be paid via bank transfer to the association account. Details are shared via notice each quarter. You can also pay in person at the association office during working hours (Mon–Sat, 10 AM – 6 PM).',
+  },
+  {
+    question: 'How do I raise a maintenance complaint?',
+    answer: 'You can raise a complaint by emailing urbantrillaresidents@gmail.com with the subject "Maintenance Request – [your flat number]". Alternatively, call the maintenance helpline or use the complaint box at the main gate.',
+  },
+  {
+    question: 'How can I register a new vehicle?',
+    answer: 'Vehicle registration forms are available at the security gate or can be downloaded from the Downloads section. Submit the completed form along with a copy of your RC book to the association office.',
+  },
+  {
+    question: 'How do I get a visitor pass?',
+    answer: 'Visitor passes for extended stays (more than 3 days) must be requested from the security office or via email. Daily visitors are handled directly at the gate with ID proof.',
+  },
+  {
+    question: 'When are committee meetings held?',
+    answer: 'The committee meets on the first Saturday of every month at 7 PM in the Community Hall. Residents are welcome to attend and raise issues during the open session at the start of each meeting.',
+  },
+  {
+    question: 'How can I participate in the Annual General Meeting?',
+    answer: 'All registered flat owners are eligible to attend the AGM. Notices with the date, time, and agenda are sent at least 21 days in advance via email and physical notice boards.',
+  },
+];
+---
+<Layout
+  title="Contact Us – UTA MACS"
+  description="Get in touch with the UTA MACS committee. Find our contact information, office hours, and location."
+>
+  <SectionHero
+    title="Contact Us"
+    subtitle="We're here to help. Reach out to the committee for any queries or concerns."
+  />
+
+  <!-- Contact info + form -->
+  <section class="section">
+    <div class="container-custom">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <!-- Contact info -->
+        <div class="animate-on-scroll">
+          <h2 class="text-section font-bold text-text-primary mb-6">Get in Touch</h2>
+
+          <div class="space-y-5 mb-8">
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-envelope text-primary-600" aria-hidden="true"></i>
+              </div>
+              <div>
+                <p class="text-small font-semibold text-text-primary mb-0.5">Email</p>
+                <a href="mailto:urbantrillaresidents@gmail.com" class="text-small text-primary-600 hover:underline break-all">
+                  urbantrillaresidents@gmail.com
+                </a>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 bg-secondary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-map-marker-alt text-secondary-600" aria-hidden="true"></i>
+              </div>
+              <div>
+                <p class="text-small font-semibold text-text-primary mb-0.5">Address</p>
+                <p class="text-small text-text-secondary leading-relaxed">
+                  Survey Number 425/2/1, Kondakal Village,<br />
+                  Rajendranagar Mandal, Ranga Reddy District,<br />
+                  Hyderabad – 500086, Telangana
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 bg-accent-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-clock text-accent-700" aria-hidden="true"></i>
+              </div>
+              <div>
+                <p class="text-small font-semibold text-text-primary mb-0.5">Office Hours</p>
+                <p class="text-small text-text-secondary">Monday – Saturday: 10:00 AM – 6:00 PM</p>
+                <p class="text-small text-text-secondary">Sunday: Closed</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Map placeholder -->
+          <div class="w-full h-48 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl flex items-center justify-center border border-border-light">
+            <div class="text-center">
+              <i class="fas fa-map text-3xl text-primary-400 mb-2 block" aria-hidden="true"></i>
+              <p class="text-small text-text-secondary">Map coming soon</p>
+              <a
+                href="https://maps.google.com/?q=Kondakal+Village+Ranga+Reddy+Hyderabad"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-small text-primary-600 hover:underline mt-1 block"
+              >
+                Open in Google Maps
+                <i class="fas fa-external-link-alt ml-1 text-xs" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact form -->
+        <div class="animate-on-scroll" style="transition-delay: 0.15s;">
+          <div class="card-premium">
+            <h3 class="text-card font-semibold text-text-primary mb-6">Send a Message</h3>
+            <form class="space-y-5" novalidate id="contact-form">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="name" class="form-label">Full Name <span class="text-red-500" aria-hidden="true">*</span></label>
+                  <input type="text" id="name" name="name" class="form-input" placeholder="Your name" required autocomplete="name" />
+                </div>
+                <div>
+                  <label for="flat" class="form-label">Flat Number</label>
+                  <input type="text" id="flat" name="flat" class="form-input" placeholder="e.g. A-304" autocomplete="off" />
+                </div>
+              </div>
+              <div>
+                <label for="contact-email" class="form-label">Email <span class="text-red-500" aria-hidden="true">*</span></label>
+                <input type="email" id="contact-email" name="email" class="form-input" placeholder="you@example.com" required autocomplete="email" />
+              </div>
+              <div>
+                <label for="subject" class="form-label">Subject <span class="text-red-500" aria-hidden="true">*</span></label>
+                <select id="subject" name="subject" class="form-input" required>
+                  <option value="" disabled selected>Select a topic</option>
+                  <option value="Maintenance">Maintenance Complaint</option>
+                  <option value="Financial">Financial / Dues Query</option>
+                  <option value="Events">Events & Activities</option>
+                  <option value="Security">Security Concern</option>
+                  <option value="General">General Enquiry</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label for="message" class="form-label">Message <span class="text-red-500" aria-hidden="true">*</span></label>
+                <textarea
+                  id="message"
+                  name="message"
+                  rows="5"
+                  class="form-input resize-none"
+                  placeholder="Describe your query or concern..."
+                  required
+                ></textarea>
+              </div>
+              <button type="submit" class="btn-primary w-full justify-center py-3">
+                <i class="fas fa-paper-plane mr-2" aria-hidden="true"></i>
+                Send Message
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section bg-section-alt">
+    <div class="container-custom">
+      <SectionHeader
+        title="Frequently Asked Questions"
+        subtitle="Answers to common queries from UTA MACS residents."
+        centered={true}
+      />
+      <FAQAccordion items={faqs} />
+    </div>
+  </section>
+</Layout>
+
+<script>
+  const form = document.getElementById('contact-form') as HTMLFormElement;
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+    btn.textContent = 'Message Sent!';
+    btn.disabled = true;
+    btn.classList.add('opacity-75');
+    setTimeout(() => {
+      btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Send Message';
+      btn.disabled = false;
+      btn.classList.remove('opacity-75');
+      form.reset();
+    }, 3000);
+  });
+</script>

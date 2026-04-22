@@ -1,0 +1,181 @@
+---
+import Layout from '@components/layout/Layout.astro';
+import SectionHero from '@components/ui/SectionHero.astro';
+import SectionHeader from '@components/ui/SectionHeader.astro';
+
+const timeline = [
+  {
+    year: '2015',
+    title: 'Foundation',
+    description: 'UTA MACS was officially registered as a Mutually Aided Cooperative Society under the Telangana MACS Act, bringing together the first 100 families.',
+  },
+  {
+    year: '2018',
+    title: 'Infrastructure Growth',
+    description: 'Major upgrades including installation of CCTV surveillance, 24/7 security, community hall renovation, and establishment of the maintenance fund.',
+  },
+  {
+    year: '2021',
+    title: 'Digital Transformation',
+    description: 'Launched the community website, introduced digital notice boards, online payment tracking, and streamlined communication channels.',
+  },
+  {
+    year: '2024',
+    title: 'New Milestones',
+    description: 'Crossed 500 family milestone, upgraded common area facilities, planted 200 trees as part of the green initiative, and launched resident portal development.',
+  },
+];
+
+const values = [
+  {
+    icon: 'fa-handshake',
+    title: 'Transparency',
+    description: 'We publish all financial statements, meeting minutes, and decisions openly so every resident is fully informed.',
+    colorBg: 'bg-primary-100',
+    colorIcon: 'text-primary-600',
+  },
+  {
+    icon: 'fa-heart',
+    title: 'Community First',
+    description: 'Every decision is made with the collective well-being of all 500+ families in mind — not individual interests.',
+    colorBg: 'bg-secondary-100',
+    colorIcon: 'text-secondary-600',
+  },
+  {
+    icon: 'fa-star',
+    title: 'Excellence',
+    description: 'We strive for the highest standards in maintenance, security, and community services that residents deserve.',
+    colorBg: 'bg-accent-100',
+    colorIcon: 'text-accent-700',
+  },
+];
+---
+<Layout
+  title="About Us – UTA MACS"
+  description="Learn about UTA MACS — our history, mission, values, and the community we've built together at Kondakal, Hyderabad."
+>
+  <SectionHero
+    title="About UTA MACS"
+    subtitle="Building a community where every resident feels safe, heard, and at home."
+  />
+
+  <!-- Mission & Vision -->
+  <section class="section">
+    <div class="container-custom">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div class="animate-on-scroll">
+          <span class="text-small font-semibold text-primary-600 uppercase tracking-wide mb-3 block">Who We Are</span>
+          <h2 class="text-section font-bold text-text-primary mb-6 leading-tight">
+            Urban Trilla Apartment<br />
+            <span class="text-primary-600">Mutually Aided Cooperative Society</span>
+          </h2>
+          <p class="text-body text-text-secondary leading-relaxed mb-4">
+            UTA MACS is the resident welfare association for the Urban Trilla Apartment complex located at Survey Number 425/2/1, Kondakal Village, Rajendranagar Mandal, Ranga Reddy District, Hyderabad — 500086.
+          </p>
+          <p class="text-body text-text-secondary leading-relaxed mb-6">
+            Registered under the Telangana Mutually Aided Cooperative Societies Act, we are a democratic, resident-led organization that manages the maintenance, security, and community development of our 500+ family complex.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-4">
+            <a href="/committee" class="btn-primary px-6 py-3">
+              <i class="fas fa-users mr-2" aria-hidden="true"></i>
+              Meet the Committee
+            </a>
+            <a href="/contact" class="btn-outline px-6 py-3">
+              <i class="fas fa-envelope mr-2" aria-hidden="true"></i>
+              Get in Touch
+            </a>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 animate-on-scroll" style="transition-delay: 0.15s;">
+          {[
+            { icon: 'fa-home', number: '500+', label: 'Families' },
+            { icon: 'fa-leaf', number: '15+', label: 'Acres' },
+            { icon: 'fa-building', number: '8', label: 'Blocks' },
+            { icon: 'fa-star', number: '10+', label: 'Amenities' },
+          ].map(stat => (
+            <div class="card-premium text-center">
+              <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <i class={`fas ${stat.icon} text-primary-600`} aria-hidden="true"></i>
+              </div>
+              <p class="text-2xl font-bold text-primary-600">{stat.number}</p>
+              <p class="text-small text-text-secondary">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Values -->
+  <section class="section bg-section-alt">
+    <div class="container-custom">
+      <SectionHeader
+        title="Our Core Values"
+        subtitle="The principles that guide every decision we make."
+        centered={true}
+      />
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {values.map((value, i) => (
+          <div class="card-premium animate-on-scroll text-center" style={`transition-delay: ${i * 0.1}s`}>
+            <div class={`w-16 h-16 ${value.colorBg} rounded-2xl flex items-center justify-center mx-auto mb-5`}>
+              <i class={`fas ${value.icon} text-2xl ${value.colorIcon}`} aria-hidden="true"></i>
+            </div>
+            <h3 class="text-card font-semibold text-text-primary mb-3">{value.title}</h3>
+            <p class="text-small text-text-secondary leading-relaxed">{value.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Timeline -->
+  <section class="section">
+    <div class="container-custom">
+      <SectionHeader
+        title="Our Journey"
+        subtitle="Key milestones in the growth of our community."
+        centered={true}
+      />
+      <div class="max-w-3xl mx-auto">
+        {timeline.map((item, i) => (
+          <div class="flex gap-6 mb-8 animate-on-scroll" style={`transition-delay: ${i * 0.1}s`}>
+            <div class="flex flex-col items-center">
+              <div class="w-14 h-14 bg-primary-600 text-white rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0">
+                {item.year}
+              </div>
+              {i < timeline.length - 1 && (
+                <div class="w-0.5 flex-1 bg-border-light mt-2"></div>
+              )}
+            </div>
+            <div class="pb-8">
+              <h3 class="text-card font-semibold text-text-primary mb-2">{item.title}</h3>
+              <p class="text-small text-text-secondary leading-relaxed">{item.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Downloads CTA -->
+  <section class="section bg-section-alt">
+    <div class="container-custom">
+      <div class="max-w-2xl mx-auto text-center animate-on-scroll">
+        <h2 class="text-section font-bold text-text-primary mb-4">Official Documents</h2>
+        <p class="text-body text-text-secondary mb-8">
+          Access our bylaws, financial reports, and other official documents in the downloads section.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a href="/downloads" class="btn-primary px-8 py-3">
+            <i class="fas fa-download mr-2" aria-hidden="true"></i>
+            View Documents
+          </a>
+          <a href="/notices" class="btn-outline px-8 py-3">
+            <i class="fas fa-bell mr-2" aria-hidden="true"></i>
+            Latest Notices
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>

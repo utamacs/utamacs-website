@@ -1,0 +1,102 @@
+---
+import Layout from '@components/layout/Layout.astro';
+import SectionHero from '@components/ui/SectionHero.astro';
+import SectionHeader from '@components/ui/SectionHeader.astro';
+import EventCard from '@components/ui/EventCard.astro';
+import { events } from '@data/events';
+
+const upcomingEvents = events.filter(e => !e.isPast);
+const pastEvents = events.filter(e => e.isPast);
+---
+<Layout
+  title="Events – UTA MACS"
+  description="Stay updated on upcoming community events, activities, and past highlights from UTA MACS."
+>
+  <SectionHero
+    title="Events & Activities"
+    subtitle="Bringing the community together through meaningful events and celebrations."
+  />
+
+  <!-- Upcoming Events -->
+  <section class="section">
+    <div class="container-custom">
+      <SectionHeader
+        title="Upcoming Events"
+        subtitle="Don't miss out on these exciting upcoming community events."
+        centered={true}
+      />
+
+      {upcomingEvents.length > 0 ? (
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {upcomingEvents.map((event, i) => (
+            <EventCard {...event} animationDelay={`${i * 0.1}s`} />
+          ))}
+        </div>
+      ) : (
+        <div class="text-center py-16 animate-on-scroll">
+          <i class="fas fa-calendar text-4xl text-text-secondary mb-4 block" aria-hidden="true"></i>
+          <h3 class="text-card font-semibold text-text-primary mb-2">No upcoming events</h3>
+          <p class="text-small text-text-secondary">Check back soon for new events.</p>
+        </div>
+      )}
+    </div>
+  </section>
+
+  <!-- Photo Gallery placeholder -->
+  <section class="section bg-section-alt">
+    <div class="container-custom">
+      <SectionHeader
+        title="Event Highlights"
+        subtitle="Glimpses of memorable moments from our community gatherings."
+        centered={true}
+      />
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-on-scroll">
+        {Array(8).fill(null).map((_, i) => (
+          <div class="aspect-square bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl flex items-center justify-center overflow-hidden group">
+            <i class="fas fa-image text-3xl text-primary-300 group-hover:scale-110 transition-transform duration-300" aria-hidden="true"></i>
+          </div>
+        ))}
+      </div>
+      <p class="text-center text-small text-text-secondary mt-6 animate-on-scroll" style="transition-delay: 0.1s;">
+        Photos from recent community events will be published here.
+      </p>
+    </div>
+  </section>
+
+  <!-- Past Events -->
+  {pastEvents.length > 0 && (
+    <section class="section">
+      <div class="container-custom">
+        <SectionHeader
+          title="Past Events"
+          subtitle="Memorable moments from previous community gatherings."
+          centered={true}
+        />
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {pastEvents.map((event, i) => (
+            <EventCard {...event} animationDelay={`${i * 0.1}s`} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- Suggest event CTA -->
+  <section class="section bg-section-alt">
+    <div class="container-custom">
+      <div class="max-w-xl mx-auto text-center animate-on-scroll">
+        <div class="w-14 h-14 bg-secondary-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+          <i class="fas fa-lightbulb text-2xl text-secondary-600" aria-hidden="true"></i>
+        </div>
+        <h2 class="text-section font-bold text-text-primary mb-3">Have an Event Idea?</h2>
+        <p class="text-body text-text-secondary mb-6">
+          We love hearing from residents. Share your event ideas with our Events Coordinator.
+        </p>
+        <a href="/contact" class="btn-primary px-8 py-3">
+          <i class="fas fa-paper-plane mr-2" aria-hidden="true"></i>
+          Suggest an Event
+        </a>
+      </div>
+    </div>
+  </section>
+</Layout>

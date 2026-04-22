@@ -1,0 +1,27 @@
+---
+import Layout from '@components/layout/Layout.astro';
+---
+<Layout title="Page Not Found – UTA MACS" description="The page you are looking for could not be found.">
+  <section class="min-h-[70vh] flex items-center justify-center">
+    <div class="container-custom text-center py-20">
+      <div class="w-24 h-24 bg-primary-100 rounded-3xl flex items-center justify-center mx-auto mb-8">
+        <i class="fas fa-map-marker-slash text-4xl text-primary-600" aria-hidden="true"></i>
+      </div>
+      <h1 class="text-6xl font-bold text-primary-600 mb-4">404</h1>
+      <h2 class="text-2xl font-semibold text-text-primary mb-4">Page Not Found</h2>
+      <p class="text-body text-text-secondary max-w-md mx-auto mb-10">
+        The page you're looking for doesn't exist or has been moved. Let's get you back on track.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="/" class="btn-primary px-8 py-3">
+          <i class="fas fa-home mr-2" aria-hidden="true"></i>
+          Go to Homepage
+        </a>
+        <a href="/contact" class="btn-outline px-8 py-3">
+          <i class="fas fa-envelope mr-2" aria-hidden="true"></i>
+          Contact Us
+        </a>
+      </div>
+    </div>
+  </section>
+</Layout>

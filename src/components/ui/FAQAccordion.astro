@@ -1,0 +1,66 @@
+---
+interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+interface Props {
+  items: FAQItem[];
+}
+
+const { items } = Astro.props;
+---
+<div class="max-w-3xl mx-auto space-y-4">
+  {items.map((item, index) => (
+    <div class="border border-border-light rounded-xl overflow-hidden shadow-soft">
+      <button
+        class="faq-trigger w-full px-6 py-5 text-left font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-inset flex items-center justify-between hover:bg-primary-50 transition-colors duration-200 bg-background"
+        aria-expanded="false"
+        aria-controls={`faq-answer-${index}`}
+        type="button"
+        id={`faq-trigger-${index}`}
+      >
+        <span class="text-body font-semibold pr-4">{item.question}</span>
+        <i class="fas fa-chevron-down text-primary-600 flex-shrink-0 transition-transform duration-300" aria-hidden="true"></i>
+      </button>
+      <div
+        id={`faq-answer-${index}`}
+        class="faq-answer px-6 overflow-hidden bg-background"
+        style="max-height: 0; transition: max-height 0.35s ease, padding 0.35s ease;"
+        role="region"
+        aria-labelledby={`faq-trigger-${index}`}
+      >
+        <p class="text-body text-text-secondary leading-relaxed pb-5">{item.answer}</p>
+      </div>
+    </div>
+  ))}
+</div>
+
+<script>
+  document.querySelectorAll('.faq-trigger').forEach((trigger) => {
+    trigger.addEventListener('click', () => {
+      const isExpanded = trigger.getAttribute('aria-expanded') === 'true';
+      const answerId = trigger.getAttribute('aria-controls')!;
+      const answer = document.getElementById(answerId) as HTMLElement;
+      const icon = trigger.querySelector('i');
+
+      // Close all others
+      document.querySelectorAll('.faq-trigger').forEach((otherTrigger) => {
+        if (otherTrigger !== trigger) {
+          otherTrigger.setAttribute('aria-expanded', 'false');
+          const otherId = otherTrigger.getAttribute('aria-controls')!;
+          const otherAnswer = document.getElementById(otherId) as HTMLElement;
+          if (otherAnswer) otherAnswer.style.maxHeight = '0';
+          otherTrigger.querySelector('i')?.classList.remove('rotate-180');
+        }
+      });
+
+      // Toggle this one
+      trigger.setAttribute('aria-expanded', String(!isExpanded));
+      if (answer) {
+        answer.style.maxHeight = isExpanded ? '0' : answer.scrollHeight + 'px';
+      }
+      icon?.classList.toggle('rotate-180', !isExpanded);
+    });
+  });
+</script>

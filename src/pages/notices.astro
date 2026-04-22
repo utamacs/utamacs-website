@@ -1,0 +1,118 @@
+---
+import Layout from '@components/layout/Layout.astro';
+import SectionHero from '@components/ui/SectionHero.astro';
+import SectionHeader from '@components/ui/SectionHeader.astro';
+import NoticeCard from '@components/ui/NoticeCard.astro';
+import { notices } from '@data/notices';
+import type { NoticeCategory } from '@data/notices';
+
+const categories: ('All' | NoticeCategory)[] = ['All', 'Important', 'Financial', 'Maintenance', 'Events', 'General'];
+---
+<Layout
+  title="Notices – UTA MACS"
+  description="Stay informed with the latest notices, announcements, and updates from UTA MACS."
+>
+  <SectionHero
+    title="Notices & Announcements"
+    subtitle="Important updates, maintenance schedules, and community announcements."
+  />
+
+  <section class="section">
+    <div class="container-custom">
+      <!-- Filter bar -->
+      <div class="flex flex-wrap gap-3 justify-center mb-10 animate-on-scroll">
+        {categories.map(cat => (
+          <button
+            type="button"
+            class="notice-filter px-4 py-2 rounded-full text-small font-semibold border transition-all duration-200"
+            class:list={[
+              cat === 'All'
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-background text-text-secondary border-border-light hover:border-primary-400 hover:text-primary-600',
+            ]}
+            data-filter={cat}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      <!-- Search -->
+      <div class="max-w-md mx-auto mb-10 animate-on-scroll" style="transition-delay: 0.1s;">
+        <div class="relative">
+          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
+          <input
+            type="search"
+            id="notice-search"
+            class="form-input pl-11"
+            placeholder="Search notices..."
+            aria-label="Search notices"
+          />
+        </div>
+      </div>
+
+      <!-- Notice grid -->
+      <div id="notices-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {notices.map((notice, i) => (
+          <div class="notice-item" data-category={notice.category}>
+            <NoticeCard {...notice} animationDelay={`${i * 0.05}s`} />
+          </div>
+        ))}
+      </div>
+
+      <!-- Empty state -->
+      <div id="no-results" class="hidden text-center py-16">
+        <i class="fas fa-search text-4xl text-text-secondary mb-4 block" aria-hidden="true"></i>
+        <h3 class="text-card font-semibold text-text-primary mb-2">No notices found</h3>
+        <p class="text-small text-text-secondary">Try a different filter or search term.</p>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  const filterButtons = document.querySelectorAll<HTMLButtonElement>('.notice-filter');
+  const noticeItems = document.querySelectorAll<HTMLElement>('.notice-item');
+  const searchInput = document.getElementById('notice-search') as HTMLInputElement;
+  const noResults = document.getElementById('no-results')!;
+
+  let activeFilter = 'All';
+
+  function applyFilters() {
+    const query = searchInput.value.toLowerCase().trim();
+    let visible = 0;
+
+    noticeItems.forEach(item => {
+      const category = item.dataset.category ?? '';
+      const text = item.textContent?.toLowerCase() ?? '';
+      const matchesFilter = activeFilter === 'All' || category === activeFilter;
+      const matchesSearch = !query || text.includes(query);
+
+      if (matchesFilter && matchesSearch) {
+        item.classList.remove('hidden');
+        visible++;
+      } else {
+        item.classList.add('hidden');
+      }
+    });
+
+    noResults.classList.toggle('hidden', visible > 0);
+  }
+
+  filterButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeFilter = btn.dataset.filter ?? 'All';
+
+      filterButtons.forEach(b => {
+        b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
+        b.classList.add('bg-background', 'text-text-secondary', 'border-border-light');
+      });
+      btn.classList.add('bg-primary-600', 'text-white', 'border-primary-600');
+      btn.classList.remove('bg-background', 'text-text-secondary', 'border-border-light');
+
+      applyFilters();
+    });
+  });
+
+  searchInput.addEventListener('input', applyFilters);
+</script>

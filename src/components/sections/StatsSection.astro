@@ -1,0 +1,55 @@
+---
+import StatCard from '@components/ui/StatCard.astro';
+import SectionHeader from '@components/ui/SectionHeader.astro';
+
+const stats = [
+  {
+    number: '500+',
+    label: 'Happy Families',
+    icon: 'fa-home',
+    iconBgClass: 'bg-primary-100',
+    iconColorClass: 'text-primary-600',
+    numberColorClass: 'text-primary-600',
+    animationDelay: '0s',
+  },
+  {
+    number: '₹2Cr+',
+    label: 'Maintenance Fund',
+    icon: 'fa-rupee-sign',
+    iconBgClass: 'bg-secondary-100',
+    iconColorClass: 'text-secondary-600',
+    numberColorClass: 'text-secondary-600',
+    animationDelay: '0.1s',
+  },
+  {
+    number: '50+',
+    label: 'Events Organized',
+    icon: 'fa-calendar-check',
+    iconBgClass: 'bg-accent-100',
+    iconColorClass: 'text-accent-700',
+    numberColorClass: 'text-accent-700',
+    animationDelay: '0.2s',
+  },
+  {
+    number: '99%',
+    label: 'Issue Resolution Rate',
+    icon: 'fa-check-circle',
+    iconBgClass: 'bg-green-100',
+    iconColorClass: 'text-green-600',
+    numberColorClass: 'text-green-600',
+    animationDelay: '0.3s',
+  },
+];
+---
+<section class="section bg-section-alt" id="stats">
+  <div class="container-custom">
+    <SectionHeader
+      title="Our Community by the Numbers"
+      subtitle="A thriving community built on trust, transparency, and collective effort."
+      centered={true}
+    />
+    <div class="grid-stats">
+      {stats.map(stat => <StatCard {...stat} />)}
+    </div>
+  </div>
+</section>

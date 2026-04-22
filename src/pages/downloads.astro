@@ -1,0 +1,104 @@
+---
+import Layout from '@components/layout/Layout.astro';
+import SectionHero from '@components/ui/SectionHero.astro';
+import SectionHeader from '@components/ui/SectionHeader.astro';
+import DocumentCard from '@components/ui/DocumentCard.astro';
+import { documents } from '@data/downloads';
+import type { DocumentCategory } from '@data/downloads';
+
+const categories: ('All' | DocumentCategory)[] = ['All', 'Bylaws', 'Financial', 'Maintenance', 'Forms', 'Minutes'];
+---
+<Layout
+  title="Downloads – UTA MACS"
+  description="Download official documents including bylaws, financial reports, maintenance schedules, and forms from UTA MACS."
+>
+  <SectionHero
+    title="Documents & Downloads"
+    subtitle="Access official documents, forms, and reports for the UTA MACS community."
+  />
+
+  <section class="section">
+    <div class="container-custom">
+      <!-- Filter bar -->
+      <div class="flex flex-wrap gap-3 justify-center mb-10 animate-on-scroll">
+        {categories.map(cat => (
+          <button
+            type="button"
+            class="doc-filter px-4 py-2 rounded-full text-small font-semibold border transition-all duration-200"
+            class:list={[
+              cat === 'All'
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-background text-text-secondary border-border-light hover:border-primary-400 hover:text-primary-600',
+            ]}
+            data-filter={cat}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      <!-- Documents grid -->
+      <div id="docs-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {documents.map((doc, i) => (
+          <div class="doc-item" data-category={doc.category}>
+            <DocumentCard {...doc} animationDelay={`${i * 0.1}s`} />
+          </div>
+        ))}
+      </div>
+
+      <!-- Empty state -->
+      <div id="no-results" class="hidden text-center py-16">
+        <i class="fas fa-folder-open text-4xl text-text-secondary mb-4 block" aria-hidden="true"></i>
+        <h3 class="text-card font-semibold text-text-primary mb-2">No documents found</h3>
+        <p class="text-small text-text-secondary">Try a different filter.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Upload request section -->
+  <section class="section bg-section-alt">
+    <div class="container-custom">
+      <div class="max-w-xl mx-auto text-center animate-on-scroll">
+        <div class="w-14 h-14 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+          <i class="fas fa-question-circle text-2xl text-primary-600" aria-hidden="true"></i>
+        </div>
+        <h2 class="text-section font-bold text-text-primary mb-3">Can't Find a Document?</h2>
+        <p class="text-body text-text-secondary mb-6">
+          If you need a document that's not listed here, please contact the association secretary.
+        </p>
+        <a href="/contact" class="btn-primary px-8 py-3">
+          <i class="fas fa-envelope mr-2" aria-hidden="true"></i>
+          Request a Document
+        </a>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  const filterButtons = document.querySelectorAll<HTMLButtonElement>('.doc-filter');
+  const docItems = document.querySelectorAll<HTMLElement>('.doc-item');
+  const noResults = document.getElementById('no-results')!;
+
+  filterButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const filter = btn.dataset.filter ?? 'All';
+
+      filterButtons.forEach(b => {
+        b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
+        b.classList.add('bg-background', 'text-text-secondary', 'border-border-light');
+      });
+      btn.classList.add('bg-primary-600', 'text-white', 'border-primary-600');
+      btn.classList.remove('bg-background', 'text-text-secondary', 'border-border-light');
+
+      let visible = 0;
+      docItems.forEach(item => {
+        const match = filter === 'All' || item.dataset.category === filter;
+        item.classList.toggle('hidden', !match);
+        if (match) visible++;
+      });
+
+      noResults.classList.toggle('hidden', visible > 0);
+    });
+  });
+</script>

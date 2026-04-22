@@ -1,0 +1,31 @@
+---
+interface Props {
+  number: string;
+  label: string;
+  icon: string;
+  iconBgClass?: string;
+  iconColorClass?: string;
+  numberColorClass?: string;
+  animationDelay?: string;
+}
+
+const {
+  number,
+  label,
+  icon,
+  iconBgClass = 'bg-primary-100',
+  iconColorClass = 'text-primary-600',
+  numberColorClass = 'text-primary-600',
+  animationDelay,
+} = Astro.props;
+---
+<div
+  class="card-stats animate-on-scroll"
+  style={animationDelay ? `transition-delay: ${animationDelay}` : undefined}
+>
+  <div class={`w-12 h-12 ${iconBgClass} rounded-xl flex items-center justify-center mx-auto mb-4`}>
+    <i class={`fas ${icon} text-xl ${iconColorClass}`} aria-hidden="true"></i>
+  </div>
+  <div class={`number ${numberColorClass}`}>{number}</div>
+  <div class="label">{label}</div>
+</div>

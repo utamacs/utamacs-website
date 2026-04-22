@@ -1,0 +1,25 @@
+---
+interface Props {
+  title: string;
+  subtitle?: string;
+}
+
+const { title, subtitle } = Astro.props;
+---
+<section class="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 text-white py-20 relative overflow-hidden">
+  <!-- Background pattern -->
+  <div class="absolute inset-0 opacity-10" aria-hidden="true">
+    <div class="absolute inset-0" style="background-image: radial-gradient(circle at 25% 25%, rgba(255,255,255,0.15) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(255,255,255,0.15) 0%, transparent 50%);"></div>
+  </div>
+  <div class="container-custom text-center relative z-10">
+    <div class="mb-4 animate-fade-in">
+      <div class="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto">
+        <i class="fas fa-building text-2xl text-secondary-400" aria-hidden="true"></i>
+      </div>
+    </div>
+    <h1 class="text-4xl md:text-5xl font-bold mb-4 text-white animate-slide-up">{title}</h1>
+    {subtitle && (
+      <p class="text-xl max-w-2xl mx-auto text-white/90 leading-relaxed animate-fade-in">{subtitle}</p>
+    )}
+  </div>
+</section>

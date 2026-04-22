@@ -1,0 +1,59 @@
+---
+export type NoticeCategory = 'Important' | 'General' | 'Maintenance' | 'Events' | 'Financial';
+
+interface Props {
+  title: string;
+  excerpt: string;
+  date: string;
+  category: NoticeCategory;
+  downloadUrl?: string;
+  animationDelay?: string;
+}
+
+const { title, excerpt, date, category, downloadUrl, animationDelay } = Astro.props;
+
+const categoryConfig: Record<NoticeCategory, { bg: string; text: string; border: string; icon: string }> = {
+  Important: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-400', icon: 'fa-exclamation-triangle' },
+  General:   { bg: 'bg-primary-50', text: 'text-primary-700', border: 'border-primary-400', icon: 'fa-info-circle' },
+  Maintenance: { bg: 'bg-secondary-50', text: 'text-secondary-700', border: 'border-secondary-400', icon: 'fa-tools' },
+  Events:    { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-400', icon: 'fa-calendar-check' },
+  Financial: { bg: 'bg-accent-50', text: 'text-accent-700', border: 'border-accent-400', icon: 'fa-rupee-sign' },
+};
+
+const config = categoryConfig[category];
+---
+<div
+  class:list={['card-premium animate-on-scroll border-l-4', config.border]}
+  style={animationDelay ? `transition-delay: ${animationDelay}` : undefined}
+>
+  <div class="flex items-start space-x-4">
+    <div class={`w-10 h-10 ${config.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+      <i class={`fas ${config.icon} ${config.text}`} aria-hidden="true"></i>
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-start justify-between gap-2 mb-2">
+        <h3 class="text-card font-semibold text-text-primary leading-snug">{title}</h3>
+        <span class={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${config.bg} ${config.text}`}>
+          {category}
+        </span>
+      </div>
+      <p class="text-small text-text-secondary mb-3 leading-relaxed">{excerpt}</p>
+      <div class="flex items-center justify-between">
+        <span class="text-small text-text-secondary flex items-center gap-1">
+          <i class="fas fa-calendar-alt text-xs" aria-hidden="true"></i>
+          {date}
+        </span>
+        {downloadUrl && (
+          <a
+            href={downloadUrl}
+            class="text-small text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1 transition-colors"
+            aria-label={`Download ${title}`}
+          >
+            <i class="fas fa-download text-xs" aria-hidden="true"></i>
+            Download
+          </a>
+        )}
+      </div>
+    </div>
+  </div>
+</div>

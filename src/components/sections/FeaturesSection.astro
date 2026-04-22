@@ -1,0 +1,88 @@
+---
+import SectionHeader from '@components/ui/SectionHeader.astro';
+
+const features = [
+  {
+    icon: 'fa-bell',
+    title: 'Notices & Announcements',
+    description: 'Stay informed with real-time notices about maintenance, events, and important community updates.',
+    href: '/notices',
+    iconBgClass: 'bg-primary-100 group-hover:bg-primary-600',
+    iconColorClass: 'text-primary-600 group-hover:text-white',
+    delay: '0s',
+  },
+  {
+    icon: 'fa-calendar-alt',
+    title: 'Events & Activities',
+    description: 'From cultural festivals to sports tournaments — participate in events that build community bonds.',
+    href: '/events',
+    iconBgClass: 'bg-secondary-100 group-hover:bg-secondary-600',
+    iconColorClass: 'text-secondary-600 group-hover:text-white',
+    delay: '0.1s',
+  },
+  {
+    icon: 'fa-download',
+    title: 'Documents & Downloads',
+    description: 'Access bylaws, financial reports, maintenance schedules, and official forms anytime, anywhere.',
+    href: '/downloads',
+    iconBgClass: 'bg-accent-100 group-hover:bg-accent-600',
+    iconColorClass: 'text-accent-700 group-hover:text-white',
+    delay: '0.2s',
+  },
+  {
+    icon: 'fa-users',
+    title: 'Committee Members',
+    description: 'Meet your elected representatives who work tirelessly to manage and improve our community.',
+    href: '/committee',
+    iconBgClass: 'bg-green-100 group-hover:bg-green-600',
+    iconColorClass: 'text-green-600 group-hover:text-white',
+    delay: '0.3s',
+  },
+  {
+    icon: 'fa-envelope',
+    title: 'Contact & Support',
+    description: 'Raise concerns, submit requests, or get in touch with the committee directly through our portal.',
+    href: '/contact',
+    iconBgClass: 'bg-purple-100 group-hover:bg-purple-600',
+    iconColorClass: 'text-purple-600 group-hover:text-white',
+    delay: '0.4s',
+  },
+  {
+    icon: 'fa-user-shield',
+    title: 'Resident Portal',
+    description: 'Log in to access your personal account, view dues, download receipts, and manage your profile.',
+    href: '/portal',
+    iconBgClass: 'bg-orange-100 group-hover:bg-orange-600',
+    iconColorClass: 'text-orange-600 group-hover:text-white',
+    delay: '0.5s',
+  },
+];
+---
+<section class="section" id="features">
+  <div class="container-custom">
+    <SectionHeader
+      title="Everything You Need"
+      subtitle="Comprehensive tools and resources to help you stay connected and informed about your community."
+      centered={true}
+    />
+    <div class="grid-features">
+      {features.map(feature => (
+        <a
+          href={feature.href}
+          class="card-feature animate-on-scroll group"
+          style={`transition-delay: ${feature.delay}`}
+        >
+          <div class={`w-14 h-14 ${feature.iconBgClass} rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300`}>
+            <i class={`fas ${feature.icon} text-xl ${feature.iconColorClass} transition-colors duration-300`} aria-hidden="true"></i>
+          </div>
+          <h3 class="text-card font-semibold text-text-primary mb-2 group-hover:text-primary-600 transition-colors duration-200">{feature.title}</h3>
+          <p class="text-small text-text-secondary leading-relaxed">{feature.description}</p>
+          <div class="mt-4 flex items-center text-primary-600 text-small font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <span>Learn more</span>
+            <i class="fas fa-arrow-right ml-2 text-xs" aria-hidden="true"></i>
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</section>

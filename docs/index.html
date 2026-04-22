@@ -1,422 +1,52 @@
-<!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UTA MACS - Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited</title>
-  <meta name="description" content="Official website of Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited - serving residents in Kondakal, Shankarpalle, Ranga Reddy District, Telangana.">
-  <meta name="keywords" content="UTA MACS, Urban Trilla Apartments, Residents Association, Kondakal, Telangana, Community, Nonprofit, Cooperative Society">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: {
-              50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
-              400: '#60a5fa', 500: '#3b82f6', 600: '#1E3A8A', 700: '#1d4ed8',
-              800: '#1e40af', 900: '#1e3a8a', 950: '#172554',
-            },
-            secondary: {
-              50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7',
-              400: '#34d399', 500: '#10B981', 600: '#059669', 700: '#047857',
-              800: '#065f46', 900: '#064e3b', 950: '#022c22',
-            },
-            accent: {
-              50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d',
-              400: '#fbbf24', 500: '#F59E0B', 600: '#d97706', 700: '#b45309',
-              800: '#92400e', 900: '#78350f', 950: '#451a03',
-            },
-          }
+<!DOCTYPE html><html lang="en" class="scroll-smooth"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>UTA MACS – Urban Trilla Apartment Owners Mutually Aided Cooperative Society</title><meta name="description" content="Official website of UTA MACS – the resident welfare association for Urban Trilla Apartments at Kondakal, Hyderabad. Notices, events, committee info, and more."><meta name="robots" content="index, follow"><meta name="author" content="UTA MACS"><meta name="keywords" content="UTA MACS, Urban Trilla Apartments, Residents Association, Kondakal, Telangana, Community"><link rel="canonical" href="https://utamacs.org/"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"><script src="https://kit.fontawesome.com/5a2b2f0b4f.js" crossorigin="anonymous" defer></script><link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏢</text></svg>"><!-- Inline theme init: runs before paint to prevent dark mode flash --><script>
+      (function () {
+        const saved = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (saved === 'dark' || (!saved && prefersDark)) {
+          document.documentElement.classList.add('dark');
         }
-      }
-    }
-  </script>
-  <script src="https://kit.fontawesome.com/5a2b2f0b4f.js" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/styles.css">
-</head>
-<body class="bg-gradient-to-br from-gray-50 to-primary-50 text-gray-900 overflow-x-hidden">
-  <!-- Header -->
-  <header id="header-placeholder"></header>
-
-  <!-- Main Content -->
-  <main>
-    <!-- Hero Section -->
-    <section class="hero-section relative min-h-screen flex items-center justify-center overflow-hidden">
-      <div class="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900"></div>
-      <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-      <div class="relative z-10 container mx-auto px-4 text-center text-white">
-        <div class="mb-8">
-          <i class="fas fa-building text-6xl md:text-8xl text-secondary-400 animate-bounce-gentle"></i>
-        </div>
-        <h1 class="text-4xl md:text-7xl font-bold mb-6 gradient-text-primary hero-text">
-          UTA MACS<br><span class="text-2xl md:text-4xl font-light">Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited</span>
-        </h1>
-        <p class="text-lg md:text-2xl mb-12 max-w-4xl mx-auto opacity-90 leading-relaxed">
-          Building a stronger community together in Kondakal, Shankarpalle, Ranga Reddy District, Telangana
-        </p>
-        <div class="flex flex-col sm:flex-row gap-6 justify-center">
-          <a href="#about" class="btn-modern group">
-            <i class="fas fa-info-circle mr-2 group-hover:animate-pulse"></i>
-            Learn More
-          </a>
-          <a href="#contact" class="glass-card hover:glass-card-dark text-white px-8 py-3 rounded-lg font-semibold transition-all duration-300 hover:scale-105 border border-white/20">
-            <i class="fas fa-users mr-2"></i>
-            Join Us
-          </a>
-        </div>
-      </div>
-      <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-        <i class="fas fa-chevron-down text-2xl text-white/70"></i>
-      </div>
-    </section>
-
-    <!-- About Section -->
-    <section id="about" class="py-24 bg-white relative">
-      <div class="container mx-auto px-4">
-        <div class="text-center mb-16 scroll-reveal">
-          <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6 gradient-text-primary">
-            About UTA MACS
-          </h2>
-          <p class="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited represents residents of Urban Trilla Apartments, fostering community welfare and cooperative governance.
-          </p>
-        </div>
-        <div class="grid md:grid-cols-2 gap-12">
-          <div class="card-hover glass-card p-8 rounded-2xl scroll-reveal">
-            <div class="flex items-center mb-6">
-              <div class="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
-                <i class="fas fa-eye text-2xl text-white"></i>
-              </div>
-              <h3 class="text-2xl font-bold text-primary-600">Our Vision</h3>
-            </div>
-            <p class="text-gray-700 text-lg leading-relaxed">
-              To create a harmonious and sustainable community where residents work together for mutual benefit and shared prosperity.
-            </p>
-          </div>
-          <div class="card-hover glass-card p-8 rounded-2xl scroll-reveal">
-            <div class="flex items-center mb-6">
-              <div class="w-16 h-16 bg-gradient-to-br from-secondary-400 to-secondary-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
-                <i class="fas fa-target text-2xl text-white"></i>
-              </div>
-              <h3 class="text-2xl font-bold text-secondary-600">Our Mission</h3>
-            </div>
-            <p class="text-gray-700 text-lg leading-relaxed">
-              Provide excellent maintenance services, promote community engagement, and ensure transparent governance for all residents.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Statistics Section -->
-    <section class="py-24 bg-gradient-to-r from-primary-50 to-secondary-50 relative overflow-hidden">
-      <div class="absolute inset-0 opacity-5">
-        <div class="morphing-shape absolute top-10 left-10 w-32 h-32"></div>
-        <div class="morphing-shape absolute bottom-10 right-10 w-24 h-24"></div>
-      </div>
-      <div class="container mx-auto px-4 relative z-10">
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-8 text-center">
-          <div class="scroll-reveal">
-            <div class="glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-              <div class="text-4xl font-bold text-primary-600 mb-2 counter" data-target="500">+</div>
-              <div class="text-gray-600 font-medium">Members</div>
-            </div>
-          </div>
-          <div class="scroll-reveal">
-            <div class="glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-              <div class="text-4xl font-bold text-primary-600 mb-2 counter" data-target="12">+</div>
-              <div class="text-gray-600 font-medium">Committee Members</div>
-            </div>
-          </div>
-          <div class="scroll-reveal">
-            <div class="glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-              <div class="text-4xl font-bold text-primary-600 mb-2 counter" data-target="50">+</div>
-              <div class="text-gray-600 font-medium">Community Events</div>
-            </div>
-          </div>
-          <div class="scroll-reveal">
-            <div class="glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-              <div class="text-4xl font-bold text-primary-600 mb-2 counter" data-target="10">+</div>
-              <div class="text-gray-600 font-medium">Years of Service</div>
-            </div>
-          </div>
-          <div class="scroll-reveal">
-            <div class="glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-              <div class="text-4xl font-bold text-primary-600 mb-2 counter" data-target="100">+</div>
-              <div class="text-gray-600 font-medium">Notices Issued</div>
-            </div>
-          </div>
-          <div class="scroll-reveal">
-            <div class="glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-              <div class="text-4xl font-bold text-primary-600 mb-2">24/7</div>
-              <div class="text-gray-600 font-medium">Resident Support</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Notices Section -->
-    <section class="py-24 bg-white">
-      <div class="container mx-auto px-4">
-        <div class="text-center mb-16">
-          <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6 gradient-text-primary">Latest Notices</h2>
-          <p class="text-xl text-gray-600">Stay updated with important announcements and community news</p>
-        </div>
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <div class="card-hover bg-gradient-to-br from-white to-gray-50 p-8 rounded-2xl shadow-lg border border-gray-100 scroll-reveal">
-            <div class="flex items-center mb-4">
-              <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center mr-3">
-                <i class="fas fa-calendar-alt text-primary-600"></i>
-              </div>
-              <div class="text-sm text-primary-600 font-medium">March 15, 2026</div>
-            </div>
-            <h3 class="text-xl font-bold mb-4 text-gray-900">Annual General Meeting Notice</h3>
-            <p class="text-gray-700 mb-6 leading-relaxed">All members are requested to attend the AGM on March 25, 2026 at 10:00 AM.</p>
-            <a href="#" class="inline-flex items-center text-primary-600 hover:text-primary-800 font-semibold group">
-              Read More
-              <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
-            </a>
-          </div>
-          <div class="card-hover bg-gradient-to-br from-white to-gray-50 p-8 rounded-2xl shadow-lg border border-gray-100 scroll-reveal">
-            <div class="flex items-center mb-4">
-              <div class="w-10 h-10 bg-secondary-100 rounded-lg flex items-center justify-center mr-3">
-                <i class="fas fa-tools text-secondary-600"></i>
-              </div>
-              <div class="text-sm text-secondary-600 font-medium">March 10, 2026</div>
-            </div>
-            <h3 class="text-xl font-bold mb-4 text-gray-900">Maintenance Schedule Update</h3>
-            <p class="text-gray-700 mb-6 leading-relaxed">Common area maintenance will be conducted from March 20-25, 2026.</p>
-            <a href="#" class="inline-flex items-center text-secondary-600 hover:text-secondary-800 font-semibold group">
-              Read More
-              <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
-            </a>
-          </div>
-          <div class="card-hover bg-gradient-to-br from-white to-gray-50 p-8 rounded-2xl shadow-lg border border-gray-100 scroll-reveal">
-            <div class="flex items-center mb-4">
-              <div class="w-10 h-10 bg-accent-100 rounded-lg flex items-center justify-center mr-3">
-                <i class="fas fa-festival text-accent-600"></i>
-              </div>
-              <div class="text-sm text-accent-600 font-medium">March 5, 2026</div>
-            </div>
-            <h3 class="text-xl font-bold mb-4 text-gray-900">Community Event: Spring Festival</h3>
-            <p class="text-gray-700 mb-6 leading-relaxed">Join us for our annual Spring Festival on March 30, 2026.</p>
-            <a href="#" class="inline-flex items-center text-accent-600 hover:text-accent-800 font-semibold group">
-              Read More
-              <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Events Section -->
-    <section class="py-24 bg-gradient-to-br from-gray-50 to-primary-25">
-      <div class="container mx-auto px-4">
-        <div class="text-center mb-16">
-          <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6 gradient-text-primary">Upcoming Events</h2>
-          <p class="text-xl text-gray-600">Join us for exciting community activities and gatherings</p>
-        </div>
-        <div class="grid md:grid-cols-2 gap-12">
-          <div class="card-hover bg-white p-8 rounded-3xl shadow-xl border border-gray-100 scroll-reveal">
-            <div class="flex items-center justify-between mb-6">
-              <div class="flex items-center">
-                <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mr-4">
-                  <i class="fas fa-users text-primary-600 text-xl"></i>
-                </div>
-                <div>
-                  <div class="text-sm text-primary-600 font-medium">March 25, 2026</div>
-                  <div class="text-xs text-gray-500">10:00 AM - 2:00 PM</div>
-                </div>
-              </div>
-              <div class="text-right">
-                <div class="text-2xl font-bold text-primary-600">AGM</div>
-              </div>
-            </div>
-            <h3 class="text-2xl font-bold mb-4 text-gray-900">Annual General Meeting</h3>
-            <p class="text-gray-700 mb-6 leading-relaxed">Discuss association matters, elect new committee members, and plan for the year ahead.</p>
-            <button class="btn-modern w-full">
-              <i class="fas fa-calendar-check mr-2"></i>
-              Register Now
-            </button>
-          </div>
-          <div class="card-hover bg-white p-8 rounded-3xl shadow-xl border border-gray-100 scroll-reveal">
-            <div class="flex items-center justify-between mb-6">
-              <div class="w-12 h-12 bg-secondary-100 rounded-xl flex items-center justify-center mr-4">
-                <i class="fas fa-festival text-secondary-600 text-xl"></i>
-              </div>
-              <div>
-                <div class="text-sm text-secondary-600 font-medium">March 30, 2026</div>
-                <div class="text-xs text-gray-500">4:00 PM - 10:00 PM</div>
-              </div>
-            </div>
-            <div class="text-right">
-              <div class="text-2xl font-bold text-secondary-600">Festival</div>
-            </div>
-          </div>
-            <h3 class="text-2xl font-bold mb-4 text-gray-900">Spring Community Festival</h3>
-            <p class="text-gray-700 mb-6 leading-relaxed">Celebrate the season with games, food, and community bonding activities.</p>
-            <button class="btn-modern w-full">
-              <i class="fas fa-ticket-alt mr-2"></i>
-              Get Tickets
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Gallery Section -->
-    <section class="py-24 bg-white">
-      <div class="container mx-auto px-4">
-        <div class="text-center mb-16">
-          <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6 gradient-text-primary">Gallery</h2>
-          <p class="text-xl text-gray-600">Capturing moments from our vibrant community life</p>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          <div class="card-hover aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden shadow-lg scroll-reveal relative group">
-            <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400&h=300&fit=crop&crop=center" alt="Community gathering event at UTA MACS" class="w-full h-full object-cover hover:scale-110 transition-transform duration-500">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-              <div class="text-white">
-                <h4 class="font-bold">Community Gathering</h4>
-                <p class="text-sm">Annual celebration event</p>
-              </div>
-            </div>
-          </div>
-          <div class="card-hover aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden shadow-lg scroll-reveal relative group">
-            <img src="https://images.unsplash.com/photo-1511578314322-379afb476865?w=400&h=300&fit=crop&crop=center" alt="Maintenance work by UTA MACS team" class="w-full h-full object-cover hover:scale-110 transition-transform duration-500">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-              <div class="text-white">
-                <h4 class="font-bold">Maintenance Day</h4>
-                <p class="text-sm">Keeping our community beautiful</p>
-              </div>
-            </div>
-          </div>
-          <div class="card-hover aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden shadow-lg scroll-reveal relative group">
-            <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop&crop=center" alt="UTA MACS committee meeting" class="w-full h-full object-cover hover:scale-110 transition-transform duration-500">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-              <div class="text-white">
-                <h4 class="font-bold">Committee Meeting</h4>
-                <p class="text-sm">Planning for the future</p>
-              </div>
-            </div>
-          </div>
-          <div class="card-hover aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden shadow-lg scroll-reveal relative group">
-            <img src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=400&h=300&fit=crop&crop=center" alt="Spring festival organized by UTA MACS" class="w-full h-full object-cover hover:scale-110 transition-transform duration-500">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-              <div class="text-white">
-                <h4 class="font-bold">Spring Festival</h4>
-                <p class="text-sm">Community celebration</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Testimonials Section -->
-    <section class="py-24 bg-gradient-to-r from-primary-50 via-white to-secondary-50">
-      <div class="container mx-auto px-4">
-        <div class="text-center mb-16">
-          <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6 gradient-text-primary">What Our Members Say</h2>
-          <p class="text-xl text-gray-600">Hear from our valued community members</p>
-        </div>
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <div class="card-hover glass-card p-8 rounded-3xl scroll-reveal">
-            <div class="flex items-center mb-6">
-              <div class="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
-                <i class="fas fa-user text-2xl text-white"></i>
-              </div>
-              <div>
-                <div class="font-bold text-lg text-gray-900">Rajesh Kumar</div>
-                <div class="text-sm text-primary-600 font-medium">Resident</div>
-              </div>
-            </div>
-            <p class="text-gray-700 italic text-lg leading-relaxed">"The association has greatly improved our community's quality of life. Maintenance issues are resolved quickly and communication is excellent."</p>
-            <div class="flex text-secondary-400 mt-4">
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-            </div>
-          </div>
-          <div class="card-hover glass-card p-8 rounded-3xl scroll-reveal">
-            <div class="flex items-center mb-6">
-              <div class="w-16 h-16 bg-gradient-to-br from-secondary-400 to-secondary-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
-                <i class="fas fa-user text-2xl text-white"></i>
-              </div>
-              <div>
-                <div class="font-bold text-lg text-gray-900">Priya Sharma</div>
-                <div class="text-sm text-secondary-600 font-medium">Committee Member</div>
-              </div>
-            </div>
-            <p class="text-gray-700 italic text-lg leading-relaxed">"Being part of this association has been rewarding. We've built a strong community spirit and achieved so much together."</p>
-            <div class="flex text-secondary-400 mt-4">
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-            </div>
-          </div>
-          <div class="card-hover glass-card p-8 rounded-3xl scroll-reveal">
-            <div class="flex items-center mb-6">
-              <div class="w-16 h-16 bg-gradient-to-br from-accent-400 to-accent-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
-                <i class="fas fa-user text-2xl text-white"></i>
-              </div>
-              <div>
-                <div class="font-bold text-lg text-gray-900">Amit Patel</div>
-                <div class="text-sm text-accent-600 font-medium">Resident</div>
-              </div>
-            </div>
-            <p class="text-gray-700 italic text-lg leading-relaxed">"The events organized by the association bring everyone together. It's wonderful to see our community thriving."</p>
-            <div class="flex text-accent-400 mt-4">
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-              <i class="fas fa-star"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="py-24 bg-gradient-to-r from-primary-600 via-primary-700 to-primary-800 text-white relative overflow-hidden">
-      <div class="absolute inset-0 opacity-10">
-        <div class="morphing-shape w-64 h-64 absolute top-10 left-10"></div>
-        <div class="morphing-shape w-48 h-48 absolute bottom-10 right-10"></div>
-      </div>
-      <div class="container mx-auto px-4 text-center relative z-10">
-        <div class="mb-8">
-          <i class="fas fa-hands-helping text-6xl text-secondary-400 animate-pulse"></i>
-        </div>
-        <h2 class="text-4xl md:text-5xl font-bold mb-6">Join UTA MACS</h2>
-        <p class="text-xl mb-12 max-w-3xl mx-auto opacity-90 leading-relaxed">
-          Become a member of Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited and help shape our community's future.
-        </p>
-        <div class="flex flex-col sm:flex-row gap-6 justify-center">
-          <a href="#contact" class="btn-modern">
-            <i class="fas fa-user-plus mr-2"></i>
-            Get Involved
-          </a>
-          <a href="mailto:urbantrillaresidents@gmail.com" class="glass-card hover:glass-card-dark px-8 py-3 rounded-lg font-semibold transition-all duration-300 hover:scale-105 border border-white/20">
-            <i class="fas fa-envelope mr-2"></i>
-            Contact Us
-          </a>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- Footer -->
-  <footer id="footer-placeholder"></footer>
-
-  <script src="js/main.js"></script>
-</body>
-</html>
+      })();
+    </script><link rel="stylesheet" href="/_astro/about.BNe5uCi9.css"><script type="module" src="/_astro/hoisted.C_I_15LC.js"></script></head> <body class="bg-background text-text-primary overflow-x-hidden"> <!-- Skip to main content --> <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary-600 text-white px-4 py-2 rounded-lg z-[100] font-medium">
+Skip to main content
+</a> <nav class="bg-background shadow-soft sticky top-0 z-50 border-b border-border-light transition-all duration-300" role="navigation" aria-label="Main navigation" id="main-nav"> <div class="container-custom"> <div class="flex justify-between items-center py-4"> <!-- Brand --> <a href="/" class="text-card-lg font-bold text-primary-600 hover:text-primary-700 transition-colors duration-200 flex items-center space-x-2" aria-label="UTA MACS Home"> <i class="fas fa-building text-primary-600" aria-hidden="true"></i> <span>UTA MACS</span> </a> <!-- Desktop Nav --> <div class="hidden lg:flex items-center space-x-6"> <a href="/" class="nav-link active" aria-label="Home"> Home </a><a href="/about" class="nav-link" aria-label="About"> About </a><a href="/committee" class="nav-link" aria-label="Committee"> Committee </a><a href="/notices" class="nav-link" aria-label="Notices"> Notices </a><a href="/events" class="nav-link" aria-label="Events"> Events </a><a href="/downloads" class="nav-link" aria-label="Downloads"> Downloads </a><a href="/contact" class="nav-link" aria-label="Contact"> Contact </a><a href="/portal" class="nav-link" aria-label="Portal"> Portal </a><a href="/login" class="nav-link" aria-label="Login"> Login </a> </div> <!-- Theme + Mobile toggle --> <div class="flex items-center space-x-3"> <button id="theme-toggle" class="p-2 text-text-secondary hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2" aria-label="Toggle dark mode" type="button"> <i class="fas fa-moon text-lg" id="theme-icon" aria-hidden="true"></i> </button>  <button id="mobile-menu-toggle" class="lg:hidden p-2 text-text-secondary hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-600" aria-label="Open menu" aria-expanded="false" type="button"> <i class="fas fa-bars text-lg" aria-hidden="true" id="hamburger-icon"></i> </button> </div> </div> </div> <!-- Mobile Menu --> <div id="mobile-menu" class="mobile-menu" role="dialog" aria-modal="true" aria-label="Mobile navigation menu"> <div class="flex flex-col h-full"> <!-- Mobile Header --> <div class="flex justify-between items-center p-4 border-b border-border-light"> <a href="/" class="text-card font-bold text-primary-600 flex items-center space-x-2"> <i class="fas fa-building" aria-hidden="true"></i> <span>UTA MACS</span> </a> <button id="mobile-menu-close" class="p-2 text-text-secondary hover:text-primary-600 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-600" aria-label="Close menu" type="button"> <i class="fas fa-times text-lg" aria-hidden="true"></i> </button> </div> <!-- Mobile Links --> <div class="flex-1 px-4 py-6 space-y-2 overflow-y-auto"> <a href="/" class="flex items-center space-x-3 p-3 rounded-xl transition-colors duration-200 font-medium bg-primary-50 text-primary-600" aria-label="Home"> <i class="fas fa-home text-primary-600 w-5" aria-hidden="true"></i> <span class="text-body">Home</span> </a><a href="/about" class="flex items-center space-x-3 p-3 rounded-xl transition-colors duration-200 font-medium text-text-secondary hover:bg-primary-50 hover:text-primary-600" aria-label="About"> <i class="fas fa-info-circle text-primary-600 w-5" aria-hidden="true"></i> <span class="text-body">About</span> </a><a href="/committee" class="flex items-center space-x-3 p-3 rounded-xl transition-colors duration-200 font-medium text-text-secondary hover:bg-primary-50 hover:text-primary-600" aria-label="Committee"> <i class="fas fa-users text-primary-600 w-5" aria-hidden="true"></i> <span class="text-body">Committee</span> </a><a href="/notices" class="flex items-center space-x-3 p-3 rounded-xl transition-colors duration-200 font-medium text-text-secondary hover:bg-primary-50 hover:text-primary-600" aria-label="Notices"> <i class="fas fa-bell text-primary-600 w-5" aria-hidden="true"></i> <span class="text-body">Notices</span> </a><a href="/events" class="flex items-center space-x-3 p-3 rounded-xl transition-colors duration-200 font-medium text-text-secondary hover:bg-primary-50 hover:text-primary-600" aria-label="Events"> <i class="fas fa-calendar-alt text-primary-600 w-5" aria-hidden="true"></i> <span class="text-body">Events</span> </a><a href="/downloads" class="flex items-center space-x-3 p-3 rounded-xl transition-colors duration-200 font-medium text-text-secondary hover:bg-primary-50 hover:text-primary-600" aria-label="Downloads"> <i class="fas fa-download text-primary-600 w-5" aria-hidden="true"></i> <span class="text-body">Downloads</span> </a><a href="/contact" class="flex items-center space-x-3 p-3 rounded-xl transition-colors duration-200 font-medium text-text-secondary hover:bg-primary-50 hover:text-primary-600" aria-label="Contact"> <i class="fas fa-envelope text-primary-600 w-5" aria-hidden="true"></i> <span class="text-body">Contact</span> </a><a href="/portal" class="flex items-center space-x-3 p-3 rounded-xl transition-colors duration-200 font-medium text-text-secondary hover:bg-primary-50 hover:text-primary-600" aria-label="Portal"> <i class="fas fa-user-shield text-primary-600 w-5" aria-hidden="true"></i> <span class="text-body">Portal</span> </a><a href="/login" class="flex items-center space-x-3 p-3 rounded-xl transition-colors duration-200 font-medium text-text-secondary hover:bg-primary-50 hover:text-primary-600" aria-label="Login"> <i class="fas fa-sign-in-alt text-primary-600 w-5" aria-hidden="true"></i> <span class="text-body">Login</span> </a> </div> <!-- Mobile Footer --> <div class="p-4 border-t border-border-light"> <div class="flex items-center justify-between"> <span class="text-small text-text-secondary">UTA MACS © 2026</span> <div class="flex space-x-3"> <a href="#" class="text-text-secondary hover:text-primary-600 transition-colors" aria-label="Facebook"> <i class="fab fa-facebook-f" aria-hidden="true"></i> </a> <a href="#" class="text-text-secondary hover:text-primary-600 transition-colors" aria-label="Twitter"> <i class="fab fa-twitter" aria-hidden="true"></i> </a> <a href="#" class="text-text-secondary hover:text-primary-600 transition-colors" aria-label="Instagram"> <i class="fab fa-instagram" aria-hidden="true"></i> </a> </div> </div> </div> </div> </div> </nav>  <main id="main">  <section class="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700"> <!-- Background decoration --> <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true"> <div class="absolute -top-40 -right-40 w-96 h-96 bg-secondary-400/10 rounded-full blur-3xl"></div> <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-accent-400/10 rounded-full blur-3xl"></div> <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-600/20 rounded-full blur-3xl"></div> </div> <!-- Floating elements --> <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true"> <div class="absolute top-20 left-10 w-4 h-4 bg-secondary-400/40 rounded-full animate-float"></div> <div class="absolute top-40 right-20 w-6 h-6 bg-accent-400/30 rounded-full animate-float" style="animation-delay: 1s;"></div> <div class="absolute bottom-32 left-1/4 w-3 h-3 bg-secondary-300/50 rounded-full animate-float" style="animation-delay: 2s;"></div> <div class="absolute bottom-20 right-1/3 w-5 h-5 bg-primary-300/40 rounded-full animate-float" style="animation-delay: 0.5s;"></div> </div> <div class="container-custom relative z-10 text-center px-4 py-20"> <!-- Badge --> <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 text-sm font-medium px-4 py-2 rounded-full mb-8 animate-on-scroll"> <i class="fas fa-building text-secondary-400" aria-hidden="true"></i> <span>Urban Trilla Apartment MACS</span> </div> <!-- Heading --> <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6 animate-on-scroll" style="transition-delay: 0.1s;">
+Welcome to
+<span class="block text-transparent bg-clip-text bg-gradient-to-r from-secondary-300 to-accent-300 mt-2">
+UTA MACS
+</span> </h1> <!-- Subtitle --> <p class="text-lg sm:text-xl text-white/80 max-w-2xl mx-auto mb-10 leading-relaxed animate-on-scroll" style="transition-delay: 0.2s;">
+Your trusted Mutually Aided Cooperative Society — building a vibrant, well-managed, and connected residential community at Kondakal, Hyderabad.
+</p> <!-- CTA Buttons --> <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16 animate-on-scroll" style="transition-delay: 0.3s;"> <a href="/notices" class="btn-secondary text-base px-8 py-4"> <i class="fas fa-bell mr-2" aria-hidden="true"></i>
+Latest Notices
+</a> <a href="/about" class="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-200"> <i class="fas fa-info-circle mr-2" aria-hidden="true"></i>
+Learn More
+</a> </div> <!-- Quick stats --> <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto animate-on-scroll" style="transition-delay: 0.4s;"> <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 text-center"> <i class="fas fa-home text-secondary-300 text-xl mb-2 block" aria-hidden="true"></i> <p class="text-2xl font-bold text-white">500+</p> <p class="text-xs text-white/70 uppercase tracking-wide">Families</p> </div><div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 text-center"> <i class="fas fa-leaf text-secondary-300 text-xl mb-2 block" aria-hidden="true"></i> <p class="text-2xl font-bold text-white">15+</p> <p class="text-xs text-white/70 uppercase tracking-wide">Acres</p> </div><div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 text-center"> <i class="fas fa-shield-alt text-secondary-300 text-xl mb-2 block" aria-hidden="true"></i> <p class="text-2xl font-bold text-white">24/7</p> <p class="text-xs text-white/70 uppercase tracking-wide">Security</p> </div><div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 text-center"> <i class="fas fa-star text-secondary-300 text-xl mb-2 block" aria-hidden="true"></i> <p class="text-2xl font-bold text-white">10+</p> <p class="text-xs text-white/70 uppercase tracking-wide">Amenities</p> </div> </div> </div> <!-- Scroll indicator --> <div class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce" aria-hidden="true"> <i class="fas fa-chevron-down text-white/60 text-xl"></i> </div> </section> <section class="section bg-section-alt" id="stats"> <div class="container-custom"> <div class="text-center mb-16"> <h2 class="text-section font-bold text-text-primary mb-4">Our Community by the Numbers</h2> <p class="text-body-lg text-text-secondary max-w-2xl mx-auto leading-relaxed">A thriving community built on trust, transparency, and collective effort.</p> </div> <div class="grid-stats"> <div class="card-stats animate-on-scroll" style="transition-delay: 0s"> <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4"> <i class="fas fa-home text-xl text-primary-600" aria-hidden="true"></i> </div> <div class="number text-primary-600">500+</div> <div class="label">Happy Families</div> </div><div class="card-stats animate-on-scroll" style="transition-delay: 0.1s"> <div class="w-12 h-12 bg-secondary-100 rounded-xl flex items-center justify-center mx-auto mb-4"> <i class="fas fa-rupee-sign text-xl text-secondary-600" aria-hidden="true"></i> </div> <div class="number text-secondary-600">₹2Cr+</div> <div class="label">Maintenance Fund</div> </div><div class="card-stats animate-on-scroll" style="transition-delay: 0.2s"> <div class="w-12 h-12 bg-accent-100 rounded-xl flex items-center justify-center mx-auto mb-4"> <i class="fas fa-calendar-check text-xl text-accent-700" aria-hidden="true"></i> </div> <div class="number text-accent-700">50+</div> <div class="label">Events Organized</div> </div><div class="card-stats animate-on-scroll" style="transition-delay: 0.3s"> <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4"> <i class="fas fa-check-circle text-xl text-green-600" aria-hidden="true"></i> </div> <div class="number text-green-600">99%</div> <div class="label">Issue Resolution Rate</div> </div> </div> </div> </section> <section class="section" id="features"> <div class="container-custom"> <div class="text-center mb-16"> <h2 class="text-section font-bold text-text-primary mb-4">Everything You Need</h2> <p class="text-body-lg text-text-secondary max-w-2xl mx-auto leading-relaxed">Comprehensive tools and resources to help you stay connected and informed about your community.</p> </div> <div class="grid-features"> <a href="/notices" class="card-feature animate-on-scroll group" style="transition-delay: 0s"> <div class="w-14 h-14 bg-primary-100 group-hover:bg-primary-600 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300"> <i class="fas fa-bell text-xl text-primary-600 group-hover:text-white transition-colors duration-300" aria-hidden="true"></i> </div> <h3 class="text-card font-semibold text-text-primary mb-2 group-hover:text-primary-600 transition-colors duration-200">Notices &amp; Announcements</h3> <p class="text-small text-text-secondary leading-relaxed">Stay informed with real-time notices about maintenance, events, and important community updates.</p> <div class="mt-4 flex items-center text-primary-600 text-small font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200"> <span>Learn more</span> <i class="fas fa-arrow-right ml-2 text-xs" aria-hidden="true"></i> </div> </a><a href="/events" class="card-feature animate-on-scroll group" style="transition-delay: 0.1s"> <div class="w-14 h-14 bg-secondary-100 group-hover:bg-secondary-600 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300"> <i class="fas fa-calendar-alt text-xl text-secondary-600 group-hover:text-white transition-colors duration-300" aria-hidden="true"></i> </div> <h3 class="text-card font-semibold text-text-primary mb-2 group-hover:text-primary-600 transition-colors duration-200">Events &amp; Activities</h3> <p class="text-small text-text-secondary leading-relaxed">From cultural festivals to sports tournaments — participate in events that build community bonds.</p> <div class="mt-4 flex items-center text-primary-600 text-small font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200"> <span>Learn more</span> <i class="fas fa-arrow-right ml-2 text-xs" aria-hidden="true"></i> </div> </a><a href="/downloads" class="card-feature animate-on-scroll group" style="transition-delay: 0.2s"> <div class="w-14 h-14 bg-accent-100 group-hover:bg-accent-600 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300"> <i class="fas fa-download text-xl text-accent-700 group-hover:text-white transition-colors duration-300" aria-hidden="true"></i> </div> <h3 class="text-card font-semibold text-text-primary mb-2 group-hover:text-primary-600 transition-colors duration-200">Documents &amp; Downloads</h3> <p class="text-small text-text-secondary leading-relaxed">Access bylaws, financial reports, maintenance schedules, and official forms anytime, anywhere.</p> <div class="mt-4 flex items-center text-primary-600 text-small font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200"> <span>Learn more</span> <i class="fas fa-arrow-right ml-2 text-xs" aria-hidden="true"></i> </div> </a><a href="/committee" class="card-feature animate-on-scroll group" style="transition-delay: 0.3s"> <div class="w-14 h-14 bg-green-100 group-hover:bg-green-600 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300"> <i class="fas fa-users text-xl text-green-600 group-hover:text-white transition-colors duration-300" aria-hidden="true"></i> </div> <h3 class="text-card font-semibold text-text-primary mb-2 group-hover:text-primary-600 transition-colors duration-200">Committee Members</h3> <p class="text-small text-text-secondary leading-relaxed">Meet your elected representatives who work tirelessly to manage and improve our community.</p> <div class="mt-4 flex items-center text-primary-600 text-small font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200"> <span>Learn more</span> <i class="fas fa-arrow-right ml-2 text-xs" aria-hidden="true"></i> </div> </a><a href="/contact" class="card-feature animate-on-scroll group" style="transition-delay: 0.4s"> <div class="w-14 h-14 bg-purple-100 group-hover:bg-purple-600 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300"> <i class="fas fa-envelope text-xl text-purple-600 group-hover:text-white transition-colors duration-300" aria-hidden="true"></i> </div> <h3 class="text-card font-semibold text-text-primary mb-2 group-hover:text-primary-600 transition-colors duration-200">Contact &amp; Support</h3> <p class="text-small text-text-secondary leading-relaxed">Raise concerns, submit requests, or get in touch with the committee directly through our portal.</p> <div class="mt-4 flex items-center text-primary-600 text-small font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200"> <span>Learn more</span> <i class="fas fa-arrow-right ml-2 text-xs" aria-hidden="true"></i> </div> </a><a href="/portal" class="card-feature animate-on-scroll group" style="transition-delay: 0.5s"> <div class="w-14 h-14 bg-orange-100 group-hover:bg-orange-600 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300"> <i class="fas fa-user-shield text-xl text-orange-600 group-hover:text-white transition-colors duration-300" aria-hidden="true"></i> </div> <h3 class="text-card font-semibold text-text-primary mb-2 group-hover:text-primary-600 transition-colors duration-200">Resident Portal</h3> <p class="text-small text-text-secondary leading-relaxed">Log in to access your personal account, view dues, download receipts, and manage your profile.</p> <div class="mt-4 flex items-center text-primary-600 text-small font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200"> <span>Learn more</span> <i class="fas fa-arrow-right ml-2 text-xs" aria-hidden="true"></i> </div> </a> </div> </div> </section>  <section class="section bg-section-alt"> <div class="container-custom"> <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4"> <div class="text-center mb-16"> <h2 class="text-section font-bold text-text-primary mb-4">Latest Notices</h2> <p class="text-body-lg text-text-secondary max-w-2xl mx-auto leading-relaxed">Stay informed with the most recent announcements.</p> </div> <a href="/notices" class="btn-outline px-5 py-2.5 text-small flex-shrink-0 self-start sm:self-auto">
+View All
+<i class="fas fa-arrow-right ml-2 text-xs" aria-hidden="true"></i> </a> </div> <div class="grid grid-cols-1 md:grid-cols-3 gap-6"> <div class="card-premium animate-on-scroll border-l-4 border-red-400" style="transition-delay: 0s"> <div class="flex items-start space-x-4"> <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0"> <i class="fas fa-exclamation-triangle text-red-700" aria-hidden="true"></i> </div> <div class="flex-1 min-w-0"> <div class="flex items-start justify-between gap-2 mb-2"> <h3 class="text-card font-semibold text-text-primary leading-snug">Annual General Meeting – April 2025</h3> <span class="text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 bg-red-50 text-red-700"> Important </span> </div> <p class="text-small text-text-secondary mb-3 leading-relaxed">The Annual General Meeting of UTA MACS is scheduled for April 30, 2025 at 6:00 PM in the Community Hall. Attendance is mandatory for all flat owners.</p> <div class="flex items-center justify-between"> <span class="text-small text-text-secondary flex items-center gap-1"> <i class="fas fa-calendar-alt text-xs" aria-hidden="true"></i> April 10, 2025 </span> <a href="#" class="text-small text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1 transition-colors" aria-label="Download Annual General Meeting – April 2025"> <i class="fas fa-download text-xs" aria-hidden="true"></i>
+Download
+</a> </div> </div> </div> </div><div class="card-premium animate-on-scroll border-l-4 border-accent-400" style="transition-delay: 0.1s"> <div class="flex items-start space-x-4"> <div class="w-10 h-10 bg-accent-50 rounded-lg flex items-center justify-center flex-shrink-0"> <i class="fas fa-rupee-sign text-accent-700" aria-hidden="true"></i> </div> <div class="flex-1 min-w-0"> <div class="flex items-start justify-between gap-2 mb-2"> <h3 class="text-card font-semibold text-text-primary leading-snug">Maintenance Fund Collection – Q2 2025</h3> <span class="text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 bg-accent-50 text-accent-700"> Financial </span> </div> <p class="text-small text-text-secondary mb-3 leading-relaxed">Quarterly maintenance dues of ₹5,000 per flat are due by April 15, 2025. Payments can be made via bank transfer or at the association office.</p> <div class="flex items-center justify-between"> <span class="text-small text-text-secondary flex items-center gap-1"> <i class="fas fa-calendar-alt text-xs" aria-hidden="true"></i> April 1, 2025 </span> <a href="#" class="text-small text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1 transition-colors" aria-label="Download Maintenance Fund Collection – Q2 2025"> <i class="fas fa-download text-xs" aria-hidden="true"></i>
+Download
+</a> </div> </div> </div> </div><div class="card-premium animate-on-scroll border-l-4 border-secondary-400" style="transition-delay: 0.2s"> <div class="flex items-start space-x-4"> <div class="w-10 h-10 bg-secondary-50 rounded-lg flex items-center justify-center flex-shrink-0"> <i class="fas fa-tools text-secondary-700" aria-hidden="true"></i> </div> <div class="flex-1 min-w-0"> <div class="flex items-start justify-between gap-2 mb-2"> <h3 class="text-card font-semibold text-text-primary leading-snug">Elevator Maintenance – Blocks A &amp; B</h3> <span class="text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 bg-secondary-50 text-secondary-700"> Maintenance </span> </div> <p class="text-small text-text-secondary mb-3 leading-relaxed">Scheduled elevator maintenance for Blocks A and B will take place on April 20, 2025 from 9:00 AM to 1:00 PM. Please plan accordingly.</p> <div class="flex items-center justify-between"> <span class="text-small text-text-secondary flex items-center gap-1"> <i class="fas fa-calendar-alt text-xs" aria-hidden="true"></i> March 28, 2025 </span>  </div> </div> </div> </div> </div> </div> </section> <section class="section bg-section-alt"> <div class="container-custom"> <div class="text-center mb-16"> <h2 class="text-section font-bold text-text-primary mb-4">What Residents Say</h2> <p class="text-body-lg text-text-secondary max-w-2xl mx-auto leading-relaxed">Hear from the families who call UTA MACS home.</p> </div> <div class="grid grid-cols-1 md:grid-cols-3 gap-6"> <div class="card-premium animate-on-scroll" style="transition-delay: 0s"> <!-- Stars --> <div class="flex text-secondary-400 mb-4" aria-label="5 out of 5 stars"> <i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i> </div> <!-- Quote --> <blockquote class="text-body text-text-secondary italic leading-relaxed mb-6">
+"The association has truly transformed our community. From prompt maintenance responses to beautifully organized festivals, living here feels like being part of one big family. The new online portal makes everything so convenient."
+</blockquote> <!-- Author --> <div class="flex items-center space-x-3 pt-4 border-t border-border-light"> <div class="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center font-semibold flex-shrink-0"> AK </div> <div> <p class="text-small font-semibold text-text-primary">Ananya Krishnan</p> <p class="text-xs text-text-secondary">Resident since 2019</p> </div> </div> </div><div class="card-premium animate-on-scroll" style="transition-delay: 0.1s"> <!-- Stars --> <div class="flex text-secondary-400 mb-4" aria-label="5 out of 5 stars"> <i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i> </div> <!-- Quote --> <blockquote class="text-body text-text-secondary italic leading-relaxed mb-6">
+"I was worried about community engagement when I moved in, but the committee&#39;s dedication blew me away. Regular events, transparent finances, and quick resolution of issues — this is how all apartment associations should operate."
+</blockquote> <!-- Author --> <div class="flex items-center space-x-3 pt-4 border-t border-border-light"> <div class="w-12 h-12 bg-secondary-100 text-secondary-600 rounded-full flex items-center justify-center font-semibold flex-shrink-0"> RT </div> <div> <p class="text-small font-semibold text-text-primary">Ravi Teja Namburu</p> <p class="text-xs text-text-secondary">Resident since 2021</p> </div> </div> </div><div class="card-premium animate-on-scroll" style="transition-delay: 0.2s"> <!-- Stars --> <div class="flex text-secondary-400 mb-4" aria-label="5 out of 5 stars"> <i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i><i class="fas fa-star text-sm" aria-hidden="true"></i> </div> <!-- Quote --> <blockquote class="text-body text-text-secondary italic leading-relaxed mb-6">
+"As a senior resident, I appreciate how the committee considers everyone&#39;s needs. The 24/7 security, well-maintained common areas, and regular health camps make this a truly safe and caring place to call home."
+</blockquote> <!-- Author --> <div class="flex items-center space-x-3 pt-4 border-t border-border-light"> <div class="w-12 h-12 bg-accent-100 text-accent-700 rounded-full flex items-center justify-center font-semibold flex-shrink-0"> LD </div> <div> <p class="text-small font-semibold text-text-primary">Lakshmi Devi</p> <p class="text-xs text-text-secondary">Resident since 2018</p> </div> </div> </div> </div> </div> </section>  <section class="section"> <div class="container-custom"> <div class="max-w-2xl mx-auto text-center animate-on-scroll"> <div class="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-6"> <i class="fas fa-door-open text-2xl text-primary-600" aria-hidden="true"></i> </div> <h2 class="text-section font-bold text-text-primary mb-4">
+Your Community, Your Voice
+</h2> <p class="text-body text-text-secondary mb-8 leading-relaxed">
+UTA MACS belongs to every resident. Participate in meetings, raise concerns, suggest events, and help shape the community we all share.
+</p> <div class="flex flex-col sm:flex-row gap-4 justify-center"> <a href="/contact" class="btn-primary px-8 py-3"> <i class="fas fa-envelope mr-2" aria-hidden="true"></i>
+Contact Committee
+</a> <a href="/portal" class="btn-outline px-8 py-3"> <i class="fas fa-user-circle mr-2" aria-hidden="true"></i>
+Resident Portal
+</a> </div> </div> </div> </section>  </main> <footer class="bg-text-primary text-white" role="contentinfo"> <div class="container-custom py-16"> <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-10"> <!-- Brand Column --> <div class="lg:col-span-1"> <div class="flex items-center space-x-2 mb-4"> <i class="fas fa-building text-secondary-400 text-2xl" aria-hidden="true"></i> <span class="text-card-lg font-bold text-white">UTA MACS</span> </div> <p class="text-small text-white/70 leading-relaxed mb-6">
+Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited.
+          Building a stronger community in Kondakal, Telangana.
+</p> <div class="flex space-x-4"> <a href="#" class="w-9 h-9 bg-white/10 hover:bg-secondary-500 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110" aria-label="Facebook"> <i class="fab fa-facebook-f text-sm" aria-hidden="true"></i> </a> <a href="#" class="w-9 h-9 bg-white/10 hover:bg-secondary-500 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110" aria-label="Twitter"> <i class="fab fa-twitter text-sm" aria-hidden="true"></i> </a> <a href="#" class="w-9 h-9 bg-white/10 hover:bg-secondary-500 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110" aria-label="Instagram"> <i class="fab fa-instagram text-sm" aria-hidden="true"></i> </a> </div> </div> <!-- Quick Links --> <div> <h3 class="text-body font-semibold text-white mb-5 uppercase tracking-wide">Quick Links</h3> <ul class="space-y-3"> <li> <a href="/about" class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"> <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i> <span>About Us</span> </a> </li><li> <a href="/committee" class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"> <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i> <span>Committee</span> </a> </li><li> <a href="/notices" class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"> <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i> <span>Notices</span> </a> </li><li> <a href="/events" class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"> <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i> <span>Events</span> </a> </li> </ul> </div> <!-- Resources --> <div> <h3 class="text-body font-semibold text-white mb-5 uppercase tracking-wide">Resources</h3> <ul class="space-y-3"> <li> <a href="/downloads" class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"> <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i> <span>Downloads</span> </a> </li><li> <a href="/contact" class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"> <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i> <span>Contact</span> </a> </li><li> <a href="/portal" class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"> <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i> <span>Member Portal</span> </a> </li><li> <a href="/login" class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 flex items-center space-x-2 group"> <i class="fas fa-chevron-right text-xs text-secondary-500 group-hover:translate-x-1 transition-transform duration-200" aria-hidden="true"></i> <span>Login</span> </a> </li> </ul> </div> <!-- Contact --> <div> <h3 class="text-body font-semibold text-white mb-5 uppercase tracking-wide">Contact Us</h3> <ul class="space-y-4"> <li class="flex items-start space-x-3"> <i class="fas fa-envelope text-secondary-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i> <a href="mailto:urbantrillaresidents@gmail.com" class="text-small text-white/70 hover:text-secondary-400 transition-colors duration-200 break-all">
+urbantrillaresidents@gmail.com
+</a> </li> <li class="flex items-start space-x-3"> <i class="fas fa-phone text-secondary-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i> <span class="text-small text-white/70">+91 XXXXX XXXXX</span> </li> <li class="flex items-start space-x-3"> <i class="fas fa-map-marker-alt text-secondary-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i> <address class="text-small text-white/70 not-italic leading-relaxed">
+Kondakal, Shankarpalle,<br>
+Ranga Reddy District,<br>
+Telangana 501203
+</address> </li> </ul> </div> </div> </div> <!-- Footer Bottom --> <div class="border-t border-white/10"> <div class="container-custom py-6"> <div class="flex flex-col sm:flex-row justify-between items-center gap-4"> <p class="text-small text-white/60 text-center sm:text-left">
+© 2026 UTA MACS — Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited. All rights reserved.
+</p> <div class="flex space-x-6"> <a href="#" class="text-small text-white/60 hover:text-white transition-colors duration-200">Privacy Policy</a> <a href="#" class="text-small text-white/60 hover:text-white transition-colors duration-200">Terms of Service</a> <a href="#" class="text-small text-white/60 hover:text-white transition-colors duration-200">Accessibility</a> </div> </div> </div> </div> </footer> <!-- Scroll reveal observer -->  </body> </html>

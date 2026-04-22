@@ -1,0 +1,73 @@
+---
+import Layout from '@components/layout/Layout.astro';
+import HeroSection from '@components/sections/HeroSection.astro';
+import StatsSection from '@components/sections/StatsSection.astro';
+import FeaturesSection from '@components/sections/FeaturesSection.astro';
+import TestimonialsSection from '@components/sections/TestimonialsSection.astro';
+import SectionHeader from '@components/ui/SectionHeader.astro';
+import NoticeCard from '@components/ui/NoticeCard.astro';
+import { notices } from '@data/notices';
+import { testimonials } from '@data/testimonials';
+
+const previewNotices = notices.slice(0, 3);
+---
+<Layout
+  title="UTA MACS – Urban Trilla Apartment Owners Mutually Aided Cooperative Society"
+  description="Official website of UTA MACS – the resident welfare association for Urban Trilla Apartments at Kondakal, Hyderabad. Notices, events, committee info, and more."
+>
+  <HeroSection />
+
+  <StatsSection />
+
+  <FeaturesSection />
+
+  <!-- Latest Notices preview -->
+  <section class="section bg-section-alt">
+    <div class="container-custom">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
+        <SectionHeader
+          title="Latest Notices"
+          subtitle="Stay informed with the most recent announcements."
+        />
+        <a href="/notices" class="btn-outline px-5 py-2.5 text-small flex-shrink-0 self-start sm:self-auto">
+          View All
+          <i class="fas fa-arrow-right ml-2 text-xs" aria-hidden="true"></i>
+        </a>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {previewNotices.map((notice, i) => (
+          <NoticeCard {...notice} animationDelay={`${i * 0.1}s`} />
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <TestimonialsSection testimonials={testimonials} />
+
+  <!-- Final CTA -->
+  <section class="section">
+    <div class="container-custom">
+      <div class="max-w-2xl mx-auto text-center animate-on-scroll">
+        <div class="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <i class="fas fa-door-open text-2xl text-primary-600" aria-hidden="true"></i>
+        </div>
+        <h2 class="text-section font-bold text-text-primary mb-4">
+          Your Community, Your Voice
+        </h2>
+        <p class="text-body text-text-secondary mb-8 leading-relaxed">
+          UTA MACS belongs to every resident. Participate in meetings, raise concerns, suggest events, and help shape the community we all share.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a href="/contact" class="btn-primary px-8 py-3">
+            <i class="fas fa-envelope mr-2" aria-hidden="true"></i>
+            Contact Committee
+          </a>
+          <a href="/portal" class="btn-outline px-8 py-3">
+            <i class="fas fa-user-circle mr-2" aria-hidden="true"></i>
+            Resident Portal
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>

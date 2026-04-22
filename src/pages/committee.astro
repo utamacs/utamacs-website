@@ -1,0 +1,55 @@
+---
+import Layout from '@components/layout/Layout.astro';
+import SectionHero from '@components/ui/SectionHero.astro';
+import SectionHeader from '@components/ui/SectionHeader.astro';
+import CommitteeMemberCard from '@components/ui/CommitteeMemberCard.astro';
+import { committeeMembers } from '@data/committee';
+---
+<Layout
+  title="Committee Members – UTA MACS"
+  description="Meet the elected committee members who manage and serve the UTA MACS residential community."
+>
+  <SectionHero
+    title="Our Committee"
+    subtitle="Dedicated volunteers elected by residents to manage and improve our community."
+  />
+
+  <section class="section">
+    <div class="container-custom">
+      <SectionHeader
+        title="Meet Your Representatives"
+        subtitle="Our committee members are committed residents who volunteer their time and expertise to make UTA MACS a better place for everyone."
+        centered={true}
+      />
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {committeeMembers.map((member, i) => (
+          <CommitteeMemberCard
+            {...member}
+            animationDelay={`${i * 0.1}s`}
+          />
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact committee section -->
+  <section class="section bg-section-alt">
+    <div class="container-custom">
+      <div class="max-w-2xl mx-auto text-center animate-on-scroll">
+        <div class="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <i class="fas fa-envelope text-2xl text-primary-600" aria-hidden="true"></i>
+        </div>
+        <h2 class="text-section font-bold text-text-primary mb-4">Reach Out to the Committee</h2>
+        <p class="text-body text-text-secondary mb-8">
+          Have a concern, suggestion, or feedback? Our committee is always open to hearing from residents.
+          Write to us at <a href="mailto:urbantrillaresidents@gmail.com" class="text-primary-600 font-semibold hover:underline">urbantrillaresidents@gmail.com</a> or use the contact form.
+        </p>
+        <a href="/contact" class="btn-primary px-8 py-3">
+          <i class="fas fa-paper-plane mr-2" aria-hidden="true"></i>
+          Contact Us
+        </a>
+      </div>
+    </div>
+  </section>
+</Layout>

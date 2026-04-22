@@ -1,0 +1,28 @@
+---
+import SectionHeader from '@components/ui/SectionHeader.astro';
+import TestimonialCard from '@components/ui/TestimonialCard.astro';
+import type { Testimonial } from '@data/testimonials';
+
+interface Props {
+  testimonials: Testimonial[];
+}
+
+const { testimonials } = Astro.props;
+---
+<section class="section bg-section-alt">
+  <div class="container-custom">
+    <SectionHeader
+      title="What Residents Say"
+      subtitle="Hear from the families who call UTA MACS home."
+      centered={true}
+    />
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {testimonials.map((t, i) => (
+        <TestimonialCard
+          {...t}
+          animationDelay={`${i * 0.1}s`}
+        />
+      ))}
+    </div>
+  </div>
+</section>

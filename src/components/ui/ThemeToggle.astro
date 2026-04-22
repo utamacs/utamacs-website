@@ -1,0 +1,55 @@
+---
+// No props needed
+---
+<button
+  id="theme-toggle"
+  class="p-2 text-text-secondary hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2"
+  aria-label="Toggle dark mode"
+  type="button"
+>
+  <i class="fas fa-moon text-lg" id="theme-icon" aria-hidden="true"></i>
+</button>
+
+<script>
+  const themeToggle = document.getElementById('theme-toggle');
+  const themeIcon = document.getElementById('theme-icon');
+
+  function getCurrentTheme(): 'dark' | 'light' {
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  }
+
+  function updateIcon(theme: 'dark' | 'light') {
+    if (!themeIcon) return;
+    if (theme === 'dark') {
+      themeIcon.className = 'fas fa-sun text-lg';
+      themeToggle?.setAttribute('aria-label', 'Switch to light mode');
+    } else {
+      themeIcon.className = 'fas fa-moon text-lg';
+      themeToggle?.setAttribute('aria-label', 'Switch to dark mode');
+    }
+  }
+
+  updateIcon(getCurrentTheme());
+
+  themeToggle?.addEventListener('click', () => {
+    const isDark = document.documentElement.classList.toggle('dark');
+    const newTheme = isDark ? 'dark' : 'light';
+    localStorage.setItem('theme', newTheme);
+    updateIcon(newTheme);
+    // Screen reader announcement
+    const msg = document.createElement('div');
+    msg.setAttribute('aria-live', 'polite');
+    msg.setAttribute('aria-atomic', 'true');
+    msg.className = 'sr-only';
+    msg.textContent = `Switched to ${newTheme} mode`;
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 1000);
+  });
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (!localStorage.getItem('theme')) {
+      document.documentElement.classList.toggle('dark', e.matches);
+      updateIcon(e.matches ? 'dark' : 'light');
+    }
+  });
+</script>

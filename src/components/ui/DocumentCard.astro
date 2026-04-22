@@ -1,0 +1,44 @@
+---
+interface Props {
+  title: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+  updatedDate: string;
+  downloadUrl: string;
+  category: string;
+  animationDelay?: string;
+}
+
+const { title, subtitle, description, icon, updatedDate, downloadUrl, category, animationDelay } = Astro.props;
+---
+<div
+  class="card-premium animate-on-scroll group"
+  style={animationDelay ? `transition-delay: ${animationDelay}` : undefined}
+>
+  <div class="flex items-start space-x-4">
+    <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-primary-600 transition-colors duration-300">
+      <i class={`fas ${icon} text-primary-600 group-hover:text-white transition-colors duration-300`} aria-hidden="true"></i>
+    </div>
+    <div class="flex-1 min-w-0">
+      <span class="text-xs font-medium text-secondary-600 uppercase tracking-wide">{category}</span>
+      <h3 class="text-card font-semibold text-text-primary mt-0.5 mb-1">{title}</h3>
+      <p class="text-small font-medium text-text-secondary mb-1">{subtitle}</p>
+      <p class="text-small text-text-secondary leading-relaxed mb-3">{description}</p>
+      <div class="flex items-center justify-between">
+        <span class="text-xs text-text-secondary flex items-center gap-1">
+          <i class="fas fa-clock text-xs" aria-hidden="true"></i>
+          Updated: {updatedDate}
+        </span>
+        <a
+          href={downloadUrl}
+          class="btn-primary text-xs px-3 py-1.5"
+          aria-label={`Download ${title}`}
+        >
+          <i class="fas fa-download mr-1" aria-hidden="true"></i>
+          Download
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

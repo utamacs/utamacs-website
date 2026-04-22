@@ -1,0 +1,53 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  location: string;
+  registrationUrl?: string;
+  isPast?: boolean;
+  animationDelay?: string;
+}
+
+const { title, description, date, time, location, registrationUrl, isPast = false, animationDelay } = Astro.props;
+---
+<div
+  class:list={['card-premium animate-on-scroll', { 'opacity-75': isPast }]}
+  style={animationDelay ? `transition-delay: ${animationDelay}` : undefined}
+>
+  {isPast && (
+    <span class="inline-block text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-1 rounded-full mb-3">
+      Past Event
+    </span>
+  )}
+  <div class="flex items-start justify-between mb-4">
+    <div class="flex items-center space-x-3">
+      <div class:list={['w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0', isPast ? 'bg-gray-100' : 'bg-primary-100']}>
+        <i class:list={['fas fa-calendar-alt text-xl', isPast ? 'text-gray-500' : 'text-primary-600']} aria-hidden="true"></i>
+      </div>
+      <div>
+        <p class:list={['text-small font-semibold', isPast ? 'text-gray-500' : 'text-primary-600']}>{date}</p>
+        <p class="text-xs text-text-secondary">{time}</p>
+      </div>
+    </div>
+  </div>
+  <h3 class="text-card font-semibold text-text-primary mb-2">{title}</h3>
+  <p class="text-small text-text-secondary mb-4 leading-relaxed">{description}</p>
+  <div class="flex items-center text-small text-text-secondary mb-4">
+    <i class="fas fa-map-marker-alt text-secondary-500 mr-2 flex-shrink-0" aria-hidden="true"></i>
+    <span>{location}</span>
+  </div>
+  {!isPast && registrationUrl && (
+    <a href={registrationUrl} class="btn-primary w-full justify-center">
+      <i class="fas fa-calendar-check mr-2" aria-hidden="true"></i>
+      Register Now
+    </a>
+  )}
+  {!isPast && !registrationUrl && (
+    <button type="button" class="btn-primary w-full justify-center" disabled>
+      <i class="fas fa-calendar-check mr-2" aria-hidden="true"></i>
+      Register Now
+    </button>
+  )}
+</div>
