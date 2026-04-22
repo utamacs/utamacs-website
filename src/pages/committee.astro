@@ -59,23 +59,12 @@ import { committeeMembers, executiveMembers } from '@data/committee';
         centered={true}
       />
 
-      <div class="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {executiveMembers.map((member, i) => (
-          <div
-            class="card-premium animate-on-scroll flex items-center gap-4"
-            style={`transition-delay: ${i * 0.07}s`}
-          >
-            <div class="w-12 h-12 bg-secondary-100 text-secondary-700 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0">
-              {member.initials}
-            </div>
-            <div>
-              <p class="font-semibold text-text-primary text-small">{member.name}</p>
-              <p class="text-xs text-text-secondary mt-0.5">
-                <i class="fas fa-briefcase mr-1 text-secondary-500" aria-hidden="true"></i>
-                {member.portfolio}
-              </p>
-            </div>
-          </div>
+          <CommitteeMemberCard
+            {...member}
+            animationDelay={`${i * 0.07}s`}
+          />
         ))}
       </div>
     </div>

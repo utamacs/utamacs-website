@@ -8,12 +8,6 @@ export interface CommitteeMember {
   colorVariant: 'primary' | 'secondary' | 'accent';
 }
 
-export interface ExecutiveMember {
-  name: string;
-  portfolio: string;
-  initials: string;
-}
-
 export const committeeMembers: CommitteeMember[] = [
   {
     name: 'Sri K. Bal Reddy',
@@ -77,11 +71,47 @@ export const committeeMembers: CommitteeMember[] = [
   },
 ];
 
-export const executiveMembers: ExecutiveMember[] = [
-  { name: 'Sri Geerish Kumar', portfolio: 'Maintenance & Club House', initials: 'GK' },
-  { name: 'Sri Praseed K. V.', portfolio: 'WTP, STP', initials: 'PK' },
-  { name: 'Smt. Jhansi', portfolio: 'Temple & Play Area', initials: 'JH' },
-  { name: 'Smt. G. Sindhu', portfolio: 'Games', initials: 'GS' },
-  { name: 'Sri Sharath Chandra', portfolio: 'Security', initials: 'SC' },
-  { name: 'Sri D. Harsha', portfolio: 'Executive Member', initials: 'DH' },
+export const executiveMembers: CommitteeMember[] = [
+  {
+    name: 'Sri Geerish Kumar',
+    role: 'Maintenance & Club House',
+    description: 'Responsible for maintenance of common areas and club house facilities across the community.',
+    initials: 'GK',
+    colorVariant: 'primary',
+  },
+  {
+    name: 'Sri Praseed K. V.',
+    role: 'WTP & STP',
+    description: 'Overseeing the water treatment plant (WTP) and sewage treatment plant (STP) operations.',
+    initials: 'PK',
+    colorVariant: 'secondary',
+  },
+  {
+    name: 'Smt. Jhansi',
+    role: 'Temple & Play Area',
+    description: 'Managing the temple facilities and play area maintenance for children and residents.',
+    initials: 'JH',
+    colorVariant: 'accent',
+  },
+  {
+    name: 'Smt. G. Sindhu',
+    role: 'Games',
+    description: 'Coordinating sports and games activities, tournaments, and recreational programs for residents.',
+    initials: 'GS',
+    colorVariant: 'primary',
+  },
+  {
+    name: 'Sri Sharath Chandra',
+    role: 'Security',
+    description: 'Overseeing security arrangements, CCTV operations, and safety protocols across the community.',
+    initials: 'SC',
+    colorVariant: 'secondary',
+  },
+  {
+    name: 'Sri D. Harsha',
+    role: 'Executive Member',
+    description: 'Supporting the committee in community development initiatives and resident welfare programs.',
+    initials: 'DH',
+    colorVariant: 'accent',
+  },
 ];
