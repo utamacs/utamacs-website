@@ -77,7 +77,9 @@
 
   /* Hero Card */
   .card-hero {
-    @apply bg-background/95 backdrop-blur-sm rounded-2xl shadow-large border border-white/20 p-8;
+    @apply bg-background backdrop-blur-sm rounded-2xl shadow-large border border-white p-8;
+    background-color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
   }
 
   /* Feature Card */
@@ -121,7 +123,8 @@
 
   /* Form Components */
   .form-input {
-    @apply w-full px-4 py-3 text-body border border-border-light rounded-xl focus:border-primary-600 focus:ring-2 focus:ring-primary-600/20 focus:outline-none transition-all duration-200 bg-background;
+    @apply w-full px-4 py-3 text-body border border-border-light rounded-xl focus:border-primary-600 focus:ring-2 focus:ring-primary-600 focus:outline-none transition-all duration-200 bg-background;
+    --tw-ring-opacity: 0.2;
   }
 
   .form-label {
@@ -336,9 +339,9 @@
   }
 
   .card-premium {
-    @apply shadow-none border border-black/20;
+    @apply shadow-none border border-black;
+    border-color: rgba(0, 0, 0, 0.2);
   }
-}
 }
 
 .btn-modern:hover::before {
