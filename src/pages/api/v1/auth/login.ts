@@ -27,37 +27,37 @@ export const POST: APIRoute = async ({ request }) => {
       userAgent: request.headers.get('user-agent') ?? undefined,
     });
 
-    const cookieOptions = [
+    const accessCookie = [
       `sb-access-token=${session.accessToken}`,
       'Path=/',
       'HttpOnly',
       'Secure',
-      'SameSite=Strict',
+      'SameSite=Lax',
       `Max-Age=${15 * 60}`,
     ].join('; ');
 
-    const refreshCookieOptions = [
+    const refreshCookie = [
       `sb-refresh-token=${session.refreshToken}`,
       'Path=/api/v1/auth/refresh',
       'HttpOnly',
       'Secure',
-      'SameSite=Strict',
+      'SameSite=Lax',
       `Max-Age=${7 * 24 * 60 * 60}`,
     ].join('; ');
+
+    const headers = new Headers({
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    });
+    headers.append('Set-Cookie', accessCookie);
+    headers.append('Set-Cookie', refreshCookie);
 
     return new Response(
       JSON.stringify({
         user: session.user,
         expiresAt: session.expiresAt,
       }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Set-Cookie': cookieOptions,
-          'Set-Cookie2': refreshCookieOptions,
-        },
-      },
+      { status: 200, headers },
     );
   } catch (err) {
     console.error('[login] error:', err instanceof Error ? err.message : err);
