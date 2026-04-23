@@ -1,0 +1,71 @@
+name: Deploy Portal to Vercel
+
+on:
+  push:
+    branches: [main, utamacs-fullstack]
+  pull_request:
+    branches: [main]
+
+jobs:
+  type-check:
+    name: type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: TypeScript check
+        run: npx tsc --noEmit --skipLibCheck
+
+  build-portal:
+    name: build portal
+    runs-on: ubuntu-latest
+    needs: type-check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Build portal
+        run: npm run build:portal
+        env:
+          PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+          PUBLIC_SOCIETY_ID: ${{ secrets.PUBLIC_SOCIETY_ID }}
+          PROVIDER: supabase
+
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    needs: build-portal
+    if: github.event_name == 'push'
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Deploy to Vercel
+        run: |
+          npm install -g vercel
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            vercel --prod \
+              --token=${{ secrets.VERCEL_TOKEN }} \
+              --scope=${{ secrets.VERCEL_ORG_ID }} \
+              --yes
+          else
+            vercel \
+              --token=${{ secrets.VERCEL_TOKEN }} \
+              --scope=${{ secrets.VERCEL_ORG_ID }} \
+              --yes
+          fi
+        env:
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

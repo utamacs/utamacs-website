@@ -1,5 +1,6 @@
 {
   "buildCommand": "npm run build:portal",
+  "alias": ["portal.utamacs.org"],
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": "astro",

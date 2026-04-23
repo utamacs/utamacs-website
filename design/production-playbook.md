@@ -17,11 +17,11 @@
 | # | Task | File | Status |
 |---|------|------|--------|
 | A1 | Verify service role key uses `process.env` | `src/lib/services/providers/supabase/SupabaseDB.ts` | `[x]` Confirmed safe — already uses `process.env` |
-| A2 | Replace in-memory rate limiter with Upstash Redis | `src/lib/middleware/rateLimiter.ts` | `[ ]` |
-| A3 | Create health check endpoint | `src/pages/api/v1/health.ts` | `[ ]` |
-| A4 | Create Vercel CI/CD pipeline | `.github/workflows/deploy-portal.yml` | `[ ]` |
-| A5 | Add production domain alias to vercel.json | `vercel.json` | `[ ]` |
-| A6 | Create Dependabot config | `.github/dependabot.yml` | `[ ]` |
+| A2 | Replace in-memory rate limiter with Upstash Redis | `src/lib/middleware/rateLimiter.ts` | `[x]` Done — Upstash `slidingWindow`, in-memory fallback for local dev |
+| A3 | Create health check endpoint | `src/pages/api/v1/health.ts` | `[x]` Done — DB connectivity check, returns 200/503 |
+| A4 | Create Vercel CI/CD pipeline | `.github/workflows/deploy-portal.yml` | `[x]` Done — type-check → build → deploy jobs |
+| A5 | Add production domain alias to vercel.json | `vercel.json` | `[x]` Done |
+| A6 | Create Dependabot config | `.github/dependabot.yml` | `[x]` Done — weekly on Monday 9am IST |
 
 ## MANUAL TASKS — Detailed step-by-step below each section
 

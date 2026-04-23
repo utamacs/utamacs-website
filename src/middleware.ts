@@ -21,7 +21,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (path.startsWith(API_PREFIX)) {
     const ip = extractClientIP(request);
     try {
-      checkRateLimit(ip, path);
+      await checkRateLimit(ip, path);
     } catch (err: unknown) {
       const e = err as { status?: number; retryAfter?: number; message?: string };
       return new Response(JSON.stringify({ error: e.message }), {
