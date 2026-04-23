@@ -17,6 +17,13 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
+      - name: Generate Astro types
+        run: npx astro sync --config astro.portal.config.mjs
+        env:
+          PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+          PUBLIC_SOCIETY_ID: ${{ secrets.PUBLIC_SOCIETY_ID }}
+          PROVIDER: supabase
       - name: TypeScript check
         run: npx tsc --noEmit --skipLibCheck
 
