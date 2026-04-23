@@ -1,85 +1,17 @@
 ---
-import Layout from '@components/layout/Layout.astro';
-import SectionHero from '@components/ui/SectionHero.astro';
+// Redirect to the portal login — the real auth lives at portal.utamacs.org
 ---
-<Layout title="Login – UTA MACS" description="Log in to access the UTA MACS resident portal.">
-  <SectionHero title="Resident Login" subtitle="Access your account to view notices, dues, and community updates." />
-
-  <section class="section bg-section-alt">
-    <div class="container-custom">
-      <div class="max-w-md mx-auto">
-        <div class="card-premium">
-          <div class="text-center mb-8">
-            <div class="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <i class="fas fa-user-circle text-3xl text-primary-600" aria-hidden="true"></i>
-            </div>
-            <h2 class="text-xl font-semibold text-text-primary">Welcome Back</h2>
-            <p class="text-small text-text-secondary mt-1">Sign in to your resident account</p>
-          </div>
-
-          <form class="space-y-5" novalidate>
-            <div>
-              <label for="email" class="form-label">Email Address</label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                class="form-input"
-                placeholder="you@example.com"
-                autocomplete="email"
-                required
-              />
-            </div>
-            <div>
-              <label for="password" class="form-label">Password</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                class="form-input"
-                placeholder="••••••••"
-                autocomplete="current-password"
-                required
-              />
-            </div>
-            <div class="flex items-center justify-between text-small">
-              <label class="flex items-center gap-2 text-text-secondary cursor-pointer">
-                <input type="checkbox" class="rounded border-border-light text-primary-600 focus:ring-primary-500" />
-                <span>Remember me</span>
-              </label>
-              <a href="/contact" class="text-primary-600 hover:text-primary-700 font-medium transition-colors">
-                Forgot password?
-              </a>
-            </div>
-            <button type="submit" class="btn-primary w-full justify-center py-3">
-              <i class="fas fa-sign-in-alt mr-2" aria-hidden="true"></i>
-              Sign In
-            </button>
-          </form>
-
-          <div class="mt-6 pt-6 border-t border-border-light text-center">
-            <p class="text-small text-text-secondary">
-              Not registered yet?
-              <a href="/contact" class="text-primary-600 hover:text-primary-700 font-medium ml-1 transition-colors">
-                Contact us
-              </a>
-            </p>
-          </div>
-        </div>
-
-        <div class="mt-6 card-premium bg-primary-50 border-primary-200">
-          <div class="flex gap-3">
-            <i class="fas fa-info-circle text-primary-600 flex-shrink-0 mt-0.5" aria-hidden="true"></i>
-            <div>
-              <p class="text-small font-semibold text-primary-800 mb-1">First time here?</p>
-              <p class="text-small text-primary-700">
-                Your login credentials are provided by the association committee. Please
-                <a href="/contact" class="font-semibold underline">contact us</a> to get access.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-</Layout>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="refresh" content="0; url=https://portal.utamacs.org/portal/login" />
+  <title>Redirecting to Portal Login – UTA MACS</title>
+</head>
+<body>
+  <p>Redirecting to the resident portal…
+    <a href="https://portal.utamacs.org/portal/login">Click here if not redirected</a>
+  </p>
+  <script>window.location.replace('https://portal.utamacs.org/portal/login');</script>
+</body>
+</html>
