@@ -1,0 +1,200 @@
+---
+import type { UserClaims } from '@lib/services/interfaces/IAuthService';
+import { featureFlagService } from '@lib/services/index';
+
+export interface Props {
+  title: string;
+  user: UserClaims;
+  activeModule?: string;
+}
+
+const { title, user, activeModule } = Astro.props;
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+
+let modules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = [];
+try {
+  const allModules = await featureFlagService.getModules(SOCIETY_ID);
+  modules = allModules.filter((m) => {
+    // security_guard only sees visitor_mgmt; vendor only sees vendors
+    if (user.role === 'security_guard') return m.moduleKey === 'visitor_mgmt';
+    if (user.role === 'vendor') return m.moduleKey === 'vendors';
+    return true;
+  });
+} catch {
+  // fallback: show basic modules
+}
+
+const MODULE_PATHS: Record<string, string> = {
+  complaints: '/portal/complaints',
+  notices: '/portal/notices',
+  events: '/portal/events',
+  polls: '/portal/polls',
+  finance: '/portal/finance',
+  facility_booking: '/portal/facilities',
+  visitor_mgmt: '/portal/visitors',
+  vendors: '/portal/vendors',
+  community: '/portal/community',
+  documents: '/portal/documents',
+  asset_mgmt: '/portal/assets',
+  parking: '/portal/parking',
+  agm: '/portal/agm',
+  notifications: '/portal/notifications',
+  analytics: '/portal/analytics',
+  compliance: '/portal/admin/audit',
+  members: '/portal/members',
+};
+---
+
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>{title} – UTA MACS Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://kit.fontawesome.com/5a2b2f0b4f.js" crossorigin="anonymous" defer></script>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#1E3A8A" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    }
+  </script>
+</head>
+<body class="h-full bg-gray-50 font-sans text-text-primary">
+
+  <!-- Mobile header -->
+  <header class="lg:hidden bg-white border-b border-border-light px-4 py-3 flex items-center justify-between sticky top-0 z-40">
+    <a href="/portal" class="flex items-center gap-2">
+      <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+        <i class="fas fa-building text-white text-sm" aria-hidden="true"></i>
+      </div>
+      <span class="font-semibold text-primary-600 text-sm">UTA MACS</span>
+    </a>
+    <button id="sidebar-toggle" class="p-2 rounded-lg text-text-secondary hover:bg-gray-100" aria-label="Toggle menu">
+      <i class="fas fa-bars" aria-hidden="true"></i>
+    </button>
+  </header>
+
+  <div class="flex h-full lg:h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside
+      id="sidebar"
+      class="fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-border-light flex flex-col transform -translate-x-full transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:flex"
+      aria-label="Portal navigation"
+    >
+      <!-- Logo -->
+      <div class="p-6 border-b border-border-light">
+        <a href="/portal" class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-building text-white" aria-hidden="true"></i>
+          </div>
+          <div>
+            <div class="font-bold text-primary-600 text-sm leading-tight">UTA MACS</div>
+            <div class="text-xs text-text-secondary">Resident Portal</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- User info -->
+      <div class="px-4 py-3 border-b border-border-light bg-gray-50">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-user text-primary-600 text-sm" aria-hidden="true"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-text-primary truncate">{user.email}</div>
+            <div class="text-xs text-text-secondary capitalize">{user.role.replace('_', ' ')}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 overflow-y-auto py-4 px-3" aria-label="Module navigation">
+        <a
+          href="/portal"
+          class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-colors ${
+            activeModule === 'dashboard'
+              ? 'bg-primary-50 text-primary-600'
+              : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
+          }`}
+        >
+          <i class="fas fa-home w-4 text-center" aria-hidden="true"></i>
+          Dashboard
+        </a>
+
+        {modules.map((mod) => {
+          const href = MODULE_PATHS[mod.moduleKey] ?? `/portal/${mod.moduleKey}`;
+          const isActive = activeModule === mod.moduleKey;
+          return (
+            <a
+              href={href}
+              class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-colors ${
+                isActive
+                  ? 'bg-primary-50 text-primary-600'
+                  : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
+              }`}
+            >
+              {mod.icon && <i class={`fas ${mod.icon} w-4 text-center`} aria-hidden="true"></i>}
+              {mod.displayName}
+            </a>
+          );
+        })}
+      </nav>
+
+      <!-- Footer actions -->
+      <div class="p-4 border-t border-border-light space-y-1">
+        <a
+          href="/portal/profile"
+          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:bg-gray-100 hover:text-text-primary transition-colors"
+        >
+          <i class="fas fa-user-cog w-4 text-center" aria-hidden="true"></i>
+          My Profile
+        </a>
+        <form method="POST" action="/api/v1/auth/signout">
+          <button
+            type="submit"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <i class="fas fa-sign-out-alt w-4 text-center" aria-hidden="true"></i>
+            Sign Out
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- Sidebar overlay (mobile) -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 z-40 hidden lg:hidden" aria-hidden="true"></div>
+
+    <!-- Main content -->
+    <main class="flex-1 overflow-y-auto">
+      <div class="p-6 max-w-7xl mx-auto">
+        <slot />
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const toggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    function openSidebar() {
+      sidebar?.classList.remove('-translate-x-full');
+      overlay?.classList.remove('hidden');
+    }
+    function closeSidebar() {
+      sidebar?.classList.add('-translate-x-full');
+      overlay?.classList.add('hidden');
+    }
+
+    toggle?.addEventListener('click', openSidebar);
+    overlay?.addEventListener('click', closeSidebar);
+  </script>
+</body>
+</html>

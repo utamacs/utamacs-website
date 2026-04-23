@@ -1,0 +1,201 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const { id } = Astro.params;
+const sb = getSupabaseServiceClient();
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+
+const { data: post } = await sb
+  .from('community_posts')
+  .select('id, title, body, category, is_pinned, created_at, author_id, profiles(full_name), units(unit_number)')
+  .eq('id', id!)
+  .eq('society_id', SOCIETY_ID)
+  .eq('is_published', true)
+  .single();
+
+if (!post) return Astro.redirect('/portal/community');
+
+const { data: comments } = await sb
+  .from('post_comments')
+  .select('id, body, created_at, author_id, parent_id, profiles(full_name)')
+  .eq('post_id', id!)
+  .eq('is_hidden', false)
+  .order('created_at', { ascending: true });
+
+const isOwner = (post as any).author_id === user.id;
+const isMod = ['executive', 'admin'].includes(user.role);
+const canDelete = isOwner || isMod;
+const canComment = !['security_guard', 'vendor'].includes(user.role);
+
+const CATEGORY_COLORS: Record<string, string> = {
+  General: 'bg-blue-100 text-blue-700',
+  Help: 'bg-orange-100 text-orange-700',
+  Lost_Found: 'bg-yellow-100 text-yellow-700',
+  Recommendation: 'bg-green-100 text-green-700',
+  Alert: 'bg-red-100 text-red-700',
+};
+
+const p = post as any;
+---
+
+<PortalLayout title={p.title} user={user} activeModule="community">
+  <div class="mb-4">
+    <nav class="text-sm text-text-secondary mb-3">
+      <a href="/portal/community" class="hover:text-primary-600">Community Board</a>
+      <span class="mx-2">›</span><span class="text-text-primary truncate">{p.title}</span>
+    </nav>
+  </div>
+
+  <div class="max-w-2xl">
+    <!-- Post -->
+    <div class={`bg-white rounded-xl border border-border-light p-6 mb-6 ${p.is_pinned ? 'border-l-4 border-l-primary-600' : ''}`}>
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold">
+            {((p.profiles as any)?.full_name ?? 'U')[0].toUpperCase()}
+          </div>
+          <div>
+            <div class="font-medium text-text-primary">{(p.profiles as any)?.full_name ?? 'Resident'}</div>
+            <div class="text-xs text-text-secondary">
+              {(p.units as any)?.unit_number ?? ''} · {new Date(p.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'})}
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          {p.is_pinned && <i class="fas fa-thumbtack text-primary-600 text-xs" title="Pinned"></i>}
+          <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[p.category] ?? 'bg-gray-100 text-gray-600'}`}>
+            {p.category.replace('_', ' ')}
+          </span>
+        </div>
+      </div>
+
+      <h1 class="text-xl font-bold text-text-primary mb-3">{p.title}</h1>
+      <div class="text-sm text-text-secondary leading-relaxed prose prose-sm max-w-none" set:html={p.body}></div>
+
+      <div class="mt-5 pt-4 border-t border-border-light flex items-center gap-4">
+        <button id="like-btn" onclick="react('like')" class="flex items-center gap-1.5 text-sm text-text-secondary hover:text-primary-600 transition-colors">
+          <i class="fas fa-thumbs-up"></i>
+          <span id="like-count">–</span> Like
+        </button>
+        <button id="helpful-btn" onclick="react('helpful')" class="flex items-center gap-1.5 text-sm text-text-secondary hover:text-green-600 transition-colors">
+          <i class="fas fa-star"></i>
+          <span id="helpful-count">–</span> Helpful
+        </button>
+        {canDelete && (
+          <button onclick="deletePost()" class="ml-auto flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition-colors">
+            <i class="fas fa-trash" aria-hidden="true"></i>
+            {isMod && !isOwner ? 'Moderate' : 'Delete'}
+          </button>
+        )}
+      </div>
+    </div>
+
+    <!-- Comments -->
+    <div class="bg-white rounded-xl border border-border-light overflow-hidden mb-4">
+      <div class="px-5 py-4 border-b border-border-light bg-gray-50">
+        <h2 class="font-semibold text-text-primary">{(comments ?? []).length} Comment{(comments ?? []).length !== 1 ? 's' : ''}</h2>
+      </div>
+      <div id="comments-list" class="divide-y divide-border-light">
+        {!(comments?.length) && (
+          <p class="text-sm text-text-secondary text-center py-6">No comments yet. Be the first!</p>
+        )}
+        {(comments ?? []).map((c: any) => (
+          <div class="px-5 py-4">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-7 h-7 rounded-full bg-gray-200 text-text-secondary flex items-center justify-center text-xs font-bold">
+                {(c.profiles?.full_name ?? 'U')[0].toUpperCase()}
+              </div>
+              <span class="text-sm font-medium text-text-primary">{c.profiles?.full_name ?? 'Resident'}</span>
+              <span class="text-xs text-text-secondary">{new Date(c.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'short'})}</span>
+            </div>
+            <p class="text-sm text-text-secondary ml-9">{c.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <!-- Comment form -->
+    {canComment && (
+      <div class="bg-white rounded-xl border border-border-light p-5">
+        <h3 class="text-sm font-semibold text-text-primary mb-3">Add a comment</h3>
+        <div id="comment-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+        <textarea id="comment-body" rows="3" maxlength="2000"
+          placeholder="Write a comment…"
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none mb-3"></textarea>
+        <button onclick="submitComment()" id="comment-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-paper-plane" aria-hidden="true"></i>
+          <span id="comment-btn-text">Post Comment</span>
+          <span id="comment-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+        </button>
+      </div>
+    )}
+  </div>
+
+  <script define:vars={{ postId: id }}>
+    async function loadReactions() {
+      const res = await fetch(`/api/v1/community/posts/${postId}`, { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      document.getElementById('like-count').textContent = data.like_count;
+      document.getElementById('helpful-count').textContent = data.helpful_count;
+    }
+
+    async function react(type) {
+      const res = await fetch(`/api/v1/community/posts/${postId}/react`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reaction_type: type }),
+      });
+      if (res.ok) loadReactions();
+    }
+
+    async function submitComment() {
+      const body = document.getElementById('comment-body').value.trim();
+      if (!body) return;
+
+      const errEl = document.getElementById('comment-error');
+      const btn = document.getElementById('comment-btn');
+      const btnText = document.getElementById('comment-btn-text');
+      const spinner = document.getElementById('comment-spinner');
+
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btnText.classList.add('hidden');
+      spinner.classList.remove('hidden');
+
+      const res = await fetch(`/api/v1/community/posts/${postId}/comments`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      });
+
+      btn.disabled = false;
+      btnText.classList.remove('hidden');
+      spinner.classList.add('hidden');
+
+      if (res.ok) {
+        document.getElementById('comment-body').value = '';
+        window.location.reload();
+      } else {
+        const d = await res.json();
+        errEl.textContent = d.detail ?? d.error ?? 'Failed to post comment.';
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    async function deletePost() {
+      if (!confirm('Are you sure you want to remove this post?')) return;
+      const res = await fetch(`/api/v1/community/posts/${postId}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok || res.status === 204) window.location.href = '/portal/community';
+      else alert('Failed to remove post.');
+    }
+
+    window.react = react;
+    window.submitComment = submitComment;
+    window.deletePost = deletePost;
+    loadReactions();
+  </script>
+</PortalLayout>

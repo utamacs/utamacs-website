@@ -1,0 +1,202 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+const facilityId = Astro.url.searchParams.get('facility');
+const [{ data: facilities }, { data: units }] = await Promise.all([
+  sb.from('facilities').select('id, name, description, capacity, booking_fee, deposit_amount, advance_booking_days, cancellation_hours_free, amenities').eq('society_id', SOCIETY_ID).eq('is_active', true).order('name'),
+  sb.from('units').select('id, unit_number, block').eq('society_id', SOCIETY_ID).order('unit_number'),
+]);
+
+const selected = facilities?.find((f: {id: string}) => f.id === facilityId) ?? facilities?.[0];
+---
+
+<PortalLayout title="Book Facility" user={user} activeModule="facility_booking">
+  <div class="mb-6">
+    <nav class="text-sm text-text-secondary mb-3">
+      <a href="/portal/facilities" class="hover:text-primary-600">Facilities</a>
+      <span class="mx-2">›</span><span class="text-text-primary">New Booking</span>
+    </nav>
+    <h1 class="text-2xl font-bold text-text-primary">Book a Facility</h1>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Booking Form -->
+    <div class="lg:col-span-2">
+      <div id="error-banner" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+      <form id="booking-form" class="bg-white rounded-xl border border-border-light p-6 space-y-5">
+        <div>
+          <label for="facility_id" class="block text-sm font-medium text-text-primary mb-1.5">Facility <span class="text-red-500">*</span></label>
+          <select id="facility_id" name="facility_id" required onchange="updateFacilityInfo(this.value)"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            {(facilities ?? []).map((f: {id: string; name: string}) => (
+              <option value={f.id} selected={f.id === selected?.id}>{f.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label for="unit_id" class="block text-sm font-medium text-text-primary mb-1.5">Your Unit <span class="text-red-500">*</span></label>
+          <select id="unit_id" name="unit_id" required
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">Select your flat</option>
+            {(units ?? []).map((u: {id: string; unit_number: string; block: string | null}) => (
+              <option value={u.id}>{u.unit_number}{u.block ? ` – Block ${u.block}` : ''}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label for="booking_date" class="block text-sm font-medium text-text-primary mb-1.5">Date <span class="text-red-500">*</span></label>
+          <input type="date" id="booking_date" name="booking_date" required
+            min={new Date().toISOString().split('T')[0]}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="start_time" class="block text-sm font-medium text-text-primary mb-1.5">Start Time <span class="text-red-500">*</span></label>
+            <input type="time" id="start_time" name="start_time" required
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label for="end_time" class="block text-sm font-medium text-text-primary mb-1.5">End Time <span class="text-red-500">*</span></label>
+            <input type="time" id="end_time" name="end_time" required
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="attendees_count" class="block text-sm font-medium text-text-primary mb-1.5">Expected Attendees</label>
+            <input type="number" id="attendees_count" name="attendees_count" min="1" value="1"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label for="purpose" class="block text-sm font-medium text-text-primary mb-1.5">Purpose</label>
+            <input type="text" id="purpose" name="purpose" maxlength="200"
+              placeholder="e.g. Birthday party, Meeting"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+          <button type="submit" id="submit-btn" class="btn-primary flex items-center gap-2">
+            <i class="fas fa-calendar-check" aria-hidden="true"></i>
+            <span id="btn-text">Confirm Booking</span>
+            <span id="btn-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+          </button>
+          <a href="/portal/facilities" class="btn-outline">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Facility Info Panel -->
+    <div>
+      <div id="facility-info" class="bg-white rounded-xl border border-border-light p-5 sticky top-6">
+        {selected ? (
+          <div>
+            <h2 class="font-semibold text-text-primary mb-3">{selected.name}</h2>
+            {selected.description && <p class="text-sm text-text-secondary mb-4">{selected.description}</p>}
+            <div class="space-y-2 text-sm">
+              {selected.capacity && <div class="flex justify-between"><span class="text-text-secondary">Capacity</span><span>{selected.capacity} persons</span></div>}
+              <div class="flex justify-between"><span class="text-text-secondary">Booking Fee</span><span class="font-medium">{selected.booking_fee > 0 ? `₹${Number(selected.booking_fee).toLocaleString('en-IN')}` : 'Free'}</span></div>
+              {selected.deposit_amount > 0 && <div class="flex justify-between"><span class="text-text-secondary">Deposit</span><span>₹{Number(selected.deposit_amount).toLocaleString('en-IN')}</span></div>}
+              <div class="flex justify-between"><span class="text-text-secondary">Advance Booking</span><span>Up to {selected.advance_booking_days} days</span></div>
+              <div class="flex justify-between"><span class="text-text-secondary">Free Cancellation</span><span>{selected.cancellation_hours_free}h before</span></div>
+            </div>
+            {selected.amenities?.length > 0 && (
+              <div class="mt-4 pt-4 border-t border-border-light">
+                <p class="text-xs text-text-secondary mb-2">Amenities</p>
+                <div class="flex flex-wrap gap-1">
+                  {selected.amenities.map((a: string) => <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded">{a}</span>)}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p class="text-sm text-text-secondary">Select a facility to see details.</p>
+        )}
+      </div>
+    </div>
+  </div>
+
+  <script define:vars={{ facilities: facilities ?? [] }}>
+    const facilityMap = Object.fromEntries((facilities as any[]).map((f: any) => [f.id, f]));
+
+    function updateFacilityInfo(id: string) {
+      const f = facilityMap[id];
+      if (!f) return;
+      const panel = document.getElementById('facility-info')!;
+      panel.innerHTML = `
+        <h2 class="font-semibold text-text-primary mb-3">${f.name}</h2>
+        ${f.description ? `<p class="text-sm text-text-secondary mb-4">${f.description}</p>` : ''}
+        <div class="space-y-2 text-sm">
+          ${f.capacity ? `<div class="flex justify-between"><span class="text-text-secondary">Capacity</span><span>${f.capacity} persons</span></div>` : ''}
+          <div class="flex justify-between"><span class="text-text-secondary">Booking Fee</span><span class="font-medium">${f.booking_fee > 0 ? `₹${Number(f.booking_fee).toLocaleString('en-IN')}` : 'Free'}</span></div>
+          ${f.deposit_amount > 0 ? `<div class="flex justify-between"><span class="text-text-secondary">Deposit</span><span>₹${Number(f.deposit_amount).toLocaleString('en-IN')}</span></div>` : ''}
+          <div class="flex justify-between"><span class="text-text-secondary">Free Cancellation</span><span>${f.cancellation_hours_free}h before</span></div>
+        </div>
+      `;
+    }
+
+    window.updateFacilityInfo = updateFacilityInfo;
+
+    const form = document.getElementById('booking-form') as HTMLFormElement;
+    const errorBanner = document.getElementById('error-banner')!;
+    const btnText = document.getElementById('btn-text')!;
+    const btnSpinner = document.getElementById('btn-spinner')!;
+    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const date = fd.get('booking_date') as string;
+      const start = fd.get('start_time') as string;
+      const end = fd.get('end_time') as string;
+
+      if (start >= end) {
+        errorBanner.textContent = 'End time must be after start time.';
+        errorBanner.classList.remove('hidden');
+        return;
+      }
+
+      errorBanner.classList.add('hidden');
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      submitBtn.disabled = true;
+
+      const res = await fetch('/api/v1/facilities/bookings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({
+          facility_id: fd.get('facility_id'),
+          unit_id: fd.get('unit_id'),
+          booking_date: date,
+          start_time: `${date}T${start}:00+05:30`,
+          end_time: `${date}T${end}:00+05:30`,
+          attendees_count: Number(fd.get('attendees_count') ?? 1),
+          purpose: fd.get('purpose') || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = '/portal/facilities?booked=1';
+      } else {
+        errorBanner.textContent = data.detail ?? data.error ?? 'Booking failed.';
+        errorBanner.classList.remove('hidden');
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</PortalLayout>

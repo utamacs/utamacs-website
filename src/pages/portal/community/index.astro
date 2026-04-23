@@ -1,0 +1,164 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const canPost = ['member', 'executive', 'admin'].includes(user.role);
+---
+
+<PortalLayout title="Community Board" user={user} activeModule="community">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Community Board</h1>
+      <p class="text-sm text-text-secondary mt-1">Posts, announcements, and discussions from your neighbours.</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/portal/community/marketplace" class="btn-outline text-sm flex items-center gap-2">
+        <i class="fas fa-tag" aria-hidden="true"></i>
+        Marketplace
+      </a>
+      {canPost && (
+        <a href="/portal/community/new" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-pen" aria-hidden="true"></i>
+          New Post
+        </a>
+      )}
+    </div>
+  </div>
+
+  <!-- Category filter -->
+  <div class="flex gap-2 flex-wrap mb-5" id="category-filters">
+    {['All','General','Help','Lost_Found','Recommendation','Alert'].map(cat => (
+      <button
+        data-cat={cat === 'All' ? '' : cat}
+        class={`filter-btn text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${cat === 'All' ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600'}`}
+      >
+        {cat.replace('_', ' ')}
+      </button>
+    ))}
+  </div>
+
+  <!-- Posts feed -->
+  <div id="posts-feed" class="space-y-4">
+    <div class="text-center py-10 text-text-secondary text-sm">Loading…</div>
+  </div>
+
+  <!-- Load more -->
+  <div class="mt-6 text-center">
+    <button id="load-more-btn" class="hidden btn-outline text-sm">Load more</button>
+  </div>
+
+  <script define:vars={{ canPost, userId: user.id }}>
+    const CATEGORY_COLORS = {
+      General: 'bg-blue-100 text-blue-700',
+      Help: 'bg-orange-100 text-orange-700',
+      Lost_Found: 'bg-yellow-100 text-yellow-700',
+      Recommendation: 'bg-green-100 text-green-700',
+      Alert: 'bg-red-100 text-red-700',
+    };
+
+    let currentCategory = '';
+    let currentOffset = 0;
+    const LIMIT = 10;
+
+    async function loadPosts(reset = false) {
+      if (reset) {
+        currentOffset = 0;
+        document.getElementById('posts-feed').innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">Loading…</div>';
+      }
+
+      const params = new URLSearchParams({ limit: LIMIT, offset: currentOffset });
+      if (currentCategory) params.set('category', currentCategory);
+
+      const res = await fetch(`/api/v1/community/posts?${params}`, { credentials: 'include' });
+      const posts = res.ok ? await res.json() : [];
+
+      const feed = document.getElementById('posts-feed');
+
+      if (reset) feed.innerHTML = '';
+
+      if (!posts.length && currentOffset === 0) {
+        feed.innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">No posts yet. Be the first to post!</div>';
+        document.getElementById('load-more-btn').classList.add('hidden');
+        return;
+      }
+
+      posts.forEach(p => {
+        const card = document.createElement('div');
+        card.className = `bg-white rounded-xl border border-border-light p-5 ${p.is_pinned ? 'border-l-4 border-l-primary-600' : ''}`;
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                ${(p.profiles?.full_name ?? 'U')[0].toUpperCase()}
+              </div>
+              <div class="min-w-0">
+                <div class="text-sm font-medium text-text-primary truncate">${p.profiles?.full_name ?? 'Resident'}</div>
+                <div class="text-xs text-text-secondary">${p.units?.unit_number ?? ''} · ${new Date(p.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              ${p.is_pinned ? '<i class="fas fa-thumbtack text-primary-600 text-xs" title="Pinned"></i>' : ''}
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[p.category] ?? 'bg-gray-100 text-gray-600'}">${p.category.replace('_',' ')}</span>
+            </div>
+          </div>
+          <a href="/portal/community/${p.id}" class="block hover:text-primary-600 transition-colors">
+            <h3 class="font-semibold text-text-primary mb-1.5">${p.title}</h3>
+            <p class="text-sm text-text-secondary line-clamp-2">${p.body.replace(/<[^>]*>/g,'')}</p>
+          </a>
+          <div class="mt-3 flex items-center gap-4 text-xs text-text-secondary">
+            <button onclick="react('${p.id}','like',this)" class="flex items-center gap-1 hover:text-primary-600 transition-colors reaction-btn" data-post="${p.id}" data-type="like">
+              <i class="fas fa-thumbs-up"></i>
+              <span class="like-count">${p.like_count}</span>
+            </button>
+            <button onclick="react('${p.id}','helpful',this)" class="flex items-center gap-1 hover:text-green-600 transition-colors reaction-btn" data-post="${p.id}" data-type="helpful">
+              <i class="fas fa-star"></i>
+              <span class="helpful-count">${p.helpful_count}</span>
+            </button>
+            <a href="/portal/community/${p.id}" class="flex items-center gap-1 hover:text-primary-600 transition-colors">
+              <i class="fas fa-comment"></i> View
+            </a>
+          </div>
+        `;
+        feed.appendChild(card);
+      });
+
+      currentOffset += posts.length;
+      document.getElementById('load-more-btn').classList.toggle('hidden', posts.length < LIMIT);
+    }
+
+    async function react(postId, type, btn) {
+      const res = await fetch(`/api/v1/community/posts/${postId}/react`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reaction_type: type }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const countEl = btn.querySelector(`.${type}-count`);
+      if (countEl) {
+        const current = parseInt(countEl.textContent || '0');
+        countEl.textContent = data.action === 'added' ? current + 1 : Math.max(0, current - 1);
+      }
+    }
+
+    document.getElementById('category-filters').addEventListener('click', (e) => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
+        b.classList.add('bg-white', 'text-text-secondary', 'border-border-light');
+      });
+      btn.classList.add('bg-primary-600', 'text-white', 'border-primary-600');
+      btn.classList.remove('bg-white', 'text-text-secondary', 'border-border-light');
+      currentCategory = btn.dataset.cat;
+      loadPosts(true);
+    });
+
+    document.getElementById('load-more-btn').addEventListener('click', () => loadPosts(false));
+
+    window.react = react;
+    loadPosts(true);
+  </script>
+</PortalLayout>

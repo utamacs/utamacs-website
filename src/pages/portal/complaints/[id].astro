@@ -1,0 +1,205 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const { id } = Astro.params;
+const created = Astro.url.searchParams.get('created') === '1';
+const isExec = ['executive','admin'].includes(user.role);
+
+const VALID_STATUS = ['Open','Assigned','In_Progress','Waiting_for_User','Resolved','Closed','Reopened'];
+---
+
+<PortalLayout title="Complaint Detail" user={user} activeModule="complaints">
+  {created && (
+    <div id="success-banner" class="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 flex items-center gap-2">
+      <i class="fas fa-check-circle" aria-hidden="true"></i>
+      Your complaint has been submitted. Our team will respond within the SLA window.
+    </div>
+  )}
+
+  <div id="detail-container">
+    <div class="flex items-center justify-center h-48 text-text-secondary">
+      <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+      Loading complaint…
+    </div>
+  </div>
+
+  <script define:vars={{ id, isExec, userId: user.id, VALID_STATUS }}>
+    const STATUS_BADGE = {
+      Open: 'bg-red-100 text-red-700', Assigned: 'bg-blue-100 text-blue-700',
+      In_Progress: 'bg-yellow-100 text-yellow-700', Waiting_for_User: 'bg-orange-100 text-orange-700',
+      Resolved: 'bg-green-100 text-green-700', Closed: 'bg-gray-100 text-gray-600',
+      Reopened: 'bg-purple-100 text-purple-700',
+    };
+    const PRIORITY_COLOR = { Critical: 'text-red-600', High: 'text-orange-500', Medium: 'text-yellow-600', Low: 'text-green-600' };
+
+    let complaint = null;
+
+    let execUsers = [];
+
+    async function load() {
+      const [cRes, cmRes, usersRes] = await Promise.all([
+        fetch(`/api/v1/complaints/${id}`, { credentials: 'include' }),
+        fetch(`/api/v1/complaints/${id}/comments`, { credentials: 'include' }),
+        isExec ? fetch('/api/v1/members?limit=100', { credentials: 'include' }) : Promise.resolve(null),
+      ]);
+      complaint = await cRes.json();
+      const comments = cRes.ok ? (await cmRes.json()) : [];
+      if (usersRes?.ok) {
+        const mData = await usersRes.json();
+        execUsers = (mData.data ?? mData ?? []).filter((m: any) => ['executive','admin'].includes(m.role ?? ''));
+      }
+      render(complaint, comments);
+    }
+
+    function render(c, comments) {
+      const container = document.getElementById('detail-container');
+      const slaDate = new Date(c.sla_deadline);
+      const slaBreached = slaDate < new Date() && !['Closed','Resolved'].includes(c.status);
+
+      container.innerHTML = `
+        <div class="mb-4">
+          <nav class="text-sm text-text-secondary mb-3">
+            <a href="/portal/complaints" class="hover:text-primary-600">Complaints</a>
+            <span class="mx-2">›</span>
+            <span class="text-text-primary font-mono">${c.ticket_number}</span>
+          </nav>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Main detail -->
+          <div class="lg:col-span-2 space-y-4">
+            <div class="bg-white rounded-xl border border-border-light p-6">
+              <div class="flex items-start justify-between gap-4 mb-4">
+                <h1 class="text-xl font-bold text-text-primary">${c.title}</h1>
+                <span class="flex-shrink-0 px-3 py-1 rounded-full text-sm font-medium ${STATUS_BADGE[c.status] ?? 'bg-gray-100 text-gray-600'}">${c.status.replace('_',' ')}</span>
+              </div>
+              ${c.description ? `<p class="text-sm text-text-secondary leading-relaxed mb-4">${c.description}</p>` : ''}
+              <div class="grid grid-cols-2 gap-4 text-sm border-t border-border-light pt-4">
+                <div><span class="text-text-secondary text-xs">Category</span><div class="font-medium mt-0.5">${c.category}</div></div>
+                <div><span class="text-text-secondary text-xs">Priority</span><div class="font-medium mt-0.5 ${PRIORITY_COLOR[c.priority] ?? ''}">${c.priority}</div></div>
+                <div><span class="text-text-secondary text-xs">SLA Deadline</span><div class="font-medium mt-0.5 ${slaBreached ? 'text-red-600' : ''}">${slaDate.toLocaleString('en-IN')} ${slaBreached ? '⚠ Breached' : ''}</div></div>
+                <div><span class="text-text-secondary text-xs">Raised On</span><div class="font-medium mt-0.5">${new Date(c.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}</div></div>
+              </div>
+            </div>
+
+            <!-- Comments thread -->
+            <div class="bg-white rounded-xl border border-border-light p-6">
+              <h2 class="font-semibold text-text-primary mb-4">Comments</h2>
+              <div id="comments-list" class="space-y-4 mb-6">
+                ${comments.length === 0 ? '<p class="text-sm text-text-secondary">No comments yet.</p>' :
+                  comments.map(cm => `
+                    <div class="flex gap-3 ${cm.is_internal ? 'bg-amber-50 border border-amber-200 rounded-lg p-3' : ''}">
+                      <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-user text-primary-600 text-xs" aria-hidden="true"></i>
+                      </div>
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="text-xs font-medium text-text-primary">${cm.user_id === userId ? 'You' : 'Management'}</span>
+                          ${cm.is_internal ? '<span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Internal</span>' : ''}
+                          <span class="text-xs text-text-secondary">${new Date(cm.created_at).toLocaleString('en-IN')}</span>
+                        </div>
+                        <p class="text-sm text-text-primary">${cm.comment}</p>
+                      </div>
+                    </div>
+                  `).join('')}
+              </div>
+
+              <form id="comment-form" class="space-y-3">
+                <textarea id="comment-text" rows="3" placeholder="Add a comment…"
+                  class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+                ${isExec ? `
+                  <label class="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" id="is-internal" class="rounded border-border-light text-primary-600" />
+                    <span class="text-text-secondary">Internal note (exec/admin only)</span>
+                  </label>
+                ` : ''}
+                <button type="submit" class="btn-primary text-sm">Post Comment</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Sidebar -->
+          <div class="space-y-4">
+            ${isExec ? `
+              <div class="bg-white rounded-xl border border-border-light p-5">
+                <h2 class="font-semibold text-text-primary mb-4">Update Status</h2>
+                <select id="status-select"
+                  class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white mb-3">
+                  ${VALID_STATUS.map(s => `<option value="${s}" ${s === c.status ? 'selected' : ''}>${s.replace('_',' ')}</option>`).join('')}
+                </select>
+                <textarea id="status-note" rows="2" placeholder="Note (optional)"
+                  class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none mb-3"></textarea>
+                <button onclick="updateStatus()" class="btn-primary text-sm w-full">Update Status</button>
+              </div>
+
+              <div class="bg-white rounded-xl border border-border-light p-5">
+                <h2 class="font-semibold text-text-primary mb-3">Assign To</h2>
+                <select id="assign-select"
+                  class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white mb-3">
+                  <option value="">Unassigned</option>
+                  ${execUsers.map((u: any) => `<option value="${u.id}" ${u.id === c.assigned_to ? 'selected' : ''}>${u.full_name ?? u.id}</option>`).join('')}
+                </select>
+                ${c.assigned_to ? `<div class="text-xs text-text-secondary mb-3">Currently assigned to: <span class="font-medium text-text-primary">${execUsers.find((u: any) => u.id === c.assigned_to)?.full_name ?? 'a team member'}</span></div>` : ''}
+                <button onclick="assignComplaint()" class="btn-outline text-sm w-full">Save Assignment</button>
+              </div>
+            ` : ''}
+
+            <div class="bg-white rounded-xl border border-border-light p-5">
+              <h2 class="font-semibold text-text-primary mb-3">Details</h2>
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between"><span class="text-text-secondary">Ticket</span><span class="font-mono text-xs font-medium">${c.ticket_number}</span></div>
+                <div class="flex justify-between"><span class="text-text-secondary">SLA Hours</span><span>${c.sla_hours}h</span></div>
+                <div class="flex justify-between"><span class="text-text-secondary">Reopen Count</span><span>${c.reopen_count}</span></div>
+                ${c.resolved_at ? `<div class="flex justify-between"><span class="text-text-secondary">Resolved</span><span>${new Date(c.resolved_at).toLocaleDateString('en-IN')}</span></div>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('comment-form')?.addEventListener('submit', postComment);
+    }
+
+    async function postComment(e) {
+      e.preventDefault();
+      const text = document.getElementById('comment-text').value.trim();
+      if (!text) return;
+      const isInternal = document.getElementById('is-internal')?.checked ?? false;
+      const res = await fetch(`/api/v1/complaints/${id}/comments`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ comment: text, is_internal: isInternal }),
+      });
+      if (res.ok) { document.getElementById('comment-text').value = ''; load(); }
+      else { const d = await res.json(); alert(d.detail ?? 'Failed to post comment'); }
+    }
+
+    async function updateStatus() {
+      const status = document.getElementById('status-select').value;
+      const note = document.getElementById('status-note').value;
+      const res = await fetch(`/api/v1/complaints/${id}/status`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ status, note }),
+      });
+      if (res.ok) load();
+      else { const d = await res.json(); alert(d.detail ?? 'Failed to update status'); }
+    }
+
+    async function assignComplaint() {
+      const assignTo = (document.getElementById('assign-select') as HTMLSelectElement)?.value || null;
+      const res = await fetch(`/api/v1/complaints/${id}/status`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ assigned_to: assignTo }),
+      });
+      if (res.ok) load();
+      else { const d = await res.json(); alert(d.detail ?? 'Failed to assign complaint'); }
+    }
+
+    window.updateStatus = updateStatus;
+    window.assignComplaint = assignComplaint;
+    load();
+  </script>
+</PortalLayout>

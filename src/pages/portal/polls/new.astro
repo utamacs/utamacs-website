@@ -1,0 +1,175 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user || !['executive','admin'].includes(user.role)) return Astro.redirect('/portal/polls');
+---
+
+<PortalLayout title="Create Poll" user={user} activeModule="polls">
+  <div class="mb-6">
+    <nav class="text-sm text-text-secondary mb-3">
+      <a href="/portal/polls" class="hover:text-primary-600">Polls</a>
+      <span class="mx-2">›</span><span class="text-text-primary">New Poll</span>
+    </nav>
+    <h1 class="text-2xl font-bold text-text-primary">Create Poll</h1>
+  </div>
+
+  <div class="max-w-2xl">
+    <div id="error-banner" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+    <form id="poll-form" class="bg-white rounded-xl border border-border-light p-6 space-y-5">
+      <div>
+        <label for="title" class="block text-sm font-medium text-text-primary mb-1.5">Question <span class="text-red-500">*</span></label>
+        <input type="text" id="title" name="title" required maxlength="300"
+          placeholder="e.g. What is your preferred timing for yoga sessions?"
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+      </div>
+
+      <div>
+        <label for="description" class="block text-sm font-medium text-text-primary mb-1.5">Description</label>
+        <textarea id="description" name="description" rows="2"
+          placeholder="Additional context (optional)"
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="poll_type" class="block text-sm font-medium text-text-primary mb-1.5">Poll Type</label>
+          <select id="poll_type" name="poll_type"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="single_choice">Single Choice</option>
+            <option value="multiple_choice">Multiple Choice</option>
+            <option value="yes_no">Yes / No</option>
+          </select>
+        </div>
+        <div>
+          <label for="ends_at" class="block text-sm font-medium text-text-primary mb-1.5">Closing Date & Time</label>
+          <input type="datetime-local" id="ends_at" name="ends_at"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+      </div>
+
+      <!-- Options builder -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-sm font-medium text-text-primary">Options <span class="text-red-500">*</span></label>
+          <button type="button" id="add-option" class="text-xs text-primary-600 hover:underline flex items-center gap-1">
+            <i class="fas fa-plus" aria-hidden="true"></i> Add option
+          </button>
+        </div>
+        <div id="options-list" class="space-y-2">
+          <div class="flex items-center gap-2">
+            <input type="text" name="option" placeholder="Option 1" required
+              class="flex-1 px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-2" aria-label="Remove option">
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" name="option" placeholder="Option 2" required
+              class="flex-1 px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-2" aria-label="Remove option">
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-6">
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" id="is_anonymous" class="rounded border-border-light text-primary-600" />
+          <span>Anonymous voting</span>
+        </label>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" id="one_vote_per_unit" class="rounded border-border-light text-primary-600" />
+          <span>One vote per unit</span>
+        </label>
+      </div>
+
+      <div class="flex items-center gap-3 pt-2">
+        <button type="submit" id="submit-btn" class="btn-primary flex items-center gap-2">
+          <i class="fas fa-vote-yea" aria-hidden="true"></i>
+          <span id="btn-text">Launch Poll</span>
+          <span id="btn-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+        </button>
+        <a href="/portal/polls" class="btn-outline">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('add-option')?.addEventListener('click', () => {
+      const list = document.getElementById('options-list')!;
+      const count = list.querySelectorAll('input[name="option"]').length + 1;
+      const div = document.createElement('div');
+      div.className = 'flex items-center gap-2';
+      div.innerHTML = `
+        <input type="text" name="option" placeholder="Option ${count}"
+          class="flex-1 px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-2" aria-label="Remove option">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>`;
+      list.appendChild(div);
+    });
+
+    // Pre-fill yes/no options when type changes
+    document.getElementById('poll_type')?.addEventListener('change', (e) => {
+      if ((e.target as HTMLSelectElement).value === 'yes_no') {
+        const inputs = document.querySelectorAll<HTMLInputElement>('input[name="option"]');
+        if (inputs[0]) inputs[0].value = 'Yes';
+        if (inputs[1]) inputs[1].value = 'No';
+      }
+    });
+
+    const form = document.getElementById('poll-form') as HTMLFormElement;
+    const errorBanner = document.getElementById('error-banner')!;
+    const btnText = document.getElementById('btn-text')!;
+    const btnSpinner = document.getElementById('btn-spinner')!;
+    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const options = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="option"]'))
+        .map(i => i.value.trim()).filter(Boolean);
+
+      if (options.length < 2) {
+        errorBanner.textContent = 'Please provide at least 2 options.';
+        errorBanner.classList.remove('hidden');
+        return;
+      }
+
+      errorBanner.classList.add('hidden');
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      submitBtn.disabled = true;
+
+      const endsAt = fd.get('ends_at') as string;
+
+      const res = await fetch('/api/v1/polls', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({
+          title: fd.get('title'),
+          description: fd.get('description') || null,
+          poll_type: fd.get('poll_type'),
+          options,
+          is_anonymous: (document.getElementById('is_anonymous') as HTMLInputElement).checked,
+          one_vote_per_unit: (document.getElementById('one_vote_per_unit') as HTMLInputElement).checked,
+          ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = '/portal/polls';
+      } else {
+        errorBanner.textContent = data.detail ?? data.error ?? 'Failed to create poll.';
+        errorBanner.classList.remove('hidden');
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</PortalLayout>

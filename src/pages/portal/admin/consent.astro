@@ -1,0 +1,216 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (user.role !== 'admin') return Astro.redirect('/portal');
+
+const CURRENT_VERSION = parseInt(import.meta.env.PRIVACY_POLICY_VERSION ?? '1');
+---
+
+<PortalLayout title="Consent Management" user={user} activeModule="compliance">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-text-primary">Consent Version Management</h1>
+    <p class="text-sm text-text-secondary mt-1">
+      DPDPA 2023 compliance — track member consent versions and force re-consent when the privacy policy is updated.
+    </p>
+  </div>
+
+  <!-- Current Policy Banner -->
+  <div class="bg-primary-50 border border-primary-200 rounded-2xl p-5 mb-6">
+    <div class="flex items-start gap-4">
+      <div class="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-shield-alt text-white" aria-hidden="true"></i>
+      </div>
+      <div class="flex-1">
+        <h3 class="font-semibold text-primary-800">Active Privacy Policy</h3>
+        <p class="text-sm text-primary-700 mt-1">
+          Current version: <strong>v{CURRENT_VERSION}</strong>
+          · Set via <code class="bg-primary-100 px-1 rounded text-xs">PRIVACY_POLICY_VERSION</code> environment variable
+        </p>
+        <p class="text-xs text-primary-600 mt-2">
+          Members whose accepted version is below v{CURRENT_VERSION} will be prompted to re-consent on next login.
+          To trigger a mandatory re-consent cycle, increment the environment variable and redeploy.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Consent Stats -->
+  <div id="stats-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-2xl border border-border-light p-4 animate-pulse h-20"></div>
+    <div class="bg-white rounded-2xl border border-border-light p-4 animate-pulse h-20"></div>
+    <div class="bg-white rounded-2xl border border-border-light p-4 animate-pulse h-20"></div>
+    <div class="bg-white rounded-2xl border border-border-light p-4 animate-pulse h-20"></div>
+  </div>
+
+  <!-- Consent Acceptance Table -->
+  <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+    <div class="p-5 border-b border-border-light flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-text-primary">Member Consent Status</h2>
+        <p class="text-xs text-text-secondary mt-0.5">Showing acceptance status for current policy v{CURRENT_VERSION}</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <select id="consent-filter" onchange="renderTable()" class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white">
+          <option value="all">All Members</option>
+          <option value="current">Consented (v{CURRENT_VERSION})</option>
+          <option value="outdated">Outdated / None</option>
+        </select>
+      </div>
+    </div>
+    <div id="consent-table-container">
+      <div class="text-center text-text-secondary py-12">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading member consent data…
+      </div>
+    </div>
+  </div>
+
+  <!-- DPDPA Compliance Note -->
+  <div class="mt-6 bg-gray-50 border border-border-light rounded-2xl p-5">
+    <h3 class="text-sm font-semibold text-text-primary mb-3">
+      <i class="fas fa-balance-scale mr-2 text-primary-600" aria-hidden="true"></i>
+      DPDPA 2023 Compliance Notes
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-text-secondary">
+      <div>
+        <p class="font-medium text-text-primary mb-1">Consent Requirements</p>
+        <ul class="space-y-1 list-disc list-inside">
+          <li>Consent must be free, specific, informed, and unambiguous</li>
+          <li>Members must be notified of any policy changes</li>
+          <li>Re-consent required before continuing data processing after a policy update</li>
+          <li>Records of consent with timestamps must be maintained</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-medium text-text-primary mb-1">Right to Withdraw</p>
+        <ul class="space-y-1 list-disc list-inside">
+          <li>Members may withdraw consent at any time</li>
+          <li>Withdrawal triggers right-to-erasure workflow</li>
+          <li>Data erasure available at: Admin → Members → Personal Data</li>
+          <li>Audit trail of all consent actions maintained per IT Act 2000</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script define:vars={{ currentVersion: CURRENT_VERSION }}>
+    let allMembers: any[] = [];
+
+    async function loadConsentData() {
+      try {
+        const res = await fetch('/api/v1/members?limit=500', { credentials: 'include' });
+        const data = await res.json();
+        allMembers = Array.isArray(data) ? data : (data.data ?? []);
+        renderStats();
+        renderTable();
+      } catch {
+        document.getElementById('consent-table-container')!.innerHTML =
+          `<div class="text-center text-red-600 py-8">Failed to load member data.</div>`;
+      }
+    }
+
+    function renderStats() {
+      const total = allMembers.length;
+      const currentConsent = allMembers.filter(m => m.consent_version >= currentVersion).length;
+      const outdated = allMembers.filter(m => m.consent_version && m.consent_version < currentVersion).length;
+      const noneYet = allMembers.filter(m => !m.consent_version).length;
+      const pct = total > 0 ? Math.round((currentConsent / total) * 100) : 0;
+
+      document.getElementById('stats-cards')!.innerHTML = `
+        <div class="bg-white rounded-2xl border border-border-light p-5">
+          <p class="text-xs text-text-secondary uppercase tracking-wide mb-1">Total Members</p>
+          <p class="text-2xl font-bold text-text-primary">${total}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-green-200 bg-green-50 p-5">
+          <p class="text-xs text-text-secondary uppercase tracking-wide mb-1">Consented (v${currentVersion})</p>
+          <p class="text-2xl font-bold text-green-600">${currentConsent}</p>
+          <p class="text-xs text-green-600 mt-1">${pct}% of members</p>
+        </div>
+        <div class="bg-white rounded-2xl border ${outdated > 0 ? 'border-amber-200 bg-amber-50' : 'border-border-light'} p-5">
+          <p class="text-xs text-text-secondary uppercase tracking-wide mb-1">Outdated Version</p>
+          <p class="text-2xl font-bold ${outdated > 0 ? 'text-amber-600' : 'text-text-primary'}">${outdated}</p>
+          <p class="text-xs text-text-secondary mt-1">Will be prompted on next login</p>
+        </div>
+        <div class="bg-white rounded-2xl border ${noneYet > 0 ? 'border-red-200 bg-red-50' : 'border-border-light'} p-5">
+          <p class="text-xs text-text-secondary uppercase tracking-wide mb-1">No Consent on File</p>
+          <p class="text-2xl font-bold ${noneYet > 0 ? 'text-red-500' : 'text-text-primary'}">${noneYet}</p>
+          <p class="text-xs text-text-secondary mt-1">Never accepted policy</p>
+        </div>`;
+    }
+
+    function renderTable() {
+      const container = document.getElementById('consent-table-container');
+      if (!container) return;
+      const filter = (document.getElementById('consent-filter') as HTMLSelectElement)?.value ?? 'all';
+
+      let filtered = allMembers;
+      if (filter === 'current') filtered = allMembers.filter(m => m.consent_version >= currentVersion);
+      else if (filter === 'outdated') filtered = allMembers.filter(m => !m.consent_version || m.consent_version < currentVersion);
+
+      if (!filtered.length) {
+        container.innerHTML = `<div class="text-center py-8 text-text-secondary text-sm">No members match this filter.</div>`;
+        return;
+      }
+
+      const rows = filtered.map(m => {
+        const version = m.consent_version ?? null;
+        const isCurrent = version && version >= currentVersion;
+        const statusBadge = isCurrent
+          ? `<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">Current (v${version})</span>`
+          : version
+            ? `<span class="px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700 font-medium">Outdated (v${version})</span>`
+            : `<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-600 font-medium">None</span>`;
+        const acceptedAt = m.consent_at ? new Date(m.consent_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+        return `
+        <tr class="border-b border-border-light hover:bg-gray-50">
+          <td class="py-3 px-4">
+            <p class="font-medium text-sm">${m.full_name ?? '—'}</p>
+            <p class="text-xs text-text-secondary">${m.units ? (m.units.block ?? '') + m.units.unit_number : '—'} · ${m.residency_type ?? 'member'}</p>
+          </td>
+          <td class="py-3 px-4">${statusBadge}</td>
+          <td class="py-3 px-4 text-sm text-text-secondary">${acceptedAt}</td>
+          <td class="py-3 px-4">
+            ${!isCurrent ? `<button onclick="sendReminder('${m.id}','${(m.full_name ?? '').replace(/'/g,"\\'")}','${m.email ?? ''}')" class="text-xs text-primary-600 hover:underline">Send Reminder</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('');
+
+      container.innerHTML = `
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-border-light">
+            <tr>
+              <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Member</th>
+              <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Consent Status</th>
+              <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Last Accepted</th>
+              <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Action</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    async function sendReminder(userId: string, name: string, email: string) {
+      if (!confirm(`Send a consent reminder notification to ${name}?`)) return;
+      try {
+        const res = await fetch('/api/v1/notifications', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            title: 'Privacy Policy Update — Action Required',
+            body: `Our privacy policy has been updated to version ${currentVersion}. Please log in to review and accept the updated policy to continue using the portal.`,
+            type: 'system',
+            channel: 'in_app',
+          }),
+        });
+        if (res.ok) alert(`Reminder sent to ${name}.`);
+        else { const d = await res.json(); alert(d.error || 'Failed to send reminder.'); }
+      } catch { alert('Network error.'); }
+    }
+
+    // Init
+    loadConsentData();
+  </script>
+</PortalLayout>

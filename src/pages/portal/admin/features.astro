@@ -1,0 +1,88 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user || user.role !== 'admin') return Astro.redirect('/portal');
+---
+
+<PortalLayout title="Feature Configuration" user={user} activeModule="compliance">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-text-primary">Feature Configuration</h1>
+    <p class="text-sm text-text-secondary mt-1">Enable or disable modules and features for UTA MACS portal.</p>
+  </div>
+
+  <div id="features-panel" class="space-y-4">
+    <div class="flex items-center justify-center h-32 text-text-secondary">
+      <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+      Loading feature configuration…
+    </div>
+  </div>
+
+  <script>
+    async function loadFeatures() {
+      const container = document.getElementById('features-panel');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/admin/feature-flags', { credentials: 'include' });
+        const { flags, modules } = await res.json();
+
+        const grouped: Record<string, typeof flags> = {};
+        for (const f of flags) {
+          if (!grouped[f.module_key]) grouped[f.module_key] = [];
+          grouped[f.module_key].push(f);
+        }
+
+        const modMap: Record<string, string> = {};
+        for (const m of modules) modMap[m.moduleKey] = m.displayName;
+
+        container.innerHTML = Object.entries(grouped).map(([moduleKey, moduleFlags]) => `
+          <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+            <div class="px-5 py-4 bg-gray-50 border-b border-border-light">
+              <h2 class="font-semibold text-text-primary">${modMap[moduleKey] ?? moduleKey}</h2>
+            </div>
+            <div class="divide-y divide-border-light">
+              ${(moduleFlags as any[]).map((f: any) => `
+                <div class="flex items-center justify-between px-5 py-3.5">
+                  <div>
+                    <div class="text-sm font-medium text-text-primary">${f.feature_key.replace(/_/g, ' ')}</div>
+                    ${f.allowed_roles ? `<div class="text-xs text-text-secondary mt-0.5">Roles: ${f.allowed_roles.join(', ')}</div>` : ''}
+                    ${f.config_json?.note ? `<div class="text-xs text-amber-600 mt-0.5">⚠ ${f.config_json.note}</div>` : ''}
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      class="sr-only peer"
+                      ${f.is_enabled ? 'checked' : ''}
+                      onchange="toggleFlag('${f.id}', this.checked)"
+                    />
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                  </label>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('');
+      } catch {
+        container.innerHTML = '<p class="text-center text-red-600 py-12">Failed to load feature configuration.</p>';
+      }
+    }
+
+    async function toggleFlag(flagId: string, isEnabled: boolean) {
+      const res = await fetch('/api/v1/admin/feature-flags', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ flag_id: flagId, is_enabled: isEnabled }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.detail ?? 'Failed to update feature flag');
+        loadFeatures();
+      }
+    }
+
+    (window as any).toggleFlag = toggleFlag;
+    loadFeatures();
+  </script>
+</PortalLayout>

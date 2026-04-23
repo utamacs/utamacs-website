@@ -1,0 +1,205 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const canUpload = ['executive', 'admin'].includes(user.role);
+---
+
+<PortalLayout title="Documents" user={user} activeModule="documents">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Documents</h1>
+      <p class="text-sm text-text-secondary mt-1">Society bylaws, meeting minutes, circulars, and more.</p>
+    </div>
+    {canUpload && (
+      <button id="upload-btn" class="btn-primary text-sm flex items-center gap-2">
+        <i class="fas fa-upload" aria-hidden="true"></i>
+        Upload Document
+      </button>
+    )}
+  </div>
+
+  <!-- Category tabs -->
+  <div class="flex gap-2 flex-wrap mb-5" id="category-filters">
+    {['All','Bylaws','Minutes','Financial','Legal','Circulars','Forms','Other'].map(cat => (
+      <button data-cat={cat === 'All' ? '' : cat}
+        class={`filter-btn text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${cat === 'All' ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600'}`}>
+        {cat}
+      </button>
+    ))}
+  </div>
+
+  <div id="documents-container">
+    <div class="text-center py-10 text-text-secondary text-sm">Loading…</div>
+  </div>
+
+  <!-- Upload modal (exec/admin only) -->
+  {canUpload && (
+    <div id="upload-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+        <h3 class="font-semibold text-text-primary mb-4 flex items-center justify-between">
+          Upload Document
+          <button id="modal-close" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
+        </h3>
+        <div id="upload-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+        <form id="upload-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Title <span class="text-red-500">*</span></label>
+            <input type="text" name="title" required maxlength="200"
+              class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Category <span class="text-red-500">*</span></label>
+            <select name="category" required class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+              <option value="">Select</option>
+              {['Bylaws','Minutes','Financial','Legal','Circulars','Forms','Other'].map(c => (
+                <option value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Storage Key <span class="text-red-500">*</span></label>
+            <input type="text" name="storage_key" required placeholder="documents/filename.pdf"
+              class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            <p class="text-xs text-text-secondary mt-1">Path in storage bucket after uploading the file.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Description</label>
+            <textarea name="description" rows="2" maxlength="500"
+              class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" name="is_public" id="is_public" class="rounded border-border-light" />
+            <label for="is_public" class="text-sm text-text-primary">Public (visible without login)</label>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="btn-primary flex-1 text-sm">Upload</button>
+            <button type="button" id="modal-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ canUpload }}>
+    const MIME_ICONS: Record<string, string> = {
+      'application/pdf': 'fa-file-pdf text-red-500',
+      'application/msword': 'fa-file-word text-blue-500',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'fa-file-word text-blue-500',
+      'application/vnd.ms-excel': 'fa-file-excel text-green-500',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'fa-file-excel text-green-500',
+      'image/jpeg': 'fa-file-image text-purple-500',
+      'image/png': 'fa-file-image text-purple-500',
+    };
+
+    function formatSize(bytes: number): string {
+      if (!bytes) return '';
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    let currentCategory = '';
+
+    async function loadDocuments() {
+      const container = document.getElementById('documents-container');
+      const params = new URLSearchParams();
+      if (currentCategory) params.set('category', currentCategory);
+
+      const res = await fetch(`/api/v1/documents?${params}`, { credentials: 'include' });
+      const docs = res.ok ? await res.json() : [];
+
+      if (!docs.length) {
+        container.innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">No documents found.</div>';
+        return;
+      }
+
+      // Group by category
+      const grouped: Record<string, any[]> = {};
+      docs.forEach((d: any) => {
+        if (!grouped[d.category]) grouped[d.category] = [];
+        grouped[d.category].push(d);
+      });
+
+      container.innerHTML = Object.entries(grouped).map(([cat, items]) => `
+        <div class="mb-6">
+          <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">${cat}</h2>
+          <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+            ${items.map((d: any) => {
+              const icon = MIME_ICONS[d.mime_type] ?? 'fa-file text-gray-400';
+              return `
+                <div class="flex items-center gap-4 px-5 py-4 border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors">
+                  <i class="fas ${icon} text-xl w-6 text-center" aria-hidden="true"></i>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-text-primary truncate">${d.title}</div>
+                    <div class="text-xs text-text-secondary mt-0.5">
+                      ${d.file_name ? `${d.file_name} · ` : ''}${formatSize(d.file_size_bytes)}
+                      ${d.version > 1 ? ` · v${d.version}` : ''}
+                      · ${new Date(d.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}
+                    </div>
+                    ${d.description ? `<div class="text-xs text-text-secondary mt-0.5 truncate">${d.description}</div>` : ''}
+                  </div>
+                  <div class="flex items-center gap-2">
+                    ${!d.is_public ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Members only</span>' : ''}
+                    <span class="text-xs text-text-secondary">${d.profiles?.full_name ? `by ${d.profiles.full_name}` : ''}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('category-filters')?.addEventListener('click', (e) => {
+      const btn = (e.target as Element).closest('.filter-btn') as HTMLElement;
+      if (!btn) return;
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
+        b.classList.add('bg-white', 'text-text-secondary', 'border-border-light');
+      });
+      btn.classList.add('bg-primary-600', 'text-white', 'border-primary-600');
+      btn.classList.remove('bg-white', 'text-text-secondary', 'border-border-light');
+      currentCategory = btn.dataset.cat ?? '';
+      loadDocuments();
+    });
+
+    if (canUpload) {
+      const modal = document.getElementById('upload-modal');
+      document.getElementById('upload-btn')?.addEventListener('click', () => modal?.classList.remove('hidden'));
+      document.getElementById('modal-close')?.addEventListener('click', () => modal?.classList.add('hidden'));
+      document.getElementById('modal-cancel')?.addEventListener('click', () => modal?.classList.add('hidden'));
+
+      document.getElementById('upload-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target as HTMLFormElement;
+        const fd = new FormData(form);
+        const errEl = document.getElementById('upload-error');
+        errEl?.classList.add('hidden');
+
+        const res = await fetch('/api/v1/documents', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: fd.get('title'), category: fd.get('category'),
+            storage_key: fd.get('storage_key'), description: fd.get('description') || null,
+            is_public: fd.has('is_public'),
+          }),
+        });
+
+        if (res.ok) {
+          modal?.classList.add('hidden');
+          form.reset();
+          loadDocuments();
+        } else {
+          const data = await res.json();
+          if (errEl) { errEl.textContent = data.detail ?? data.error ?? 'Upload failed.'; errEl.classList.remove('hidden'); }
+        }
+      });
+    }
+
+    loadDocuments();
+  </script>
+</PortalLayout>

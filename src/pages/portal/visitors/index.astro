@@ -1,0 +1,387 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const isGuard = user.role === 'security_guard';
+const isMember = user.role === 'member';
+---
+
+<PortalLayout title="Visitor Management" user={user} activeModule="visitor_mgmt">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Visitor Management</h1>
+      <p class="text-sm text-text-secondary mt-1">
+        {isGuard ? 'Log visitor entry and exit.' : 'Manage visitor pre-approvals.'}
+      </p>
+    </div>
+    {!isGuard && (
+      <a href="/portal/visitors/new" class="btn-primary text-sm flex items-center gap-2">
+        <i class="fas fa-plus" aria-hidden="true"></i>
+        Pre-Approve Visitor
+      </a>
+    )}
+  </div>
+
+  <!-- Guard View: Entry/Exit Logging -->
+  {isGuard && (
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <!-- Log Entry -->
+      <div class="bg-white rounded-xl border border-border-light p-6">
+        <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <i class="fas fa-sign-in-alt text-green-600" aria-hidden="true"></i>
+          Log Entry
+        </h2>
+        <form id="entry-form" class="space-y-3">
+          <input type="text" id="entry-visitor-name" placeholder="Visitor name *" required
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <input type="text" id="entry-unit" placeholder="Host unit (e.g. A-101) *" required
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <select id="entry-type"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="walk_in">Walk-in</option>
+            <option value="pre_approved">Pre-Approved</option>
+            <option value="delivery">Delivery</option>
+            <option value="service">Service</option>
+            <option value="vendor">Vendor</option>
+          </select>
+          <input type="text" id="entry-vehicle" placeholder="Vehicle number (optional)"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <button type="submit" class="btn-primary w-full text-sm">
+            <i class="fas fa-sign-in-alt mr-2" aria-hidden="true"></i>Log Entry
+          </button>
+        </form>
+      </div>
+
+      <!-- Active Visitors / Log Exit -->
+      <div class="bg-white rounded-xl border border-border-light p-6">
+        <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <i class="fas fa-sign-out-alt text-red-600" aria-hidden="true"></i>
+          Active Visitors
+        </h2>
+        <div id="active-visitors" class="space-y-3">
+          <p class="text-sm text-text-secondary text-center py-4">Loading…</p>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Member View: Pre-Approvals -->
+  {!isGuard && (
+    <div id="pre-approvals-panel" class="bg-white rounded-xl border border-border-light overflow-hidden mb-6">
+      <div class="px-5 py-4 border-b border-border-light bg-gray-50">
+        <h2 class="font-semibold text-text-primary">My Pre-Approvals</h2>
+      </div>
+      <div id="pre-approvals-list" class="p-5">
+        <p class="text-sm text-text-secondary text-center py-4">Loading…</p>
+      </div>
+    </div>
+  )}
+
+  <!-- Tabs: Visitor Logs | Deliveries -->
+  <div class="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1 w-fit">
+    <button id="tab-logs" onclick="switchTab('logs')"
+      class="tab-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white text-text-primary shadow-soft">
+      Visitor Logs
+    </button>
+    <button id="tab-deliveries" onclick="switchTab('deliveries')"
+      class="tab-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-colors text-text-secondary hover:text-text-primary">
+      Deliveries
+    </button>
+  </div>
+
+  <!-- Visitor Logs panel -->
+  <div id="panel-logs" class="bg-white rounded-xl border border-border-light overflow-hidden">
+    <div id="visitor-logs-list">
+      <p class="text-sm text-text-secondary text-center py-6">Loading…</p>
+    </div>
+  </div>
+
+  <!-- Deliveries panel -->
+  <div id="panel-deliveries" class="hidden">
+    <div class="bg-white rounded-xl border border-border-light overflow-hidden mb-4">
+      <div class="px-5 py-4 border-b border-border-light bg-gray-50 flex items-center justify-between">
+        <h2 class="font-semibold text-text-primary">Delivery Log</h2>
+        <div class="flex items-center gap-2">
+          <input type="date" id="delivery-date"
+            class="text-sm border border-border-light rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+      </div>
+      <div id="deliveries-list" class="p-5">
+        <p class="text-sm text-text-secondary text-center py-4">Loading…</p>
+      </div>
+    </div>
+
+    {isGuard && (
+      <div class="bg-white rounded-xl border border-border-light p-5">
+        <h2 class="font-semibold text-text-primary mb-4">Log New Delivery</h2>
+        <form id="delivery-form" class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-text-primary mb-1">Host Unit <span class="text-red-500">*</span></label>
+              <input type="text" id="del-unit" placeholder="e.g. A-101" required
+                class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-primary mb-1">Courier</label>
+              <input type="text" id="del-courier" placeholder="e.g. Zomato, Swiggy"
+                class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-text-primary mb-1">Tracking Number</label>
+            <input type="text" id="del-tracking" placeholder="Optional"
+              class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <button type="submit" class="btn-primary text-sm">Log Delivery</button>
+        </form>
+      </div>
+    )}
+  </div>
+
+  <script define:vars={{ isGuard, userId: user.id }}>
+    const STATUS_BADGE: Record<string, string> = {
+      approved: 'bg-green-100 text-green-700', pending: 'bg-yellow-100 text-yellow-700',
+      used: 'bg-gray-100 text-gray-600', expired: 'bg-red-100 text-red-700', cancelled: 'bg-red-100 text-red-700',
+    };
+
+    function switchTab(tab: string) {
+      const logs = document.getElementById('panel-logs');
+      const deliveries = document.getElementById('panel-deliveries');
+      const tabLogs = document.getElementById('tab-logs');
+      const tabDel = document.getElementById('tab-deliveries');
+      if (tab === 'logs') {
+        logs?.classList.remove('hidden'); deliveries?.classList.add('hidden');
+        tabLogs?.classList.add('bg-white','text-text-primary','shadow-soft');
+        tabLogs?.classList.remove('text-text-secondary');
+        tabDel?.classList.remove('bg-white','text-text-primary','shadow-soft');
+        tabDel?.classList.add('text-text-secondary');
+      } else {
+        logs?.classList.add('hidden'); deliveries?.classList.remove('hidden');
+        tabDel?.classList.add('bg-white','text-text-primary','shadow-soft');
+        tabDel?.classList.remove('text-text-secondary');
+        tabLogs?.classList.remove('bg-white','text-text-primary','shadow-soft');
+        tabLogs?.classList.add('text-text-secondary');
+        loadDeliveries();
+      }
+    }
+
+    async function loadAll() {
+      await Promise.all([
+        isGuard ? loadActiveVisitors() : loadPreApprovals(),
+        loadLogs(),
+      ]);
+    }
+
+    async function loadDeliveries(date?: string) {
+      const container = document.getElementById('deliveries-list');
+      if (!container) return;
+      const d = date ?? new Date().toISOString().slice(0, 10);
+      const res = await fetch(`/api/v1/visitors/deliveries?date=${d}`, { credentials: 'include' });
+      const items = res.ok ? await res.json() : [];
+      if (!items.length) {
+        container.innerHTML = '<p class="text-sm text-text-secondary text-center py-4">No deliveries on this date.</p>';
+        return;
+      }
+      container.innerHTML = `
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-border-light">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Unit</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Courier</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Received</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border-light">
+            ${items.map((d: any) => `
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium text-text-primary">${d.units?.unit_number ?? '—'}</td>
+                <td class="px-4 py-3 text-text-secondary">${d.courier_company ?? '—'}${d.tracking_number ? ` <span class="text-xs text-text-secondary">(${d.tracking_number})</span>` : ''}</td>
+                <td class="px-4 py-3 text-xs text-text-secondary">${new Date(d.received_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</td>
+                <td class="px-4 py-3">
+                  ${d.collected_at
+                    ? `<span class="text-xs text-green-600 font-medium"><i class="fas fa-check-circle"></i> Collected ${new Date(d.collected_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>`
+                    : isGuard
+                      ? `<button onclick="markCollected('${d.id}')" class="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded-lg hover:bg-green-100 font-medium">Mark Collected</button>`
+                      : '<span class="text-xs text-amber-600 font-medium">Pending pickup</span>'
+                  }
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function markCollected(deliveryId: string) {
+      const res = await fetch(`/api/v1/visitors/deliveries/${deliveryId}/collect`, { method: 'PUT', credentials: 'include' });
+      if (res.ok) loadDeliveries((document.getElementById('delivery-date') as HTMLInputElement)?.value);
+      else alert('Failed to mark as collected.');
+    }
+
+    (window as any).switchTab = switchTab;
+    (window as any).markCollected = markCollected;
+
+    async function loadPreApprovals() {
+      const container = document.getElementById('pre-approvals-list');
+      if (!container) return;
+      const res = await fetch('/api/v1/visitors/pre-approvals', { credentials: 'include' });
+      const data = await res.json();
+      if (!data.length) {
+        container.innerHTML = '<p class="text-sm text-text-secondary text-center py-4">No pre-approvals yet.</p>';
+        return;
+      }
+      container.innerHTML = `
+        <div class="space-y-3">
+          ${data.map((p: any) => `
+            <div class="flex items-center justify-between p-3 rounded-lg border border-border-light">
+              <div>
+                <div class="font-medium text-sm text-text-primary">${p.visitor_name}</div>
+                <div class="text-xs text-text-secondary mt-0.5">${p.purpose ?? '—'} · ${new Date(p.expected_date).toLocaleDateString('en-IN')}</div>
+              </div>
+              <span class="text-xs px-2 py-1 rounded-full font-medium ${STATUS_BADGE[p.status] ?? 'bg-gray-100 text-gray-600'}">${p.status}</span>
+            </div>
+          `).join('')}
+        </div>`;
+    }
+
+    async function loadActiveVisitors() {
+      const container = document.getElementById('active-visitors');
+      if (!container) return;
+      const res = await fetch('/api/v1/visitors/logs', { credentials: 'include' });
+      const logs = await res.json();
+      const active = logs.filter((l: any) => !l.exit_time);
+      if (!active.length) {
+        container.innerHTML = '<p class="text-sm text-text-secondary text-center py-4">No active visitors.</p>';
+        return;
+      }
+      container.innerHTML = active.map((l: any) => `
+        <div class="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50">
+          <div>
+            <div class="font-medium text-sm text-text-primary">${l.visitor_name}</div>
+            <div class="text-xs text-text-secondary mt-0.5">Unit: ${l.units?.unit_number ?? '—'} · In: ${new Date(l.entry_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
+          </div>
+          <button onclick="logExit('${l.id}')" class="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg font-medium transition-colors">
+            <i class="fas fa-sign-out-alt mr-1" aria-hidden="true"></i>Log Exit
+          </button>
+        </div>
+      `).join('');
+    }
+
+    async function loadLogs() {
+      const container = document.getElementById('visitor-logs-list');
+      if (!container) return;
+      const res = await fetch('/api/v1/visitors/logs', { credentials: 'include' });
+      const logs = await res.json();
+      if (!logs.length) {
+        container.innerHTML = '<p class="text-sm text-text-secondary text-center py-6">No visitor logs.</p>';
+        return;
+      }
+      container.innerHTML = `
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-border-light">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Visitor</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary hidden md:table-cell">Unit</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Type</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Entry</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Exit</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border-light">
+            ${logs.map((l: any) => `
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium text-text-primary">${l.visitor_name}</td>
+                <td class="px-4 py-3 hidden md:table-cell text-text-secondary">${l.units?.unit_number ?? '—'}</td>
+                <td class="px-4 py-3 text-text-secondary capitalize">${l.entry_type.replace('_',' ')}</td>
+                <td class="px-4 py-3 text-text-secondary text-xs">${new Date(l.entry_time).toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})}</td>
+                <td class="px-4 py-3 text-xs ${l.exit_time ? 'text-text-secondary' : 'text-green-600 font-medium'}">
+                  ${l.exit_time ? new Date(l.exit_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '● Still inside'}
+                  ${isGuard && !l.exit_time ? `<button onclick="logExit('${l.id}')" class="ml-2 text-red-600 hover:underline text-xs">Exit</button>` : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    async function logExit(logId: string) {
+      const res = await fetch(`/api/v1/visitors/logs/${logId}/exit`, { method: 'PUT', credentials: 'include' });
+      if (res.ok) loadAll();
+      else alert('Failed to log exit.');
+    }
+
+    // Entry form
+    document.getElementById('entry-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = (document.getElementById('entry-visitor-name') as HTMLInputElement).value.trim();
+      const unitText = (document.getElementById('entry-unit') as HTMLInputElement).value.trim();
+      const entryType = (document.getElementById('entry-type') as HTMLSelectElement).value;
+      const vehicle = (document.getElementById('entry-vehicle') as HTMLInputElement).value.trim();
+
+      if (!name || !unitText) return alert('Visitor name and host unit are required.');
+
+      // Look up unit id from unit_number
+      const unitRes = await fetch(`/api/v1/visitors/lookup-unit?unit_number=${encodeURIComponent(unitText)}`, { credentials: 'include' });
+      const unitData = unitRes.ok ? await unitRes.json() : null;
+      if (!unitData?.id) return alert('Unit not found. Please enter exact unit number (e.g. A-101).');
+
+      const res = await fetch('/api/v1/visitors/logs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ visitor_name: name, host_unit_id: unitData.id, entry_type: entryType, vehicle_number: vehicle || null }),
+      });
+
+      if (res.ok) {
+        (document.getElementById('entry-visitor-name') as HTMLInputElement).value = '';
+        (document.getElementById('entry-unit') as HTMLInputElement).value = '';
+        (document.getElementById('entry-vehicle') as HTMLInputElement).value = '';
+        loadAll();
+        alert('Entry logged successfully.');
+      } else {
+        const d = await res.json();
+        alert(d.detail ?? 'Failed to log entry.');
+      }
+    });
+
+    // Delivery date picker
+    const deliveryDateInput = document.getElementById('delivery-date') as HTMLInputElement;
+    if (deliveryDateInput) {
+      deliveryDateInput.value = new Date().toISOString().slice(0, 10);
+      deliveryDateInput.addEventListener('change', () => loadDeliveries(deliveryDateInput.value));
+    }
+
+    // Delivery form (guard only)
+    document.getElementById('delivery-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const unitText = (document.getElementById('del-unit') as HTMLInputElement).value.trim();
+      const courier = (document.getElementById('del-courier') as HTMLInputElement).value.trim();
+      const tracking = (document.getElementById('del-tracking') as HTMLInputElement).value.trim();
+
+      const unitRes = await fetch(`/api/v1/visitors/lookup-unit?unit_number=${encodeURIComponent(unitText)}`, { credentials: 'include' });
+      const unitData = unitRes.ok ? await unitRes.json() : null;
+      if (!unitData?.id) return alert('Unit not found. Please enter exact unit number (e.g. A-101).');
+
+      const res = await fetch('/api/v1/visitors/deliveries', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unit_id: unitData.id, courier_company: courier || null, tracking_number: tracking || null }),
+      });
+
+      if (res.ok) {
+        (document.getElementById('del-unit') as HTMLInputElement).value = '';
+        (document.getElementById('del-courier') as HTMLInputElement).value = '';
+        (document.getElementById('del-tracking') as HTMLInputElement).value = '';
+        loadDeliveries(deliveryDateInput?.value);
+        alert('Delivery logged.');
+      } else {
+        const d = await res.json();
+        alert(d.detail ?? d.error ?? 'Failed to log delivery.');
+      }
+    });
+
+    window.logExit = logExit;
+    loadAll();
+  </script>
+</PortalLayout>

@@ -1,0 +1,148 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+---
+
+<PortalLayout title="Events" user={user} activeModule="events">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Events</h1>
+      <p class="text-sm text-text-secondary mt-1">Upcoming community events and activities.</p>
+    </div>
+    {['executive','admin'].includes(user.role) && (
+      <a href="/portal/events/new" class="btn-primary text-sm flex items-center gap-2">
+        <i class="fas fa-plus" aria-hidden="true"></i>
+        Create Event
+      </a>
+    )}
+  </div>
+
+  <div id="events-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="col-span-full flex items-center justify-center h-32 text-text-secondary">
+      <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+      Loading events…
+    </div>
+  </div>
+
+  <script>
+    const CATEGORY_ICON: Record<string, string> = {
+      Cultural: 'fa-music',
+      Sports: 'fa-running',
+      Governance: 'fa-gavel',
+      Social: 'fa-heart',
+      Educational: 'fa-book',
+      General: 'fa-calendar',
+    };
+
+    async function loadEvents() {
+      const container = document.getElementById('events-list');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/events', { credentials: 'include' });
+        const events = await res.json();
+        if (!events.length) {
+          container.innerHTML = '<p class="col-span-full text-center text-text-secondary py-12">No upcoming events.</p>';
+          return;
+        }
+        // Load RSVP status for all upcoming events in parallel
+        const now = new Date();
+        const upcomingIds = events.filter((e: any) => new Date(e.starts_at) >= now).map((e: any) => e.id);
+        const rsvpMap: Record<string, any> = {};
+        await Promise.all(upcomingIds.map(async (id: string) => {
+          const r = await fetch(`/api/v1/events/${id}/register`, { credentials: 'include' }).catch(() => null);
+          if (r?.ok) rsvpMap[id] = await r.json();
+        }));
+
+        container.innerHTML = events.map((e: any) => {
+          const start = new Date(e.starts_at);
+          const isPast = start < now;
+          const rsvp = rsvpMap[e.id];
+          const reg = rsvp?.registration;
+          const spotsLeft = rsvp?.spots_left;
+          const isFull = rsvp?.capacity && spotsLeft === 0 && !reg;
+          return `
+            <div class="bg-white rounded-xl border border-border-light overflow-hidden ${isPast ? 'opacity-70' : ''}">
+              <div class="bg-primary-600 px-4 py-3 flex items-center gap-3">
+                <i class="fas ${CATEGORY_ICON[e.category] ?? 'fa-calendar'} text-white text-lg" aria-hidden="true"></i>
+                <span class="text-white font-semibold truncate">${e.category}</span>
+              </div>
+              <div class="p-4">
+                <h2 class="font-semibold text-text-primary mb-1">${e.title}</h2>
+                ${e.description ? `<p class="text-xs text-text-secondary mb-3 line-clamp-2">${e.description}</p>` : ''}
+                <div class="space-y-1 text-xs text-text-secondary">
+                  <div class="flex items-center gap-2">
+                    <i class="fas fa-calendar-alt w-3.5 text-center" aria-hidden="true"></i>
+                    ${start.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long' })}
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <i class="fas fa-clock w-3.5 text-center" aria-hidden="true"></i>
+                    ${start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  ${e.location ? `<div class="flex items-center gap-2"><i class="fas fa-map-marker-alt w-3.5 text-center" aria-hidden="true"></i>${e.location}</div>` : ''}
+                  ${e.capacity ? `<div class="flex items-center gap-2"><i class="fas fa-users w-3.5 text-center" aria-hidden="true"></i>${spotsLeft != null ? `${spotsLeft} spots left` : `Capacity: ${e.capacity}`}</div>` : ''}
+                </div>
+                ${!isPast ? `
+                  <div class="mt-4 pt-3 border-t border-border-light" id="rsvp-${e.id}">
+                    ${reg && reg.status !== 'cancelled'
+                      ? `<div class="flex items-center justify-between">
+                           <span class="text-xs font-medium ${reg.status === 'waitlisted' ? 'text-amber-600' : 'text-green-600'}">
+                             <i class="fas ${reg.status === 'waitlisted' ? 'fa-clock' : 'fa-check-circle'}"></i>
+                             ${reg.status === 'waitlisted' ? 'Waitlisted' : 'Registered'}
+                           </span>
+                           <button class="text-xs text-red-500 hover:text-red-700 underline" onclick="cancelRsvp('${e.id}')">Cancel</button>
+                         </div>`
+                      : isFull
+                        ? `<button class="btn-outline text-xs w-full py-2 opacity-75" onclick="rsvp('${e.id}')">Join Waitlist</button>`
+                        : `<button class="btn-primary text-xs w-full py-2" onclick="rsvp('${e.id}')">RSVP</button>`
+                    }
+                  </div>
+                ` : '<div class="mt-4 pt-3 border-t border-border-light text-xs text-text-secondary text-center">Event completed</div>'}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch {
+        container.innerHTML = '<p class="col-span-full text-center text-red-600 py-12">Failed to load events.</p>';
+      }
+    }
+
+    async function rsvp(eventId: string) {
+      const el = document.getElementById(`rsvp-${eventId}`);
+      if (el) el.innerHTML = '<div class="text-xs text-text-secondary text-center py-1">Registering…</div>';
+      const res = await fetch(`/api/v1/events/${eventId}/register`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attendees_count: 1 }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (el) {
+          const isWait = d.registration?.status === 'waitlisted';
+          el.innerHTML = `<div class="flex items-center justify-between">
+            <span class="text-xs font-medium ${isWait ? 'text-amber-600' : 'text-green-600'}">
+              <i class="fas ${isWait ? 'fa-clock' : 'fa-check-circle'}"></i>
+              ${isWait ? 'Added to Waitlist' : 'Registered!'}
+            </span>
+            <button class="text-xs text-red-500 hover:text-red-700 underline" onclick="cancelRsvp('${eventId}')">Cancel</button>
+          </div>`;
+        }
+      } else {
+        const d = await res.json();
+        if (el) el.innerHTML = `<p class="text-xs text-red-600 text-center">${d.error ?? 'Failed to register'}</p>`;
+      }
+    }
+
+    async function cancelRsvp(eventId: string) {
+      if (!confirm('Cancel your registration for this event?')) return;
+      const res = await fetch(`/api/v1/events/${eventId}/register`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok || res.status === 204) loadEvents();
+    }
+
+    (window as any).rsvp = rsvp;
+    (window as any).cancelRsvp = cancelRsvp;
+    loadEvents();
+  </script>
+</PortalLayout>

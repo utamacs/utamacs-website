@@ -1,0 +1,349 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user || !['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal/admin');
+---
+
+<PortalLayout title="Infrastructure Assets" user={user} activeModule="compliance">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/admin" class="hover:text-primary-600">Admin</a>
+        <span class="mx-2">›</span><span class="text-text-primary">Infrastructure Assets</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-text-primary">Infrastructure Assets</h1>
+      <p class="text-sm text-text-secondary mt-1">Lifts, generators, CCTV, pumps — AMC and service tracking.</p>
+    </div>
+    <button id="add-asset-btn" class="btn-primary text-sm flex items-center gap-2">
+      <i class="fas fa-plus" aria-hidden="true"></i>Add Asset
+    </button>
+  </div>
+
+  <!-- Alerts banner -->
+  <div id="alerts-banner" class="hidden mb-5"></div>
+
+  <!-- Assets grid -->
+  <div id="assets-container">
+    <div class="text-center py-10 text-text-secondary text-sm">Loading…</div>
+  </div>
+
+  <!-- Service log panel (slides in) -->
+  <div id="service-panel" class="hidden fixed inset-0 bg-black/50 z-50 flex justify-end">
+    <div class="bg-white w-full max-w-md h-full overflow-y-auto flex flex-col">
+      <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
+        <h2 id="service-panel-title" class="font-semibold text-text-primary">Service Logs</h2>
+        <button id="service-panel-close" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
+      </div>
+      <div id="service-logs-list" class="flex-1 p-5 overflow-y-auto">
+        <div class="text-center py-8 text-text-secondary text-sm">Loading…</div>
+      </div>
+      <div class="border-t border-border-light p-5">
+        <h3 class="text-sm font-semibold text-text-primary mb-3">Log Service</h3>
+        <div id="service-form-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700"></div>
+        <form id="service-form" class="space-y-3">
+          <input type="hidden" id="service-asset-id" />
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-medium text-text-primary mb-1">Date <span class="text-red-500">*</span></label>
+              <input type="date" name="service_date" required class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-primary mb-1">Type <span class="text-red-500">*</span></label>
+              <input type="text" name="service_type" required maxlength="100" placeholder="AMC, Repair, Inspection" class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-text-primary mb-1">Description</label>
+            <textarea name="description" rows="2" maxlength="500" class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-medium text-text-primary mb-1">Cost (₹)</label>
+              <input type="number" name="cost" min="0" step="0.01" class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-primary mb-1">Next Service Date</label>
+              <input type="date" name="next_service_date" class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <button type="submit" class="btn-primary w-full text-sm">Log Service</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Asset Modal -->
+  <div id="asset-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-lg max-h-screen overflow-y-auto">
+      <h3 class="font-semibold text-text-primary mb-4 flex justify-between">
+        Add Asset
+        <button id="asset-modal-close" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
+      </h3>
+      <div id="asset-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+      <form id="asset-form" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Name <span class="text-red-500">*</span></label>
+            <input name="name" required maxlength="200" placeholder="e.g. Lift A" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Category <span class="text-red-500">*</span></label>
+            <select name="category" required class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+              <option value="">Select</option>
+              {['Lift','Generator','Pump','CCTV','Fire_Safety','Gate','Electrical','Other'].map(c => (
+                <option value={c}>{c.replace('_',' ')}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Make</label>
+            <input name="make" maxlength="100" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Model</label>
+            <input name="model" maxlength="100" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1">Serial Number</label>
+          <input name="serial_number" maxlength="100" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Installed</label>
+            <input type="date" name="installation_date" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Warranty Until</label>
+            <input type="date" name="warranty_expiry" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Next Service</label>
+            <input type="date" name="next_service_date" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">AMC Start</label>
+            <input type="date" name="amc_start" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">AMC End</label>
+            <input type="date" name="amc_end" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">AMC Amount (₹)</label>
+            <input type="number" name="amc_amount" min="0" step="0.01" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="btn-primary flex-1 text-sm">Save Asset</button>
+          <button type="button" id="asset-modal-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const CATEGORY_ICONS: Record<string, string> = {
+      Lift: 'fa-elevator text-blue-600', Generator: 'fa-bolt text-amber-600',
+      Pump: 'fa-tint text-cyan-600', CCTV: 'fa-video text-purple-600',
+      Fire_Safety: 'fa-fire-extinguisher text-red-600', Gate: 'fa-door-open text-green-600',
+      Electrical: 'fa-plug text-yellow-600', Other: 'fa-wrench text-gray-600',
+    };
+
+    let currentAssetId = '';
+
+    async function loadAssets() {
+      const res = await fetch('/api/v1/admin/assets', { credentials: 'include' });
+      const assets = res.ok ? await res.json() : [];
+
+      // Show alerts
+      const alerts = assets.filter((a: any) => a.amc_expired || a.service_overdue);
+      const alertsBanner = document.getElementById('alerts-banner')!;
+      if (alerts.length) {
+        alertsBanner.className = 'mb-5 p-4 bg-red-50 border border-red-200 rounded-xl';
+        alertsBanner.innerHTML = `
+          <div class="flex items-center gap-2 text-red-700 font-medium text-sm mb-2">
+            <i class="fas fa-exclamation-triangle"></i>${alerts.length} asset${alerts.length > 1 ? 's' : ''} need attention
+          </div>
+          <ul class="space-y-1">
+            ${alerts.map((a: any) => `
+              <li class="text-xs text-red-600 flex items-center gap-1.5">
+                <i class="fas fa-circle text-red-400" style="font-size:6px"></i>
+                <strong>${a.name}</strong>: ${a.amc_expired ? 'AMC expired' : ''}${a.amc_expired && a.service_overdue ? ', ' : ''}${a.service_overdue ? 'service overdue' : ''}
+              </li>
+            `).join('')}
+          </ul>`;
+        alertsBanner.classList.remove('hidden');
+      }
+
+      const container = document.getElementById('assets-container')!;
+      if (!assets.length) {
+        container.innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">No assets registered yet.</div>';
+        return;
+      }
+
+      // Group by category
+      const grouped: Record<string, any[]> = {};
+      assets.forEach((a: any) => { if (!grouped[a.category]) grouped[a.category] = []; grouped[a.category].push(a); });
+
+      container.innerHTML = Object.entries(grouped).map(([cat, items]) => `
+        <div class="mb-6">
+          <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3 flex items-center gap-2">
+            <i class="fas ${CATEGORY_ICONS[cat] ?? 'fa-wrench text-gray-400'} text-base" aria-hidden="true"></i>
+            ${cat.replace('_', ' ')}
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            ${items.map((a: any) => {
+              const statusFlags = [
+                a.amc_expired && '<span class="text-xs text-red-600 font-medium">AMC Expired</span>',
+                a.service_overdue && '<span class="text-xs text-red-600 font-medium">Service Overdue</span>',
+                a.service_due_soon && !a.service_overdue && '<span class="text-xs text-amber-600 font-medium">Service Due Soon</span>',
+                a.warranty_expired && '<span class="text-xs text-gray-500">Warranty Expired</span>',
+              ].filter(Boolean).join(' · ');
+
+              return `
+                <div class="bg-white rounded-xl border ${(a.amc_expired || a.service_overdue) ? 'border-red-200' : 'border-border-light'} p-4">
+                  <div class="flex items-start justify-between gap-2 mb-3">
+                    <div>
+                      <div class="font-medium text-text-primary text-sm">${a.name}</div>
+                      ${a.make ? `<div class="text-xs text-text-secondary mt-0.5">${a.make}${a.model ? ' · ' + a.model : ''}</div>` : ''}
+                    </div>
+                    <i class="fas ${CATEGORY_ICONS[a.category] ?? 'fa-wrench text-gray-400'} text-lg flex-shrink-0 mt-0.5" aria-hidden="true"></i>
+                  </div>
+                  <div class="space-y-1 text-xs text-text-secondary mb-3">
+                    ${a.next_service_date ? `<div><i class="fas fa-calendar mr-1"></i>Next service: <span class="${a.service_overdue ? 'text-red-600 font-medium' : a.service_due_soon ? 'text-amber-600 font-medium' : ''}">${new Date(a.next_service_date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span></div>` : ''}
+                    ${a.amc_end ? `<div><i class="fas fa-file-contract mr-1"></i>AMC until: <span class="${a.amc_expired ? 'text-red-600 font-medium' : ''}">${new Date(a.amc_end).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span></div>` : ''}
+                    ${a.vendors?.name ? `<div><i class="fas fa-building mr-1"></i>${a.vendors.name}</div>` : ''}
+                  </div>
+                  ${statusFlags ? `<div class="mb-3 flex flex-wrap gap-1">${statusFlags}</div>` : ''}
+                  <button onclick="openServicePanel('${a.id}','${a.name}')" class="w-full btn-outline text-xs py-1.5">
+                    <i class="fas fa-tools mr-1" aria-hidden="true"></i>Service Logs
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function openServicePanel(assetId: string, assetName: string) {
+      currentAssetId = assetId;
+      document.getElementById('service-panel-title')!.textContent = `${assetName} — Service Logs`;
+      document.getElementById('service-asset-id')!.setAttribute('value', assetId);
+      document.getElementById('service-panel')!.classList.remove('hidden');
+      await loadServiceLogs(assetId);
+    }
+
+    async function loadServiceLogs(assetId: string) {
+      const container = document.getElementById('service-logs-list')!;
+      container.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm">Loading…</div>';
+
+      const res = await fetch(`/api/v1/admin/assets/${assetId}/service-logs`, { credentials: 'include' });
+      const logs = res.ok ? await res.json() : [];
+
+      if (!logs.length) {
+        container.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm">No service logs yet.</div>';
+        return;
+      }
+
+      container.innerHTML = `<div class="space-y-3">
+        ${logs.map((l: any) => `
+          <div class="border border-border-light rounded-xl p-3">
+            <div class="flex items-start justify-between gap-2 mb-1">
+              <div class="font-medium text-sm text-text-primary">${l.service_type}</div>
+              <div class="text-xs text-text-secondary whitespace-nowrap">${new Date(l.service_date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+            </div>
+            ${l.description ? `<p class="text-xs text-text-secondary mb-1">${l.description}</p>` : ''}
+            <div class="flex gap-3 text-xs text-text-secondary">
+              ${l.cost ? `<span>₹${Number(l.cost).toLocaleString('en-IN')}</span>` : ''}
+              ${l.vendors?.name ? `<span>${l.vendors.name}</span>` : ''}
+              ${l.next_service_date ? `<span>Next: ${new Date(l.next_service_date).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+
+    // Service form
+    document.getElementById('service-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const assetId = (document.getElementById('service-asset-id') as HTMLInputElement).value;
+      const fd = new FormData(e.target as HTMLFormElement);
+      const errEl = document.getElementById('service-form-error')!;
+      errEl.classList.add('hidden');
+
+      const res = await fetch(`/api/v1/admin/assets/${assetId}/service-logs`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_date: fd.get('service_date'),
+          service_type: fd.get('service_type'),
+          description: fd.get('description') || null,
+          cost: fd.get('cost') ? parseFloat(fd.get('cost') as string) : null,
+          next_service_date: fd.get('next_service_date') || null,
+        }),
+      });
+
+      if (res.ok) {
+        (e.target as HTMLFormElement).reset();
+        loadServiceLogs(assetId);
+        loadAssets();
+      } else {
+        const d = await res.json();
+        errEl.textContent = d.detail ?? d.error ?? 'Failed to log service.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('service-panel-close')!.addEventListener('click', () => {
+      document.getElementById('service-panel')!.classList.add('hidden');
+    });
+
+    // Add asset modal
+    const assetModal = document.getElementById('asset-modal')!;
+    document.getElementById('add-asset-btn')!.addEventListener('click', () => assetModal.classList.remove('hidden'));
+    document.getElementById('asset-modal-close')!.addEventListener('click', () => assetModal.classList.add('hidden'));
+    document.getElementById('asset-modal-cancel')!.addEventListener('click', () => assetModal.classList.add('hidden'));
+
+    document.getElementById('asset-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target as HTMLFormElement);
+      const errEl = document.getElementById('asset-error')!;
+      errEl.classList.add('hidden');
+
+      const res = await fetch('/api/v1/admin/assets', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: fd.get('name'), category: fd.get('category'),
+          make: fd.get('make') || null, model: fd.get('model') || null,
+          serial_number: fd.get('serial_number') || null,
+          installation_date: fd.get('installation_date') || null,
+          warranty_expiry: fd.get('warranty_expiry') || null,
+          next_service_date: fd.get('next_service_date') || null,
+          amc_start: fd.get('amc_start') || null,
+          amc_end: fd.get('amc_end') || null,
+          amc_amount: fd.get('amc_amount') ? parseFloat(fd.get('amc_amount') as string) : null,
+        }),
+      });
+
+      if (res.ok) {
+        assetModal.classList.add('hidden');
+        (e.target as HTMLFormElement).reset();
+        loadAssets();
+      } else {
+        const d = await res.json();
+        errEl.textContent = d.detail ?? d.error ?? 'Failed to add asset.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    (window as any).openServicePanel = openServicePanel;
+    loadAssets();
+  </script>
+</PortalLayout>

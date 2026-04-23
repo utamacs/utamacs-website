@@ -131,5 +131,7 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    (await import('@tailwindcss/forms')).default,
+  ],
 };

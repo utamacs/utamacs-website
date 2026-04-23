@@ -1,0 +1,28 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import MemberDashboard from '@portal/MemberDashboard';
+import ExecutiveDashboard from '@portal/ExecutiveDashboard';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+---
+
+<PortalLayout title="Dashboard" user={user} activeModule="dashboard">
+  {(user.role === 'member') && (
+    <MemberDashboard userId={user.id} client:load />
+  )}
+  {(['executive', 'admin'].includes(user.role)) && (
+    <ExecutiveDashboard role={user.role} client:load />
+  )}
+  {user.role === 'security_guard' && (
+    <div class="text-center py-12">
+      <div class="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-id-badge text-3xl text-primary-600" aria-hidden="true"></i>
+      </div>
+      <h2 class="text-lg font-semibold text-text-primary mb-2">Security Dashboard</h2>
+      <p class="text-text-secondary mb-4">Manage visitor entry and exit logs.</p>
+      <a href="/portal/visitors" class="btn-primary">Go to Visitor Management</a>
+    </div>
+  )}
+</PortalLayout>

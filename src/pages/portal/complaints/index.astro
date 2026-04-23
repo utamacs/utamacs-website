@@ -1,0 +1,12 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import ComplaintsView from '@portal/ComplaintsView';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+---
+
+<PortalLayout title="Complaints" user={user} activeModule="complaints">
+  <ComplaintsView role={user.role} userId={user.id} client:load />
+</PortalLayout>

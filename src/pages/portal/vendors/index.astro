@@ -1,0 +1,299 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const isExec = ['executive', 'admin'].includes(user.role);
+const isVendor = user.role === 'vendor';
+if (!isExec && !isVendor) return Astro.redirect('/portal');
+---
+
+<PortalLayout title="Vendors & Work Orders" user={user} activeModule="vendors">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">
+        {isVendor ? 'My Work Orders' : 'Vendors & Work Orders'}
+      </h1>
+      <p class="text-sm text-text-secondary mt-1">
+        {isVendor ? 'View and update your assigned work orders.' : 'Manage service vendors and work assignments.'}
+      </p>
+    </div>
+    {isExec && (
+      <div class="flex gap-2">
+        <button id="add-vendor-btn" class="btn-outline text-sm flex items-center gap-2">
+          <i class="fas fa-plus" aria-hidden="true"></i>Add Vendor
+        </button>
+        <button id="add-wo-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-file-alt" aria-hidden="true"></i>New Work Order
+        </button>
+      </div>
+    )}
+  </div>
+
+  {isExec && (
+    <>
+      <!-- Vendors list -->
+      <div class="bg-white rounded-xl border border-border-light overflow-hidden mb-6">
+        <div class="px-5 py-4 border-b border-border-light bg-gray-50 flex items-center justify-between">
+          <h2 class="font-semibold text-text-primary">Vendors</h2>
+          <span id="vendor-count" class="text-xs text-text-secondary"></span>
+        </div>
+        <div id="vendors-list" class="p-5">
+          <div class="text-sm text-text-secondary text-center py-4">Loading…</div>
+        </div>
+      </div>
+    </>
+  )}
+
+  <!-- Work Orders -->
+  <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+    <div class="px-5 py-4 border-b border-border-light bg-gray-50">
+      <h2 class="font-semibold text-text-primary">Work Orders</h2>
+    </div>
+    <div id="work-orders-list" class="p-5">
+      <div class="text-sm text-text-secondary text-center py-4">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Add Vendor Modal -->
+  {isExec && (
+    <div id="vendor-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+        <h3 class="font-semibold text-text-primary mb-4 flex justify-between">
+          Add Vendor
+          <button id="vendor-modal-close" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
+        </h3>
+        <div id="vendor-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+        <form id="vendor-form" class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Name <span class="text-red-500">*</span></label>
+            <input name="name" required maxlength="200" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Category <span class="text-red-500">*</span></label>
+            <select name="category" required class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+              <option value="">Select</option>
+              {['Plumbing','Electrical','Housekeeping','Security','Landscaping','Lift','IT','Generator','Pest_Control','Other'].map(c => (
+                <option value={c}>{c.replace('_',' ')}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Contact Person</label>
+            <input name="contact_person" maxlength="100" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Phone</label>
+              <input name="phone" type="tel" maxlength="15" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Email</label>
+              <input name="email" type="email" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">GSTIN</label>
+              <input name="gstin" maxlength="15" placeholder="15-char GSTIN" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">PAN</label>
+              <input name="pan" maxlength="10" placeholder="For TDS" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="btn-primary flex-1 text-sm">Save Vendor</button>
+            <button type="button" id="vendor-modal-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
+
+  <!-- Add Work Order Modal -->
+  {isExec && (
+    <div id="wo-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+        <h3 class="font-semibold text-text-primary mb-4 flex justify-between">
+          New Work Order
+          <button id="wo-modal-close" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
+        </h3>
+        <div id="wo-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+        <form id="wo-form" class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Vendor <span class="text-red-500">*</span></label>
+            <select name="vendor_id" required id="wo-vendor-select" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+              <option value="">Select vendor</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Title <span class="text-red-500">*</span></label>
+            <input name="title" required maxlength="200" placeholder="Brief work description" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Description</label>
+            <textarea name="description" rows="3" maxlength="1000" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Deadline</label>
+              <input name="deadline" type="date" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Quoted Amount (₹)</label>
+              <input name="quoted_amount" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="btn-primary flex-1 text-sm">Create Work Order</button>
+            <button type="button" id="wo-modal-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ isExec, isVendor }}>
+    const STATUS_COLORS: Record<string, string> = {
+      draft: 'bg-gray-100 text-gray-600',
+      issued: 'bg-blue-100 text-blue-700',
+      in_progress: 'bg-yellow-100 text-yellow-700',
+      completed: 'bg-green-100 text-green-700',
+      disputed: 'bg-red-100 text-red-700',
+      closed: 'bg-gray-100 text-gray-500',
+    };
+
+    let vendors: any[] = [];
+
+    async function loadVendors() {
+      if (!isExec) return;
+      const res = await fetch('/api/v1/vendors', { credentials: 'include' });
+      vendors = res.ok ? await res.json() : [];
+      document.getElementById('vendor-count').textContent = `${vendors.length} vendor${vendors.length !== 1 ? 's' : ''}`;
+
+      const list = document.getElementById('vendors-list');
+      if (!vendors.length) {
+        list.innerHTML = '<div class="text-sm text-text-secondary text-center py-4">No vendors yet.</div>';
+        return;
+      }
+
+      list.innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="border-b border-border-light text-xs text-text-secondary">
+              <th class="pb-2 text-left">Name</th>
+              <th class="pb-2 text-left">Category</th>
+              <th class="pb-2 text-left hidden md:table-cell">Contact</th>
+              <th class="pb-2 text-left hidden md:table-cell">GSTIN</th>
+              <th class="pb-2 text-left">Status</th>
+            </tr></thead>
+            <tbody class="divide-y divide-border-light">
+              ${vendors.map(v => `
+                <tr class="hover:bg-gray-50">
+                  <td class="py-3 font-medium text-text-primary">${v.name}</td>
+                  <td class="py-3 text-text-secondary">${v.category?.replace('_',' ')}</td>
+                  <td class="py-3 text-text-secondary hidden md:table-cell">${v.contact_person ?? '—'}</td>
+                  <td class="py-3 text-text-secondary hidden md:table-cell font-mono text-xs">${v.gstin ?? '—'}</td>
+                  <td class="py-3"><span class="text-xs px-2 py-0.5 rounded-full ${v.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'} font-medium">${v.is_active ? 'Active' : 'Inactive'}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`;
+
+      // Populate vendor select in WO modal
+      const sel = document.getElementById('wo-vendor-select');
+      if (sel) {
+        sel.innerHTML = '<option value="">Select vendor</option>' +
+          vendors.filter(v => v.is_active).map(v => `<option value="${v.id}">${v.name} (${v.category?.replace('_',' ')})</option>`).join('');
+      }
+    }
+
+    async function loadWorkOrders() {
+      const res = await fetch('/api/v1/vendors/work-orders', { credentials: 'include' });
+      const wos = res.ok ? await res.json() : [];
+      const list = document.getElementById('work-orders-list');
+
+      if (!wos.length) {
+        list.innerHTML = '<div class="text-sm text-text-secondary text-center py-4">No work orders.</div>';
+        return;
+      }
+
+      list.innerHTML = `
+        <div class="space-y-3">
+          ${wos.map((w: any) => `
+            <div class="border border-border-light rounded-xl p-4">
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <div class="font-medium text-text-primary text-sm">${w.title}</div>
+                  <div class="text-xs text-text-secondary mt-0.5">${w.vendors?.name ?? '—'} · ${w.vendors?.category?.replace('_',' ') ?? ''}</div>
+                </div>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[w.status] ?? 'bg-gray-100 text-gray-600'}">${w.status.replace('_',' ')}</span>
+              </div>
+              ${w.description ? `<p class="text-xs text-text-secondary mb-2 line-clamp-2">${w.description}</p>` : ''}
+              <div class="flex gap-3 text-xs text-text-secondary">
+                ${w.deadline ? `<span><i class="fas fa-calendar mr-1"></i>${new Date(w.deadline).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>` : ''}
+                ${w.quoted_amount ? `<span><i class="fas fa-rupee-sign mr-1"></i>${Number(w.quoted_amount).toLocaleString('en-IN')}</span>` : ''}
+                ${w.complaint_id ? `<a href="/portal/complaints/${w.complaint_id}" class="text-primary-600 hover:underline">View complaint</a>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>`;
+    }
+
+    if (isExec) {
+      const vendorModal = document.getElementById('vendor-modal');
+      const woModal = document.getElementById('wo-modal');
+
+      document.getElementById('add-vendor-btn')?.addEventListener('click', () => vendorModal?.classList.remove('hidden'));
+      document.getElementById('vendor-modal-close')?.addEventListener('click', () => vendorModal?.classList.add('hidden'));
+      document.getElementById('vendor-modal-cancel')?.addEventListener('click', () => vendorModal?.classList.add('hidden'));
+
+      document.getElementById('add-wo-btn')?.addEventListener('click', () => woModal?.classList.remove('hidden'));
+      document.getElementById('wo-modal-close')?.addEventListener('click', () => woModal?.classList.add('hidden'));
+      document.getElementById('wo-modal-cancel')?.addEventListener('click', () => woModal?.classList.add('hidden'));
+
+      document.getElementById('vendor-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target as HTMLFormElement);
+        const errEl = document.getElementById('vendor-error');
+        errEl?.classList.add('hidden');
+        const res = await fetch('/api/v1/vendors', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: fd.get('name'), category: fd.get('category'),
+            contact_person: fd.get('contact_person') || null,
+            phone: fd.get('phone') || null, email: fd.get('email') || null,
+            gstin: fd.get('gstin') || null, pan: fd.get('pan') || null,
+          }),
+        });
+        if (res.ok) { vendorModal?.classList.add('hidden'); (e.target as HTMLFormElement).reset(); loadVendors(); }
+        else { const d = await res.json(); if (errEl) { errEl.textContent = d.detail ?? d.error ?? 'Failed.'; errEl.classList.remove('hidden'); } }
+      });
+
+      document.getElementById('wo-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target as HTMLFormElement);
+        const errEl = document.getElementById('wo-error');
+        errEl?.classList.add('hidden');
+        const res = await fetch('/api/v1/vendors/work-orders', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vendor_id: fd.get('vendor_id'), title: fd.get('title'),
+            description: fd.get('description') || null,
+            deadline: fd.get('deadline') || null,
+            quoted_amount: fd.get('quoted_amount') ? parseFloat(fd.get('quoted_amount') as string) : null,
+          }),
+        });
+        if (res.ok) { woModal?.classList.add('hidden'); (e.target as HTMLFormElement).reset(); loadWorkOrders(); }
+        else { const d = await res.json(); if (errEl) { errEl.textContent = d.detail ?? d.error ?? 'Failed.'; errEl.classList.remove('hidden'); } }
+      });
+    }
+
+    loadVendors();
+    loadWorkOrders();
+  </script>
+</PortalLayout>

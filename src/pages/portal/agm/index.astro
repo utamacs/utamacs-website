@@ -1,0 +1,649 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const isExec = ['executive', 'admin'].includes(user.role);
+const isAdmin = user.role === 'admin';
+---
+
+<PortalLayout title="AGM & Governance" user={user} activeModule="agm">
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">AGM & Governance</h1>
+      <p class="text-sm text-text-secondary mt-1">
+        Annual General Meeting minutes, financial statements, and governance documents.
+      </p>
+    </div>
+    {isExec && (
+      <div class="flex gap-2">
+        <button id="new-session-btn" class="btn-outline text-sm">
+          <i class="fas fa-calendar-plus mr-2" aria-hidden="true"></i>New AGM Session
+        </button>
+        <button id="new-doc-btn" class="btn-primary text-sm">
+          <i class="fas fa-file-plus mr-2" aria-hidden="true"></i>Add Document
+        </button>
+      </div>
+    )}
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+    <button onclick="switchTab('sessions')" id="tab-sessions"
+      class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-white text-primary-600 shadow-sm">
+      AGM Sessions
+    </button>
+    <button onclick="switchTab('documents')" id="tab-documents"
+      class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+      Documents
+    </button>
+    {isExec && (
+      <button onclick="switchTab('pending')" id="tab-pending"
+        class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+        Pending Review
+      </button>
+    )}
+  </div>
+
+  <!-- Sessions Panel -->
+  <div id="panel-sessions">
+    <div id="sessions-container">
+      <div class="text-center text-text-secondary py-12">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading sessions…
+      </div>
+    </div>
+  </div>
+
+  <!-- Documents Panel -->
+  <div id="panel-documents" class="hidden">
+    <div class="flex flex-wrap gap-3 mb-4">
+      <select id="filter-doc-type" onchange="loadDocuments()"
+        class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white">
+        <option value="">All Types</option>
+        <option value="minutes">Minutes</option>
+        <option value="financial_statement">Financial Statement</option>
+        <option value="audit_report">Audit Report</option>
+        <option value="resolution">Resolution</option>
+        <option value="notice">AGM Notice</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div id="documents-container">
+      <div class="text-center text-text-secondary py-12">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading documents…
+      </div>
+    </div>
+  </div>
+
+  <!-- Pending Review Panel (exec only) -->
+  {isExec && (
+    <div id="panel-pending" class="hidden">
+      <div id="pending-container">
+        <div class="text-center text-text-secondary py-12">
+          <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- New AGM Session Modal -->
+  {isExec && (
+    <div id="session-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+        <div class="p-6 border-b border-border-light flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-text-primary">Create AGM Session</h2>
+          <button onclick="closeSessionModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="s-year" class="block text-sm font-medium text-text-primary mb-1">Year *</label>
+              <input id="s-year" type="number" value="2025" min="2000" max="2100"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label for="s-type" class="block text-sm font-medium text-text-primary mb-1">Type</label>
+              <select id="s-type" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+                <option value="annual">Annual (AGM)</option>
+                <option value="extraordinary">Extraordinary (EGM)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label for="s-date" class="block text-sm font-medium text-text-primary mb-1">Meeting Date *</label>
+            <input id="s-date" type="date"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label for="s-venue" class="block text-sm font-medium text-text-primary mb-1">Venue</label>
+            <input id="s-venue" type="text" placeholder="Community Hall, Block A"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label for="s-notes" class="block text-sm font-medium text-text-primary mb-1">Notes</label>
+            <textarea id="s-notes" rows="2"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm resize-none"></textarea>
+          </div>
+          <div id="session-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+        </div>
+        <div class="p-6 pt-0 flex gap-3">
+          <button onclick="closeSessionModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+          <button id="session-save-btn" class="flex-1 btn-primary text-sm">Create Session</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- New Document Modal -->
+  {isExec && (
+    <div id="doc-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b border-border-light flex items-center justify-between">
+          <h2 id="doc-modal-title" class="text-lg font-semibold text-text-primary">Submit AGM Document</h2>
+          <button onclick="closeDocModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label for="d-session" class="block text-sm font-medium text-text-primary mb-1">AGM Session</label>
+            <select id="d-session" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+              <option value="">No session (standalone document)</option>
+            </select>
+          </div>
+          <div>
+            <label for="d-type" class="block text-sm font-medium text-text-primary mb-1">Document Type *</label>
+            <select id="d-type" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+              <option value="minutes">Meeting Minutes</option>
+              <option value="financial_statement">Financial Statement</option>
+              <option value="audit_report">Audit Report</option>
+              <option value="resolution">Resolution</option>
+              <option value="notice">AGM Notice / Agenda</option>
+              <option value="proxy_form">Proxy Form</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label for="d-title" class="block text-sm font-medium text-text-primary mb-1">Title *</label>
+            <input id="d-title" type="text" placeholder="e.g. AGM 2025 — Meeting Minutes"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label for="d-desc" class="block text-sm font-medium text-text-primary mb-1">Description</label>
+            <textarea id="d-desc" rows="2"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm resize-none"
+              placeholder="Brief description of the document contents…"></textarea>
+          </div>
+          <div>
+            <label for="d-file-name" class="block text-sm font-medium text-text-primary mb-1">File Name</label>
+            <input id="d-file-name" type="text" placeholder="agm-2025-minutes.pdf"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            <p class="text-xs text-text-secondary mt-1">File upload integration to be configured with storage bucket.</p>
+          </div>
+          <div>
+            <label for="d-effective" class="block text-sm font-medium text-text-primary mb-1">Effective Date</label>
+            <input id="d-effective" type="date"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="d-public" type="checkbox" class="rounded" />
+            <label for="d-public" class="text-sm text-text-primary">Make public to all members once approved</label>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="d-submit-now" type="checkbox" checked class="rounded" />
+            <label for="d-submit-now" class="text-sm text-text-primary">Submit for approval immediately (uncheck to save as draft)</label>
+          </div>
+          <div id="doc-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+        </div>
+        <div class="p-6 pt-0 flex gap-3">
+          <button onclick="closeDocModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+          <button id="doc-save-btn" class="flex-1 btn-primary text-sm">Submit Document</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Approve/Reject Modal (admin only) -->
+  {isAdmin && (
+    <div id="review-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+        <div class="p-6 border-b border-border-light flex items-center justify-between">
+          <h2 id="review-modal-title" class="text-lg font-semibold text-text-primary">Review Document</h2>
+          <button onclick="closeReviewModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <p id="review-doc-title" class="font-medium text-text-primary"></p>
+          <div>
+            <label for="review-comment" class="block text-sm font-medium text-text-primary mb-1">Comment</label>
+            <textarea id="review-comment" rows="3"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm resize-none"
+              placeholder="Optional comment (required for rejection)…"></textarea>
+          </div>
+          <div id="review-public-row" class="flex items-center gap-2">
+            <input id="review-public" type="checkbox" class="rounded" />
+            <label for="review-public" class="text-sm text-text-primary">Publish to all members on approval</label>
+          </div>
+          <div id="review-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+          <input id="review-doc-id" type="hidden" />
+        </div>
+        <div class="p-6 pt-0 flex gap-3">
+          <button onclick="closeReviewModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+          <button id="review-reject-btn" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium">Reject</button>
+          <button id="review-approve-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium">Approve</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ isExec, isAdmin }}>
+    const STATUS_BADGE = {
+      draft:     'bg-gray-100 text-gray-600',
+      submitted: 'bg-amber-100 text-amber-700',
+      approved:  'bg-green-100 text-green-700',
+      rejected:  'bg-red-100 text-red-700',
+    };
+    const STATUS_ICON = {
+      draft:     'fa-pencil-alt',
+      submitted: 'fa-clock',
+      approved:  'fa-check-circle',
+      rejected:  'fa-times-circle',
+    };
+    const DOC_TYPE_LABEL = {
+      minutes: 'Minutes',
+      financial_statement: 'Financial Statement',
+      audit_report: 'Audit Report',
+      resolution: 'Resolution',
+      notice: 'AGM Notice',
+      proxy_form: 'Proxy Form',
+      other: 'Other',
+    };
+
+    let sessions = [];
+
+    function switchTab(tab) {
+      const panels = ['sessions', 'documents', 'pending'];
+      panels.forEach(p => {
+        const el = document.getElementById(`panel-${p}`);
+        if (el) el.classList.toggle('hidden', p !== tab);
+        const btn = document.getElementById(`tab-${p}`);
+        if (btn) {
+          btn.classList.toggle('bg-white', p === tab);
+          btn.classList.toggle('text-primary-600', p === tab);
+          btn.classList.toggle('shadow-sm', p === tab);
+          btn.classList.toggle('text-text-secondary', p !== tab);
+        }
+      });
+      if (tab === 'sessions' && sessions.length === 0) loadSessions();
+      if (tab === 'documents') loadDocuments();
+      if (tab === 'pending' && isExec) loadPending();
+    }
+
+    async function loadSessions() {
+      const container = document.getElementById('sessions-container');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/agm/sessions', { credentials: 'include' });
+        const data = await res.json();
+        sessions = Array.isArray(data) ? data : [];
+
+        if (!sessions.length) {
+          container.innerHTML = `
+            <div class="text-center py-12">
+              <i class="fas fa-landmark text-4xl text-gray-300 mb-4 block" aria-hidden="true"></i>
+              <h3 class="text-lg font-medium text-text-primary mb-2">No AGM Sessions Yet</h3>
+              <p class="text-sm text-text-secondary mb-4">Create your first AGM session to get started.</p>
+              ${isExec ? '<button onclick="openSessionModal()" class="btn-primary text-sm">Create AGM Session</button>' : ''}
+            </div>`;
+          return;
+        }
+
+        const SESSION_STATUS_COLOR = {
+          scheduled: 'border-l-blue-400',
+          held: 'border-l-green-500',
+          adjourned: 'border-l-amber-400',
+          cancelled: 'border-l-red-400',
+        };
+
+        container.innerHTML = sessions.map(s => {
+          const docsCount = s.agm_documents?.length ?? 0;
+          const approvedDocs = (s.agm_documents ?? []).filter(d => d.status === 'approved').length;
+          const pendingDocs = (s.agm_documents ?? []).filter(d => d.status === 'submitted').length;
+          const borderColor = SESSION_STATUS_COLOR[s.status] || 'border-l-gray-300';
+          const typeLabel = s.agm_type === 'extraordinary' ? 'EGM' : 'AGM';
+          return `
+          <div class="bg-white rounded-2xl border border-border-light border-l-4 ${borderColor} p-5 mb-4 hover:shadow-soft transition-shadow">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-primary-50 text-primary-700">${typeLabel} ${s.agm_year}</span>
+                  <span class="text-xs capitalize px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">${s.status}</span>
+                </div>
+                <h3 class="text-lg font-semibold text-text-primary">${typeLabel} ${s.agm_year}</h3>
+                <p class="text-sm text-text-secondary">${new Date(s.meeting_date).toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' })}${s.venue ? ` · ${s.venue}` : ''}</p>
+              </div>
+              <div class="flex gap-2 text-right">
+                <div class="text-center">
+                  <p class="text-xl font-bold text-primary-600">${docsCount}</p>
+                  <p class="text-xs text-text-secondary">Docs</p>
+                </div>
+                ${pendingDocs > 0 ? `<div class="text-center"><p class="text-xl font-bold text-amber-500">${pendingDocs}</p><p class="text-xs text-text-secondary">Pending</p></div>` : ''}
+                ${approvedDocs > 0 ? `<div class="text-center"><p class="text-xl font-bold text-green-600">${approvedDocs}</p><p class="text-xs text-text-secondary">Approved</p></div>` : ''}
+              </div>
+            </div>
+            ${s.quorum_met ? '<p class="text-xs text-green-600 mb-3"><i class="fas fa-check-circle mr-1"></i>Quorum met · ' + (s.attendees_count ?? 0) + ' attendees</p>' : ''}
+            <div class="flex gap-2 flex-wrap">
+              <button onclick="filterDocsBySession('${s.id}')" class="text-xs text-primary-600 hover:underline">
+                View Documents
+              </button>
+              ${isExec && s.status === 'scheduled' ? `<button onclick="markHeld('${s.id}')" class="text-xs text-text-secondary hover:text-text-primary hover:underline">Mark as Held</button>` : ''}
+            </div>
+          </div>`;
+        }).join('');
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load sessions.</div>`;
+      }
+    }
+
+    async function loadDocuments(sessionId = null) {
+      const container = document.getElementById('documents-container');
+      if (!container) return;
+      const docType = document.getElementById('filter-doc-type')?.value || '';
+      const params = new URLSearchParams();
+      if (sessionId) params.set('session_id', sessionId);
+      if (docType) params.set('document_type', docType);
+
+      try {
+        const res = await fetch(`/api/v1/agm/documents?${params}`, { credentials: 'include' });
+        const docs = await res.json();
+
+        if (!Array.isArray(docs) || !docs.length) {
+          container.innerHTML = `<div class="text-center py-12 text-text-secondary">
+            <i class="fas fa-folder-open text-3xl mb-3 block opacity-30" aria-hidden="true"></i>
+            <p class="text-sm">No documents found.</p>
+          </div>`;
+          return;
+        }
+
+        container.innerHTML = docs.map(d => renderDocCard(d)).join('');
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load documents.</div>`;
+      }
+    }
+
+    async function loadPending() {
+      const container = document.getElementById('pending-container');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/agm/documents?status=submitted', { credentials: 'include' });
+        const docs = await res.json();
+
+        if (!Array.isArray(docs) || !docs.length) {
+          container.innerHTML = `<div class="text-center py-12 text-text-secondary">
+            <i class="fas fa-check-circle text-3xl mb-3 block text-green-300" aria-hidden="true"></i>
+            <p class="text-sm">No documents pending review.</p>
+          </div>`;
+          return;
+        }
+
+        container.innerHTML = docs.map(d => renderDocCard(d, true)).join('');
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load pending documents.</div>`;
+      }
+    }
+
+    function renderDocCard(d, showActions = false) {
+      const badge = STATUS_BADGE[d.status] || 'bg-gray-100 text-gray-600';
+      const icon = STATUS_ICON[d.status] || 'fa-file';
+      const typeLabel = DOC_TYPE_LABEL[d.document_type] || d.document_type;
+      const sessionInfo = d.agm_sessions ? `AGM ${d.agm_sessions.agm_year} · ` : '';
+      const isDualApproval = ['financial_statement', 'audit_report'].includes(d.document_type);
+      const needsSecondary = isDualApproval && d.status === 'submitted' && !d.secondary_approved_at;
+
+      const approveBtn = isAdmin && d.status === 'submitted'
+        ? `<button onclick="openReviewModal('${d.id}','${d.title.replace(/'/g,"\\'")}',false)" class="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-lg hover:bg-red-200">Reject</button>
+           <button onclick="openReviewModal('${d.id}','${d.title.replace(/'/g,"\\'")}',true)" class="${needsSecondary ? 'opacity-50 cursor-not-allowed' : ''} text-xs bg-green-100 text-green-700 px-3 py-1 rounded-lg hover:bg-green-200" ${needsSecondary ? 'disabled title="Requires secondary approval first"' : ''}>Approve</button>`
+        : '';
+
+      const secondaryBtn = isExec && !isAdmin && isDualApproval && d.status === 'submitted' && !d.secondary_approved_at
+        ? `<button onclick="secondaryApprove('${d.id}')" class="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-lg hover:bg-blue-200">Secondary Sign-off</button>`
+        : '';
+
+      const submitBtn = isExec && d.status === 'draft'
+        ? `<button onclick="submitDoc('${d.id}')" class="text-xs bg-amber-100 text-amber-700 px-3 py-1 rounded-lg hover:bg-amber-200">Submit for Approval</button>`
+        : '';
+
+      const historyBtn = isExec
+        ? `<button onclick="showHistory('${d.id}')" class="text-xs text-text-secondary hover:text-text-primary hover:underline">History</button>`
+        : '';
+
+      return `
+      <div class="bg-white rounded-2xl border border-border-light p-5 mb-4 hover:shadow-soft transition-shadow">
+        <div class="flex items-start justify-between mb-2">
+          <div class="flex-1 min-w-0 mr-4">
+            <div class="flex items-center gap-2 mb-1 flex-wrap">
+              <span class="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-700">${typeLabel}</span>
+              <span class="px-2 py-0.5 text-xs rounded-full font-medium ${badge}">
+                <i class="fas ${icon} mr-1" aria-hidden="true"></i>${d.status}
+              </span>
+              ${d.is_public ? '<span class="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-600"><i class="fas fa-globe mr-1"></i>Public</span>' : ''}
+              ${needsSecondary && isExec ? '<span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Awaiting 2nd sign-off</span>' : ''}
+            </div>
+            <h3 class="text-base font-semibold text-text-primary truncate">${d.title}</h3>
+            <p class="text-xs text-text-secondary mt-0.5">${sessionInfo}${new Date(d.created_at).toLocaleDateString('en-IN')}</p>
+          </div>
+          ${d.file_name ? `<i class="fas fa-file-pdf text-red-400 text-xl flex-shrink-0" aria-hidden="true"></i>` : ''}
+        </div>
+        ${d.description ? `<p class="text-sm text-text-secondary mb-3 line-clamp-2">${d.description}</p>` : ''}
+        ${d.review_comment ? `<div class="bg-${d.status === 'rejected' ? 'red' : 'gray'}-50 rounded-lg p-3 mb-3 text-xs text-text-secondary">${d.status === 'rejected' ? '<strong>Rejection reason:</strong> ' : ''}${d.review_comment}</div>` : ''}
+        <div class="flex items-center gap-2 flex-wrap mt-2">
+          ${submitBtn}
+          ${secondaryBtn}
+          ${approveBtn}
+          ${historyBtn}
+        </div>
+      </div>`;
+    }
+
+    function filterDocsBySession(sessionId) {
+      switchTab('documents');
+      loadDocuments(sessionId);
+    }
+
+    async function markHeld(sessionId) {
+      const quorum = confirm('Did the meeting achieve quorum?');
+      const attendees = parseInt(prompt('Number of attendees:', '0') || '0', 10);
+      try {
+        const res = await fetch(`/api/v1/agm/sessions?id=${sessionId}`, {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'held', quorum_met: quorum, attendees_count: attendees }),
+        });
+        if (res.ok) { sessions = []; loadSessions(); }
+        else { const d = await res.json(); alert(d.error || 'Failed to update session.'); }
+      } catch { alert('Network error.'); }
+    }
+
+    async function submitDoc(docId) {
+      if (!confirm('Submit this document for admin approval?')) return;
+      try {
+        const res = await fetch(`/api/v1/agm/documents/${docId}/submit`, {
+          method: 'PUT', credentials: 'include',
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Failed to submit.'); return; }
+        loadDocuments();
+        if (document.getElementById('panel-pending') && !document.getElementById('panel-pending').classList.contains('hidden')) loadPending();
+      } catch { alert('Network error.'); }
+    }
+
+    async function secondaryApprove(docId) {
+      const comment = prompt('Secondary approval comment (optional):') ?? '';
+      try {
+        const res = await fetch(`/api/v1/agm/documents/${docId}/secondary-approve`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comment }),
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Failed.'); return; }
+        alert('Secondary approval recorded. Admin can now give final approval.');
+        loadPending();
+      } catch { alert('Network error.'); }
+    }
+
+    async function showHistory(docId) {
+      try {
+        const res = await fetch(`/api/v1/agm/documents/${docId}/history`, { credentials: 'include' });
+        const history = await res.json();
+        if (!Array.isArray(history)) { alert('No history available.'); return; }
+        const text = history.map(h =>
+          `${new Date(h.created_at).toLocaleDateString('en-IN')} — ${h.action} by ${h.profiles?.full_name ?? 'Unknown'}${h.comment ? `: "${h.comment}"` : ''}`
+        ).join('\n');
+        alert('Document Workflow History:\n\n' + (text || 'No history yet.'));
+      } catch { alert('Failed to load history.'); }
+    }
+
+    // Session Modal
+    function openSessionModal() {
+      document.getElementById('session-modal').classList.remove('hidden');
+      document.getElementById('session-error').classList.add('hidden');
+    }
+    function closeSessionModal() {
+      document.getElementById('session-modal').classList.add('hidden');
+    }
+
+    document.getElementById('new-session-btn')?.addEventListener('click', openSessionModal);
+    document.getElementById('session-save-btn')?.addEventListener('click', async () => {
+      const year = parseInt(document.getElementById('s-year').value, 10);
+      const type = document.getElementById('s-type').value;
+      const date = document.getElementById('s-date').value;
+      const venue = document.getElementById('s-venue').value.trim();
+      const notes = document.getElementById('s-notes').value.trim();
+      const errEl = document.getElementById('session-error');
+      const btn = document.getElementById('session-save-btn');
+
+      if (!year || !date) { errEl.textContent = 'Year and meeting date are required.'; errEl.classList.remove('hidden'); return; }
+
+      btn.disabled = true; btn.textContent = 'Creating…'; errEl.classList.add('hidden');
+      try {
+        const res = await fetch('/api/v1/agm/sessions', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agm_year: year, agm_type: type, meeting_date: date, venue: venue || undefined, notes: notes || undefined }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.error || 'Failed to create session.'; errEl.classList.remove('hidden'); return; }
+        closeSessionModal();
+        sessions = []; loadSessions();
+      } catch { errEl.textContent = 'Network error.'; errEl.classList.remove('hidden'); }
+      finally { btn.disabled = false; btn.textContent = 'Create Session'; }
+    });
+
+    // Doc Modal
+    async function openDocModal() {
+      document.getElementById('doc-modal').classList.remove('hidden');
+      document.getElementById('doc-error').classList.add('hidden');
+      // Load sessions for dropdown
+      if (!sessions.length) {
+        const res = await fetch('/api/v1/agm/sessions', { credentials: 'include' });
+        sessions = await res.json().catch(() => []);
+      }
+      const sel = document.getElementById('d-session');
+      sel.innerHTML = `<option value="">No session (standalone)</option>` +
+        sessions.map(s => `<option value="${s.id}">${s.agm_type === 'extraordinary' ? 'EGM' : 'AGM'} ${s.agm_year} · ${new Date(s.meeting_date).toLocaleDateString('en-IN')}</option>`).join('');
+    }
+    function closeDocModal() {
+      document.getElementById('doc-modal').classList.add('hidden');
+    }
+
+    document.getElementById('new-doc-btn')?.addEventListener('click', openDocModal);
+    document.getElementById('doc-save-btn')?.addEventListener('click', async () => {
+      const title = document.getElementById('d-title').value.trim();
+      const sessionId = document.getElementById('d-session').value;
+      const docType = document.getElementById('d-type').value;
+      const desc = document.getElementById('d-desc').value.trim();
+      const fileName = document.getElementById('d-file-name').value.trim();
+      const effective = document.getElementById('d-effective').value;
+      const isPublic = document.getElementById('d-public').checked;
+      const submitNow = document.getElementById('d-submit-now').checked;
+      const errEl = document.getElementById('doc-error');
+      const btn = document.getElementById('doc-save-btn');
+
+      if (!title) { errEl.textContent = 'Title is required.'; errEl.classList.remove('hidden'); return; }
+      btn.disabled = true; btn.textContent = submitNow ? 'Submitting…' : 'Saving…'; errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/agm/documents', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title, document_type: docType,
+            agm_session_id: sessionId || undefined,
+            description: desc || undefined, file_name: fileName || undefined,
+            effective_date: effective || undefined, is_public: isPublic,
+            submit: submitNow,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.error || 'Failed to save document.'; errEl.classList.remove('hidden'); return; }
+        closeDocModal();
+        loadDocuments();
+        if (!document.getElementById('panel-pending')?.classList.contains('hidden')) loadPending();
+      } catch { errEl.textContent = 'Network error.'; errEl.classList.remove('hidden'); }
+      finally { btn.disabled = false; btn.textContent = submitNow ? 'Submit Document' : 'Save Draft'; }
+    });
+
+    // Review Modal (admin)
+    let reviewingDocId = null;
+    let reviewIsApprove = false;
+    function openReviewModal(docId, docTitle, isApprove) {
+      reviewingDocId = docId; reviewIsApprove = isApprove;
+      document.getElementById('review-doc-id').value = docId;
+      document.getElementById('review-doc-title').textContent = docTitle;
+      document.getElementById('review-modal-title').textContent = isApprove ? 'Approve Document' : 'Reject Document';
+      document.getElementById('review-public-row').classList.toggle('hidden', !isApprove);
+      document.getElementById('review-error').classList.add('hidden');
+      document.getElementById('review-comment').value = '';
+      document.getElementById('review-modal').classList.remove('hidden');
+    }
+    function closeReviewModal() { document.getElementById('review-modal').classList.add('hidden'); }
+
+    document.getElementById('review-approve-btn')?.addEventListener('click', async () => {
+      await handleReview(true);
+    });
+    document.getElementById('review-reject-btn')?.addEventListener('click', async () => {
+      await handleReview(false);
+    });
+
+    async function handleReview(isApprove) {
+      const comment = document.getElementById('review-comment').value.trim();
+      const isPublic = document.getElementById('review-public')?.checked ?? false;
+      const errEl = document.getElementById('review-error');
+
+      if (!isApprove && !comment) { errEl.textContent = 'A rejection comment is required.'; errEl.classList.remove('hidden'); return; }
+
+      const endpoint = isApprove ? 'approve' : 'reject';
+      try {
+        const res = await fetch(`/api/v1/agm/documents/${reviewingDocId}/${endpoint}`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comment: comment || undefined, is_public: isPublic }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.error || 'Failed.'; errEl.classList.remove('hidden'); return; }
+        closeReviewModal();
+        loadPending();
+        loadDocuments();
+      } catch { errEl.textContent = 'Network error.'; errEl.classList.remove('hidden'); }
+    }
+
+    // Initialize
+    loadSessions();
+  </script>
+</PortalLayout>

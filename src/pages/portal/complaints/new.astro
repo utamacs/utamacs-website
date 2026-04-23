@@ -1,0 +1,138 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+const { data: units } = await sb.from('units').select('id, unit_number, block').eq('society_id', SOCIETY_ID).order('unit_number');
+
+const CATEGORIES = ['Plumbing','Electrical','Lift','Security','Housekeeping','Parking','Water_Supply','Maintenance','Common_Area','Pest_Control','Internet_Cable','Generator','Garden','Other'];
+const PRIORITIES = ['Low','Medium','High','Critical'];
+---
+
+<PortalLayout title="Raise Complaint" user={user} activeModule="complaints">
+  <div class="mb-6">
+    <nav class="text-sm text-text-secondary mb-3">
+      <a href="/portal/complaints" class="hover:text-primary-600">Complaints</a>
+      <span class="mx-2">›</span>
+      <span class="text-text-primary">New Complaint</span>
+    </nav>
+    <h1 class="text-2xl font-bold text-text-primary">Raise a Complaint</h1>
+    <p class="text-sm text-text-secondary mt-1">Describe the issue clearly. Our team will respond within the SLA window.</p>
+  </div>
+
+  <div class="max-w-2xl">
+    <div id="error-banner" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+    <form id="complaint-form" class="bg-white rounded-xl border border-border-light p-6 space-y-5">
+      <div>
+        <label for="title" class="block text-sm font-medium text-text-primary mb-1.5">
+          Issue Summary <span class="text-red-500">*</span>
+        </label>
+        <input type="text" id="title" name="title" required maxlength="200"
+          placeholder="e.g. Lift not working in Block A"
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="category" class="block text-sm font-medium text-text-primary mb-1.5">
+            Category <span class="text-red-500">*</span>
+          </label>
+          <select id="category" name="category" required
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">Select category</option>
+            {CATEGORIES.map(c => <option value={c}>{c.replace('_', ' ')}</option>)}
+          </select>
+        </div>
+        <div>
+          <label for="priority" class="block text-sm font-medium text-text-primary mb-1.5">Priority</label>
+          <select id="priority" name="priority"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            {PRIORITIES.map(p => <option value={p} selected={p === 'Medium'}>{p}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label for="unit_id" class="block text-sm font-medium text-text-primary mb-1.5">
+          Your Unit <span class="text-red-500">*</span>
+        </label>
+        <select id="unit_id" name="unit_id" required
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+          <option value="">Select your flat</option>
+          {(units ?? []).map((u: {id: string; unit_number: string; block: string | null}) => (
+            <option value={u.id}>{u.unit_number}{u.block ? ` – Block ${u.block}` : ''}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label for="description" class="block text-sm font-medium text-text-primary mb-1.5">
+          Detailed Description
+        </label>
+        <textarea id="description" name="description" rows="5" maxlength="2000"
+          placeholder="Describe when it started, how often it occurs, and any other relevant details…"
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+        <p class="text-xs text-text-secondary mt-1">Max 2000 characters</p>
+      </div>
+
+      <div class="flex items-center gap-3 pt-2">
+        <button type="submit" id="submit-btn"
+          class="btn-primary flex items-center gap-2">
+          <i class="fas fa-paper-plane" aria-hidden="true"></i>
+          <span id="btn-text">Submit Complaint</span>
+          <span id="btn-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+        </button>
+        <a href="/portal/complaints" class="btn-outline">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('complaint-form') as HTMLFormElement;
+    const errorBanner = document.getElementById('error-banner')!;
+    const btnText = document.getElementById('btn-text')!;
+    const btnSpinner = document.getElementById('btn-spinner')!;
+    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBanner.classList.add('hidden');
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      submitBtn.disabled = true;
+
+      const fd = new FormData(form);
+      const payload = {
+        title: fd.get('title'),
+        category: fd.get('category'),
+        priority: fd.get('priority'),
+        unit_id: fd.get('unit_id'),
+        description: fd.get('description'),
+      };
+
+      const res = await fetch('/api/v1/complaints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        window.location.href = `/portal/complaints/${data.id}?created=1`;
+      } else {
+        errorBanner.textContent = data.detail ?? data.error ?? 'Failed to submit complaint.';
+        errorBanner.classList.remove('hidden');
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</PortalLayout>

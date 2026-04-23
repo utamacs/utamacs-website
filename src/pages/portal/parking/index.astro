@@ -1,0 +1,780 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const isExec = ['executive', 'admin'].includes(user.role);
+---
+
+<PortalLayout title="Parking Management" user={user} activeModule="parking">
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Parking Management</h1>
+      <p class="text-sm text-text-secondary mt-1">
+        {isExec ? 'Manage parking slots and allocations for the society.' : 'View your parking allocation and waitlist status.'}
+      </p>
+    </div>
+    {isExec && (
+      <button id="add-slot-btn" class="btn-primary text-sm whitespace-nowrap">
+        <i class="fas fa-plus mr-2" aria-hidden="true"></i>Add Slot
+      </button>
+    )}
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+    <button onclick="switchTab('slots')" id="tab-slots"
+      class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-white text-primary-600 shadow-sm">
+      Slot Grid
+    </button>
+    <button onclick="switchTab('my')" id="tab-my"
+      class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+      My Allocation
+    </button>
+    <button onclick="switchTab('waitlist')" id="tab-waitlist"
+      class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+      Waitlist
+    </button>
+    {isExec && (
+      <button onclick="switchTab('audit')" id="tab-audit"
+        class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+        Audit Log
+      </button>
+    )}
+  </div>
+
+  <!-- Slot Grid Panel -->
+  <div id="panel-slots">
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-3 mb-4">
+      <select id="filter-slot-type" onchange="loadSlots()"
+        class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white">
+        <option value="">All Types</option>
+        <option value="covered">Covered</option>
+        <option value="open">Open</option>
+        <option value="basement">Basement</option>
+        <option value="visitor">Visitor</option>
+      </select>
+      <select id="filter-vehicle-type" onchange="loadSlots()"
+        class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white">
+        <option value="">All Vehicles</option>
+        <option value="car">Car</option>
+        <option value="bike">Bike</option>
+        <option value="cycle">Cycle</option>
+        <option value="ev">EV</option>
+        <option value="any">Any</option>
+      </select>
+      <select id="filter-available" onchange="loadSlots()"
+        class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white">
+        <option value="">All Slots</option>
+        <option value="true">Available Only</option>
+      </select>
+      <div class="flex gap-3 text-xs text-text-secondary items-center ml-auto">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-green-500 inline-block"></span>Available</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-red-400 inline-block"></span>Occupied</span>
+      </div>
+    </div>
+    <div id="slots-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div class="col-span-full text-center text-text-secondary py-12">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading slots…
+      </div>
+    </div>
+  </div>
+
+  <!-- My Allocation Panel -->
+  <div id="panel-my" class="hidden">
+    <div id="my-allocation-container">
+      <div class="text-center text-text-secondary py-12">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
+      </div>
+    </div>
+  </div>
+
+  <!-- Waitlist Panel -->
+  <div id="panel-waitlist" class="hidden">
+    <div id="waitlist-container">
+      <div class="text-center text-text-secondary py-12">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading waitlist…
+      </div>
+    </div>
+  </div>
+
+  <!-- Audit Panel (exec only) -->
+  {isExec && (
+    <div id="panel-audit" class="hidden">
+      <div id="audit-container">
+        <div class="text-center text-text-secondary py-12">
+          <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading audit log…
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Allocate Modal (exec only) -->
+  {isExec && (
+    <div id="allocate-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+        <div class="p-6 border-b border-border-light flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-text-primary">Allocate Parking Slot</h2>
+          <button onclick="closeAllocateModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Slot</label>
+            <input id="alloc-slot-display" type="text" readonly
+              class="w-full border border-border-light rounded-lg px-3 py-2 bg-gray-50 text-sm text-text-primary" />
+            <input id="alloc-slot-id" type="hidden" />
+          </div>
+          <div>
+            <label for="alloc-unit" class="block text-sm font-medium text-text-primary mb-1">Unit *</label>
+            <input id="alloc-unit-id" type="hidden" />
+            <select id="alloc-unit" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+              <option value="">Loading units…</option>
+            </select>
+          </div>
+          <div>
+            <label for="alloc-user" class="block text-sm font-medium text-text-primary mb-1">Resident *</label>
+            <select id="alloc-user" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+              <option value="">Select unit first</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="alloc-vehicle-number" class="block text-sm font-medium text-text-primary mb-1">Vehicle Number</label>
+              <input id="alloc-vehicle-number" type="text" placeholder="TS09AB1234"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label for="alloc-vehicle-make" class="block text-sm font-medium text-text-primary mb-1">Vehicle Make</label>
+              <input id="alloc-vehicle-make" type="text" placeholder="Maruti Swift"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label for="alloc-expires-at" class="block text-sm font-medium text-text-primary mb-1">Expires At (optional)</label>
+            <input id="alloc-expires-at" type="date"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label for="alloc-notes" class="block text-sm font-medium text-text-primary mb-1">Notes</label>
+            <textarea id="alloc-notes" rows="2" placeholder="Any notes…"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm resize-none"></textarea>
+          </div>
+          <div id="alloc-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+        </div>
+        <div class="p-6 pt-0 flex gap-3">
+          <button onclick="closeAllocateModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+          <button id="alloc-save-btn" class="flex-1 btn-primary text-sm">Allocate</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Add Slot Modal (exec only) -->
+  {isExec && (
+    <div id="add-slot-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+        <div class="p-6 border-b border-border-light flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-text-primary">Add New Parking Slot</h2>
+          <button onclick="closeAddSlotModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label for="new-slot-number" class="block text-sm font-medium text-text-primary mb-1">Slot Number *</label>
+            <input id="new-slot-number" type="text" placeholder="e.g. A-P-01"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="new-slot-type" class="block text-sm font-medium text-text-primary mb-1">Slot Type</label>
+              <select id="new-slot-type" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+                <option value="open">Open</option>
+                <option value="covered">Covered</option>
+                <option value="basement">Basement</option>
+                <option value="visitor">Visitor</option>
+              </select>
+            </div>
+            <div>
+              <label for="new-vehicle-type" class="block text-sm font-medium text-text-primary mb-1">Vehicle Type</label>
+              <select id="new-vehicle-type" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+                <option value="car">Car</option>
+                <option value="bike">Bike</option>
+                <option value="cycle">Cycle</option>
+                <option value="ev">EV</option>
+                <option value="any">Any</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="new-level" class="block text-sm font-medium text-text-primary mb-1">Level/Floor</label>
+              <input id="new-level" type="number" value="0" min="0"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label for="new-monthly-charge" class="block text-sm font-medium text-text-primary mb-1">Monthly Charge (₹)</label>
+              <input id="new-monthly-charge" type="number" value="0" min="0"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label for="new-slot-notes" class="block text-sm font-medium text-text-primary mb-1">Notes</label>
+            <input id="new-slot-notes" type="text" placeholder="Optional notes"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div id="add-slot-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+        </div>
+        <div class="p-6 pt-0 flex gap-3">
+          <button onclick="closeAddSlotModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+          <button id="add-slot-save-btn" class="flex-1 btn-primary text-sm">Create Slot</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ isExec, userRole: user.role }}>
+    const SLOT_TYPE_ICONS = {
+      covered:  'fa-warehouse',
+      open:     'fa-parking',
+      basement: 'fa-layer-group',
+      visitor:  'fa-user-clock',
+    };
+    const VEHICLE_ICONS = {
+      car: 'fa-car',
+      bike: 'fa-motorcycle',
+      cycle: 'fa-bicycle',
+      ev: 'fa-bolt',
+      any: 'fa-car',
+    };
+
+    let allSlots = [];
+    let allMembers = [];
+    let currentTab = 'slots';
+
+    function switchTab(tab) {
+      currentTab = tab;
+      const panels = ['slots', 'my', 'waitlist', 'audit'];
+      panels.forEach(p => {
+        const el = document.getElementById(`panel-${p}`);
+        if (el) el.classList.toggle('hidden', p !== tab);
+        const btn = document.getElementById(`tab-${p}`);
+        if (btn) {
+          btn.classList.toggle('bg-white', p === tab);
+          btn.classList.toggle('text-primary-600', p === tab);
+          btn.classList.toggle('shadow-sm', p === tab);
+          btn.classList.toggle('text-text-secondary', p !== tab);
+          btn.classList.toggle('hover:text-text-primary', p !== tab);
+        }
+      });
+
+      if (tab === 'slots' && allSlots.length === 0) loadSlots();
+      if (tab === 'my') loadMyAllocation();
+      if (tab === 'waitlist') loadWaitlist();
+      if (tab === 'audit' && isExec) loadAudit();
+    }
+
+    async function loadSlots() {
+      const container = document.getElementById('slots-grid');
+      if (!container) return;
+      const slotType = document.getElementById('filter-slot-type')?.value || '';
+      const vehicleType = document.getElementById('filter-vehicle-type')?.value || '';
+      const available = document.getElementById('filter-available')?.value || '';
+      const params = new URLSearchParams();
+      if (slotType) params.set('slot_type', slotType);
+      if (vehicleType) params.set('vehicle_type', vehicleType);
+      if (available) params.set('available', available);
+
+      try {
+        const res = await fetch(`/api/v1/parking/slots?${params}`, { credentials: 'include' });
+        const slots = await res.json();
+        allSlots = slots;
+
+        if (!slots.length) {
+          container.innerHTML = `<div class="col-span-full text-center text-text-secondary py-12">
+            <i class="fas fa-parking text-3xl mb-3 block opacity-30" aria-hidden="true"></i>
+            <p>No parking slots found.</p>
+            ${isExec ? '<p class="text-xs mt-1">Click "Add Slot" to create your first slot.</p>' : ''}
+          </div>`;
+          return;
+        }
+
+        container.innerHTML = slots.map(s => {
+          const occupied = !s.is_available;
+          const icon = SLOT_TYPE_ICONS[s.slot_type] || 'fa-parking';
+          const vehicleIcon = VEHICLE_ICONS[s.vehicle_type] || 'fa-car';
+          const bg = occupied ? 'bg-red-50 border-red-200 hover:border-red-300' : 'bg-green-50 border-green-200 hover:border-green-300';
+          const iconColor = occupied ? 'text-red-400' : 'text-green-500';
+          const unitText = occupied ? (s.active_allocation?.units?.unit_number ?? 'Occupied') : 'Available';
+          const levelText = s.level > 0 ? `L${s.level}` : 'G';
+          const chargeText = s.monthly_charge > 0 ? `₹${s.monthly_charge}/mo` : '';
+          const allocBtn = isExec && !occupied
+            ? `<button onclick="openAllocateModal('${s.id}','${s.slot_number}')" class="mt-2 w-full text-xs bg-primary-600 text-white py-1 rounded-md hover:bg-primary-700">Allocate</button>`
+            : '';
+          const releaseBtn = isExec && occupied
+            ? `<button onclick="releaseSlot('${s.active_allocation?.id}','${s.slot_number}')" class="mt-2 w-full text-xs bg-red-500 text-white py-1 rounded-md hover:bg-red-600">Release</button>`
+            : '';
+          return `
+          <div class="border ${bg} rounded-xl p-3 cursor-pointer transition-all text-center" onclick="showSlotDetail('${s.id}')">
+            <div class="text-xs text-text-secondary mb-1">${levelText}</div>
+            <i class="fas ${icon} ${iconColor} text-xl mb-1" aria-hidden="true"></i>
+            <div class="font-semibold text-sm text-text-primary">${s.slot_number}</div>
+            <div class="text-xs ${occupied ? 'text-red-600' : 'text-green-600'} mt-0.5">${unitText}</div>
+            ${chargeText ? `<div class="text-xs text-text-secondary mt-0.5">${chargeText}</div>` : ''}
+            <div class="text-xs text-text-secondary mt-0.5"><i class="fas ${vehicleIcon}" aria-hidden="true"></i></div>
+            ${allocBtn}${releaseBtn}
+          </div>`;
+        }).join('');
+      } catch {
+        container.innerHTML = `<div class="col-span-full text-center text-red-600 py-8">Failed to load parking slots.</div>`;
+      }
+    }
+
+    async function loadMyAllocation() {
+      const container = document.getElementById('my-allocation-container');
+      if (!container) return;
+      try {
+        const [allocRes, waitRes] = await Promise.all([
+          fetch('/api/v1/parking/allocations', { credentials: 'include' }),
+          fetch('/api/v1/parking/waitlist', { credentials: 'include' }),
+        ]);
+        const allocs = await allocRes.json();
+        const waitlist = await waitRes.json();
+        const activeAlloc = Array.isArray(allocs) ? allocs.find(a => a.status === 'active') : null;
+        const myWaitlist = Array.isArray(waitlist) ? waitlist.find(w => ['waiting','offered'].includes(w.status)) : null;
+
+        let html = '';
+        if (activeAlloc) {
+          const slot = activeAlloc.parking_slots;
+          const allocDate = new Date(activeAlloc.allocated_at).toLocaleDateString('en-IN');
+          const expiry = activeAlloc.expires_at ? new Date(activeAlloc.expires_at).toLocaleDateString('en-IN') : 'Indefinite';
+          html += `
+          <div class="bg-white rounded-2xl border border-green-200 p-6 mb-6">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h3 class="text-lg font-semibold text-text-primary">Active Parking Allocation</h3>
+                <p class="text-sm text-text-secondary">Your assigned parking slot</p>
+              </div>
+              <span class="px-3 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">Active</span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p class="text-text-secondary text-xs">Slot Number</p>
+                <p class="font-semibold text-primary-600 text-lg">${slot?.slot_number ?? '—'}</p>
+              </div>
+              <div>
+                <p class="text-text-secondary text-xs">Type</p>
+                <p class="font-medium capitalize">${slot?.slot_type ?? '—'} / ${slot?.vehicle_type ?? '—'}</p>
+              </div>
+              <div>
+                <p class="text-text-secondary text-xs">Level</p>
+                <p class="font-medium">${slot?.level != null ? (slot.level === 0 ? 'Ground' : `Level ${slot.level}`) : '—'}</p>
+              </div>
+              <div>
+                <p class="text-text-secondary text-xs">Vehicle</p>
+                <p class="font-medium">${activeAlloc.vehicle_number ?? '—'} ${activeAlloc.vehicle_make ? `(${activeAlloc.vehicle_make})` : ''}</p>
+              </div>
+              <div>
+                <p class="text-text-secondary text-xs">Allocated On</p>
+                <p class="font-medium">${allocDate}</p>
+              </div>
+              <div>
+                <p class="text-text-secondary text-xs">Valid Until</p>
+                <p class="font-medium">${expiry}</p>
+              </div>
+            </div>
+            ${activeAlloc.notes ? `<p class="text-xs text-text-secondary mt-4 bg-gray-50 rounded-lg p-3">${activeAlloc.notes}</p>` : ''}
+          </div>`;
+        }
+
+        if (myWaitlist) {
+          const pos = myWaitlist.status === 'offered' ? 'Slot Offered!' : 'On Waitlist';
+          const posColor = myWaitlist.status === 'offered' ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-blue-600 bg-blue-50 border-blue-200';
+          html += `
+          <div class="bg-white rounded-2xl border ${posColor} p-6 mb-6">
+            <div class="flex items-start justify-between mb-3">
+              <h3 class="text-lg font-semibold text-text-primary">Waitlist Status</h3>
+              <span class="px-3 py-1 text-xs font-medium ${posColor} rounded-full border">${pos}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p class="text-text-secondary text-xs">Preference</p>
+                <p class="font-medium capitalize">${myWaitlist.slot_type} slot / ${myWaitlist.vehicle_type}</p>
+              </div>
+              <div>
+                <p class="text-text-secondary text-xs">Requested</p>
+                <p class="font-medium">${new Date(myWaitlist.requested_at).toLocaleDateString('en-IN')}</p>
+              </div>
+            </div>
+            ${myWaitlist.status === 'offered' ? `<p class="text-sm text-amber-700 mt-3 font-medium">A slot has been offered to you. Please contact the management to confirm your allocation.</p>` : ''}
+            <button onclick="withdrawWaitlist('${myWaitlist.id}')"
+              class="mt-4 text-xs text-red-600 hover:text-red-700 hover:underline">
+              Withdraw from waitlist
+            </button>
+          </div>`;
+        }
+
+        if (!activeAlloc && !myWaitlist) {
+          html = `
+          <div class="text-center py-12">
+            <i class="fas fa-parking text-4xl text-gray-300 mb-4 block" aria-hidden="true"></i>
+            <h3 class="text-lg font-medium text-text-primary mb-2">No Active Parking Allocation</h3>
+            <p class="text-sm text-text-secondary mb-6">You don't have a parking slot assigned. Join the waitlist to request one.</p>
+            <button onclick="openJoinWaitlistForm()" class="btn-primary text-sm">Join Waitlist</button>
+          </div>`;
+        }
+
+        // Past allocations
+        const past = Array.isArray(allocs) ? allocs.filter(a => a.status !== 'active') : [];
+        if (past.length) {
+          html += `<h3 class="text-base font-semibold text-text-primary mb-3">Past Allocations</h3>
+          <div class="space-y-2">
+            ${past.map(a => `
+              <div class="bg-white border border-border-light rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <p class="font-medium text-sm">Slot ${a.parking_slots?.slot_number ?? '—'}</p>
+                  <p class="text-xs text-text-secondary">${new Date(a.allocated_at).toLocaleDateString('en-IN')} → ${a.released_at ? new Date(a.released_at).toLocaleDateString('en-IN') : '—'}</p>
+                </div>
+                <span class="px-2 py-1 text-xs capitalize bg-gray-100 text-gray-600 rounded-full">${a.status}</span>
+              </div>`).join('')}
+          </div>`;
+        }
+
+        container.innerHTML = html;
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load allocation data.</div>`;
+      }
+    }
+
+    async function loadWaitlist() {
+      const container = document.getElementById('waitlist-container');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/parking/waitlist', { credentials: 'include' });
+        const list = await res.json();
+        if (!Array.isArray(list) || !list.length) {
+          const msg = userRole === 'member'
+            ? `<div class="text-center py-12">
+                <p class="text-text-secondary text-sm mb-4">You are not on the waitlist.</p>
+                <button onclick="openJoinWaitlistForm()" class="btn-primary text-sm">Join Waitlist</button>
+               </div>`
+            : `<p class="text-center text-text-secondary py-8 text-sm">Waitlist is empty.</p>`;
+          container.innerHTML = msg;
+          return;
+        }
+
+        const STATUS_BADGE = {
+          waiting: 'bg-blue-100 text-blue-700',
+          offered: 'bg-amber-100 text-amber-700',
+          allocated: 'bg-green-100 text-green-700',
+          withdrawn: 'bg-gray-100 text-gray-600',
+        };
+
+        const rows = list.map((w, idx) => {
+          const badge = STATUS_BADGE[w.status] || 'bg-gray-100 text-gray-600';
+          const withdrawBtn = ['waiting','offered'].includes(w.status)
+            ? `<button onclick="withdrawWaitlist('${w.id}')" class="text-xs text-red-600 hover:underline">Withdraw</button>`
+            : '';
+          return `
+          <tr class="border-b border-border-light hover:bg-gray-50">
+            <td class="py-3 px-4 text-sm text-text-secondary">${idx + 1}</td>
+            <td class="py-3 px-4 text-sm font-medium">${w.profiles?.full_name ?? '—'}</td>
+            <td class="py-3 px-4 text-sm text-text-secondary">${w.units ? `${w.units.block ?? ''}${w.units.unit_number}` : '—'}</td>
+            <td class="py-3 px-4 text-sm capitalize">${w.slot_type} / ${w.vehicle_type}</td>
+            <td class="py-3 px-4 text-sm">${new Date(w.requested_at).toLocaleDateString('en-IN')}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 text-xs rounded-full capitalize font-medium ${badge}">${w.status}</span>
+              ${w.status === 'offered' && w.parking_slots ? `<span class="text-xs text-text-secondary ml-1">(${w.parking_slots.slot_number})</span>` : ''}
+            </td>
+            <td class="py-3 px-4">${withdrawBtn}</td>
+          </tr>`;
+        }).join('');
+
+        container.innerHTML = `
+          ${userRole === 'member' ? '<div class="mb-4 flex justify-end"><button onclick="openJoinWaitlistForm()" class="btn-outline text-sm">+ Join Waitlist</button></div>' : ''}
+          <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+            <table class="w-full">
+              <thead class="bg-gray-50 border-b border-border-light">
+                <tr>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">#</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Resident</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Unit</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Preference</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Requested</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Status</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load waitlist.</div>`;
+      }
+    }
+
+    async function loadAudit() {
+      const container = document.getElementById('audit-container');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/parking/allocations', { credentials: 'include' });
+        const allocs = await res.json();
+        if (!Array.isArray(allocs) || !allocs.length) {
+          container.innerHTML = `<p class="text-center text-text-secondary py-8 text-sm">No allocation history.</p>`;
+          return;
+        }
+        const STATUS_BADGE = {
+          active: 'bg-green-100 text-green-700',
+          released: 'bg-gray-100 text-gray-600',
+          suspended: 'bg-red-100 text-red-700',
+        };
+        container.innerHTML = `
+          <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-border-light">
+                <tr>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Slot</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Resident</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Unit</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Vehicle</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Allocated</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Released</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${allocs.map(a => {
+                  const badge = STATUS_BADGE[a.status] || 'bg-gray-100 text-gray-600';
+                  return `
+                  <tr class="border-b border-border-light hover:bg-gray-50">
+                    <td class="py-3 px-4 font-medium">${a.parking_slots?.slot_number ?? '—'}</td>
+                    <td class="py-3 px-4 text-text-secondary">${a.profiles?.full_name ?? '—'}</td>
+                    <td class="py-3 px-4 text-text-secondary">${a.units?.unit_number ?? '—'}</td>
+                    <td class="py-3 px-4 text-text-secondary">${a.vehicle_number ?? '—'}</td>
+                    <td class="py-3 px-4 text-text-secondary">${new Date(a.allocated_at).toLocaleDateString('en-IN')}</td>
+                    <td class="py-3 px-4 text-text-secondary">${a.released_at ? new Date(a.released_at).toLocaleDateString('en-IN') : '—'}</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs rounded-full capitalize font-medium ${badge}">${a.status}</span></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load audit log.</div>`;
+      }
+    }
+
+    function showSlotDetail(slotId) {
+      const slot = allSlots.find(s => s.id === slotId);
+      if (!slot || !isExec) return;
+      if (!slot.is_available) {
+        alert(`Slot ${slot.slot_number} is currently occupied by unit ${slot.active_allocation?.units?.unit_number ?? 'unknown'}.`);
+        return;
+      }
+      openAllocateModal(slotId, slot.slot_number);
+    }
+
+    async function openAllocateModal(slotId, slotNumber) {
+      if (!isExec) return;
+      document.getElementById('alloc-slot-id').value = slotId;
+      document.getElementById('alloc-slot-display').value = slotNumber;
+      document.getElementById('alloc-error').classList.add('hidden');
+      document.getElementById('allocate-modal').classList.remove('hidden');
+
+      // Load units + members
+      try {
+        const res = await fetch('/api/v1/members?limit=200', { credentials: 'include' });
+        const members = await res.json();
+        allMembers = Array.isArray(members) ? members : (members.data ?? []);
+
+        const unitMap = new Map();
+        allMembers.forEach(m => {
+          if (m.unit_id && m.units) {
+            if (!unitMap.has(m.unit_id)) unitMap.set(m.unit_id, { unitNumber: m.units.unit_number || m.unit_id, members: [] });
+            unitMap.get(m.unit_id).members.push(m);
+          }
+        });
+
+        const unitSelect = document.getElementById('alloc-unit');
+        unitSelect.innerHTML = `<option value="">Select unit…</option>` +
+          Array.from(unitMap.entries()).map(([uid, u]) =>
+            `<option value="${uid}">${u.unitNumber}</option>`
+          ).join('');
+
+        unitSelect.onchange = () => {
+          const uid = unitSelect.value;
+          const u = unitMap.get(uid);
+          const userSelect = document.getElementById('alloc-user');
+          if (!u) { userSelect.innerHTML = `<option value="">Select unit first</option>`; return; }
+          userSelect.innerHTML = `<option value="">Select resident…</option>` +
+            u.members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('');
+        };
+      } catch {
+        document.getElementById('alloc-unit').innerHTML = `<option value="">Failed to load units</option>`;
+      }
+    }
+
+    function closeAllocateModal() {
+      document.getElementById('allocate-modal').classList.add('hidden');
+    }
+
+    document.getElementById('alloc-save-btn')?.addEventListener('click', async () => {
+      const slotId = document.getElementById('alloc-slot-id').value;
+      const unitId = document.getElementById('alloc-unit').value;
+      const userId = document.getElementById('alloc-user').value;
+      const vehicleNumber = document.getElementById('alloc-vehicle-number').value.trim();
+      const vehicleMake = document.getElementById('alloc-vehicle-make').value.trim();
+      const expiresAt = document.getElementById('alloc-expires-at').value;
+      const notes = document.getElementById('alloc-notes').value.trim();
+      const errEl = document.getElementById('alloc-error');
+      const btn = document.getElementById('alloc-save-btn');
+
+      if (!unitId || !userId) { errEl.textContent = 'Please select a unit and resident.'; errEl.classList.remove('hidden'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Allocating…';
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/parking/allocations', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slot_id: slotId, unit_id: unitId, user_id: userId,
+            vehicle_number: vehicleNumber || undefined, vehicle_make: vehicleMake || undefined,
+            expires_at: expiresAt || undefined, notes: notes || undefined }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.error || 'Allocation failed.'; errEl.classList.remove('hidden'); return; }
+        closeAllocateModal();
+        allSlots = [];
+        loadSlots();
+      } catch {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Allocate';
+      }
+    });
+
+    async function releaseSlot(allocationId, slotNumber) {
+      if (!confirm(`Release slot ${slotNumber}? The resident will lose their parking allocation.`)) return;
+      const notes = prompt('Reason for release (optional):') ?? '';
+      try {
+        const res = await fetch(`/api/v1/parking/allocations/${allocationId}/release`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes }),
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Failed to release slot.'); return; }
+        const msg = data.waitlist_offered
+          ? `Slot released. Waitlist entry notified.`
+          : 'Slot released successfully.';
+        alert(msg);
+        allSlots = [];
+        loadSlots();
+      } catch {
+        alert('Network error.');
+      }
+    }
+
+    async function withdrawWaitlist(waitlistId) {
+      if (!confirm('Withdraw from the parking waitlist?')) return;
+      try {
+        const res = await fetch(`/api/v1/parking/waitlist?id=${waitlistId}`, {
+          method: 'DELETE', credentials: 'include',
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Failed to withdraw.'); return; }
+        loadMyAllocation();
+        if (currentTab === 'waitlist') loadWaitlist();
+      } catch {
+        alert('Network error.');
+      }
+    }
+
+    function openJoinWaitlistForm() {
+      const slotType = prompt('Slot type preference (covered/open/basement/visitor/any):', 'any') ?? 'any';
+      const vehicleType = prompt('Vehicle type (car/bike/cycle/ev/any):', 'car') ?? 'car';
+      const notes = prompt('Any notes (optional):') ?? '';
+
+      fetch('/api/v1/members', { credentials: 'include' })
+        .then(r => r.json())
+        .then(members => {
+          const myMember = Array.isArray(members) ? members[0] : (members.data?.[0]);
+          const unitId = myMember?.unit_id;
+          if (!unitId) { alert('Could not determine your unit. Please contact management.'); return; }
+          return fetch('/api/v1/parking/waitlist', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ unit_id: unitId, slot_type: slotType, vehicle_type: vehicleType, notes }),
+          });
+        })
+        .then(r => r?.json())
+        .then(data => {
+          if (data?.error) { alert(data.error); return; }
+          if (data) { alert('Added to waitlist!'); loadMyAllocation(); loadWaitlist(); }
+        })
+        .catch(() => alert('Network error.'));
+    }
+
+    // Add slot modal
+    document.getElementById('add-slot-btn')?.addEventListener('click', () => {
+      document.getElementById('add-slot-modal').classList.remove('hidden');
+      document.getElementById('add-slot-error').classList.add('hidden');
+    });
+
+    function closeAddSlotModal() {
+      document.getElementById('add-slot-modal').classList.add('hidden');
+    }
+
+    document.getElementById('add-slot-save-btn')?.addEventListener('click', async () => {
+      const slotNumber = document.getElementById('new-slot-number').value.trim();
+      const slotType = document.getElementById('new-slot-type').value;
+      const vehicleType = document.getElementById('new-vehicle-type').value;
+      const level = parseInt(document.getElementById('new-level').value || '0', 10);
+      const monthlyCharge = parseFloat(document.getElementById('new-monthly-charge').value || '0');
+      const notes = document.getElementById('new-slot-notes').value.trim();
+      const errEl = document.getElementById('add-slot-error');
+      const btn = document.getElementById('add-slot-save-btn');
+
+      if (!slotNumber) { errEl.textContent = 'Slot number is required.'; errEl.classList.remove('hidden'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Creating…';
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/parking/slots', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slot_number: slotNumber, slot_type: slotType, vehicle_type: vehicleType,
+            level, monthly_charge: monthlyCharge, notes: notes || undefined }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.error || 'Failed to create slot.'; errEl.classList.remove('hidden'); return; }
+        closeAddSlotModal();
+        document.getElementById('new-slot-number').value = '';
+        allSlots = [];
+        loadSlots();
+      } catch {
+        errEl.textContent = 'Network error.';
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Slot';
+      }
+    });
+
+    // Initialize
+    loadSlots();
+  </script>
+</PortalLayout>

@@ -1,0 +1,166 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const { id } = Astro.params;
+const sb = getSupabaseServiceClient();
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+
+const { data: listing } = await sb
+  .from('marketplace_listings')
+  .select('id, title, description, category, price, status, contact_preference, created_at, expires_at, seller_id, profiles(full_name), units(unit_number, block)')
+  .eq('id', id!)
+  .eq('society_id', SOCIETY_ID)
+  .single();
+
+if (!listing) return Astro.redirect('/portal/community/marketplace');
+
+const l = listing as any;
+const isOwner = l.seller_id === user.id;
+const isMod = ['executive', 'admin'].includes(user.role);
+const canManage = isOwner || isMod;
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Furniture: 'bg-amber-100 text-amber-700',
+  Electronics: 'bg-blue-100 text-blue-700',
+  Appliances: 'bg-purple-100 text-purple-700',
+  Books: 'bg-green-100 text-green-700',
+  Toys: 'bg-pink-100 text-pink-700',
+  Clothing: 'bg-indigo-100 text-indigo-700',
+  Sports: 'bg-teal-100 text-teal-700',
+  Vehicles: 'bg-orange-100 text-orange-700',
+  Services: 'bg-cyan-100 text-cyan-700',
+  Other: 'bg-gray-100 text-gray-600',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  active: 'bg-green-100 text-green-700',
+  sold: 'bg-gray-100 text-gray-500',
+  expired: 'bg-red-100 text-red-600',
+  removed: 'bg-red-100 text-red-600',
+};
+
+const daysLeft = l.expires_at
+  ? Math.max(0, Math.ceil((new Date(l.expires_at).getTime() - Date.now()) / 86400000))
+  : null;
+---
+
+<PortalLayout title={l.title} user={user} activeModule="community">
+  <div class="mb-4">
+    <nav class="text-sm text-text-secondary mb-3">
+      <a href="/portal/community" class="hover:text-primary-600">Community Board</a>
+      <span class="mx-2">›</span>
+      <a href="/portal/community/marketplace" class="hover:text-primary-600">Marketplace</a>
+      <span class="mx-2">›</span><span class="text-text-primary truncate">{l.title}</span>
+    </nav>
+  </div>
+
+  <div class="max-w-lg">
+    <div class="bg-white rounded-xl border border-border-light p-6">
+      <!-- Header -->
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div class="flex gap-2 flex-wrap">
+          <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[l.category] ?? 'bg-gray-100 text-gray-600'}`}>
+            {l.category}
+          </span>
+          <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[l.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            {l.status}
+          </span>
+        </div>
+        {daysLeft !== null && l.status === 'active' && (
+          <span class={`text-xs whitespace-nowrap ${daysLeft <= 3 ? 'text-red-500 font-medium' : 'text-text-secondary'}`}>
+            {daysLeft === 0 ? 'Expires today' : `${daysLeft}d left`}
+          </span>
+        )}
+      </div>
+
+      <h1 class="text-xl font-bold text-text-primary mb-2">{l.title}</h1>
+
+      <div class="text-2xl font-bold text-primary-600 mb-4">
+        {l.price != null
+          ? `₹${Number(l.price).toLocaleString('en-IN')}`
+          : <span class="text-text-secondary text-base font-normal">Price on request / Free</span>
+        }
+      </div>
+
+      {l.description && (
+        <div class="text-sm text-text-secondary leading-relaxed mb-5 whitespace-pre-wrap border-t border-border-light pt-4">
+          {l.description}
+        </div>
+      )}
+
+      <!-- Seller info -->
+      <div class="bg-gray-50 rounded-xl p-4 mb-5">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold text-sm">
+            {(l.profiles?.full_name ?? 'R')[0].toUpperCase()}
+          </div>
+          <div>
+            <div class="font-medium text-text-primary text-sm">{l.profiles?.full_name ?? 'Resident'}</div>
+            <div class="text-xs text-text-secondary">
+              {l.units?.unit_number ?? ''}{l.units?.block ? ` · Block ${l.units.block}` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 text-xs text-text-secondary">
+          <i class="fas fa-info-circle mr-1"></i>
+          Contact via:
+          {l.contact_preference === 'phone' && ' phone (ask in community)'}
+          {l.contact_preference === 'message' && ' community board message'}
+          {l.contact_preference === 'both' && ' phone or community board message'}
+        </div>
+      </div>
+
+      <!-- Actions -->
+      {canManage && l.status === 'active' && (
+        <div class="flex gap-2 flex-wrap border-t border-border-light pt-4">
+          {isOwner && (
+            <button id="mark-sold-btn" class="btn-primary text-sm flex items-center gap-1.5">
+              <i class="fas fa-check-circle" aria-hidden="true"></i>
+              Mark as Sold
+            </button>
+          )}
+          <button id="remove-btn" class="text-sm bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 px-4 py-2 rounded-xl font-medium transition-colors flex items-center gap-1.5">
+            <i class="fas fa-trash" aria-hidden="true"></i>
+            {isMod && !isOwner ? 'Remove Listing' : 'Remove'}
+          </button>
+        </div>
+      )}
+
+      {l.status !== 'active' && (
+        <div class="border-t border-border-light pt-4 text-sm text-text-secondary">
+          This listing is no longer active.
+        </div>
+      )}
+    </div>
+
+    <p class="text-xs text-text-secondary mt-4 text-center">
+      Listed on {new Date(l.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'})}
+    </p>
+  </div>
+
+  <script define:vars={{ listingId: id }}>
+    document.getElementById('mark-sold-btn')?.addEventListener('click', async () => {
+      if (!confirm('Mark this listing as sold?')) return;
+      const res = await fetch(`/api/v1/community/marketplace/${listingId}`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'sold' }),
+      });
+      if (res.ok) window.location.reload();
+      else alert('Failed to update listing.');
+    });
+
+    document.getElementById('remove-btn')?.addEventListener('click', async () => {
+      if (!confirm('Remove this listing?')) return;
+      const res = await fetch(`/api/v1/community/marketplace/${listingId}`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      if (res.ok || res.status === 204) window.location.href = '/portal/community/marketplace';
+      else alert('Failed to remove listing.');
+    });
+  </script>
+</PortalLayout>

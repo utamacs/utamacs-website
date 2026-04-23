@@ -1,0 +1,248 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const isExec = ['executive', 'admin'].includes(user.role);
+---
+
+<PortalLayout title="Finance & Dues" user={user} activeModule="finance">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Finance & Dues</h1>
+      <p class="text-sm text-text-secondary mt-1">{isExec ? 'Manage maintenance billing and track collections.' : 'View and pay your maintenance dues.'}</p>
+    </div>
+    {isExec && (
+      <button id="create-period-btn" class="btn-primary text-sm flex items-center gap-2">
+        <i class="fas fa-plus" aria-hidden="true"></i>
+        Create Billing Period
+      </button>
+    )}
+  </div>
+
+  <!-- Billing period creation modal (exec/admin only) -->
+  {isExec && (
+    <div id="period-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large">
+        <div class="flex items-center justify-between mb-5">
+          <h2 class="font-semibold text-text-primary text-lg">Create Billing Period</h2>
+          <button id="close-modal-btn" class="text-text-secondary hover:text-text-primary text-lg" aria-label="Close">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div id="period-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <form id="period-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Period Name <span class="text-red-500">*</span></label>
+            <input name="name" type="text" required placeholder="e.g. Q1 FY2025-26"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Start Date <span class="text-red-500">*</span></label>
+              <input name="start_date" type="date" required class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">End Date <span class="text-red-500">*</span></label>
+              <input name="end_date" type="date" required class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Due Date <span class="text-red-500">*</span></label>
+              <input name="due_date" type="date" required class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Base Amount (₹) <span class="text-red-500">*</span></label>
+              <input name="base_amount" type="number" required min="1" step="1" placeholder="e.g. 3000"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">GST Rate (%)</label>
+              <input name="gst_rate" type="number" min="0" max="28" step="0.01" placeholder="0"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Default Penalty (₹)</label>
+              <input name="penalty_amount" type="number" min="0" step="1" placeholder="0"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <p class="text-xs text-text-secondary">Dues will be auto-generated for all occupied units immediately.</p>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" id="period-submit-btn" class="btn-primary flex-1">Generate Dues</button>
+            <button type="button" id="cancel-modal-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
+
+  <div id="dues-list" class="space-y-4">
+    <div class="flex items-center justify-center h-32 text-text-secondary">
+      <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+      Loading dues…
+    </div>
+  </div>
+
+  <script define:vars={{ isExec }}>
+    const STATUS_STYLES: Record<string, { badge: string; border: string }> = {
+      pending:        { badge: 'bg-yellow-100 text-yellow-700', border: 'border-yellow-300' },
+      overdue:        { badge: 'bg-red-100 text-red-700',       border: 'border-red-400' },
+      paid:           { badge: 'bg-green-100 text-green-700',   border: 'border-green-300' },
+      partially_paid: { badge: 'bg-blue-100 text-blue-700',     border: 'border-blue-300' },
+      waived:         { badge: 'bg-gray-100 text-gray-600',     border: 'border-gray-300' },
+    };
+
+    async function loadDues() {
+      const container = document.getElementById('dues-list');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/finance/dues', { credentials: 'include' });
+        const dues = await res.json();
+        if (!dues.length) {
+          container.innerHTML = '<div class="bg-white rounded-xl border border-border-light p-12 text-center"><i class="fas fa-check-circle text-4xl text-green-500 mb-3 block"></i><p class="text-text-secondary">No dues found.</p></div>';
+          return;
+        }
+        container.innerHTML = dues.map((d: any) => {
+          const style = STATUS_STYLES[d.status] ?? { badge: 'bg-gray-100 text-gray-600', border: 'border-gray-300' };
+          return `
+            <div class="bg-white rounded-xl border-l-4 border ${style.border} p-5">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h2 class="font-semibold text-text-primary">${d.billing_periods?.name ?? 'Maintenance Due'}</h2>
+                  <p class="text-sm text-text-secondary mt-1">Unit: ${d.units?.unit_number ?? '—'} · Due: ${new Date(d.due_date).toLocaleDateString('en-IN')}</p>
+                </div>
+                <span class="flex-shrink-0 text-xs px-2 py-1 rounded-full font-medium ${style.badge}">${d.status.replace('_', ' ')}</span>
+              </div>
+              <div class="mt-4 grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <div class="text-text-secondary text-xs">Base Amount</div>
+                  <div class="font-semibold">₹${Number(d.base_amount).toLocaleString('en-IN')}</div>
+                </div>
+                <div>
+                  <div class="text-text-secondary text-xs">Penalty</div>
+                  <div class="font-semibold ${d.penalty_amount > 0 ? 'text-red-600' : ''}">₹${Number(d.penalty_amount).toLocaleString('en-IN')}</div>
+                </div>
+                <div>
+                  <div class="text-text-secondary text-xs">Total Due</div>
+                  <div class="font-bold text-lg">₹${Number(d.total_amount).toLocaleString('en-IN')}</div>
+                </div>
+              </div>
+              <div class="mt-4 pt-4 border-t border-border-light flex items-center gap-3 flex-wrap">
+                ${d.status !== 'paid' && d.status !== 'waived' ? `
+                  <button onclick="handlePay('${d.id}', ${d.total_amount})" class="btn-primary text-sm">
+                    Pay ₹${Number(d.total_amount).toLocaleString('en-IN')}
+                  </button>
+                ` : ''}
+                ${d.status === 'paid' && d.payment_id ? `
+                  <a href="/api/v1/finance/payments/${d.payment_id}/receipt" target="_blank"
+                    class="btn-outline text-sm flex items-center gap-1.5">
+                    <i class="fas fa-receipt" aria-hidden="true"></i> Receipt
+                  </a>
+                  <button onclick="generateGstInvoice('${d.payment_id}')"
+                    class="btn-outline text-sm flex items-center gap-1.5">
+                    <i class="fas fa-file-invoice" aria-hidden="true"></i> GST Invoice
+                  </button>
+                ` : ''}
+                ${d.status === 'paid' && !d.payment_id ? `
+                  <span class="text-xs text-green-600 font-medium"><i class="fas fa-check-circle"></i> Paid</span>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch {
+        container.innerHTML = '<p class="text-center text-red-600 py-12">Failed to load dues.</p>';
+      }
+    }
+
+    async function handlePay(duesId: string, amount: number) {
+      const mode = prompt('Payment mode (cash/upi/cheque/neft/rtgs/online):') ?? '';
+      if (!mode.trim()) return;
+      const ref = prompt('Transaction reference (optional):') ?? undefined;
+      const res = await fetch('/api/v1/finance/payments', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ dues_id: duesId, amount, payment_mode: mode.trim(), transaction_ref: ref || undefined }),
+      });
+      if (res.ok) { loadDues(); }
+      else { const err = await res.json(); alert(`Payment failed: ${err.detail ?? err.error}`); }
+    }
+
+    // Billing period modal (exec/admin only)
+    if (isExec) {
+      const modal = document.getElementById('period-modal');
+      const openBtn = document.getElementById('create-period-btn');
+      const closeBtn = document.getElementById('close-modal-btn');
+      const cancelBtn = document.getElementById('cancel-modal-btn');
+      const form = document.getElementById('period-form') as HTMLFormElement;
+      const errEl = document.getElementById('period-error')!;
+
+      openBtn?.addEventListener('click', () => modal?.classList.remove('hidden'));
+      closeBtn?.addEventListener('click', () => modal?.classList.add('hidden'));
+      cancelBtn?.addEventListener('click', () => modal?.classList.add('hidden'));
+
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.classList.add('hidden');
+        const btn = document.getElementById('period-submit-btn') as HTMLButtonElement;
+        btn.disabled = true;
+        btn.textContent = 'Creating…';
+
+        const fd = new FormData(form);
+        const gstRate = fd.get('gst_rate');
+        const penalty = fd.get('penalty_amount');
+
+        const res = await fetch('/api/v1/finance/dues', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: fd.get('name'),
+            start_date: fd.get('start_date'),
+            end_date: fd.get('end_date'),
+            due_date: fd.get('due_date'),
+            base_amount: parseFloat(fd.get('base_amount') as string),
+            gst_rate: gstRate ? parseFloat(gstRate as string) : 0,
+            penalty_amount: penalty ? parseFloat(penalty as string) : 0,
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          modal?.classList.add('hidden');
+          form.reset();
+          alert(`Billing period created! ${data.dues_created} dues generated.`);
+          loadDues();
+        } else {
+          errEl.textContent = data.detail ?? data.error ?? 'Failed to create billing period.';
+          errEl.classList.remove('hidden');
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Generate Dues';
+      });
+    }
+
+    async function generateGstInvoice(paymentId: string) {
+      try {
+        const res = await fetch('/api/v1/finance/invoices/generate', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ payment_id: paymentId }),
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Failed to generate invoice.'); return; }
+        // Open invoice HTML in new tab
+        const win = window.open('', '_blank');
+        if (win) { win.document.write(data.html); win.document.close(); }
+      } catch { alert('Network error generating invoice.'); }
+    }
+
+    (window as any).handlePay = handlePay;
+    (window as any).generateGstInvoice = generateGstInvoice;
+    loadDues();
+  </script>
+</PortalLayout>

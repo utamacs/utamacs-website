@@ -1,0 +1,44 @@
+{
+  "name": "UTA MACS Portal",
+  "short_name": "MACS Portal",
+  "description": "Urban Trilla Apartment Owners Cooperative — Resident Portal",
+  "start_url": "/portal",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1E3A8A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/assets/logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "productivity"],
+  "lang": "en-IN",
+  "dir": "ltr",
+  "shortcuts": [
+    {
+      "name": "Complaints",
+      "url": "/portal/complaints",
+      "description": "View and raise complaints"
+    },
+    {
+      "name": "Notices",
+      "url": "/portal/notices",
+      "description": "Society notices and announcements"
+    },
+    {
+      "name": "Community",
+      "url": "/portal/community",
+      "description": "Community board"
+    }
+  ]
+}

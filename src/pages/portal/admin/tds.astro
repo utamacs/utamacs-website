@@ -1,0 +1,307 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal');
+---
+
+<PortalLayout title="TDS Tracking" user={user} activeModule="compliance">
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">TDS Tracking</h1>
+      <p class="text-sm text-text-secondary mt-1">
+        Tax Deducted at Source — vendor expenses and maintenance payments (IT Act Section 194C).
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <label for="fy-select" class="text-sm font-medium text-text-secondary">Financial Year:</label>
+      <select id="fy-select" onchange="loadTDS()" class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white">
+      </select>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div id="summary-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-2xl border border-border-light p-4 animate-pulse h-20"></div>
+    <div class="bg-white rounded-2xl border border-border-light p-4 animate-pulse h-20"></div>
+    <div class="bg-white rounded-2xl border border-border-light p-4 animate-pulse h-20"></div>
+    <div class="bg-white rounded-2xl border border-border-light p-4 animate-pulse h-20"></div>
+  </div>
+
+  <!-- Alert: vendors missing PAN -->
+  <div id="pan-alert" class="hidden mb-6"></div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+    <button onclick="switchTab('vendors')" id="tab-vendors"
+      class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-white text-primary-600 shadow-sm">
+      Vendor TDS (194C)
+    </button>
+    <button onclick="switchTab('payments')" id="tab-payments"
+      class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+      Payment TDS
+    </button>
+    <button onclick="switchTab('expenses')" id="tab-expenses"
+      class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+      Expense Ledger
+    </button>
+  </div>
+
+  <div id="panel-vendors">
+    <div id="vendors-container">
+      <div class="text-center text-text-secondary py-12"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>
+    </div>
+  </div>
+
+  <div id="panel-payments" class="hidden">
+    <div id="payments-container">
+      <div class="text-center text-text-secondary py-12"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>
+    </div>
+  </div>
+
+  <div id="panel-expenses" class="hidden">
+    <div id="expenses-container">
+      <div class="text-center text-text-secondary py-12"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>
+    </div>
+  </div>
+
+  <script>
+    let tdsData: any = null;
+    let currentTab = 'vendors';
+
+    // Populate FY dropdown (current FY + 3 previous)
+    function initFYSelect() {
+      const now = new Date();
+      const currentFY = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      const sel = document.getElementById('fy-select') as HTMLSelectElement;
+      sel.innerHTML = '';
+      for (let y = currentFY; y >= currentFY - 3; y--) {
+        const opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = `FY ${y}-${String(y + 1).slice(-2)}`;
+        sel.appendChild(opt);
+      }
+    }
+
+    function switchTab(tab: string) {
+      currentTab = tab;
+      ['vendors', 'payments', 'expenses'].forEach(t => {
+        const el = document.getElementById(`panel-${t}`);
+        if (el) el.classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById(`tab-${t}`);
+        if (btn) {
+          btn.classList.toggle('bg-white', t === tab);
+          btn.classList.toggle('text-primary-600', t === tab);
+          btn.classList.toggle('shadow-sm', t === tab);
+          btn.classList.toggle('text-text-secondary', t !== tab);
+        }
+      });
+      if (tdsData) renderCurrentTab();
+    }
+
+    async function loadTDS() {
+      const fy = (document.getElementById('fy-select') as HTMLSelectElement)?.value || '';
+      try {
+        const res = await fetch(`/api/v1/finance/tds-report?fy=${fy}`, { credentials: 'include' });
+        tdsData = await res.json();
+        renderSummary();
+        renderPanAlert();
+        renderCurrentTab();
+      } catch {
+        document.getElementById('summary-cards')!.innerHTML =
+          `<div class="col-span-4 text-center text-red-600 py-4">Failed to load TDS data.</div>`;
+      }
+    }
+
+    function renderSummary() {
+      if (!tdsData) return;
+      const s = tdsData.summary;
+      const fmt = (n: number) => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById('summary-cards')!.innerHTML = `
+        <div class="bg-white rounded-2xl border border-border-light p-5">
+          <p class="text-xs text-text-secondary uppercase tracking-wide mb-1">Total TDS</p>
+          <p class="text-2xl font-bold text-primary-600">${fmt(s.total_tds)}</p>
+          <p class="text-xs text-text-secondary mt-1">FY ${s.fy === 'all' ? 'All Years' : s.fy + '-' + String(Number(s.fy) + 1).slice(-2)}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-border-light p-5">
+          <p class="text-xs text-text-secondary uppercase tracking-wide mb-1">TDS on Expenses</p>
+          <p class="text-2xl font-bold text-text-primary">${fmt(s.total_tds_on_expenses)}</p>
+          <p class="text-xs text-text-secondary mt-1">Vendor / contractor payments</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-border-light p-5">
+          <p class="text-xs text-text-secondary uppercase tracking-wide mb-1">TDS on Dues</p>
+          <p class="text-2xl font-bold text-text-primary">${fmt(s.total_tds_on_payments)}</p>
+          <p class="text-xs text-text-secondary mt-1">Maintenance payment deductions</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-border-light p-5 ${s.missing_pan_vendor_count > 0 ? 'border-amber-300 bg-amber-50' : ''}">
+          <p class="text-xs text-text-secondary uppercase tracking-wide mb-1">Missing PAN</p>
+          <p class="text-2xl font-bold ${s.missing_pan_vendor_count > 0 ? 'text-amber-600' : 'text-green-600'}">${s.missing_pan_vendor_count}</p>
+          <p class="text-xs text-text-secondary mt-1">Vendors without PAN</p>
+        </div>`;
+    }
+
+    function renderPanAlert() {
+      const alertEl = document.getElementById('pan-alert');
+      if (!alertEl || !tdsData) return;
+      const missing = tdsData.missing_pan_vendors ?? [];
+      if (!missing.length) { alertEl.classList.add('hidden'); return; }
+      alertEl.classList.remove('hidden');
+      alertEl.innerHTML = `
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div class="flex items-start gap-3">
+            <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5" aria-hidden="true"></i>
+            <div>
+              <p class="text-sm font-semibold text-amber-800">Vendors Missing PAN — Form 16A Cannot Be Issued</p>
+              <p class="text-xs text-amber-700 mt-1">The following vendors have TDS deducted but no PAN on file. Add their PAN in Vendors management.</p>
+              <ul class="mt-2 text-xs text-amber-800 space-y-1">
+                ${missing.map((v: any) => `<li>• <strong>${v.vendor_name}</strong> — TDS: ₹${Number(v.total_tds).toFixed(2)}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderCurrentTab() {
+      if (currentTab === 'vendors') renderVendors();
+      else if (currentTab === 'payments') renderPayments();
+      else if (currentTab === 'expenses') renderExpenses();
+    }
+
+    function renderVendors() {
+      const container = document.getElementById('vendors-container');
+      if (!container || !tdsData) return;
+      const vendors = tdsData.vendor_tds_summary ?? [];
+      if (!vendors.length) {
+        container.innerHTML = `<div class="text-center py-12 text-text-secondary text-sm">No vendor TDS entries for this period.</div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+          <div class="p-4 border-b border-border-light bg-gray-50">
+            <p class="text-xs text-text-secondary">TDS is deductible under IT Act Section 194C when annual vendor payments exceed ₹1,00,000. Form 16A must be issued quarterly.</p>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-border-light">
+              <tr>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Vendor</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">PAN</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-right">Total Expenses</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-right">TDS Deducted</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-right">Transactions</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Form 16A</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${vendors.map((v: any) => `
+              <tr class="border-b border-border-light hover:bg-gray-50">
+                <td class="py-3 px-4 font-medium">${v.vendor_name}</td>
+                <td class="py-3 px-4 font-mono text-sm ${v.pan ? 'text-text-primary' : 'text-red-500'}">
+                  ${v.pan || '<i class="fas fa-exclamation-circle mr-1"></i>Missing'}
+                </td>
+                <td class="py-3 px-4 text-right">₹${Number(v.total_expense).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                <td class="py-3 px-4 text-right font-semibold text-primary-600">₹${Number(v.total_tds).toFixed(2)}</td>
+                <td class="py-3 px-4 text-right text-text-secondary">${v.entries}</td>
+                <td class="py-3 px-4">
+                  ${v.pan
+                    ? '<span class="text-xs text-green-600"><i class="fas fa-check mr-1"></i>Issuable</span>'
+                    : '<span class="text-xs text-red-500"><i class="fas fa-times mr-1"></i>PAN required</span>'}
+                </td>
+              </tr>`).join('')}
+            </tbody>
+            <tfoot>
+              <tr class="bg-gray-50 border-t-2 border-border-light font-bold">
+                <td colspan="2" class="py-3 px-4">Total</td>
+                <td class="py-3 px-4 text-right">₹${vendors.reduce((s: number, v: any) => s + Number(v.total_expense), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                <td class="py-3 px-4 text-right text-primary-600">₹${vendors.reduce((s: number, v: any) => s + Number(v.total_tds), 0).toFixed(2)}</td>
+                <td class="py-3 px-4 text-right">${vendors.reduce((s: number, v: any) => s + v.entries, 0)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>`;
+    }
+
+    function renderPayments() {
+      const container = document.getElementById('payments-container');
+      if (!container || !tdsData) return;
+      const payments = tdsData.payments_with_tds ?? [];
+      if (!payments.length) {
+        container.innerHTML = `<div class="text-center py-12 text-text-secondary text-sm">No maintenance payments with TDS for this period.</div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-border-light">
+              <tr>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Member</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Unit</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Receipt No.</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-right">Amount</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-right">TDS</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${payments.map((p: any) => `
+              <tr class="border-b border-border-light hover:bg-gray-50">
+                <td class="py-3 px-4">${p.maintenance_dues?.profiles?.full_name ?? '—'}</td>
+                <td class="py-3 px-4 text-text-secondary">${p.maintenance_dues?.units ? p.maintenance_dues.units.block + p.maintenance_dues.units.unit_number : '—'}</td>
+                <td class="py-3 px-4 font-mono text-xs">${p.receipt_number ?? '—'}</td>
+                <td class="py-3 px-4 text-right">₹${Number(p.amount).toFixed(2)}</td>
+                <td class="py-3 px-4 text-right font-semibold text-primary-600">₹${Number(p.tds_deducted).toFixed(2)}</td>
+                <td class="py-3 px-4 text-text-secondary">${p.paid_at ? new Date(p.paid_at).toLocaleDateString('en-IN') : '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    function renderExpenses() {
+      const container = document.getElementById('expenses-container');
+      if (!container || !tdsData) return;
+      const expenses = tdsData.expenses_with_tds ?? [];
+      if (!expenses.length) {
+        container.innerHTML = `<div class="text-center py-12 text-text-secondary text-sm">No vendor expenses with TDS for this period.</div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-border-light">
+              <tr>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Vendor</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Category</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Bill No.</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-right">Amount</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-right">TDS (194C)</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-right">Net Payable</th>
+                <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${expenses.map((e: any) => {
+                const net = Number(e.amount ?? 0) - Number(e.tds_deducted ?? 0);
+                return `
+                <tr class="border-b border-border-light hover:bg-gray-50">
+                  <td class="py-3 px-4">${e.vendors?.name ?? '—'} ${!e.vendors?.pan ? '<span class="text-xs text-red-400 ml-1">No PAN</span>' : ''}</td>
+                  <td class="py-3 px-4 text-text-secondary">${e.expense_categories?.name ?? '—'}</td>
+                  <td class="py-3 px-4 font-mono text-xs">${e.bill_number ?? '—'}</td>
+                  <td class="py-3 px-4 text-right">₹${Number(e.amount).toFixed(2)}</td>
+                  <td class="py-3 px-4 text-right font-semibold text-primary-600">₹${Number(e.tds_deducted).toFixed(2)}</td>
+                  <td class="py-3 px-4 text-right">₹${net.toFixed(2)}</td>
+                  <td class="py-3 px-4 text-text-secondary">${e.payment_date ? new Date(e.payment_date).toLocaleDateString('en-IN') : '—'}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    // Init
+    initFYSelect();
+    loadTDS();
+  </script>
+</PortalLayout>

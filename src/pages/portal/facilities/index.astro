@@ -1,0 +1,132 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+---
+
+<PortalLayout title="Facility Booking" user={user} activeModule="facility_booking">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-text-primary">Facility Booking</h1>
+    <p class="text-sm text-text-secondary mt-1">Book community facilities for your events and activities.</p>
+  </div>
+
+  <div id="facilities-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+    <div class="col-span-full flex items-center justify-center h-32 text-text-secondary">
+      <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+      Loading facilities…
+    </div>
+  </div>
+
+  <!-- My Bookings -->
+  <div class="mt-8">
+    <h2 class="text-lg font-semibold text-text-primary mb-4">My Bookings</h2>
+    <div id="my-bookings" class="space-y-3">
+      <div class="text-sm text-text-secondary text-center py-6">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading your bookings…
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BOOKING_BADGE: Record<string, string> = {
+      pending:   'bg-yellow-100 text-yellow-700',
+      confirmed: 'bg-green-100 text-green-700',
+      waitlisted:'bg-blue-100 text-blue-700',
+      in_use:    'bg-teal-100 text-teal-700',
+      completed: 'bg-gray-100 text-gray-600',
+      cancelled: 'bg-red-100 text-red-600',
+      no_show:   'bg-orange-100 text-orange-700',
+    };
+
+    async function loadFacilities() {
+      const container = document.getElementById('facilities-list');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/facilities', { credentials: 'include' });
+        const facilities = await res.json();
+        container.innerHTML = facilities.map((f: any) => `
+          <div class="bg-white rounded-xl border border-border-light overflow-hidden hover:shadow-soft transition-shadow">
+            <div class="h-2 bg-primary-600"></div>
+            <div class="p-5">
+              <h2 class="font-semibold text-text-primary mb-1">${f.name}</h2>
+              ${f.description ? `<p class="text-xs text-text-secondary mb-3 line-clamp-2">${f.description}</p>` : ''}
+              <div class="space-y-1 text-xs text-text-secondary mb-4">
+                ${f.capacity ? `<div class="flex items-center gap-2"><i class="fas fa-users w-3.5 text-center" aria-hidden="true"></i>Capacity: ${f.capacity} persons</div>` : ''}
+                ${f.booking_fee > 0 ? `<div class="flex items-center gap-2"><i class="fas fa-rupee-sign w-3.5 text-center" aria-hidden="true"></i>Booking fee: ₹${Number(f.booking_fee).toLocaleString('en-IN')}</div>` : '<div class="flex items-center gap-2"><i class="fas fa-gift w-3.5 text-center" aria-hidden="true"></i>Free to book</div>'}
+                ${f.deposit_amount > 0 ? `<div class="flex items-center gap-2"><i class="fas fa-shield-alt w-3.5 text-center" aria-hidden="true"></i>Deposit: ₹${Number(f.deposit_amount).toLocaleString('en-IN')}</div>` : ''}
+                <div class="flex items-center gap-2"><i class="fas fa-calendar-check w-3.5 text-center" aria-hidden="true"></i>Free cancellation: ${f.cancellation_hours_free}h before</div>
+              </div>
+              ${f.amenities?.length ? `
+                <div class="flex flex-wrap gap-1 mb-4">
+                  ${f.amenities.map((a: string) => `<span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded">${a}</span>`).join('')}
+                </div>
+              ` : ''}
+              <a href="/portal/facilities/book?facility=${f.id}" class="btn-primary text-xs w-full py-2 text-center block">Book Now</a>
+            </div>
+          </div>
+        `).join('');
+      } catch {
+        container.innerHTML = '<p class="col-span-full text-center text-red-600 py-12">Failed to load facilities.</p>';
+      }
+    }
+
+    async function loadMyBookings() {
+      const container = document.getElementById('my-bookings');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/facilities/bookings', { credentials: 'include' });
+        const bookings = await res.json();
+        if (!bookings.length) {
+          container.innerHTML = '<p class="text-sm text-text-secondary text-center py-4">No bookings yet.</p>';
+          return;
+        }
+        container.innerHTML = bookings.map((b: any) => {
+          const start = new Date(b.start_time);
+          const canCancel = ['pending','confirmed','waitlisted'].includes(b.status) && start > new Date();
+          return `
+            <div class="bg-white rounded-xl border border-border-light p-4 flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-medium text-text-primary text-sm">${b.facilities?.name ?? 'Facility'}</span>
+                  <span class="text-xs px-2 py-0.5 rounded-full font-medium ${BOOKING_BADGE[b.status] ?? 'bg-gray-100 text-gray-600'}">${b.status.replace('_',' ')}</span>
+                </div>
+                <div class="text-xs text-text-secondary">
+                  ${start.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}
+                  · ${start.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
+                  ${b.end_time ? ` – ${new Date(b.end_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}` : ''}
+                </div>
+                ${b.fee_charged > 0 ? `<div class="text-xs text-text-secondary mt-0.5">Fee: ₹${Number(b.fee_charged).toLocaleString('en-IN')}${b.deposit_paid > 0 ? ` · Deposit: ₹${Number(b.deposit_paid).toLocaleString('en-IN')}` : ''}</div>` : ''}
+              </div>
+              ${canCancel ? `<button onclick="cancelBooking('${b.id}')" class="text-sm text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0">Cancel</button>` : ''}
+            </div>
+          `;
+        }).join('');
+      } catch {
+        container.innerHTML = '<p class="text-sm text-red-600 text-center py-4">Failed to load bookings.</p>';
+      }
+    }
+
+    async function cancelBooking(bookingId: string) {
+      const reason = prompt('Reason for cancellation (optional):') ?? '';
+      if (!confirm('Cancel this booking?')) return;
+      const res = await fetch(`/api/v1/facilities/bookings/${bookingId}/cancel`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        alert(d.message);
+        loadMyBookings();
+      } else {
+        const d = await res.json();
+        alert(d.error ?? 'Failed to cancel booking.');
+      }
+    }
+
+    (window as any).cancelBooking = cancelBooking;
+    loadFacilities();
+    loadMyBookings();
+  </script>
+</PortalLayout>

@@ -1,0 +1,190 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user || user.role === 'security_guard' || user.role === 'vendor') {
+  return Astro.redirect('/portal');
+}
+
+const isPrivileged = ['executive', 'admin'].includes(user.role);
+const isAdmin = user.role === 'admin';
+---
+
+<PortalLayout title="Member Directory" user={user} activeModule="members">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-text-primary">Member Directory</h1>
+    <p class="text-sm text-text-secondary mt-1">Residents of Urban Trilla Apartments.</p>
+  </div>
+
+  <!-- Role change modal (admin only) -->
+  {isAdmin && (
+    <div id="role-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
+        <h2 class="font-semibold text-text-primary text-lg mb-1">Change Member Role</h2>
+        <p id="role-modal-name" class="text-sm text-text-secondary mb-5"></p>
+        <div id="role-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">New Role</label>
+            <select id="role-select"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+              <option value="member">Member</option>
+              <option value="executive">Executive</option>
+              <option value="admin">Admin</option>
+              <option value="security_guard">Security Guard</option>
+              <option value="vendor">Vendor</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Role Expiry Date <span class="text-text-secondary font-normal">(optional — for exec term)</span></label>
+            <input type="date" id="role-expiry"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            <p class="text-xs text-text-secondary mt-1">Leave blank for indefinite. Set for executive term end dates.</p>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button id="role-save-btn" class="btn-primary flex-1">Save Role</button>
+            <button id="role-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Search -->
+  <div class="mb-5">
+    <div class="relative max-w-sm">
+      <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
+      <input type="search" id="search-input" placeholder="Search by name…"
+        class="w-full pl-10 pr-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+    </div>
+  </div>
+
+  <div id="member-count" class="text-xs text-text-secondary mb-4">Loading…</div>
+
+  <div id="members-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {Array.from({length: 6}).map(() => (
+      <div class="bg-white rounded-xl border border-border-light p-4 animate-pulse">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-gray-200"></div>
+          <div class="flex-1">
+            <div class="h-3 bg-gray-200 rounded w-24 mb-2"></div>
+            <div class="h-2.5 bg-gray-100 rounded w-16"></div>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <script define:vars={{ isPrivileged, isAdmin }}>
+    const ROLE_BADGE: Record<string, string> = {
+      member:         'bg-gray-100 text-gray-600',
+      executive:      'bg-purple-100 text-purple-700',
+      admin:          'bg-red-100 text-red-700',
+      security_guard: 'bg-amber-100 text-amber-700',
+      vendor:         'bg-blue-100 text-blue-700',
+    };
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    let roleTargetId: string | null = null;
+
+    async function loadMembers(q = '') {
+      const params = new URLSearchParams({ limit: '100' });
+      if (q) params.set('q', q);
+
+      const res = await fetch(`/api/v1/members?${params}`, { credentials: 'include' });
+      const members = res.ok ? await res.json() : [];
+
+      document.getElementById('member-count')!.textContent = `${members.length} resident${members.length !== 1 ? 's' : ''} found`;
+
+      const grid = document.getElementById('members-grid')!;
+      if (!members.length) {
+        grid.innerHTML = '<div class="col-span-full text-center py-10 text-text-secondary text-sm">No members found.</div>';
+        return;
+      }
+
+      grid.innerHTML = members.map((m: any) => {
+        const initials = m.full_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
+        const unitDisplay = [m.unit_number, m.block ? `Block ${m.block}` : null].filter(Boolean).join(' · ');
+        const residencyBadge = m.residency_type === 'owner'
+          ? '<span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">Owner</span>'
+          : '<span class="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">Tenant</span>';
+        const roleBadge = m.role ? `<span class="text-xs px-1.5 py-0.5 rounded font-medium ${ROLE_BADGE[m.role] ?? 'bg-gray-100 text-gray-600'}">${m.role.replace('_',' ')}</span>` : '';
+        const expiryNote = m.role_expires_at ? `<div class="text-xs text-amber-600 mt-0.5"><i class="fas fa-clock"></i> Role expires ${new Date(m.role_expires_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>` : '';
+
+        return `
+          <div class="bg-white rounded-xl border border-border-light p-4 hover:shadow-soft transition-shadow">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+                ${initials}
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="font-medium text-text-primary text-sm truncate">${m.full_name}</div>
+                <div class="text-xs text-text-secondary mt-0.5">${unitDisplay || '—'}</div>
+              </div>
+              <div class="flex flex-col items-end gap-1">
+                ${residencyBadge}
+                ${roleBadge}
+              </div>
+            </div>
+            ${expiryNote}
+            ${isPrivileged && m.move_in_date ? `<div class="mt-1 text-xs text-text-secondary">Since ${new Date(m.move_in_date).toLocaleDateString('en-IN', {month:'short',year:'numeric'})}</div>` : ''}
+            ${isAdmin ? `
+              <div class="mt-3 pt-3 border-t border-border-light">
+                <button onclick="openRoleModal('${m.id}','${m.full_name}','${m.role ?? 'member'}','${m.role_expires_at ?? ''}')"
+                  class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
+                  <i class="fas fa-user-edit" aria-hidden="true"></i> Change Role
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openRoleModal(userId: string, name: string, currentRole: string, expiresAt: string) {
+      roleTargetId = userId;
+      document.getElementById('role-modal-name')!.textContent = `Member: ${name} · Current role: ${currentRole.replace('_',' ')}`;
+      (document.getElementById('role-select') as HTMLSelectElement).value = currentRole;
+      (document.getElementById('role-expiry') as HTMLInputElement).value = expiresAt ? expiresAt.slice(0, 10) : '';
+      document.getElementById('role-error')!.classList.add('hidden');
+      document.getElementById('role-modal')!.classList.remove('hidden');
+    }
+
+    document.getElementById('role-save-btn')?.addEventListener('click', async () => {
+      if (!roleTargetId) return;
+      const role = (document.getElementById('role-select') as HTMLSelectElement).value;
+      const expiry = (document.getElementById('role-expiry') as HTMLInputElement).value;
+      const errEl = document.getElementById('role-error')!;
+      errEl.classList.add('hidden');
+
+      const res = await fetch(`/api/v1/members/${roleTargetId}/role`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, expires_at: expiry || null }),
+      });
+
+      if (res.ok) {
+        document.getElementById('role-modal')!.classList.add('hidden');
+        roleTargetId = null;
+        loadMembers((document.getElementById('search-input') as HTMLInputElement).value.trim());
+      } else {
+        const d = await res.json();
+        errEl.textContent = d.error ?? d.detail ?? 'Failed to update role.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('role-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('role-modal')!.classList.add('hidden');
+      roleTargetId = null;
+    });
+
+    document.getElementById('search-input')!.addEventListener('input', (e) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => loadMembers((e.target as HTMLInputElement).value.trim()), 350);
+    });
+
+    (window as any).openRoleModal = openRoleModal;
+    loadMembers();
+  </script>
+</PortalLayout>

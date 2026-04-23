@@ -1,0 +1,232 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!['executive','admin'].includes(user.role)) return Astro.redirect('/portal');
+---
+
+<PortalLayout title="Admin" user={user} activeModule="compliance">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-text-primary">Administration</h1>
+    <p class="text-sm text-text-secondary mt-1">System configuration and compliance tools.</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Feature Flags -->
+    {user.role === 'admin' && (
+      <div class="bg-white rounded-xl border border-border-light p-5">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+            <i class="fas fa-toggle-on text-purple-600" aria-hidden="true"></i>
+          </div>
+          <div>
+            <h2 class="font-semibold text-text-primary">Feature Configuration</h2>
+            <p class="text-xs text-text-secondary">Enable or disable portal modules and features</p>
+          </div>
+        </div>
+        <a href="/portal/admin/features" class="btn-primary text-sm w-full text-center block">Manage Features</a>
+      </div>
+    )}
+
+    <!-- Audit Logs -->
+    {user.role === 'admin' && (
+      <div class="bg-white rounded-xl border border-border-light p-5">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+            <i class="fas fa-shield-alt text-blue-600" aria-hidden="true"></i>
+          </div>
+          <div>
+            <h2 class="font-semibold text-text-primary">Audit Logs</h2>
+            <p class="text-xs text-text-secondary">DPDPA-compliant activity trail</p>
+          </div>
+        </div>
+        <a href="/portal/admin/audit" class="btn-primary text-sm w-full text-center block">View Audit Logs</a>
+      </div>
+    )}
+
+    <!-- Member Management -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+          <i class="fas fa-users text-green-600" aria-hidden="true"></i>
+        </div>
+        <div>
+          <h2 class="font-semibold text-text-primary">Member Management</h2>
+          <p class="text-xs text-text-secondary">View and manage member accounts and roles</p>
+        </div>
+      </div>
+      <a href="/portal/members" class="btn-primary text-sm w-full text-center block">Manage Members</a>
+    </div>
+
+    <!-- Finance Reports -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+          <i class="fas fa-chart-bar text-amber-600" aria-hidden="true"></i>
+        </div>
+        <div>
+          <h2 class="font-semibold text-text-primary">Finance Reports</h2>
+          <p class="text-xs text-text-secondary">Collection reports, dues aging, expense summary</p>
+        </div>
+      </div>
+      <a href="/portal/finance" class="btn-primary text-sm w-full text-center block">View Finance</a>
+    </div>
+
+    <!-- Infrastructure Assets -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+          <i class="fas fa-building text-teal-600" aria-hidden="true"></i>
+        </div>
+        <div>
+          <h2 class="font-semibold text-text-primary">Infrastructure Assets</h2>
+          <p class="text-xs text-text-secondary">Lifts, generators, CCTV — AMC and service tracking</p>
+        </div>
+      </div>
+      <a href="/portal/admin/assets" class="btn-primary text-sm w-full text-center block">Manage Assets</a>
+    </div>
+
+    <!-- Staff Attendance -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+          <i class="fas fa-user-clock text-indigo-600" aria-hidden="true"></i>
+        </div>
+        <div>
+          <h2 class="font-semibold text-text-primary">Staff Attendance</h2>
+          <p class="text-xs text-text-secondary">Housekeeping, security, maintenance staff logs</p>
+        </div>
+      </div>
+      <a href="/portal/admin/staff" class="btn-primary text-sm w-full text-center block">View Attendance</a>
+    </div>
+
+    <!-- TDS Tracking -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+          <i class="fas fa-percent text-orange-600" aria-hidden="true"></i>
+        </div>
+        <div>
+          <h2 class="font-semibold text-text-primary">TDS Tracking</h2>
+          <p class="text-xs text-text-secondary">IT Act Section 194C — vendor TDS, Form 16A readiness</p>
+        </div>
+      </div>
+      <a href="/portal/admin/tds" class="btn-primary text-sm w-full text-center block">View TDS Report</a>
+    </div>
+
+    <!-- Consent Management -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
+          <i class="fas fa-shield-alt text-violet-600" aria-hidden="true"></i>
+        </div>
+        <div>
+          <h2 class="font-semibold text-text-primary">Consent Management</h2>
+          <p class="text-xs text-text-secondary">DPDPA 2023 — member consent versions and re-consent tracking</p>
+        </div>
+      </div>
+      <a href="/portal/admin/consent" class="btn-primary text-sm w-full text-center block">Manage Consent</a>
+    </div>
+
+    <!-- AI Insights -->
+    <div class="bg-white rounded-xl border border-border-light p-5 md:col-span-2">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center">
+            <i class="fas fa-brain text-rose-600" aria-hidden="true"></i>
+          </div>
+          <div>
+            <h2 class="font-semibold text-text-primary">AI Insights</h2>
+            <p class="text-xs text-text-secondary">Pattern analysis and recommendations powered by AI</p>
+          </div>
+        </div>
+        <button id="load-insights-btn" class="btn-outline text-sm flex items-center gap-2">
+          <i class="fas fa-sparkles" aria-hidden="true"></i>
+          Generate Insights
+        </button>
+      </div>
+
+      <div id="insights-container" class="hidden space-y-3">
+        <div id="insights-loading" class="hidden text-center py-6 text-text-secondary text-sm">
+          <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+          Analysing last 30 days of operational data…
+        </div>
+        <div id="insights-list" class="space-y-3"></div>
+        <p id="insights-ts" class="text-xs text-text-secondary text-right"></p>
+      </div>
+      <div id="insights-placeholder" class="text-sm text-text-secondary">
+        Click "Generate Insights" to analyse complaint patterns, maintenance alerts, and financial trends.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PRIORITY_STYLES: Record<string, string> = {
+      high: 'border-red-200 bg-red-50',
+      medium: 'border-amber-200 bg-amber-50',
+      low: 'border-green-200 bg-green-50',
+    };
+    const PRIORITY_BADGE: Record<string, string> = {
+      high: 'bg-red-100 text-red-700',
+      medium: 'bg-amber-100 text-amber-700',
+      low: 'bg-green-100 text-green-700',
+    };
+
+    document.getElementById('load-insights-btn')!.addEventListener('click', async () => {
+      const btn = document.getElementById('load-insights-btn') as HTMLButtonElement;
+      const container = document.getElementById('insights-container')!;
+      const loading = document.getElementById('insights-loading')!;
+      const list = document.getElementById('insights-list')!;
+      const ts = document.getElementById('insights-ts')!;
+      const placeholder = document.getElementById('insights-placeholder')!;
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Generating…';
+      placeholder.classList.add('hidden');
+      container.classList.remove('hidden');
+      loading.classList.remove('hidden');
+      list.innerHTML = '';
+
+      try {
+        const res = await fetch('/api/v1/admin/insights', { credentials: 'include' });
+        const data = res.ok ? await res.json() : null;
+
+        loading.classList.add('hidden');
+
+        if (!data || !data.insights || data.insights.length === 0) {
+          list.innerHTML = '<div class="text-sm text-text-secondary">No insights generated. Try again later or check that ANTHROPIC_API_KEY is configured.</div>';
+        } else {
+          data.insights.forEach((insight: any) => {
+            const card = document.createElement('div');
+            card.className = `rounded-xl border p-4 ${PRIORITY_STYLES[insight.priority] ?? 'border-border-light bg-white'}`;
+            card.innerHTML = `
+              <div class="flex items-start gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span class="text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_BADGE[insight.priority] ?? 'bg-gray-100 text-gray-600'}">${insight.priority.toUpperCase()}</span>
+                    <span class="text-xs text-text-secondary capitalize">${(insight.type ?? '').replace(/_/g,' ')}</span>
+                  </div>
+                  <p class="font-medium text-text-primary text-sm">${insight.title}</p>
+                  <p class="text-xs text-text-secondary mt-0.5">${insight.body}</p>
+                </div>
+              </div>
+            `;
+            list.appendChild(card);
+          });
+
+          if (data.generated_at) {
+            ts.textContent = `Generated at ${new Date(data.generated_at).toLocaleString('en-IN')}`;
+          }
+        }
+      } catch {
+        loading.classList.add('hidden');
+        list.innerHTML = '<div class="text-sm text-red-600">Failed to generate insights. Please try again.</div>';
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-sparkles" aria-hidden="true"></i> Regenerate';
+    });
+  </script>
+</PortalLayout>
