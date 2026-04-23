@@ -1,6 +1,5 @@
 {
   "buildCommand": "npm run build:portal",
-  "nodeVersion": "20.x",
   "alias": ["portal.utamacs.org"],
   "outputDirectory": "dist",
   "installCommand": "npm install",
