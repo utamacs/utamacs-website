@@ -9,11 +9,11 @@ const PORTAL_PREFIX = '/portal';
 const API_PREFIX = '/api/v1';
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  const { request, redirect, locals } = context;
+  const { request, redirect, locals, cookies } = context;
   const url = new URL(request.url);
   const path = url.pathname;
 
-  // 1. Rate-limit API routes before processing (saves compute on rejected requests)
+  // 1. Rate-limit API routes before processing
   if (path.startsWith(API_PREFIX)) {
     const ip = extractClientIP(request);
     try {
@@ -30,12 +30,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
   }
 
-  // 2. Guard /portal/* pages before calling next() so locals.user is set when the page renders
+  // 2. Guard /portal/* pages before calling next() so locals.user is set at render time
   if (path.startsWith(PORTAL_PREFIX) && !path.startsWith(API_PREFIX)) {
     if (!PUBLIC_PORTAL_PATHS.includes(path)) {
-      const cookieHeader = request.headers.get('Cookie') ?? '';
-      const tokenMatch = cookieHeader.match(/sb-access-token=([^;]+)/);
-      const accessToken = tokenMatch?.[1];
+      // Use Astro's cookies API — reads the incoming Cookie header correctly
+      const accessToken = cookies.get('sb-access-token')?.value;
+      console.log('[middleware] path:', path, '| has token:', !!accessToken);
 
       if (!accessToken) {
         return redirect(`/portal/login?next=${encodeURIComponent(path)}`);
@@ -50,7 +50,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
   }
 
-  // 3. Process the request (locals.user is now available to portal pages)
+  // 3. Process the request
   const response = await next();
 
   // 4. Apply security headers to all responses

@@ -6,7 +6,6 @@ import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 function safeRedirect(next: string | null): string {
   if (!next) return '/portal';
-  // Only allow relative paths to prevent open redirect
   try {
     const url = new URL(next, 'https://example.com');
     return url.pathname + url.search;
@@ -15,7 +14,8 @@ function safeRedirect(next: string | null): string {
   }
 }
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async (context) => {
+  const { request, cookies } = context;
   const contentType = request.headers.get('content-type') ?? '';
   const isForm = contentType.includes('application/x-www-form-urlencoded');
 
@@ -37,10 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (!email || !password) {
       if (isForm) {
-        return new Response(null, {
-          status: 302,
-          headers: { Location: '/portal/login?error=required' },
-        });
+        return new Response(null, { status: 302, headers: { Location: '/portal/login?error=required' } });
       }
       return new Response(JSON.stringify({ error: 'Email and password are required' }), {
         status: 400,
@@ -59,45 +56,35 @@ export const POST: APIRoute = async ({ request }) => {
       userAgent: request.headers.get('user-agent') ?? undefined,
     });
 
-    const accessCookie = [
-      `sb-access-token=${session.accessToken}`,
-      'Path=/',
-      'HttpOnly',
-      'Secure',
-      'SameSite=Lax',
-      `Max-Age=${15 * 60}`,
-    ].join('; ');
+    // Use Astro's native cookies API — the Vercel adapter serialises these
+    // directly into the outgoing HTTP response, bypassing any edge-level
+    // header reconstruction that strips Set-Cookie.
+    cookies.set('sb-access-token', session.accessToken, {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 15 * 60,
+    });
 
-    const refreshCookie = [
-      `sb-refresh-token=${session.refreshToken}`,
-      'Path=/api/v1/auth/refresh',
-      'HttpOnly',
-      'Secure',
-      'SameSite=Lax',
-      `Max-Age=${7 * 24 * 60 * 60}`,
-    ].join('; ');
+    cookies.set('sb-refresh-token', session.refreshToken, {
+      path: '/api/v1/auth/refresh',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60,
+    });
 
     if (isForm) {
-      // Form submission: 302 redirect — browser sets cookie and follows natively
-      const headers = new Headers({
-        'Location': next,
-        'Cache-Control': 'no-store',
+      return new Response(null, {
+        status: 302,
+        headers: { Location: next, 'Cache-Control': 'no-store' },
       });
-      headers.append('Set-Cookie', accessCookie);
-      headers.append('Set-Cookie', refreshCookie);
-      return new Response(null, { status: 302, headers });
     }
 
-    // JSON API: return tokens for client-side handling
-    const headers = new Headers({
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
-    });
-    headers.append('Set-Cookie', accessCookie);
-    headers.append('Set-Cookie', refreshCookie);
     return new Response(
       JSON.stringify({ user: session.user, expiresAt: session.expiresAt }),
-      { status: 200, headers },
+      { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } },
     );
   } catch (err) {
     console.error('[login] error:', err instanceof Error ? err.message : err);
