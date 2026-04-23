@@ -79,7 +79,7 @@ export class SupabaseAuthService implements IAuthService {
   async sendPasswordReset(email: string): Promise<void> {
     const sb = getSupabaseAnonClient();
     const { error } = await sb.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.API_BASE_URL}/auth/reset-password`,
+      redirectTo: 'https://portal.utamacs.org/api/v1/auth/callback?type=recovery',
     });
     if (error) throw Object.assign(new Error(error.message), { status: 400 });
   }
