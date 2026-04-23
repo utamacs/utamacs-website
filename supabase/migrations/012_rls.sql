@@ -221,7 +221,7 @@ CREATE POLICY poll_options_read ON poll_options FOR SELECT
 CREATE POLICY poll_votes_insert ON poll_votes FOR INSERT
   WITH CHECK (
     user_id = auth.uid()
-    AND NOT EXISTS (SELECT 1 FROM poll_votes pv WHERE pv.poll_id = NEW.poll_id AND pv.user_id = auth.uid())
+    AND NOT EXISTS (SELECT 1 FROM poll_votes pv WHERE pv.poll_id = poll_votes.poll_id AND pv.user_id = auth.uid())
   );
 
 CREATE POLICY poll_votes_read ON poll_votes FOR SELECT
