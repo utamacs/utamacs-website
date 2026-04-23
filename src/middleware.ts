@@ -38,13 +38,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
       console.log('[middleware] path:', path, '| has token:', !!accessToken);
 
       if (!accessToken) {
+        console.log('[middleware] no cookie → redirect to login');
         return redirect(`/portal/login?next=${encodeURIComponent(path)}`);
       }
 
       try {
         const user = await authService.validateToken(accessToken);
+        console.log('[middleware] validated user:', user.id, 'role:', user.role);
         (locals as Record<string, unknown>)['user'] = user;
-      } catch {
+      } catch (err) {
+        console.error('[middleware] validateToken failed:', err instanceof Error ? err.message : err);
         return redirect(`/portal/login?next=${encodeURIComponent(path)}&expired=1`);
       }
     }

@@ -56,36 +56,30 @@ export const POST: APIRoute = async (context) => {
       userAgent: request.headers.get('user-agent') ?? undefined,
     });
 
-    // Use Astro's native cookies API — the Vercel adapter serialises these
-    // directly into the outgoing HTTP response, bypassing any edge-level
-    // header reconstruction that strips Set-Cookie.
-    cookies.set('sb-access-token', session.accessToken, {
-      path: '/',
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 15 * 60,
-    });
-
-    cookies.set('sb-refresh-token', session.refreshToken, {
-      path: '/api/v1/auth/refresh',
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60,
-    });
+    // Write Set-Cookie directly onto the raw Response using .append() so both
+    // headers are preserved as separate lines. Never use new Headers({...}) or
+    // Object.fromEntries() — plain objects collapse duplicate keys and only the
+    // last Set-Cookie survives.
+    const setCookie = (name: string, value: string, maxAge: number, path: string) =>
+      `${name}=${encodeURIComponent(value)}; Path=${path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 
     if (isForm) {
-      return new Response(null, {
-        status: 302,
+      const r = new Response(null, {
+        status: 303,
         headers: { Location: next, 'Cache-Control': 'no-store' },
       });
+      r.headers.append('Set-Cookie', setCookie('sb-access-token', session.accessToken, 15 * 60, '/'));
+      r.headers.append('Set-Cookie', setCookie('sb-refresh-token', session.refreshToken, 7 * 24 * 60 * 60, '/api/v1/auth/refresh'));
+      return r;
     }
 
-    return new Response(
+    const r = new Response(
       JSON.stringify({ user: session.user, expiresAt: session.expiresAt }),
       { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } },
     );
+    r.headers.append('Set-Cookie', setCookie('sb-access-token', session.accessToken, 15 * 60, '/'));
+    r.headers.append('Set-Cookie', setCookie('sb-refresh-token', session.refreshToken, 7 * 24 * 60 * 60, '/api/v1/auth/refresh'));
+    return r;
   } catch (err) {
     console.error('[login] error:', err instanceof Error ? err.message : err);
     if (isForm) {
