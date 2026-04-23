@@ -1,3 +1,4 @@
+export const prerender = false;
 import type { APIRoute } from 'astro';
 import { authService } from '@lib/services/index';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
