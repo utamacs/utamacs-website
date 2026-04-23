@@ -1,115 +1,18 @@
 ---
-import Layout from '@components/layout/Layout.astro';
-import SectionHero from '@components/ui/SectionHero.astro';
-import SectionHeader from '@components/ui/SectionHeader.astro';
-
-const features = [
-  {
-    icon: 'fa-file-invoice-dollar',
-    title: 'Maintenance Dues',
-    description: 'View outstanding dues, payment history, and download receipts for all transactions.',
-    colorBg: 'bg-primary-100',
-    colorIcon: 'text-primary-600',
-    status: 'Coming Soon',
-  },
-  {
-    icon: 'fa-tools',
-    title: 'Maintenance Requests',
-    description: 'Submit and track maintenance requests. Get real-time updates on the status of your complaints.',
-    colorBg: 'bg-secondary-100',
-    colorIcon: 'text-secondary-600',
-    status: 'Coming Soon',
-  },
-  {
-    icon: 'fa-car',
-    title: 'Vehicle Management',
-    description: 'Register your vehicles, manage visitor passes, and track parking slot allocations.',
-    colorBg: 'bg-accent-100',
-    colorIcon: 'text-accent-700',
-    status: 'Coming Soon',
-  },
-  {
-    icon: 'fa-vote-yea',
-    title: 'Online Voting',
-    description: 'Participate in community polls and elections securely from your device.',
-    colorBg: 'bg-green-100',
-    colorIcon: 'text-green-600',
-    status: 'Coming Soon',
-  },
-  {
-    icon: 'fa-comments',
-    title: 'Community Forum',
-    description: 'Connect with neighbors, share information, and discuss community matters.',
-    colorBg: 'bg-purple-100',
-    colorIcon: 'text-purple-600',
-    status: 'Coming Soon',
-  },
-  {
-    icon: 'fa-bell',
-    title: 'Push Notifications',
-    description: 'Get instant alerts for new notices, events, and important announcements.',
-    colorBg: 'bg-orange-100',
-    colorIcon: 'text-orange-600',
-    status: 'Coming Soon',
-  },
-];
+// Redirect to the live portal on portal.utamacs.org
+// If logged in → lands on dashboard; if not → middleware redirects to login
 ---
-<Layout
-  title="Resident Portal – UTA MACS"
-  description="The UTA MACS resident portal — manage dues, maintenance requests, and stay connected with your community."
->
-  <SectionHero
-    title="Resident Portal"
-    subtitle="Your personal hub for all community services and information."
-  />
-
-  <section class="section">
-    <div class="container-custom">
-      <!-- Login prompt -->
-      <div class="max-w-2xl mx-auto mb-16 animate-on-scroll">
-        <div class="card-premium bg-gradient-to-br from-primary-50 to-secondary-50 border-primary-200 text-center">
-          <div class="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <i class="fas fa-lock text-2xl text-primary-600" aria-hidden="true"></i>
-          </div>
-          <h2 class="text-xl font-semibold text-text-primary mb-2">Sign In Required</h2>
-          <p class="text-body text-text-secondary mb-6">
-            Please log in with your resident credentials to access the portal features.
-          </p>
-          <div class="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="/login" class="btn-primary px-8 py-3">
-              <i class="fas fa-sign-in-alt mr-2" aria-hidden="true"></i>
-              Sign In
-            </a>
-            <a href="/contact" class="btn-outline px-8 py-3">
-              <i class="fas fa-envelope mr-2" aria-hidden="true"></i>
-              Request Access
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <SectionHeader
-        title="Portal Features"
-        subtitle="Here's what you'll be able to do once the portal is fully launched."
-        centered={true}
-      />
-
-      <div class="grid-features">
-        {features.map((feature, i) => (
-          <div class="card-premium animate-on-scroll group relative" style={`transition-delay: ${i * 0.1}s`}>
-            <div class={`w-14 h-14 ${feature.colorBg} rounded-2xl flex items-center justify-center mb-5`}>
-              <i class={`fas ${feature.icon} text-xl ${feature.colorIcon}`} aria-hidden="true"></i>
-            </div>
-            <div class="absolute top-4 right-4">
-              <span class="text-xs font-semibold bg-secondary-100 text-secondary-700 px-2 py-1 rounded-full">
-                {feature.status}
-              </span>
-            </div>
-            <h3 class="text-card font-semibold text-text-primary mb-2">{feature.title}</h3>
-            <p class="text-small text-text-secondary leading-relaxed">{feature.description}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-</Layout>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="refresh" content="0; url=https://portal.utamacs.org/portal" />
+  <title>Redirecting to Portal – UTA MACS</title>
+</head>
+<body>
+  <p>Redirecting to the resident portal…
+    <a href="https://portal.utamacs.org/portal">Click here if not redirected</a>
+  </p>
+  <script>window.location.replace('https://portal.utamacs.org/portal');</script>
+</body>
+</html>

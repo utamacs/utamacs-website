@@ -1,7 +1,7 @@
 ---
 export const prerender = false;
 import { authService } from '@lib/services/index';
-import Layout from '@components/layout/Layout.astro';
+import Layout from '@components/layout/PortalAuthLayout.astro';
 
 const redirectTo = Astro.url.searchParams.get('next') ?? '/portal';
 const expired = Astro.url.searchParams.get('expired') === '1';

@@ -173,17 +173,47 @@ const faqs = [
 
 <script>
   const form = document.getElementById('contact-form') as HTMLFormElement;
-  form?.addEventListener('submit', (e) => {
+  form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
-    btn.textContent = 'Message Sent!';
+    const originalHTML = btn.innerHTML;
+
     btn.disabled = true;
-    btn.classList.add('opacity-75');
-    setTimeout(() => {
-      btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Send Message';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending…';
+
+    const data = new FormData(form);
+    try {
+      const res = await fetch('https://portal.utamacs.org/api/v1/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.get('name'),
+          flat: data.get('flat') || undefined,
+          email: data.get('email'),
+          subject: data.get('subject'),
+          message: data.get('message'),
+        }),
+      });
+
+      if (res.ok) {
+        btn.innerHTML = '<i class="fas fa-check mr-2"></i>Message Sent!';
+        btn.classList.add('bg-secondary-500');
+        form.reset();
+        setTimeout(() => {
+          btn.innerHTML = originalHTML;
+          btn.disabled = false;
+          btn.classList.remove('bg-secondary-500');
+        }, 4000);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+        alert(body.error ?? 'Failed to send message. Please try again.');
+      }
+    } catch {
+      btn.innerHTML = originalHTML;
       btn.disabled = false;
-      btn.classList.remove('opacity-75');
-      form.reset();
-    }, 3000);
+      alert('Network error. Please check your connection and try again.');
+    }
   });
 </script>
