@@ -1,22 +1,61 @@
 ---
 export const prerender = false;
+import { authService } from '@lib/services/index';
 import Layout from '@components/layout/Layout.astro';
 
 const redirectTo = Astro.url.searchParams.get('next') ?? '/portal';
 const expired = Astro.url.searchParams.get('expired') === '1';
-const errorCode = Astro.url.searchParams.get('error');
 
-const errorMessages: Record<string, string> = {
-  invalid_credentials: 'Incorrect email or password. Please try again.',
-  required: 'Email and password are required.',
-};
-const errorMessage = errorCode ? (errorMessages[errorCode] ?? 'Sign-in failed. Please try again.') : null;
+let errorMessage: string | null = null;
+const errorCode = Astro.url.searchParams.get('error');
+if (errorCode) {
+  const map: Record<string, string> = {
+    invalid_credentials: 'Incorrect email or password.',
+    required: 'Email and password are required.',
+    auth_callback_failed: 'Authentication failed. Please try again.',
+  };
+  errorMessage = map[errorCode] ?? 'Sign-in failed. Please try again.';
+}
+
+if (Astro.request.method === 'POST') {
+  try {
+    const data = await Astro.request.formData();
+    const email = data.get('email')?.toString();
+    const password = data.get('password')?.toString();
+    const next = data.get('next')?.toString() ?? '/portal';
+
+    if (!email || !password) {
+      errorMessage = 'Email and password are required.';
+    } else {
+      const session = await authService.signIn(email, password);
+
+      Astro.cookies.set('sb-access-token', session.accessToken, {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: 15 * 60,
+      });
+
+      Astro.cookies.set('sb-refresh-token', session.refreshToken, {
+        path: '/api/v1/auth/refresh',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60,
+      });
+
+      return Astro.redirect(next);
+    }
+  } catch {
+    errorMessage = 'Incorrect email or password.';
+  }
+}
 ---
 
 <Layout title="Resident Login – UTA MACS" description="Sign in to access the UTA MACS resident portal.">
   <section class="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
     <div class="w-full max-w-md">
-      <!-- Logo -->
       <div class="text-center mb-8">
         <a href="/" class="inline-flex items-center gap-3 justify-center">
           <div class="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center">
@@ -45,44 +84,30 @@ const errorMessage = errorCode ? (errorMessages[errorCode] ?? 'Sign-in failed. P
           </div>
         )}
 
-        <form method="POST" action="/api/v1/auth/login" class="space-y-4">
+        <form method="POST" class="space-y-4">
           <input type="hidden" name="next" value={redirectTo} />
 
           <div>
             <label for="email" class="block text-sm font-medium text-text-primary mb-1.5">Email Address</label>
             <input
-              type="email"
-              id="email"
-              name="email"
-              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              type="email" id="email" name="email" required autocomplete="email"
               placeholder="you@example.com"
-              autocomplete="email"
-              required
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
             />
           </div>
           <div>
             <label for="password" class="block text-sm font-medium text-text-primary mb-1.5">Password</label>
             <input
-              type="password"
-              id="password"
-              name="password"
-              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              type="password" id="password" name="password" required autocomplete="current-password"
               placeholder="••••••••"
-              autocomplete="current-password"
-              required
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
             />
           </div>
           <div class="flex items-center justify-between text-sm">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" class="rounded border-border-light text-primary-600 focus:ring-primary-600" />
-              <span class="text-text-secondary">Remember me</span>
-            </label>
+            <span class="text-text-secondary"></span>
             <a href="/portal/forgot-password" class="text-primary-600 hover:underline">Forgot password?</a>
           </div>
-          <button
-            type="submit"
-            class="btn-primary w-full flex items-center justify-center gap-2"
-          >
+          <button type="submit" class="btn-primary w-full flex items-center justify-center gap-2">
             Sign In
           </button>
         </form>

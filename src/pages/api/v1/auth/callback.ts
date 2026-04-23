@@ -1,8 +1,8 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { createServerClient, parseCookieHeader, serializeCookieHeader, type CookieOptions } from '@supabase/ssr';
+import { getSupabaseAnonClient } from '@lib/services/providers/supabase/SupabaseDB';
 
-export const GET: APIRoute = async ({ request, redirect }) => {
+export const GET: APIRoute = async ({ request, redirect, cookies }) => {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const type = url.searchParams.get('type');
@@ -12,31 +12,29 @@ export const GET: APIRoute = async ({ request, redirect }) => {
     return redirect('/portal/login?error=auth_callback_failed');
   }
 
-  const headers = new Headers();
+  const supabase = getSupabaseAnonClient();
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-  const supabase = createServerClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return parseCookieHeader(request.headers.get('Cookie') ?? '');
-        },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            headers.append('Set-Cookie', serializeCookieHeader(name, value, options))
-          );
-        },
-      },
-    }
-  );
-
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-  if (error) {
+  if (error || !data.session) {
     return redirect('/portal/login?error=auth_callback_failed');
   }
 
-  const destination = type === 'recovery' ? '/portal/reset-password' : next;
-  return new Response(null, { status: 302, headers: { ...Object.fromEntries(headers), Location: destination } });
+  // Use Astro's cookies API — same approach as login.astro
+  cookies.set('sb-access-token', data.session.access_token, {
+    path: '/',
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 15 * 60,
+  });
+
+  cookies.set('sb-refresh-token', data.session.refresh_token, {
+    path: '/api/v1/auth/refresh',
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60,
+  });
+
+  return redirect(type === 'recovery' ? '/portal/reset-password' : next);
 };
