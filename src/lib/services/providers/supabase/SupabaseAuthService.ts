@@ -19,6 +19,7 @@ export class SupabaseAuthService implements IAuthService {
   async signIn(email: string, password: string): Promise<AuthSession> {
     const sb = getSupabaseAnonClient();
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    console.log('[signIn] error:', error, 'hasSession:', !!data.session, 'hasUser:', !!data.user);
     if (error || !data.session || !data.user) {
       throw Object.assign(new Error(error?.message ?? 'Sign-in failed'), { status: 401 });
     }
