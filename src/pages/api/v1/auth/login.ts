@@ -60,6 +60,7 @@ export const POST: APIRoute = async ({ request }) => {
       },
     );
   } catch (err) {
+    console.error('[login] error:', err instanceof Error ? err.message : err);
     return normalizeError(err, request.url);
   }
 };
