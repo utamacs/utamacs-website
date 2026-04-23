@@ -19,6 +19,7 @@ export function getSupabaseServiceClient(): SupabaseClient {
 export function getSupabaseAnonClient(): SupabaseClient {
   const url = process.env.PUBLIC_SUPABASE_URL ?? import.meta.env.PUBLIC_SUPABASE_URL;
   const key = process.env.PUBLIC_SUPABASE_ANON_KEY ?? import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+  console.log('[SupabaseDB] url:', url?.slice(0, 40), 'key:', key?.slice(0, 20));
   if (!url || !key) {
     throw new Error('Supabase public credentials are not configured');
   }
