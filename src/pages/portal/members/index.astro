@@ -77,7 +77,7 @@ const isAdmin = user.role === 'admin';
   </div>
 
   <script define:vars={{ isPrivileged, isAdmin }}>
-    const ROLE_BADGE: Record<string, string> = {
+    const ROLE_BADGE = {
       member:         'bg-gray-100 text-gray-600',
       executive:      'bg-purple-100 text-purple-700',
       admin:          'bg-red-100 text-red-700',
@@ -85,8 +85,8 @@ const isAdmin = user.role === 'admin';
       vendor:         'bg-blue-100 text-blue-700',
     };
 
-    let debounceTimer: ReturnType<typeof setTimeout>;
-    let roleTargetId: string | null = null;
+    let debounceTimer;
+    let roleTargetId = null;
 
     async function loadMembers(q = '') {
       const params = new URLSearchParams({ limit: '100' });
@@ -95,16 +95,16 @@ const isAdmin = user.role === 'admin';
       const res = await fetch(`/api/v1/members?${params}`, { credentials: 'include' });
       const members = res.ok ? await res.json() : [];
 
-      document.getElementById('member-count')!.textContent = `${members.length} resident${members.length !== 1 ? 's' : ''} found`;
+      document.getElementById('member-count').textContent = `${members.length} resident${members.length !== 1 ? 's' : ''} found`;
 
-      const grid = document.getElementById('members-grid')!;
+      const grid = document.getElementById('members-grid');
       if (!members.length) {
         grid.innerHTML = '<div class="col-span-full text-center py-10 text-text-secondary text-sm">No members found.</div>';
         return;
       }
 
-      grid.innerHTML = members.map((m: any) => {
-        const initials = m.full_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
+      grid.innerHTML = members.map((m) => {
+        const initials = m.full_name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
         const unitDisplay = [m.unit_number, m.block ? `Block ${m.block}` : null].filter(Boolean).join(' · ');
         const residencyBadge = m.residency_type === 'owner'
           ? '<span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">Owner</span>'
@@ -142,20 +142,20 @@ const isAdmin = user.role === 'admin';
       }).join('');
     }
 
-    function openRoleModal(userId: string, name: string, currentRole: string, expiresAt: string) {
+    function openRoleModal(userId, name, currentRole, expiresAt) {
       roleTargetId = userId;
-      document.getElementById('role-modal-name')!.textContent = `Member: ${name} · Current role: ${currentRole.replace('_',' ')}`;
-      (document.getElementById('role-select') as HTMLSelectElement).value = currentRole;
-      (document.getElementById('role-expiry') as HTMLInputElement).value = expiresAt ? expiresAt.slice(0, 10) : '';
-      document.getElementById('role-error')!.classList.add('hidden');
-      document.getElementById('role-modal')!.classList.remove('hidden');
+      document.getElementById('role-modal-name').textContent = `Member: ${name} · Current role: ${currentRole.replace('_',' ')}`;
+      document.getElementById('role-select').value = currentRole;
+      document.getElementById('role-expiry').value = expiresAt ? expiresAt.slice(0, 10) : '';
+      document.getElementById('role-error').classList.add('hidden');
+      document.getElementById('role-modal').classList.remove('hidden');
     }
 
     document.getElementById('role-save-btn')?.addEventListener('click', async () => {
       if (!roleTargetId) return;
-      const role = (document.getElementById('role-select') as HTMLSelectElement).value;
-      const expiry = (document.getElementById('role-expiry') as HTMLInputElement).value;
-      const errEl = document.getElementById('role-error')!;
+      const role = document.getElementById('role-select').value;
+      const expiry = document.getElementById('role-expiry').value;
+      const errEl = document.getElementById('role-error');
       errEl.classList.add('hidden');
 
       const res = await fetch(`/api/v1/members/${roleTargetId}/role`, {
@@ -164,9 +164,9 @@ const isAdmin = user.role === 'admin';
       });
 
       if (res.ok) {
-        document.getElementById('role-modal')!.classList.add('hidden');
+        document.getElementById('role-modal').classList.add('hidden');
         roleTargetId = null;
-        loadMembers((document.getElementById('search-input') as HTMLInputElement).value.trim());
+        loadMembers(document.getElementById('search-input').value.trim());
       } else {
         const d = await res.json();
         errEl.textContent = d.error ?? d.detail ?? 'Failed to update role.';
@@ -175,16 +175,16 @@ const isAdmin = user.role === 'admin';
     });
 
     document.getElementById('role-cancel-btn')?.addEventListener('click', () => {
-      document.getElementById('role-modal')!.classList.add('hidden');
+      document.getElementById('role-modal').classList.add('hidden');
       roleTargetId = null;
     });
 
-    document.getElementById('search-input')!.addEventListener('input', (e) => {
+    document.getElementById('search-input').addEventListener('input', (e) => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => loadMembers((e.target as HTMLInputElement).value.trim()), 350);
+      debounceTimer = setTimeout(() => loadMembers(e.target.value.trim()), 350);
     });
 
-    (window as any).openRoleModal = openRoleModal;
+    window.openRoleModal = openRoleModal;
     loadMembers();
   </script>
 </PortalLayout>
