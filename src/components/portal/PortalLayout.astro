@@ -1,6 +1,7 @@
 ---
 import type { UserClaims } from '@lib/services/interfaces/IAuthService';
 import { featureFlagService } from '@lib/services/index';
+import '../../styles/global.css';
 
 export interface Props {
   title: string;
@@ -56,14 +57,8 @@ const MODULE_PATHS: Record<string, string> = {
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <script src="https://kit.fontawesome.com/5a2b2f0b4f.js" crossorigin="anonymous" defer></script>
-  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" />
   <meta name="theme-color" content="#1E3A8A" />
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => undefined);
-    }
-  </script>
 </head>
 <body class="h-full bg-gray-50 font-sans text-text-primary">
 
