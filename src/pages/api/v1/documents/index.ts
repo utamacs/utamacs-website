@@ -18,7 +18,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     let query = sb
       .from('documents')
-      .select('id, title, description, category, file_name, mime_type, file_size_bytes, version, is_public, requires_role, created_at, updated_at, profiles(full_name)')
+      .select('id, title, description, category, file_name, mime_type, file_size_bytes, version, is_public, requires_role, created_by, created_at')
       .eq('society_id', SOCIETY_ID)
       .order('category')
       .order('title');

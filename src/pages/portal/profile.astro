@@ -133,7 +133,7 @@ const p = profile as any;
       }
     }
 
-    async function acceptConsent(version: number) {
+    async function acceptConsent(version) {
       const res = await fetch('/api/v1/members/consent', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ version }),
@@ -174,7 +174,7 @@ const p = profile as any;
       else alert('Failed to send reset email. Please try again.');
     });
 
-    (window as any).acceptConsent = acceptConsent;
+    window.acceptConsent = acceptConsent;
     loadConsentStatus();
   </script>
 </PortalLayout>

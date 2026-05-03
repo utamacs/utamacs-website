@@ -142,12 +142,12 @@ const isMember = user.role === 'member';
   </div>
 
   <script define:vars={{ isGuard, userId: user.id }}>
-    const STATUS_BADGE: Record<string, string> = {
+    const STATUS_BADGE = {
       approved: 'bg-green-100 text-green-700', pending: 'bg-yellow-100 text-yellow-700',
       used: 'bg-gray-100 text-gray-600', expired: 'bg-red-100 text-red-700', cancelled: 'bg-red-100 text-red-700',
     };
 
-    function switchTab(tab: string) {
+    function switchTab(tab) {
       const logs = document.getElementById('panel-logs');
       const deliveries = document.getElementById('panel-deliveries');
       const tabLogs = document.getElementById('tab-logs');
@@ -175,7 +175,7 @@ const isMember = user.role === 'member';
       ]);
     }
 
-    async function loadDeliveries(date?: string) {
+    async function loadDeliveries(date) {
       const container = document.getElementById('deliveries-list');
       if (!container) return;
       const d = date ?? new Date().toISOString().slice(0, 10);
@@ -196,7 +196,7 @@ const isMember = user.role === 'member';
             </tr>
           </thead>
           <tbody class="divide-y divide-border-light">
-            ${items.map((d: any) => `
+            ${items.map((d) => `
               <tr class="hover:bg-gray-50">
                 <td class="px-4 py-3 font-medium text-text-primary">${d.units?.unit_number ?? '—'}</td>
                 <td class="px-4 py-3 text-text-secondary">${d.courier_company ?? '—'}${d.tracking_number ? ` <span class="text-xs text-text-secondary">(${d.tracking_number})</span>` : ''}</td>
@@ -216,14 +216,14 @@ const isMember = user.role === 'member';
       `;
     }
 
-    async function markCollected(deliveryId: string) {
+    async function markCollected(deliveryId) {
       const res = await fetch(`/api/v1/visitors/deliveries/${deliveryId}/collect`, { method: 'PUT', credentials: 'include' });
-      if (res.ok) loadDeliveries((document.getElementById('delivery-date') as HTMLInputElement)?.value);
+      if (res.ok) loadDeliveries(document.getElementById('delivery-date')?.value);
       else alert('Failed to mark as collected.');
     }
 
-    (window as any).switchTab = switchTab;
-    (window as any).markCollected = markCollected;
+    window.switchTab = switchTab;
+    window.markCollected = markCollected;
 
     async function loadPreApprovals() {
       const container = document.getElementById('pre-approvals-list');
@@ -236,7 +236,7 @@ const isMember = user.role === 'member';
       }
       container.innerHTML = `
         <div class="space-y-3">
-          ${data.map((p: any) => `
+          ${data.map((p) => `
             <div class="flex items-center justify-between p-3 rounded-lg border border-border-light">
               <div>
                 <div class="font-medium text-sm text-text-primary">${p.visitor_name}</div>
@@ -253,12 +253,12 @@ const isMember = user.role === 'member';
       if (!container) return;
       const res = await fetch('/api/v1/visitors/logs', { credentials: 'include' });
       const logs = await res.json();
-      const active = logs.filter((l: any) => !l.exit_time);
+      const active = logs.filter((l) => !l.exit_time);
       if (!active.length) {
         container.innerHTML = '<p class="text-sm text-text-secondary text-center py-4">No active visitors.</p>';
         return;
       }
-      container.innerHTML = active.map((l: any) => `
+      container.innerHTML = active.map((l) => `
         <div class="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50">
           <div>
             <div class="font-medium text-sm text-text-primary">${l.visitor_name}</div>
@@ -292,7 +292,7 @@ const isMember = user.role === 'member';
             </tr>
           </thead>
           <tbody class="divide-y divide-border-light">
-            ${logs.map((l: any) => `
+            ${logs.map((l) => `
               <tr class="hover:bg-gray-50">
                 <td class="px-4 py-3 font-medium text-text-primary">${l.visitor_name}</td>
                 <td class="px-4 py-3 hidden md:table-cell text-text-secondary">${l.units?.unit_number ?? '—'}</td>
@@ -308,7 +308,7 @@ const isMember = user.role === 'member';
         </table>`;
     }
 
-    async function logExit(logId: string) {
+    async function logExit(logId) {
       const res = await fetch(`/api/v1/visitors/logs/${logId}/exit`, { method: 'PUT', credentials: 'include' });
       if (res.ok) loadAll();
       else alert('Failed to log exit.');
@@ -317,10 +317,10 @@ const isMember = user.role === 'member';
     // Entry form
     document.getElementById('entry-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = (document.getElementById('entry-visitor-name') as HTMLInputElement).value.trim();
-      const unitText = (document.getElementById('entry-unit') as HTMLInputElement).value.trim();
-      const entryType = (document.getElementById('entry-type') as HTMLSelectElement).value;
-      const vehicle = (document.getElementById('entry-vehicle') as HTMLInputElement).value.trim();
+      const name = document.getElementById('entry-visitor-name').value.trim();
+      const unitText = document.getElementById('entry-unit').value.trim();
+      const entryType = document.getElementById('entry-type').value;
+      const vehicle = document.getElementById('entry-vehicle').value.trim();
 
       if (!name || !unitText) return alert('Visitor name and host unit are required.');
 
@@ -335,9 +335,9 @@ const isMember = user.role === 'member';
       });
 
       if (res.ok) {
-        (document.getElementById('entry-visitor-name') as HTMLInputElement).value = '';
-        (document.getElementById('entry-unit') as HTMLInputElement).value = '';
-        (document.getElementById('entry-vehicle') as HTMLInputElement).value = '';
+        document.getElementById('entry-visitor-name').value = '';
+        document.getElementById('entry-unit').value = '';
+        document.getElementById('entry-vehicle').value = '';
         loadAll();
         alert('Entry logged successfully.');
       } else {
@@ -347,7 +347,7 @@ const isMember = user.role === 'member';
     });
 
     // Delivery date picker
-    const deliveryDateInput = document.getElementById('delivery-date') as HTMLInputElement;
+    const deliveryDateInput = document.getElementById('delivery-date');
     if (deliveryDateInput) {
       deliveryDateInput.value = new Date().toISOString().slice(0, 10);
       deliveryDateInput.addEventListener('change', () => loadDeliveries(deliveryDateInput.value));
@@ -356,9 +356,9 @@ const isMember = user.role === 'member';
     // Delivery form (guard only)
     document.getElementById('delivery-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const unitText = (document.getElementById('del-unit') as HTMLInputElement).value.trim();
-      const courier = (document.getElementById('del-courier') as HTMLInputElement).value.trim();
-      const tracking = (document.getElementById('del-tracking') as HTMLInputElement).value.trim();
+      const unitText = document.getElementById('del-unit').value.trim();
+      const courier = document.getElementById('del-courier').value.trim();
+      const tracking = document.getElementById('del-tracking').value.trim();
 
       const unitRes = await fetch(`/api/v1/visitors/lookup-unit?unit_number=${encodeURIComponent(unitText)}`, { credentials: 'include' });
       const unitData = unitRes.ok ? await unitRes.json() : null;
@@ -370,9 +370,9 @@ const isMember = user.role === 'member';
       });
 
       if (res.ok) {
-        (document.getElementById('del-unit') as HTMLInputElement).value = '';
-        (document.getElementById('del-courier') as HTMLInputElement).value = '';
-        (document.getElementById('del-tracking') as HTMLInputElement).value = '';
+        document.getElementById('del-unit').value = '';
+        document.getElementById('del-courier').value = '';
+        document.getElementById('del-tracking').value = '';
         loadDeliveries(deliveryDateInput?.value);
         alert('Delivery logged.');
       } else {
