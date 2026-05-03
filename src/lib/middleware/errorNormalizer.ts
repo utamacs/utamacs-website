@@ -9,6 +9,10 @@ export interface ProblemDetails {
 
 export function normalizeError(err: unknown, instance?: string): Response {
   const problem = toProblem(err, instance);
+  // Log every server error so Vercel function logs show the real cause
+  if (problem.status >= 500) {
+    console.error('[API 500]', instance, err instanceof Error ? err.message : err);
+  }
   return new Response(JSON.stringify(problem), {
     status: problem.status,
     headers: { 'Content-Type': 'application/problem+json' },
