@@ -33,22 +33,26 @@ const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: st
   { moduleKey: 'compliance',       displayName: 'Compliance & Audit',     icon: 'fa-shield-alt' },
 ];
 
-let modules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = [];
+const roleFilter = (m: { moduleKey: string }) => {
+  if (user.role === 'security_guard') return m.moduleKey === 'visitor_mgmt';
+  if (user.role === 'vendor') return m.moduleKey === 'vendors';
+  return true;
+};
+
+// Start with the hardcoded fallback so all built modules always appear.
+// Overlay with DB active modules: if DB has an entry for a key, use its display name/icon;
+// otherwise keep the fallback entry. This way missing or inactive DB seeds never hide modules.
+let modules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = FALLBACK_MODULES;
 try {
-  const allModules = await featureFlagService.getModules(SOCIETY_ID);
-  const source = allModules.length > 0 ? allModules : FALLBACK_MODULES;
-  modules = source.filter((m) => {
-    if (user.role === 'security_guard') return m.moduleKey === 'visitor_mgmt';
-    if (user.role === 'vendor') return m.moduleKey === 'vendors';
-    return true;
-  });
+  const dbModules = await featureFlagService.getModules(SOCIETY_ID);
+  if (dbModules.length > 0) {
+    const dbMap = new Map(dbModules.map((m) => [m.moduleKey, m]));
+    modules = FALLBACK_MODULES.map((f) => dbMap.get(f.moduleKey) ?? f);
+  }
 } catch {
-  modules = FALLBACK_MODULES.filter((m) => {
-    if (user.role === 'security_guard') return m.moduleKey === 'visitor_mgmt';
-    if (user.role === 'vendor') return m.moduleKey === 'vendors';
-    return true;
-  });
+  // keep FALLBACK_MODULES
 }
+modules = modules.filter(roleFilter);
 
 const MODULE_PATHS: Record<string, string> = {
   complaints: '/portal/complaints',
