@@ -643,6 +643,21 @@ const isAdmin = user.role === 'admin';
       } catch { errEl.textContent = 'Network error.'; errEl.classList.remove('hidden'); }
     }
 
+    // Expose functions referenced in onclick/onchange attributes
+    window.switchTab = switchTab;
+    window.openSessionModal = openSessionModal;
+    window.closeSessionModal = closeSessionModal;
+    window.openDocModal = openDocModal;
+    window.closeDocModal = closeDocModal;
+    window.openReviewModal = openReviewModal;
+    window.closeReviewModal = closeReviewModal;
+    window.filterDocsBySession = filterDocsBySession;
+    window.markHeld = markHeld;
+    window.submitDoc = submitDoc;
+    window.secondaryApprove = secondaryApprove;
+    window.showHistory = showHistory;
+    window.loadDocuments = loadDocuments;
+
     // Initialize
     loadSessions();
   </script>

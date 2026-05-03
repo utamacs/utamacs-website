@@ -56,7 +56,7 @@ export const POST: APIRoute = async ({ request }) => {
         ends_at,
         location: location ?? null,
         capacity: capacity ?? null,
-        is_published: false,
+        is_published: true,
         created_by: user.id,
       })
       .select()

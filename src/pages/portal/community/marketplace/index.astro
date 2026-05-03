@@ -63,7 +63,7 @@ const canList = !['security_guard', 'vendor'].includes(user.role);
   </div>
 
   <script define:vars={{ userId: user.id }}>
-    const CATEGORY_COLORS: Record<string, string> = {
+    const CATEGORY_COLORS = {
       Furniture: 'bg-amber-100 text-amber-700',
       Electronics: 'bg-blue-100 text-blue-700',
       Appliances: 'bg-purple-100 text-purple-700',
@@ -80,7 +80,7 @@ const canList = !['security_guard', 'vendor'].includes(user.role);
     let currentOffset = 0;
     let currentQ = '';
     const LIMIT = 12;
-    let debounceTimer: ReturnType<typeof setTimeout>;
+    let debounceTimer;
 
     async function loadListings(reset = false) {
       if (reset) { currentOffset = 0; }
@@ -91,18 +91,18 @@ const canList = !['security_guard', 'vendor'].includes(user.role);
       const res = await fetch(`/api/v1/community/marketplace?${params}`, { credentials: 'include' });
       const { listings, total } = res.ok ? await res.json() : { listings: [], total: 0 };
 
-      const grid = document.getElementById('listings-grid')!;
+      const grid = document.getElementById('listings-grid');
       if (reset) grid.innerHTML = '';
 
-      document.getElementById('result-count')!.textContent = total > 0 ? `${total} listing${total !== 1 ? 's' : ''} available` : '';
+      document.getElementById('result-count').textContent = total > 0 ? `${total} listing${total !== 1 ? 's' : ''} available` : '';
 
       if (!listings.length && currentOffset === 0) {
         grid.innerHTML = '<div class="col-span-full text-center py-12 text-text-secondary text-sm">No listings found.</div>';
-        document.getElementById('load-more-btn')!.classList.add('hidden');
+        document.getElementById('load-more-btn').classList.add('hidden');
         return;
       }
 
-      listings.forEach((l: any) => {
+      listings.forEach((l) => {
         const card = document.createElement('a');
         card.href = `/portal/community/marketplace/${l.id}`;
         card.className = 'bg-white rounded-xl border border-border-light p-4 hover:shadow-soft transition-shadow flex flex-col';
@@ -124,11 +124,11 @@ const canList = !['security_guard', 'vendor'].includes(user.role);
       });
 
       currentOffset += listings.length;
-      document.getElementById('load-more-btn')!.classList.toggle('hidden', currentOffset >= total);
+      document.getElementById('load-more-btn').classList.toggle('hidden', currentOffset >= total);
     }
 
-    document.getElementById('cat-filters')!.addEventListener('click', (e) => {
-      const btn = (e.target as Element).closest('.filter-btn') as HTMLElement;
+    document.getElementById('cat-filters').addEventListener('click', (e) => {
+      const btn = e.target.closest('.filter-btn');
       if (!btn) return;
       document.querySelectorAll('.filter-btn').forEach(b => {
         b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
@@ -140,15 +140,15 @@ const canList = !['security_guard', 'vendor'].includes(user.role);
       loadListings(true);
     });
 
-    document.getElementById('search-input')!.addEventListener('input', (e) => {
+    document.getElementById('search-input').addEventListener('input', (e) => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        currentQ = (e.target as HTMLInputElement).value.trim();
+        currentQ = e.target.value.trim();
         loadListings(true);
       }, 350);
     });
 
-    document.getElementById('load-more-btn')!.addEventListener('click', () => loadListings(false));
+    document.getElementById('load-more-btn').addEventListener('click', () => loadListings(false));
 
     loadListings(true);
   </script>

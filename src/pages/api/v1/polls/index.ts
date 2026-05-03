@@ -56,7 +56,7 @@ export const POST: APIRoute = async ({ request }) => {
         one_vote_per_unit: one_vote_per_unit ?? false,
         starts_at: starts_at ?? new Date().toISOString(),
         ends_at: ends_at ?? null,
-        is_published: false,
+        is_published: true,
         result_visibility: 'after_close',
         created_by: user.id,
       })

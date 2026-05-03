@@ -27,7 +27,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     let query = sb
       .from('audit_logs')
-      .select('id, action, resource_type, resource_id, user_id, new_values, old_values, created_at, profiles(full_name)', { count: 'exact' })
+      .select('id, action, resource_type, resource_id, user_id, new_values, old_values, created_at', { count: 'exact' })
       .eq('society_id', SOCIETY_ID)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);

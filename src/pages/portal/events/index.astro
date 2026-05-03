@@ -141,8 +141,8 @@ if (!user) return Astro.redirect('/portal/login');
       if (res.ok || res.status === 204) loadEvents();
     }
 
-    (window as any).rsvp = rsvp;
-    (window as any).cancelRsvp = cancelRsvp;
+    window.rsvp = rsvp;
+    window.cancelRsvp = cancelRsvp;
     loadEvents();
   </script>
 </PortalLayout>
