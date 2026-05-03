@@ -90,7 +90,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
   </div>
 
   <script define:vars={{ isExec }}>
-    const STATUS_STYLES: Record<string, { badge: string; border: string }> = {
+    const STATUS_STYLES = {
       pending:        { badge: 'bg-yellow-100 text-yellow-700', border: 'border-yellow-300' },
       overdue:        { badge: 'bg-red-100 text-red-700',       border: 'border-red-400' },
       paid:           { badge: 'bg-green-100 text-green-700',   border: 'border-green-300' },
@@ -108,7 +108,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
           container.innerHTML = '<div class="bg-white rounded-xl border border-border-light p-12 text-center"><i class="fas fa-check-circle text-4xl text-green-500 mb-3 block"></i><p class="text-text-secondary">No dues found.</p></div>';
           return;
         }
-        container.innerHTML = dues.map((d: any) => {
+        container.innerHTML = dues.map((d) => {
           const style = STATUS_STYLES[d.status] ?? { badge: 'bg-gray-100 text-gray-600', border: 'border-gray-300' };
           return `
             <div class="bg-white rounded-xl border-l-4 border ${style.border} p-5">
@@ -161,7 +161,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
       }
     }
 
-    async function handlePay(duesId: string, amount: number) {
+    async function handlePay(duesId, amount) {
       const mode = prompt('Payment mode (cash/upi/cheque/neft/rtgs/online):') ?? '';
       if (!mode.trim()) return;
       const ref = prompt('Transaction reference (optional):') ?? undefined;
@@ -179,8 +179,8 @@ const isExec = ['executive', 'admin'].includes(user.role);
       const openBtn = document.getElementById('create-period-btn');
       const closeBtn = document.getElementById('close-modal-btn');
       const cancelBtn = document.getElementById('cancel-modal-btn');
-      const form = document.getElementById('period-form') as HTMLFormElement;
-      const errEl = document.getElementById('period-error')!;
+      const form = document.getElementById('period-form');
+      const errEl = document.getElementById('period-error');
 
       openBtn?.addEventListener('click', () => modal?.classList.remove('hidden'));
       closeBtn?.addEventListener('click', () => modal?.classList.add('hidden'));
@@ -189,7 +189,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
       form?.addEventListener('submit', async (e) => {
         e.preventDefault();
         errEl.classList.add('hidden');
-        const btn = document.getElementById('period-submit-btn') as HTMLButtonElement;
+        const btn = document.getElementById('period-submit-btn');
         btn.disabled = true;
         btn.textContent = 'Creating…';
 
@@ -204,9 +204,9 @@ const isExec = ['executive', 'admin'].includes(user.role);
             start_date: fd.get('start_date'),
             end_date: fd.get('end_date'),
             due_date: fd.get('due_date'),
-            base_amount: parseFloat(fd.get('base_amount') as string),
-            gst_rate: gstRate ? parseFloat(gstRate as string) : 0,
-            penalty_amount: penalty ? parseFloat(penalty as string) : 0,
+            base_amount: parseFloat(fd.get('base_amount')),
+            gst_rate: gstRate ? parseFloat(gstRate) : 0,
+            penalty_amount: penalty ? parseFloat(penalty) : 0,
           }),
         });
 
@@ -226,7 +226,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
       });
     }
 
-    async function generateGstInvoice(paymentId: string) {
+    async function generateGstInvoice(paymentId) {
       try {
         const res = await fetch('/api/v1/finance/invoices/generate', {
           method: 'POST', credentials: 'include',
@@ -241,8 +241,8 @@ const isExec = ['executive', 'admin'].includes(user.role);
       } catch { alert('Network error generating invoice.'); }
     }
 
-    (window as any).handlePay = handlePay;
-    (window as any).generateGstInvoice = generateGstInvoice;
+    window.handlePay = handlePay;
+    window.generateGstInvoice = generateGstInvoice;
     loadDues();
   </script>
 </PortalLayout>

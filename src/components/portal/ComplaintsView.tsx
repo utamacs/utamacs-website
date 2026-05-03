@@ -41,12 +41,17 @@ export default function ComplaintsView({ role, userId }: Props) {
 
   const fetchComplaints = async () => {
     setLoading(true);
-    const params = new URLSearchParams({ limit: '20' });
-    if (statusFilter) params.set('status', statusFilter);
-    const res = await fetch(`/api/v1/complaints?${params}`, { credentials: 'include' });
-    const data = await res.json();
-    setComplaints(data.data ?? []);
-    setTotal(data.total ?? 0);
+    try {
+      const params = new URLSearchParams({ limit: '20' });
+      if (statusFilter) params.set('status', statusFilter);
+      const res = await fetch(`/api/v1/complaints?${params}`, { credentials: 'include' });
+      if (!res.ok) { setLoading(false); return; }
+      const data = await res.json();
+      setComplaints(data.data ?? []);
+      setTotal(data.total ?? 0);
+    } catch {
+      // network error or non-JSON response — stay at empty state
+    }
     setLoading(false);
   };
 

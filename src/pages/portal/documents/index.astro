@@ -85,7 +85,7 @@ const canUpload = ['executive', 'admin'].includes(user.role);
   )}
 
   <script define:vars={{ canUpload }}>
-    const MIME_ICONS: Record<string, string> = {
+    const MIME_ICONS = {
       'application/pdf': 'fa-file-pdf text-red-500',
       'application/msword': 'fa-file-word text-blue-500',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'fa-file-word text-blue-500',
@@ -95,7 +95,7 @@ const canUpload = ['executive', 'admin'].includes(user.role);
       'image/png': 'fa-file-image text-purple-500',
     };
 
-    function formatSize(bytes: number): string {
+    function formatSize(bytes) {
       if (!bytes) return '';
       if (bytes < 1024) return `${bytes} B`;
       if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -118,8 +118,8 @@ const canUpload = ['executive', 'admin'].includes(user.role);
       }
 
       // Group by category
-      const grouped: Record<string, any[]> = {};
-      docs.forEach((d: any) => {
+      const grouped = {};
+      docs.forEach((d) => {
         if (!grouped[d.category]) grouped[d.category] = [];
         grouped[d.category].push(d);
       });
@@ -128,7 +128,7 @@ const canUpload = ['executive', 'admin'].includes(user.role);
         <div class="mb-6">
           <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">${cat}</h2>
           <div class="bg-white rounded-xl border border-border-light overflow-hidden">
-            ${items.map((d: any) => {
+            ${items.map((d) => {
               const icon = MIME_ICONS[d.mime_type] ?? 'fa-file text-gray-400';
               return `
                 <div class="flex items-center gap-4 px-5 py-4 border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors">
@@ -155,7 +155,7 @@ const canUpload = ['executive', 'admin'].includes(user.role);
     }
 
     document.getElementById('category-filters')?.addEventListener('click', (e) => {
-      const btn = (e.target as Element).closest('.filter-btn') as HTMLElement;
+      const btn = e.target.closest('.filter-btn');
       if (!btn) return;
       document.querySelectorAll('.filter-btn').forEach(b => {
         b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
@@ -175,7 +175,7 @@ const canUpload = ['executive', 'admin'].includes(user.role);
 
       document.getElementById('upload-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const form = e.target as HTMLFormElement;
+        const form = e.target;
         const fd = new FormData(form);
         const errEl = document.getElementById('upload-error');
         errEl?.classList.add('hidden');

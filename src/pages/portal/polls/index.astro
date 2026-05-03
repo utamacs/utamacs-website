@@ -38,7 +38,7 @@ if (!user) return Astro.redirect('/portal/login');
           container.innerHTML = '<p class="text-center text-text-secondary py-12">No active polls at this time.</p>';
           return;
         }
-        container.innerHTML = polls.map((p: any) => {
+        container.innerHTML = polls.map((p) => {
           const isOpen = !p.ends_at || new Date(p.ends_at) > new Date();
           const options = p.poll_options ?? [];
           return `
@@ -54,7 +54,7 @@ if (!user) return Astro.redirect('/portal/login');
               </div>
               ${p.ends_at ? `<p class="text-xs text-text-secondary mb-4">Closes: ${new Date(p.ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>` : ''}
               <div class="space-y-2" id="poll-options-${p.id}">
-                ${options.sort((a: any, b: any) => a.order_index - b.order_index).map((opt: any) => `
+                ${options.sort((a, b) => a.order_index - b.order_index).map((opt) => `
                   <button
                     onclick="castVote('${p.id}', '${opt.id}')"
                     class="w-full text-left px-4 py-3 rounded-lg border border-border-light hover:border-primary-600 hover:bg-primary-50 transition-colors text-sm font-medium text-text-primary"
@@ -72,7 +72,7 @@ if (!user) return Astro.redirect('/portal/login');
       }
     }
 
-    async function castVote(pollId: string, optionId: string) {
+    async function castVote(pollId, optionId) {
       const res = await fetch(`/api/v1/polls/${pollId}/vote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -83,7 +83,7 @@ if (!user) return Astro.redirect('/portal/login');
       if (res.ok) {
         alert('Your vote has been recorded. Thank you!');
         document.querySelectorAll(`#poll-options-${pollId} button`).forEach((btn) => {
-          (btn as HTMLButtonElement).disabled = true;
+          btn.disabled = true;
           btn.classList.add('opacity-60', 'cursor-not-allowed');
         });
       } else {
@@ -91,7 +91,7 @@ if (!user) return Astro.redirect('/portal/login');
       }
     }
 
-    (window as any).castVote = castVote;
+    window.castVote = castVote;
     loadPolls();
   </script>
 </PortalLayout>

@@ -130,12 +130,12 @@ const selected = facilities?.find((f: {id: string}) => f.id === facilityId) ?? f
   </div>
 
   <script define:vars={{ facilities: facilities ?? [] }}>
-    const facilityMap = Object.fromEntries((facilities as any[]).map((f: any) => [f.id, f]));
+    const facilityMap = Object.fromEntries(facilities.map((f) => [f.id, f]));
 
-    function updateFacilityInfo(id: string) {
+    function updateFacilityInfo(id) {
       const f = facilityMap[id];
       if (!f) return;
-      const panel = document.getElementById('facility-info')!;
+      const panel = document.getElementById('facility-info');
       panel.innerHTML = `
         <h2 class="font-semibold text-text-primary mb-3">${f.name}</h2>
         ${f.description ? `<p class="text-sm text-text-secondary mb-4">${f.description}</p>` : ''}
@@ -150,18 +150,18 @@ const selected = facilities?.find((f: {id: string}) => f.id === facilityId) ?? f
 
     window.updateFacilityInfo = updateFacilityInfo;
 
-    const form = document.getElementById('booking-form') as HTMLFormElement;
-    const errorBanner = document.getElementById('error-banner')!;
-    const btnText = document.getElementById('btn-text')!;
-    const btnSpinner = document.getElementById('btn-spinner')!;
-    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+    const form = document.getElementById('booking-form');
+    const errorBanner = document.getElementById('error-banner');
+    const btnText = document.getElementById('btn-text');
+    const btnSpinner = document.getElementById('btn-spinner');
+    const submitBtn = document.getElementById('submit-btn');
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      const date = fd.get('booking_date') as string;
-      const start = fd.get('start_time') as string;
-      const end = fd.get('end_time') as string;
+      const date = fd.get('booking_date');
+      const start = fd.get('start_time');
+      const end = fd.get('end_time');
 
       if (start >= end) {
         errorBanner.textContent = 'End time must be after start time.';
