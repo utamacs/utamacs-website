@@ -27,7 +27,7 @@ function toProblem(err: unknown, instance?: string): ProblemDetails {
       type: `https://utamacs.org/errors/${code.toLowerCase()}`,
       title: httpTitle(status),
       status,
-      detail: status < 500 ? err.message : 'An internal error occurred',
+      detail: err.message,  // TODO: revert to `status < 500 ? err.message : 'An internal error occurred'` after diagnosis
       ...(instance ? { instance } : {}),
     };
   }
