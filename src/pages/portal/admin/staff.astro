@@ -81,18 +81,18 @@ const today = new Date().toISOString().split('T')[0];
   </div>
 
   <script define:vars={{ today }}>
-    async function loadAttendance(date: string) {
+    async function loadAttendance(date) {
       const res = await fetch(`/api/v1/admin/staff-attendance?date=${date}`, { credentials: 'include' });
       const records = res.ok ? await res.json() : [];
 
       // Active (no check_out) shown in active panel only for today
       if (date === today) {
-        const active = records.filter((r: any) => !r.check_out);
-        const activeContainer = document.getElementById('active-staff-list')!;
+        const active = records.filter((r) => !r.check_out);
+        const activeContainer = document.getElementById('active-staff-list');
         if (!active.length) {
           activeContainer.innerHTML = '<div class="text-sm text-text-secondary text-center py-4">No staff currently on premises.</div>';
         } else {
-          activeContainer.innerHTML = active.map((r: any) => `
+          activeContainer.innerHTML = active.map((r) => `
             <div class="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50">
               <div>
                 <div class="font-medium text-sm text-text-primary">${r.staff_name}</div>
@@ -107,7 +107,7 @@ const today = new Date().toISOString().split('T')[0];
       }
 
       // Full log table
-      const logContainer = document.getElementById('attendance-log')!;
+      const logContainer = document.getElementById('attendance-log');
       if (!records.length) {
         logContainer.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm">No attendance records for this date.</div>';
         return;
@@ -125,7 +125,7 @@ const today = new Date().toISOString().split('T')[0];
             </tr>
           </thead>
           <tbody class="divide-y divide-border-light">
-            ${records.map((r: any) => {
+            ${records.map((r) => {
               let hours = '—';
               if (r.check_out) {
                 const diff = (new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / 3600000;
@@ -147,7 +147,7 @@ const today = new Date().toISOString().split('T')[0];
         </table>`;
     }
 
-    async function checkOut(id: string) {
+    async function checkOut(id) {
       const res = await fetch('/api/v1/admin/staff-attendance', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ check_out_id: id }),
@@ -158,8 +158,8 @@ const today = new Date().toISOString().split('T')[0];
 
     document.getElementById('checkin-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const fd = new FormData(e.target as HTMLFormElement);
-      const errEl = document.getElementById('checkin-error')!;
+      const fd = new FormData(e.target);
+      const errEl = document.getElementById('checkin-error');
       errEl.classList.add('hidden');
 
       const res = await fetch('/api/v1/admin/staff-attendance', {
@@ -168,7 +168,7 @@ const today = new Date().toISOString().split('T')[0];
       });
 
       if (res.ok) {
-        (e.target as HTMLFormElement).reset();
+        e.target.reset();
         loadAttendance(today);
       } else {
         const d = await res.json();
@@ -178,10 +178,10 @@ const today = new Date().toISOString().split('T')[0];
     });
 
     document.getElementById('date-picker')?.addEventListener('change', (e) => {
-      loadAttendance((e.target as HTMLInputElement).value);
+      loadAttendance(e.target.value);
     });
 
-    (window as any).checkOut = checkOut;
+    window.checkOut = checkOut;
     loadAttendance(today);
   </script>
 </PortalLayout>

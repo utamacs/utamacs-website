@@ -96,7 +96,7 @@ const CURRENT_VERSION = parseInt(import.meta.env.PRIVACY_POLICY_VERSION ?? '1');
   </div>
 
   <script define:vars={{ currentVersion: CURRENT_VERSION }}>
-    let allMembers: any[] = [];
+    let allMembers = [];
 
     async function loadConsentData() {
       try {
@@ -143,7 +143,7 @@ const CURRENT_VERSION = parseInt(import.meta.env.PRIVACY_POLICY_VERSION ?? '1');
     function renderTable() {
       const container = document.getElementById('consent-table-container');
       if (!container) return;
-      const filter = (document.getElementById('consent-filter') as HTMLSelectElement)?.value ?? 'all';
+      const filter = document.getElementById('consent-filter')?.value ?? 'all';
 
       let filtered = allMembers;
       if (filter === 'current') filtered = allMembers.filter(m => m.consent_version >= currentVersion);
@@ -191,7 +191,7 @@ const CURRENT_VERSION = parseInt(import.meta.env.PRIVACY_POLICY_VERSION ?? '1');
         </table>`;
     }
 
-    async function sendReminder(userId: string, name: string, email: string) {
+    async function sendReminder(userId, name, email) {
       if (!confirm(`Send a consent reminder notification to ${name}?`)) return;
       try {
         const res = await fetch('/api/v1/notifications', {
