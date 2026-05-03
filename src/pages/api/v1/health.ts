@@ -26,11 +26,9 @@ export const GET: APIRoute = async ({ request }) => {
   };
   const missing = Object.entries(vars).filter(([, ok]) => !ok).map(([k]) => k);
 
-  // Cookie check — does the caller have an auth cookie?
   const cookieHeader = request.headers.get('Cookie') ?? '';
   const hasAccessToken = /sb-access-token=/.test(cookieHeader);
 
-  // Try validateJWT if caller sends a cookie
   let authProbe = 'no cookie sent — cannot test';
   if (hasAccessToken) {
     try {
@@ -42,27 +40,26 @@ export const GET: APIRoute = async ({ request }) => {
     }
   }
 
-  // Probe each failing table
   let tableProbes: Awaited<ReturnType<typeof probe>>[] = [];
   if (vars.PUBLIC_SUPABASE_URL && vars.SUPABASE_SERVICE_ROLE_KEY) {
     const { getSupabaseServiceClient } = await import('@lib/services/providers/supabase/SupabaseDB');
     const sb = getSupabaseServiceClient();
 
     tableProbes = await Promise.all([
-      probe('societies',       async () => { const { error } = await sb.from('societies').select('id').eq('id', SOCIETY_ID).single(); if (error) throw new Error(error.message); }),
-      probe('complaints',      async () => { const { error } = await sb.from('complaints').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('notices',         async () => { const { error } = await sb.from('notices').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('events',          async () => { const { error } = await sb.from('events').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('polls',           async () => { const { error } = await sb.from('polls').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('facilities',      async () => { const { error } = await sb.from('facilities').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('vendors',         async () => { const { error } = await sb.from('vendors').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('community_posts', async () => { const { error } = await sb.from('community_posts').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('documents',       async () => { const { error } = await sb.from('documents').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('audit_logs',      async () => { const { error } = await sb.from('audit_logs').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('agm_sessions',    async () => { const { error } = await sb.from('agm_sessions').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('assets',          async () => { const { error } = await sb.from('assets').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('profiles',        async () => { const { error } = await sb.from('profiles').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
-      probe('user_roles',      async () => { const { error } = await sb.from('user_roles').select('user_id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('societies',             async () => { const { error } = await sb.from('societies').select('id').eq('id', SOCIETY_ID).single(); if (error) throw new Error(error.message); }),
+      probe('complaints',            async () => { const { error } = await sb.from('complaints').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('notices',               async () => { const { error } = await sb.from('notices').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('events',                async () => { const { error } = await sb.from('events').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('polls',                 async () => { const { error } = await sb.from('polls').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('facilities',            async () => { const { error } = await sb.from('facilities').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('vendors',               async () => { const { error } = await sb.from('vendors').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('community_posts',       async () => { const { error } = await sb.from('community_posts').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('documents',             async () => { const { error } = await sb.from('documents').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('audit_logs',            async () => { const { error } = await sb.from('audit_logs').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('agm_sessions',          async () => { const { error } = await sb.from('agm_sessions').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('infrastructure_assets', async () => { const { error } = await sb.from('infrastructure_assets').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('profiles',              async () => { const { error } = await sb.from('profiles').select('id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
+      probe('user_roles',            async () => { const { error } = await sb.from('user_roles').select('user_id').eq('society_id', SOCIETY_ID).limit(1); if (error) throw new Error(error.message); }),
     ]);
   }
 
