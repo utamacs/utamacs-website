@@ -1,0 +1,102 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal/letters');
+---
+
+<PortalLayout title="Letterhead Templates" user={user} activeModule="letters">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/letters" class="hover:text-primary-600">Letters</a>
+        <span class="mx-2">›</span>
+        <span class="text-text-primary">Letterhead Templates</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-text-primary">Letterhead Templates</h1>
+      <p class="text-sm text-text-secondary mt-1">Configure reusable letterhead designs for official correspondence.</p>
+    </div>
+    <a href="/portal/letters/templates/new" class="btn-primary text-sm flex items-center gap-2">
+      <i class="fas fa-plus" aria-hidden="true"></i>
+      New Template
+    </a>
+  </div>
+
+  <div id="templates-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="col-span-full flex items-center justify-center h-32 text-text-secondary">
+      <i class="fas fa-spinner fa-spin mr-2"></i> Loading…
+    </div>
+  </div>
+
+  <script>
+    async function load() {
+      const container = document.getElementById('templates-list');
+      if (!container) return;
+      const res = await fetch('/api/v1/letters/templates', { credentials: 'include' });
+      const templates = res.ok ? await res.json() : [];
+
+      if (!templates.length) {
+        container.innerHTML = `
+          <div class="col-span-full text-center py-16">
+            <div class="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-file-alt text-primary-600 text-2xl"></i>
+            </div>
+            <h3 class="font-semibold text-text-primary mb-2">No templates yet</h3>
+            <p class="text-sm text-text-secondary mb-4">Create your first letterhead template to start generating official letters.</p>
+            <a href="/portal/letters/templates/new" class="btn-primary text-sm">Create Template</a>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = templates.map((t) => `
+        <div class="bg-white rounded-xl border border-border-light p-5 flex flex-col gap-3 hover:shadow-soft transition-shadow">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-9 h-9 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-file-alt text-primary-600"></i>
+              </div>
+              <div class="min-w-0">
+                <h3 class="font-semibold text-text-primary truncate">${t.name}</h3>
+                <p class="text-xs text-text-secondary">Updated ${new Date(t.updated_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}</p>
+              </div>
+            </div>
+            ${t.is_default ? '<span class="flex-shrink-0 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">Default</span>' : ''}
+          </div>
+          <div class="text-xs text-text-secondary space-y-1">
+            <div class="flex items-center gap-2"><i class="fas fa-chevron-right w-3"></i>${t.subsequent_page_header}</div>
+            <div class="flex items-center gap-2"><i class="fas fa-quote-left w-3"></i>${t.closing_line1} / ${t.closing_line2}</div>
+          </div>
+          <div class="flex items-center gap-2 pt-2 border-t border-border-light">
+            <a href="/portal/letters/templates/${t.id}" class="btn-outline text-xs flex-1 text-center py-1.5">
+              <i class="fas fa-edit mr-1"></i> Edit
+            </a>
+            <a href="/portal/letters/new?template=${t.id}" class="btn-primary text-xs flex-1 text-center py-1.5">
+              <i class="fas fa-pen mr-1"></i> Use
+            </a>
+            ${!t.is_default ? `
+            <button onclick="deleteTemplate('${t.id}', '${t.name}')"
+              class="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+              <i class="fas fa-trash text-xs"></i>
+            </button>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function deleteTemplate(id, name) {
+      if (!confirm(`Delete template "${name}"? This cannot be undone.`)) return;
+      const res = await fetch(`/api/v1/letters/templates/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok || res.status === 204) {
+        load();
+      } else {
+        const d = await res.json();
+        alert(d.error ?? 'Failed to delete template');
+      }
+    }
+
+    window.deleteTemplate = deleteTemplate;
+    load();
+  </script>
+</PortalLayout>

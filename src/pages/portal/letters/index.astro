@@ -1,0 +1,219 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal');
+---
+
+<PortalLayout title="Letters" user={user} activeModule="letters">
+  <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Letter Archive</h1>
+      <p class="text-sm text-text-secondary mt-1">Official correspondence generated using the letterhead system.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/portal/letters/templates" class="btn-outline text-sm flex items-center gap-2">
+        <i class="fas fa-cog" aria-hidden="true"></i>
+        Manage Templates
+      </a>
+      <a href="/portal/letters/new" class="btn-primary text-sm flex items-center gap-2">
+        <i class="fas fa-pen" aria-hidden="true"></i>
+        Write Letter
+      </a>
+    </div>
+  </div>
+
+  <!-- Search & filter bar -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <div class="relative flex-1 max-w-sm">
+      <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
+      <input type="search" id="search-input" placeholder="Search by title or subject…"
+        class="w-full pl-10 pr-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div id="result-count" class="text-xs text-text-secondary mb-4"></div>
+
+  <!-- Letters list -->
+  <div id="letters-list" class="space-y-3">
+    <div class="flex items-center justify-center h-32 text-text-secondary text-sm">
+      <i class="fas fa-spinner fa-spin mr-2"></i> Loading…
+    </div>
+  </div>
+
+  <div class="mt-6 text-center">
+    <button id="load-more-btn" class="hidden btn-outline text-sm">Load more</button>
+  </div>
+
+  <!-- Delete confirmation modal -->
+  <div id="delete-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-large max-w-sm w-full p-6">
+      <h3 class="font-semibold text-text-primary mb-2">Delete letter?</h3>
+      <p class="text-sm text-text-secondary mb-1">This will permanently delete both files from GitHub and remove the record.</p>
+      <p id="delete-modal-title" class="text-sm font-medium text-text-primary mb-5"></p>
+      <div class="flex gap-2 justify-end">
+        <button onclick="closeDeleteModal()" class="btn-outline text-sm">Cancel</button>
+        <button id="delete-confirm-btn" class="btn-primary text-sm bg-red-600 hover:bg-red-700 border-red-600">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden fixed bottom-6 right-6 px-4 py-2.5 rounded-lg shadow-large text-sm z-50 text-white"></div>
+
+  <script define:vars={{ isAdmin: user.role === 'admin' }}>
+    let currentOffset = 0;
+    let currentQ = '';
+    const LIMIT = 20;
+    let debounceTimer;
+    let pendingDeleteId = null;
+
+    async function loadLetters(reset) {
+      if (reset) currentOffset = 0;
+      const params = new URLSearchParams({ limit: String(LIMIT), offset: String(currentOffset) });
+      if (currentQ) params.set('q', currentQ);
+
+      const res = await fetch(`/api/v1/letters?${params}`, { credentials: 'include' });
+      const { letters, total } = res.ok ? await res.json() : { letters: [], total: 0 };
+
+      const container = document.getElementById('letters-list');
+      if (reset) container.innerHTML = '';
+
+      document.getElementById('result-count').textContent =
+        total > 0 ? `${total} letter${total !== 1 ? 's' : ''} in archive` : '';
+
+      if (!letters.length && currentOffset === 0) {
+        container.innerHTML = `
+          <div class="text-center py-16">
+            <div class="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-envelope-open-text text-primary-600 text-2xl"></i>
+            </div>
+            <h3 class="font-semibold text-text-primary mb-2">No letters yet</h3>
+            <p class="text-sm text-text-secondary mb-4">Generated letters will appear here after you write and save them.</p>
+            <a href="/portal/letters/new" class="btn-primary text-sm">Write First Letter</a>
+          </div>`;
+        document.getElementById('load-more-btn').classList.add('hidden');
+        return;
+      }
+
+      letters.forEach(l => {
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-xl border border-border-light p-4 flex items-start justify-between gap-4 hover:shadow-soft transition-shadow';
+        const createdDate = new Date(l.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+        const createdTime = new Date(l.created_at).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+        const templateName = l.letterhead_templates?.name ?? '—';
+
+        card.innerHTML = `
+          <div class="flex items-start gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <i class="fas fa-file-alt text-primary-600"></i>
+            </div>
+            <div class="min-w-0">
+              <h3 class="font-semibold text-text-primary truncate">${l.title}</h3>
+              ${l.subject ? `<p class="text-xs text-text-secondary mt-0.5 truncate">Subject: ${l.subject}</p>` : ''}
+              ${l.recipient ? `<p class="text-xs text-text-secondary truncate">To: ${l.recipient.split('\n')[0]}</p>` : ''}
+              <div class="flex items-center gap-3 mt-2">
+                <span class="text-xs text-text-secondary">
+                  <i class="fas fa-file-alt mr-0.5"></i> ${templateName}
+                </span>
+                <span class="text-xs text-text-secondary">
+                  <i class="fas fa-clock mr-0.5"></i> ${createdDate}, ${createdTime}
+                </span>
+                ${l.signatures_used?.length ? `<span class="text-xs text-text-secondary"><i class="fas fa-signature mr-0.5"></i> ${l.signatures_used.join(', ')}</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            ${l.git_path_pdf ? `<a href="/portal/letters/${l.id}?download=pdf" title="Download PDF"
+              class="p-2 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors text-sm">
+              <i class="fas fa-file-pdf"></i></a>` : ''}
+            ${l.git_path_docx ? `<a href="/portal/letters/${l.id}?download=docx" title="Download DOCX"
+              class="p-2 rounded-lg text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors text-sm">
+              <i class="fas fa-file-word"></i></a>` : ''}
+            ${isAdmin ? `<button onclick="openDeleteModal('${l.id}', '${l.title.replace(/'/g,'\\\'')}')"
+              title="Delete" class="p-2 rounded-lg text-text-secondary hover:text-red-600 hover:bg-red-50 transition-colors text-sm">
+              <i class="fas fa-trash"></i></button>` : ''}
+          </div>`;
+        container.appendChild(card);
+      });
+
+      currentOffset += letters.length;
+      document.getElementById('load-more-btn').classList.toggle('hidden', currentOffset >= total);
+    }
+
+    // Download via redirect through letter detail API
+    document.addEventListener('click', async (e) => {
+      const a = e.target.closest('a[href*="?download="]');
+      if (!a) return;
+      e.preventDefault();
+      const url = new URL(a.href);
+      const format = url.searchParams.get('download');
+      const id = url.pathname.split('/').pop();
+      const res = await fetch(`/api/v1/letters/${id}`, { credentials: 'include' });
+      if (!res.ok) { showToast('Failed to get download URL', true); return; }
+      const letter = await res.json();
+      const downloadUrl = format === 'pdf' ? letter.download_pdf : letter.download_docx;
+      if (downloadUrl) {
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = '';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        showToast('File not available', true);
+      }
+    });
+
+    function openDeleteModal(id, title) {
+      pendingDeleteId = id;
+      document.getElementById('delete-modal-title').textContent = `"${title}"`;
+      document.getElementById('delete-modal').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+      pendingDeleteId = null;
+      document.getElementById('delete-modal').classList.add('hidden');
+    }
+
+    document.getElementById('delete-confirm-btn').addEventListener('click', async () => {
+      if (!pendingDeleteId) return;
+      const btn = document.getElementById('delete-confirm-btn');
+      btn.disabled = true; btn.textContent = 'Deleting…';
+      const res = await fetch(`/api/v1/letters/${pendingDeleteId}`, { method: 'DELETE', credentials: 'include' });
+      btn.disabled = false; btn.textContent = 'Delete';
+      closeDeleteModal();
+      if (res.ok || res.status === 204) {
+        showToast('Letter deleted', false);
+        loadLetters(true);
+      } else {
+        const d = await res.json();
+        showToast(d.error ?? 'Delete failed', true);
+      }
+    });
+
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        currentQ = e.target.value.trim();
+        loadLetters(true);
+      }, 350);
+    });
+
+    document.getElementById('load-more-btn').addEventListener('click', () => loadLetters(false));
+
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = `fixed bottom-6 right-6 px-4 py-2.5 rounded-lg shadow-large text-sm z-50 text-white ${isError ? 'bg-red-600' : 'bg-green-600'}`;
+      setTimeout(() => t.classList.add('hidden'), 3500);
+    }
+
+    window.openDeleteModal = openDeleteModal;
+    window.closeDeleteModal = closeDeleteModal;
+    loadLetters(true);
+  </script>
+</PortalLayout>
