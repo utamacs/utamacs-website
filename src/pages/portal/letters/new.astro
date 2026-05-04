@@ -12,7 +12,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 <PortalLayout title="Generate Letter" user={user} activeModule="letters">
 
   <!-- Carlito font for live preview -->
-  <style>
+  <style is:global>
     @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-Regular.ttf') format('truetype'); font-weight:400; }
     @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-Bold.ttf') format('truetype'); font-weight:700; }
     @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-Italic.ttf') format('truetype'); font-style:italic; }
@@ -441,9 +441,9 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
             <div class="lh-soc-tag">${esc(t.society_tagline ?? 'COMMUNITY • CARE • MAINTENANCE')}</div>
             <div class="lh-reg-row">
               <span class="reg-line"></span>
-              <span style="font-size:7pt;">◆</span>
+              <span style="font-size:9pt; line-height:1; margin:0 2px;">→</span>
               <span class="reg-text">Reg No: ${esc(t.society_reg_no ?? 'TG/RRD/MACS/2026-15/FOW & M')}</span>
-              <span style="font-size:7pt;">◆</span>
+              <span style="font-size:9pt; line-height:1; margin:0 2px;">←</span>
               <span class="reg-line"></span>
             </div>
           </div>
@@ -562,9 +562,9 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
                     {
                       columns: [
                         { canvas: [{ type: 'line', x1: 0, y1: 4, x2: 25, y2: 4, lineWidth: 0.75, lineColor: GOLD }], width: 29 },
-                        { text: '◆', fontSize: 7, color: GOLD, width: 8, margin: [0, 1, 0, 0] },
+                        { text: '→', fontSize: 8, color: GOLD, width: 9, margin: [0, 0, 0, 0] },
                         { text: `Reg No: ${t.society_reg_no ?? 'TG/RRD/MACS/2026-15/FOW & M'}`, fontSize: 7.5, color: GOLD, alignment: 'center', width: '*' },
-                        { text: '◆', fontSize: 7, color: GOLD, width: 8, margin: [0, 1, 0, 0] },
+                        { text: '←', fontSize: 8, color: GOLD, width: 9, margin: [0, 0, 0, 0] },
                         { canvas: [{ type: 'line', x1: 0, y1: 4, x2: 25, y2: 4, lineWidth: 0.75, lineColor: GOLD }], width: 29 },
                       ],
                       columnGap: 2,

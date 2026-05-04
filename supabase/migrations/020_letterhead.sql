@@ -198,11 +198,11 @@ BEGIN
   RETURNING id INTO v_template_id;
 
   IF v_template_id IS NOT NULL THEN
-    -- Default committee members (matches actual committee data)
+    -- Default committee members (matches actual committee data from letterhead PDF)
     INSERT INTO letterhead_committee_members (template_id, name, designation, display_order) VALUES
-      (v_template_id, 'Sri K. Bal Reddy',  'President',          1),
-      (v_template_id, 'Sri Prashanth',      'General Secretary',  2),
-      (v_template_id, 'Sri Suresh Kumar',   'Treasurer',          3);
+      (v_template_id, 'Mr. K Bal Reddy',      'President',  1),
+      (v_template_id, 'Mr. Prashant Panikar', 'Secretary',  2),
+      (v_template_id, 'Mr. V Suresh Kumar',   'Treasurer',  3);
 
     -- Default dynamic fields matching the letterhead template
     INSERT INTO letterhead_dynamic_fields (template_id, field_key, display_label, field_type, placeholder, is_required, display_order) VALUES
