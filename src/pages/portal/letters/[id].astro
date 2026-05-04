@@ -443,7 +443,7 @@ if (user.role === 'executive' && letter.created_by !== user.id) return Astro.red
         margin: [0, 3, 0, 0],
       }));
 
-      function firstPageHeader() {
+      function buildLetterheadContent() {
         const addrH = (3 * hdrFs * 1.55) + (headerMembers.length * (hdrFs * 1.4 + 3)) + (headerMembers.length > 0 ? 10 : 0);
         const addrValignOffset = t.logo_valign === 'center' ? Math.max(0, Math.round((logoH - addrH) / 2))
           : t.logo_valign === 'bottom'  ? Math.max(0, Math.round(logoH - addrH))
@@ -457,31 +457,28 @@ if (user.role === 'executive' && letter.created_by !== user.id) return Astro.red
         const logoImgEl = logoB64
           ? { image: `data:image/png;base64,${logoB64}`, fit: [logoFitW, logoH], alignment: logoAlignment }
           : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
-        return {
-          margin: [57, 28, 57, 0],
-          stack: [
-            {
-              columns: [
-                { stack: [logoImgEl], width: '*' },
-                {
-                  width: addrColW,
-                  margin: [0, addrValignOffset, 0, 0],
-                  stack: [
-                    { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
-                    { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
-                    { text: t.society_address_line3 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
-                    ...cmteeContent,
-                  ],
-                },
-              ],
-              columnGap: COL_GAP,
-            },
-            { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 481, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 8, 0, 0] },
-          ],
-        };
+        return [
+          {
+            // Shift up 22pt so logo sits at 28pt from page top (50pt margin − 22pt = 28pt)
+            margin: [0, -22, 0, 0],
+            columns: [
+              { stack: [logoImgEl], width: '*' },
+              {
+                width: addrColW,
+                margin: [0, addrValignOffset, 0, 0],
+                stack: [
+                  { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                  { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                  { text: t.society_address_line3 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                  ...cmteeContent,
+                ],
+              },
+            ],
+            columnGap: COL_GAP,
+          },
+          { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 481, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 8, 0, 20] },
+        ];
       }
-
-      const topMargin = Math.max(140, logoH + 55);
 
       function subsequentHeader() {
         return {
@@ -511,6 +508,7 @@ if (user.role === 'executive' && letter.created_by !== user.id) return Astro.red
       }
 
       const body = [];
+      body.push(...buildLetterheadContent());
       body.push({ text: dateStr, fontSize: bodyFs, margin: [0, 0, 0, 16] });
       if (vals.to?.trim()) {
         const toLines = vals.to.trim().split('\n');
@@ -551,9 +549,9 @@ if (user.role === 'executive' && letter.created_by !== user.id) return Astro.red
 
       return {
         pageSize: 'A4',
-        pageMargins: [57, topMargin, 57, 60],
+        pageMargins: [57, 50, 57, 60],
         defaultStyle: { font: fontName, fontSize: bodyFs, lineHeight: 1.45, color: '#111827' },
-        header: (page) => page === 1 ? firstPageHeader() : subsequentHeader(),
+        header: (page) => page === 1 ? null : subsequentHeader(),
         footer: buildFooter,
         content: body,
       };

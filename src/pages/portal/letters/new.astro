@@ -495,22 +495,18 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         margin: [0, 3, 0, 0],
       }));
 
-      // ── FIRST PAGE HEADER ────────────────────────────────────────────
-      // Logo PNG is the full branded image (building + URBAN TRILLA MACS + tagline + reg no).
-      // Right column holds address + committee only.
-      function firstPageHeader() {
-        // pdfmake columns have no native vertical alignment; approximate it by offsetting
-        // the address block's top margin to match the template's logo_valign setting.
+      // ── FIRST PAGE LETTERHEAD (injected into body, not a header callback) ──
+      // pageMargins[1] is sized for the subsequent-page header (~50pt). To keep
+      // the logo visually at the same position as before (28pt from top), we
+      // apply a negative top margin of -22 to pull the block up into that space.
+      function buildLetterheadContent() {
         const addrH = (3 * hdrFs * 1.55) + (headerMembers.length * (hdrFs * 1.4 + 3)) + (headerMembers.length > 0 ? 10 : 0);
         const addrValignOffset = t.logo_valign === 'center' ? Math.max(0, Math.round((logoH - addrH) / 2))
           : t.logo_valign === 'bottom'  ? Math.max(0, Math.round(logoH - addrH))
           : 0;
 
-        // Logo column: give it width:'*' so it takes all remaining space after the
-        // address column. The image inside is clamped by fit so it won't overflow.
-        // An explicit columnGap guarantees visible separation regardless of logo size.
         const addrColW = Math.round((t.addr_col_width_px ?? 210) * 0.75);
-        const COL_GAP = 16; // pt gap between logo column and address column
+        const COL_GAP = 16;
 
         const logoAlignment = t.logo_halign ?? 'left';
         const logoFitW = (t.logo_width_px ?? 0) > 0
@@ -520,31 +516,28 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
           ? { image: `data:image/png;base64,${logoB64}`, fit: [logoFitW, logoH], alignment: logoAlignment }
           : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
 
-        return {
-          margin: [57, 28, 57, 0],
-          stack: [
-            {
-              columns: [
-                // Left: logo fills remaining space; image is left-aligned within column
-                { stack: [logoImgEl], width: '*' },
-                // Right: address + committee (CSS px → PDF pt: ×0.75; top offset per valign)
-                {
-                  width: addrColW,
-                  margin: [0, addrValignOffset, 0, 0],
-                  stack: [
-                    { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
-                    { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
-                    { text: t.society_address_line3 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
-                    ...cmteeContent,
-                  ],
-                },
-              ],
-              columnGap: COL_GAP,
-            },
-            // Thick navy underline (A4 content width: 595.28 - 57 - 57 = 481pt)
-            { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 481, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 8, 0, 0] },
-          ],
-        };
+        return [
+          {
+            // Shift up 22pt so logo sits at 28pt from page top (50pt margin − 22pt = 28pt)
+            margin: [0, -22, 0, 0],
+            columns: [
+              { stack: [logoImgEl], width: '*' },
+              {
+                width: addrColW,
+                margin: [0, addrValignOffset, 0, 0],
+                stack: [
+                  { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                  { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                  { text: t.society_address_line3 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                  ...cmteeContent,
+                ],
+              },
+            ],
+            columnGap: COL_GAP,
+          },
+          // Thick navy underline; 20pt bottom margin separates letterhead from body
+          { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 481, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 8, 0, 20] },
+        ];
       }
 
       // ── SUBSEQUENT PAGE HEADER ───────────────────────────────────────
@@ -578,6 +571,11 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 
       // ── Body content ─────────────────────────────────────────────────
       const body = [];
+
+      // Letterhead: logo + address + navy divider as first body items.
+      // pageMargins[1]=50 is sized for subsequent-page headers; the letterhead
+      // uses a -22pt top offset so the logo stays at 28pt from the page top.
+      body.push(...buildLetterheadContent());
 
       // Date
       body.push({ text: dateStr, fontSize: bodyFs, margin: [0, 0, 0, 16] });
@@ -635,13 +633,13 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         });
       }
 
-      // Dynamic top margin: grows with logo so header never overlaps body
-      const topMargin = Math.max(140, logoH + 55);
+      // 50pt top margin fits the subsequent-page header (~43pt) with a small gap.
+      // Page 1 has no header callback; its letterhead is the first body item above.
       return {
         pageSize: 'A4',
-        pageMargins: [57, topMargin, 57, 60],
+        pageMargins: [57, 50, 57, 60],
         defaultStyle: { font: fontName, fontSize: bodyFs, lineHeight: 1.45, color: '#111827' },
-        header: (page) => page === 1 ? firstPageHeader() : subsequentHeader(),
+        header: (page) => page === 1 ? null : subsequentHeader(),
         footer: buildFooter,
         content: body,
       };
