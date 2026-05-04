@@ -381,21 +381,21 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 
       const previewEl = document.getElementById('letter-preview');
       previewEl.style.fontSize = `${t.body_font_size_pt ?? 11}pt`;
-      // Logo justify-content positions the logo within its column only;
-      // the address column always stays top-aligned via align-items:flex-start on header.
-      const logoJustify = t.logo_valign === 'center' ? 'center' : t.logo_valign === 'bottom' ? 'flex-end' : 'flex-start';
+      // align-items on the header row controls BOTH logo and address together,
+      // matching the template's logo_valign design intent.
+      const logoAlignItems = t.logo_valign === 'center' ? 'center' : t.logo_valign === 'bottom' ? 'flex-end' : 'flex-start';
       previewEl.innerHTML = `
         <!-- ── HEADER: full logo image (left) + address/committee (right) ── -->
-        <div class="lh-header" style="align-items:stretch;">
+        <div class="lh-header" style="align-items:${logoAlignItems};">
 
-          <!-- Full branded logo — position within column controlled by logo_valign -->
-          <div class="lh-logo-col" style="display:flex; flex-direction:column; justify-content:${logoJustify};">
+          <!-- Full branded logo -->
+          <div class="lh-logo-col">
             <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo"
               style="height:${t.logo_height_px ?? 160}px; width:auto; display:block;"
               onerror="this.style.visibility='hidden';" />
           </div>
 
-          <!-- Right: address + committee — always top-aligned -->
+          <!-- Right: address + committee — aligned with logo per logo_valign -->
           <div class="lh-right-col" style="flex:0 0 ${t.addr_col_width_px ?? 210}px;">
             <div class="lh-addr" style="font-size:${t.header_font_size_pt ?? 8.5}pt;">
               ${esc(t.society_address_line1 ?? '')}<br>
@@ -488,6 +488,13 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
           ? { image: `data:image/png;base64,${logoB64}`, fit: [600, logoH], alignment: 'left' }
           : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
 
+        // pdfmake columns have no native vertical alignment; approximate it by offsetting
+        // the address block's top margin to match the template's logo_valign setting.
+        const addrH = (3 * hdrFs * 1.55) + (headerMembers.length * (hdrFs * 1.4 + 3)) + (headerMembers.length > 0 ? 10 : 0);
+        const addrValignOffset = t.logo_valign === 'center' ? Math.max(0, Math.round((logoH - addrH) / 2))
+          : t.logo_valign === 'bottom'  ? Math.max(0, Math.round(logoH - addrH))
+          : 0;
+
         return {
           margin: [57, 28, 57, 0],
           stack: [
@@ -497,9 +504,10 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
                 { stack: [logoImg], width: 'auto' },
                 // Spacer pushes right column to the far right
                 { text: '', width: '*' },
-                // Right: address + committee (convert CSS px → PDF pt: ×0.75)
+                // Right: address + committee (CSS px → PDF pt: ×0.75; top offset per valign)
                 {
                   width: Math.round((t.addr_col_width_px ?? 210) * 0.75),
+                  margin: [0, addrValignOffset, 0, 0],
                   stack: [
                     { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
                     { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
