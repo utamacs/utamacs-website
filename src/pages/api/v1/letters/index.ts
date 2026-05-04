@@ -4,6 +4,7 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
+import { generateDocxBuffer } from '@lib/utils/docxGenerator';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const GITHUB_LETTERS_REPO = import.meta.env.GITHUB_LETTERS_REPO ?? '';
@@ -139,10 +140,9 @@ export const POST: APIRoute = async ({ request }) => {
       field_values?: Record<string, string>;
       signatures_used?: string[];
       pdf_base64?: string;
-      docx_base64?: string;
     };
 
-    const { template_id, title, subject, recipient, field_values, signatures_used, pdf_base64, docx_base64 } = body;
+    const { template_id, title, subject, recipient, field_values, signatures_used, pdf_base64 } = body;
 
     if (!title?.trim()) {
       return new Response(JSON.stringify({ error: 'title is required' }), {
@@ -150,14 +150,23 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    if (!pdf_base64 && !docx_base64) {
-      return new Response(JSON.stringify({ error: 'At least one of pdf_base64 or docx_base64 is required' }), {
+    if (!pdf_base64) {
+      return new Response(JSON.stringify({ error: 'pdf_base64 is required' }), {
         status: 400, headers: { 'Content-Type': 'application/json' },
       });
     }
 
+    const sb = getSupabaseServiceClient();
     const now = new Date();
     const commitMsg = `Add letter: ${sanitizePlainText(title.trim())} (${now.toISOString().slice(0, 10)})`;
+
+    // Fetch full template so we can generate the DOCX server-side.
+    // (The browser cannot import 'docx' — it's a Node.js package.)
+    const { data: template } = await sb
+      .from('letterhead_templates')
+      .select('*, letterhead_committee_members(*)')
+      .eq('id', template_id!)
+      .single();
 
     let pdfPath: string | null = null;
     let pdfSha: string | null = null;
@@ -165,21 +174,21 @@ export const POST: APIRoute = async ({ request }) => {
     let docxSha: string | null = null;
 
     // Commit PDF
-    if (pdf_base64) {
-      pdfPath = buildGitPath(title.trim(), now, 'pdf');
-      const result = await commitToGitHub(pdfPath, pdf_base64, `${commitMsg} [PDF]`);
-      pdfSha = result.sha;
-    }
+    pdfPath = buildGitPath(title.trim(), now, 'pdf');
+    const pdfResult = await commitToGitHub(pdfPath, pdf_base64, `${commitMsg} [PDF]`);
+    pdfSha = pdfResult.sha;
 
-    // Commit DOCX
-    if (docx_base64) {
+    // Generate and commit DOCX server-side
+    if (template) {
+      const signatories = (signatures_used ?? []).map(d => ({ designation: d }));
+      const docxBuf = await generateDocxBuffer(template, field_values ?? {}, signatories);
+      const docx_base64 = docxBuf.toString('base64');
       docxPath = buildGitPath(title.trim(), now, 'docx');
-      const result = await commitToGitHub(docxPath, docx_base64, `${commitMsg} [DOCX]`);
-      docxSha = result.sha;
+      const docxResult = await commitToGitHub(docxPath, docx_base64, `${commitMsg} [DOCX]`);
+      docxSha = docxResult.sha;
     }
 
     // Save metadata in DB
-    const sb = getSupabaseServiceClient();
     const { data, error } = await sb
       .from('generated_letters')
       .insert({
