@@ -484,10 +484,6 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       // Logo PNG is the full branded image (building + URBAN TRILLA MACS + tagline + reg no).
       // Right column holds address + committee only.
       function firstPageHeader() {
-        const logoImg = logoB64
-          ? { image: `data:image/png;base64,${logoB64}`, fit: [600, logoH], alignment: 'left' }
-          : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
-
         // pdfmake columns have no native vertical alignment; approximate it by offsetting
         // the address block's top margin to match the template's logo_valign setting.
         const addrH = (3 * hdrFs * 1.55) + (headerMembers.length * (hdrFs * 1.4 + 3)) + (headerMembers.length > 0 ? 10 : 0);
@@ -495,18 +491,26 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
           : t.logo_valign === 'bottom'  ? Math.max(0, Math.round(logoH - addrH))
           : 0;
 
+        // Logo column: give it width:'*' so it takes all remaining space after the
+        // address column. The image inside is clamped by fit so it won't overflow.
+        // An explicit columnGap guarantees visible separation regardless of logo size.
+        const addrColW = Math.round((t.addr_col_width_px ?? 210) * 0.75);
+        const COL_GAP = 16; // pt gap between logo column and address column
+
+        const logoImgEl = logoB64
+          ? { image: `data:image/png;base64,${logoB64}`, fit: [481 - addrColW - COL_GAP, logoH], alignment: 'left' }
+          : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
+
         return {
           margin: [57, 28, 57, 0],
           stack: [
             {
               columns: [
-                // Left: full branded logo image
-                { stack: [logoImg], width: 'auto' },
-                // Spacer pushes right column to the far right
-                { text: '', width: '*' },
+                // Left: logo fills remaining space; image is left-aligned within column
+                { stack: [logoImgEl], width: '*' },
                 // Right: address + committee (CSS px → PDF pt: ×0.75; top offset per valign)
                 {
-                  width: Math.round((t.addr_col_width_px ?? 210) * 0.75),
+                  width: addrColW,
                   margin: [0, addrValignOffset, 0, 0],
                   stack: [
                     { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
@@ -516,7 +520,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
                   ],
                 },
               ],
-              columnGap: 0,
+              columnGap: COL_GAP,
             },
             // Thick navy underline (A4 content width: 595.28 - 57 - 57 = 481pt)
             { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 481, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 8, 0, 0] },
@@ -746,9 +750,17 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         }],
       });
 
-      // Packer.toString() returns base64 directly and works in browser environments;
-      // Packer.toBuffer() is Node.js-only and fails in the browser.
-      return await Packer.toString(doc);
+      // Packer.toString() returns raw binary bytes (not base64) — unusable for GitHub.
+      // Packer.toBuffer() works in both Node and browser (returns Buffer/Uint8Array).
+      // Chunk the byte→char conversion to avoid call-stack limits on large files.
+      const buf = await Packer.toBuffer(doc);
+      const bytes = new Uint8Array(buf);
+      const CHUNK = 8192;
+      let s = '';
+      for (let i = 0; i < bytes.byteLength; i += CHUNK) {
+        s += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+      }
+      return btoa(s);
     }
 
     async function downloadDocx() {
