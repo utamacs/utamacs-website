@@ -203,7 +203,8 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
     let carlitoBoldB64 = null;
     let carlitoItalicB64 = null;
     let carlitoBoldItalicB64 = null;
-    let logoB64 = null; // data:image/png;base64,…
+    let logoB64 = null;
+    let currentLogoUrl = null;
 
     // ── Utilities ─────────────────────────────────────────────────────────────
     async function toBase64(url, opts = {}) {
@@ -228,14 +229,13 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // ── Font + Logo preload ───────────────────────────────────────────────────
+    // ── Font preload ──────────────────────────────────────────────────────────
     async function initAssets() {
-      [carlitoRegB64, carlitoBoldB64, carlitoItalicB64, carlitoBoldItalicB64, logoB64] = await Promise.all([
+      [carlitoRegB64, carlitoBoldB64, carlitoItalicB64, carlitoBoldItalicB64] = await Promise.all([
         toBase64('/fonts/Carlito-Regular.ttf'),
         toBase64('/fonts/Carlito-Bold.ttf'),
         toBase64('/fonts/Carlito-Italic.ttf'),
         toBase64('/fonts/Carlito-BoldItalic.ttf'),
-        toBase64('/UTA-MACS-Logo.png', { cache: 'reload' }),
       ]);
 
       if (carlitoRegB64 && carlitoBoldB64) {
@@ -251,6 +251,19 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
           bolditalics:carlitoBoldItalicB64 ? 'Carlito-BoldItalic.ttf' : 'Carlito-Bold.ttf',
         };
       }
+    }
+
+    // ── Logo helpers ──────────────────────────────────────────────────────────
+    function resolveLogoUrl(logoPath) {
+      const p = logoPath || '/UTA-MACS-Logo.png';
+      return (p.startsWith('http') || p.startsWith('/')) ? p : '/' + p;
+    }
+
+    async function ensureLogoLoaded(logoPath) {
+      const src = resolveLogoUrl(logoPath);
+      if (currentLogoUrl === src) return;
+      currentLogoUrl = src;
+      logoB64 = await toBase64(src, { cache: 'reload' });
     }
 
     // ── Template loading ──────────────────────────────────────────────────────
@@ -278,6 +291,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         (currentTemplate.letterhead_committee_members ?? []).sort((a, b) => a.display_order - b.display_order);
       currentTemplate.letterhead_dynamic_fields =
         (currentTemplate.letterhead_dynamic_fields ?? []).sort((a, b) => a.display_order - b.display_order);
+      await ensureLogoLoaded(currentTemplate.logo_path);
       renderDynamicFields();
       renderSignatureOptions();
       updatePreview();
@@ -381,17 +395,18 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 
       const previewEl = document.getElementById('letter-preview');
       previewEl.style.fontSize = `${t.body_font_size_pt ?? 11}pt`;
-      // align-items on the header row controls BOTH logo and address together,
-      // matching the template's logo_valign design intent.
       const logoAlignItems = t.logo_valign === 'center' ? 'center' : t.logo_valign === 'bottom' ? 'flex-end' : 'flex-start';
+      const logoSrc = resolveLogoUrl(t.logo_path);
+      const logoW = (t.logo_width_px ?? 0) > 0 ? `${t.logo_width_px}px` : 'auto';
+      const halignFlex = t.logo_halign === 'center' ? 'center' : t.logo_halign === 'right' ? 'flex-end' : 'flex-start';
       previewEl.innerHTML = `
         <!-- ── HEADER: full logo image (left) + address/committee (right) ── -->
         <div class="lh-header" style="align-items:${logoAlignItems};">
 
           <!-- Full branded logo -->
-          <div class="lh-logo-col">
-            <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo"
-              style="height:${t.logo_height_px ?? 160}px; width:auto; display:block;"
+          <div class="lh-logo-col" style="flex:1; display:flex; justify-content:${halignFlex};">
+            <img src="${logoSrc}" alt="UTA MACS Logo"
+              style="height:${t.logo_height_px ?? 160}px; width:${logoW}; display:block;"
               onerror="this.style.visibility='hidden';" />
           </div>
 
@@ -497,8 +512,12 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         const addrColW = Math.round((t.addr_col_width_px ?? 210) * 0.75);
         const COL_GAP = 16; // pt gap between logo column and address column
 
+        const logoAlignment = t.logo_halign ?? 'left';
+        const logoFitW = (t.logo_width_px ?? 0) > 0
+          ? Math.round(t.logo_width_px * 0.75)
+          : 481 - addrColW - COL_GAP;
         const logoImgEl = logoB64
-          ? { image: `data:image/png;base64,${logoB64}`, fit: [481 - addrColW - COL_GAP, logoH], alignment: 'left' }
+          ? { image: `data:image/png;base64,${logoB64}`, fit: [logoFitW, logoH], alignment: logoAlignment }
           : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
 
         return {

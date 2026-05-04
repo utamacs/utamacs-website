@@ -94,6 +94,20 @@ const isNew = id === 'new';
             <i class="fas fa-heading text-primary-600"></i> Header Configuration
           </h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Logo URL -->
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-text-primary mb-1">
+                <i class="fas fa-image text-primary-600 mr-1"></i> Logo URL
+              </label>
+              <p class="text-xs text-text-secondary mb-2">Relative path (e.g. <code class="bg-gray-100 px-1 rounded">/UTA-MACS-Logo.png</code>) or full <code class="bg-gray-100 px-1 rounded">https://</code> URL. Leave blank to use the default logo.</p>
+              <div class="flex gap-3 items-center">
+                <input id="f-logo-path" type="text" placeholder="/UTA-MACS-Logo.png"
+                  class="flex-1 border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 font-mono" />
+                <img id="logo-preview-img" src="/UTA-MACS-Logo.png" alt="Logo preview"
+                  class="h-12 w-auto rounded border border-border-light bg-gray-50 object-contain flex-shrink-0"
+                  onerror="this.style.opacity='0.2';" />
+              </div>
+            </div>
             <div>
               <label class="block text-sm font-medium text-text-primary mb-1">Society Name</label>
               <input id="f-society-name" type="text" value="Urban Trilla MACS" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
@@ -137,11 +151,28 @@ const isNew = id === 'new';
               <div class="flex justify-between text-xs text-text-secondary mt-1"><span>60 px</span><span>400 px</span></div>
             </div>
             <div>
-              <label class="block text-sm font-medium text-text-primary mb-1">Logo Vertical Position</label>
+              <label class="block text-sm font-medium text-text-primary mb-1">Logo Vertical Alignment</label>
               <select id="f-logo-valign" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600">
                 <option value="top">Top</option>
                 <option value="center">Center</option>
                 <option value="bottom">Bottom</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-2">
+                Logo Width
+                <span class="ml-2 font-normal text-primary-600 tabular-nums" id="logo-width-val">auto</span>
+              </label>
+              <input id="f-logo-width" type="range" min="0" max="600" step="4" value="0"
+                class="w-full accent-primary-600" />
+              <div class="flex justify-between text-xs text-text-secondary mt-1"><span>auto</span><span>600 px</span></div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Logo Horizontal Alignment</label>
+              <select id="f-logo-halign" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600">
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
               </select>
             </div>
             <div>
@@ -299,11 +330,16 @@ const isNew = id === 'new';
       const email       = document.getElementById('f-email')?.value ?? 'urbantrillaresidents@gmail.com';
       const societyName = document.getElementById('f-society-name')?.value ?? 'Urban Trilla MACS';
       const logoH       = Number(document.getElementById('f-logo-height')?.value ?? 160);
+      const logoW       = Number(document.getElementById('f-logo-width')?.value ?? 0);
       const logoValign  = document.getElementById('f-logo-valign')?.value ?? 'top';
+      const logoHalign  = document.getElementById('f-logo-halign')?.value ?? 'left';
+      const logoPath    = document.getElementById('f-logo-path')?.value.trim() || '/UTA-MACS-Logo.png';
+      const logoSrc     = logoPath.startsWith('http') || logoPath.startsWith('/') ? logoPath : '/' + logoPath;
       const addrColW    = Number(document.getElementById('f-addr-col')?.value ?? 210);
       const bodyFs      = document.getElementById('f-body-fs')?.value ?? '11';
       const hdrFs       = document.getElementById('f-header-fs')?.value ?? '8.5';
       const alignItems  = logoValign === 'center' ? 'center' : logoValign === 'bottom' ? 'flex-end' : 'flex-start';
+      const halignFlex  = logoHalign === 'center' ? 'center' : logoHalign === 'right' ? 'flex-end' : 'flex-start';
 
       const headerMembers = Array.from(document.querySelectorAll('[data-member-idx]'))
         .filter(el => el.querySelector('.member-in-header')?.checked)
@@ -343,9 +379,9 @@ const isNew = id === 'new';
       previewEl.style.fontSize = `${bodyFs}pt`;
       previewEl.innerHTML = `
         <div class="lh-header" style="align-items:${alignItems};">
-          <div class="lh-logo-col">
-            <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo"
-              style="height:${logoH}px; width:auto; display:block;"
+          <div class="lh-logo-col" style="flex:1; display:flex; justify-content:${halignFlex};">
+            <img src="${logoSrc}" alt="Logo"
+              style="height:${logoH}px; width:${logoW > 0 ? logoW + 'px' : 'auto'}; display:block;"
               onerror="this.style.visibility='hidden';" />
           </div>
           <div class="lh-right-col" style="flex:0 0 ${addrColW}px;">
@@ -527,9 +563,15 @@ const isNew = id === 'new';
 
       const lh = t.logo_height_px ?? 160;
       const ac = t.addr_col_width_px ?? 210;
+      document.getElementById('f-logo-path').value    = t.logo_path ?? '/UTA-MACS-Logo.png';
+      updateLogoPreview(t.logo_path ?? '/UTA-MACS-Logo.png');
       document.getElementById('f-logo-height').value  = String(lh);
       document.getElementById('logo-height-val').textContent = `${lh} px`;
       document.getElementById('f-logo-valign').value  = t.logo_valign ?? 'top';
+      const lw = t.logo_width_px ?? 0;
+      document.getElementById('f-logo-width').value   = String(lw);
+      document.getElementById('logo-width-val').textContent = lw > 0 ? `${lw} px` : 'auto';
+      document.getElementById('f-logo-halign').value  = t.logo_halign ?? 'left';
       document.getElementById('f-addr-col').value     = String(ac);
       document.getElementById('addr-col-val').textContent = `${ac} px`;
       document.getElementById('f-body-fs').value      = String(t.body_font_size_pt ?? 11);
@@ -563,8 +605,11 @@ const isNew = id === 'new';
         footer_email:             document.getElementById('f-email').value.trim(),
         committee_members:        collectMembers(),
         dynamic_fields:           collectFields(),
+        logo_path:                document.getElementById('f-logo-path').value.trim() || '/UTA-MACS-Logo.png',
         logo_height_px:           Number(document.getElementById('f-logo-height').value),
+        logo_width_px:            Number(document.getElementById('f-logo-width').value),
         logo_valign:              document.getElementById('f-logo-valign').value,
+        logo_halign:              document.getElementById('f-logo-halign').value,
         body_font_size_pt:        Number(document.getElementById('f-body-fs').value),
         header_font_size_pt:      Number(document.getElementById('f-header-fs').value),
         addr_col_width_px:        Number(document.getElementById('f-addr-col').value),
@@ -594,9 +639,23 @@ const isNew = id === 'new';
       }
     });
 
-    // Update slider labels and preview on range input
+    function updateLogoPreview(path) {
+      const src = !path ? '/UTA-MACS-Logo.png'
+        : (path.startsWith('http') || path.startsWith('/')) ? path : '/' + path;
+      const img = document.getElementById('logo-preview-img');
+      img.style.opacity = '1';
+      img.src = src;
+    }
+
+    document.getElementById('f-logo-path').addEventListener('input', e => {
+      updateLogoPreview(e.target.value.trim());
+    });
     document.getElementById('f-logo-height').addEventListener('input', e => {
       document.getElementById('logo-height-val').textContent = e.target.value + ' px';
+    });
+    document.getElementById('f-logo-width').addEventListener('input', e => {
+      const v = Number(e.target.value);
+      document.getElementById('logo-width-val').textContent = v > 0 ? `${v} px` : 'auto';
     });
     document.getElementById('f-addr-col').addEventListener('input', e => {
       document.getElementById('addr-col-val').textContent = e.target.value + ' px';
