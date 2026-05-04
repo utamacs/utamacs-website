@@ -132,9 +132,17 @@ const isNew = id === 'new';
                 Logo Height
                 <span class="ml-2 font-normal text-primary-600 tabular-nums" id="logo-height-val">160 px</span>
               </label>
-              <input id="f-logo-height" type="range" min="60" max="220" step="4" value="160"
+              <input id="f-logo-height" type="range" min="60" max="400" step="4" value="160"
                 class="w-full accent-primary-600" />
-              <div class="flex justify-between text-xs text-text-secondary mt-1"><span>60 px</span><span>220 px</span></div>
+              <div class="flex justify-between text-xs text-text-secondary mt-1"><span>60 px</span><span>400 px</span></div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Logo Vertical Position</label>
+              <select id="f-logo-valign" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600">
+                <option value="top">Top</option>
+                <option value="center">Center</option>
+                <option value="bottom">Bottom</option>
+              </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-text-primary mb-2">
@@ -291,9 +299,11 @@ const isNew = id === 'new';
       const email       = document.getElementById('f-email')?.value ?? 'urbantrillaresidents@gmail.com';
       const societyName = document.getElementById('f-society-name')?.value ?? 'Urban Trilla MACS';
       const logoH       = Number(document.getElementById('f-logo-height')?.value ?? 160);
+      const logoValign  = document.getElementById('f-logo-valign')?.value ?? 'top';
       const addrColW    = Number(document.getElementById('f-addr-col')?.value ?? 210);
       const bodyFs      = document.getElementById('f-body-fs')?.value ?? '11';
       const hdrFs       = document.getElementById('f-header-fs')?.value ?? '8.5';
+      const alignItems  = logoValign === 'center' ? 'center' : logoValign === 'bottom' ? 'flex-end' : 'flex-start';
 
       const headerMembers = Array.from(document.querySelectorAll('[data-member-idx]'))
         .filter(el => el.querySelector('.member-in-header')?.checked)
@@ -332,7 +342,7 @@ const isNew = id === 'new';
       const previewEl = document.getElementById('letter-preview');
       previewEl.style.fontSize = `${bodyFs}pt`;
       previewEl.innerHTML = `
-        <div class="lh-header">
+        <div class="lh-header" style="align-items:${alignItems};">
           <div class="lh-logo-col">
             <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo"
               style="height:${logoH}px; width:auto; display:block;"
@@ -519,6 +529,7 @@ const isNew = id === 'new';
       const ac = t.addr_col_width_px ?? 210;
       document.getElementById('f-logo-height').value  = String(lh);
       document.getElementById('logo-height-val').textContent = `${lh} px`;
+      document.getElementById('f-logo-valign').value  = t.logo_valign ?? 'top';
       document.getElementById('f-addr-col').value     = String(ac);
       document.getElementById('addr-col-val').textContent = `${ac} px`;
       document.getElementById('f-body-fs').value      = String(t.body_font_size_pt ?? 11);
@@ -553,6 +564,7 @@ const isNew = id === 'new';
         committee_members:        collectMembers(),
         dynamic_fields:           collectFields(),
         logo_height_px:           Number(document.getElementById('f-logo-height').value),
+        logo_valign:              document.getElementById('f-logo-valign').value,
         body_font_size_pt:        Number(document.getElementById('f-body-fs').value),
         header_font_size_pt:      Number(document.getElementById('f-header-fs').value),
         addr_col_width_px:        Number(document.getElementById('f-addr-col').value),
