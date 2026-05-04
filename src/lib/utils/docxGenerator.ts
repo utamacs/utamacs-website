@@ -1,5 +1,5 @@
 import {
-  AlignmentType, BorderStyle, Document, Footer, Header, Packer,
+  AlignmentType, BorderStyle, Document, Footer, Header, ImageRun, Packer,
   PageNumber, Paragraph, Table, TableCell, TableRow, TextRun, WidthType,
 } from 'docx';
 
@@ -16,6 +16,8 @@ export interface DocxTemplate {
   closing_line1?: string;
   closing_line2?: string;
   subsequent_page_header?: string;
+  logo_height_px?: number;
+  logo_width_px?: number;
   letterhead_committee_members?: Array<{
     name: string;
     designation: string;
@@ -34,6 +36,7 @@ export async function generateDocxBuffer(
   template: DocxTemplate,
   fieldValues: Record<string, string | undefined>,
   signatories: Array<{ designation: string }>,
+  logoBase64?: string,
 ): Promise<Buffer> {
   const NAVY = '1a2a6c';
   const GOLD = 'c8a84b';
@@ -52,14 +55,56 @@ export async function generateDocxBuffer(
 
   const dateStr = fieldValues.date ? formatDate(fieldValues.date) : formatDate(new Date().toISOString().slice(0, 10));
 
-  const headerParas: Paragraph[] = [
-    p(tr(`${template.society_name ?? 'URBAN TRILLA MACS'}  |  ${template.society_tagline ?? 'COMMUNITY • CARE • MAINTENANCE'}`,
-      { bold: true, color: NAVY, size: 24 }), { spacing: { after: 60 } }),
-    p(tr(`Reg No: ${template.society_reg_no ?? 'TG/RRD/MACS/2026-15/FOW & M'}  |  ${template.society_address_line1 ?? ''} ${template.society_address_line2 ?? ''} ${template.society_address_line3 ?? ''}`,
-      { size: 16, color: '374151' }), { spacing: { after: 60 } }),
-    p(headerMembers.map(m => tr(`${m.designation}: ${m.name}   `, { bold: true, size: 16, color: NAVY })),
-      { spacing: { after: 60 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: NAVY, space: 4 } } }),
-  ];
+  // Build header: logo+address table when logo available, text-only otherwise
+  let headerChildren: (Paragraph | Table)[];
+  if (logoBase64) {
+    const logoH = template.logo_height_px ?? 100;
+    const logoW = (template.logo_width_px ?? 0) > 0 ? template.logo_width_px! : Math.round(logoH * 3.0);
+    const addrCells = [
+      template.society_address_line1,
+      template.society_address_line2,
+      template.society_address_line3,
+    ].filter(Boolean).map(line =>
+      p(tr(line!, { bold: true, color: NAVY, size: 16 }), { spacing: { after: 40 } }));
+    const memberCells = headerMembers.map(m =>
+      p([tr(m.designation, { bold: true, color: GOLD, size: 16 }), tr('  ' + m.name, { bold: true, color: NAVY, size: 16 })],
+        { spacing: { after: 40 } }));
+
+    headerChildren = [
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [new TableRow({
+          children: [
+            new TableCell({
+              borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
+              children: [new Paragraph({
+                children: [new ImageRun({
+                  data: Buffer.from(logoBase64, 'base64'),
+                  transformation: { width: logoW, height: logoH },
+                } as ConstructorParameters<typeof ImageRun>[0])],
+              })],
+            }),
+            new TableCell({
+              borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
+              width: { size: 3000, type: WidthType.DXA },
+              children: [...addrCells, ...memberCells],
+            }),
+          ],
+        })],
+      }),
+      p(tr(''), { spacing: { after: 60 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: NAVY, space: 4 } } }),
+    ];
+  } else {
+    headerChildren = [
+      p(tr(`${template.society_name ?? 'URBAN TRILLA MACS'}  |  ${template.society_tagline ?? 'COMMUNITY • CARE • MAINTENANCE'}`,
+        { bold: true, color: NAVY, size: 24 }), { spacing: { after: 60 } }),
+      p(tr(`Reg No: ${template.society_reg_no ?? 'TG/RRD/MACS/2026-15/FOW & M'}  |  ${template.society_address_line1 ?? ''} ${template.society_address_line2 ?? ''} ${template.society_address_line3 ?? ''}`,
+        { size: 16, color: '374151' }), { spacing: { after: 60 } }),
+      p(headerMembers.map(m => tr(`${m.designation}: ${m.name}   `, { bold: true, size: 16, color: NAVY })),
+        { spacing: { after: 60 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: NAVY, space: 4 } } }),
+    ];
+  }
+  const headerParas = headerChildren;
 
   const footerParas: Paragraph[] = [
     p(tr(`Web: ${template.footer_website ?? 'www.utamacs.org'}    Ph: ${template.footer_phone ?? '+91 7032820247'}    Email: ${template.footer_email ?? 'urbantrillaresidents@gmail.com'}`,

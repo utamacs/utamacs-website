@@ -39,8 +39,21 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    // Fetch logo for embedding in DOCX header
+    let logoBase64: string | undefined;
+    const logoPath = (template.logo_path as string | undefined) || '/UTA-MACS-Logo.png';
+    try {
+      const origin = new URL(request.url).origin;
+      const logoUrl = logoPath.startsWith('http') ? logoPath : `${origin}${logoPath.startsWith('/') ? '' : '/'}${logoPath}`;
+      const logoRes = await fetch(logoUrl);
+      if (logoRes.ok) {
+        const buf = await logoRes.arrayBuffer();
+        logoBase64 = Buffer.from(buf).toString('base64');
+      }
+    } catch { /* logo not critical — DOCX falls back to text header */ }
+
     const signatories = (signatures_used ?? []).map(d => ({ designation: d }));
-    const buf = await generateDocxBuffer(template, field_values ?? {}, signatories);
+    const buf = await generateDocxBuffer(template, field_values ?? {}, signatories, logoBase64);
 
     return new Response(buf, {
       headers: {
