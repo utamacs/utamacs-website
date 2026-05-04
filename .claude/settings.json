@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)",
+      "Bash(npm run build)",
+      "Bash(npm run deploy)",
+      "Bash(find src -type f)",
+      "Bash(find docs -type f)",
+      "Bash(grep -r * src/)",
+      "Bash(grep -r * docs/)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add src/*)",
+      "Bash(git add docs/*)",
+      "Bash(git add CLAUDE.md)",
+      "Bash(git add .claude/*)"
+    ]
+  }
+}
