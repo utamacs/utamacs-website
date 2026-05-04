@@ -495,9 +495,9 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
                 { stack: [logoImg], width: 'auto' },
                 // Spacer pushes right column to the far right
                 { text: '', width: '*' },
-                // Right: address + committee
+                // Right: address + committee (convert CSS px → PDF pt: ×0.75)
                 {
-                  width: 185,
+                  width: Math.round((t.addr_col_width_px ?? 210) * 0.75),
                   stack: [
                     { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
                     { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
@@ -515,9 +515,13 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       }
 
       // ── SUBSEQUENT PAGE HEADER ───────────────────────────────────────
+      // Position the header just above the content area start (topMargin) so there's
+      // no large gap between the header text and body on page 2+.
       function subsequentHeader() {
+        const hdrLineH = 10 * 1.45 + 4 + 5; // text line + margin + canvas line ≈ 23pt
+        const hdrTop = Math.max(20, topMargin - hdrLineH - 8);
         return {
-          margin: [57, 28, 57, 0],
+          margin: [57, hdrTop, 57, 0],
           stack: [
             { text: t.subsequent_page_header ?? 'Urban Trilla MACS — Continued', bold: true, color: NAVY, fontSize: 10 },
             { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 481, y2: 5, lineWidth: 1, lineColor: '#e5e7eb' }], margin: [0, 4, 0, 0] },
@@ -584,25 +588,23 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         body.push({ text: '', margin: [0, 0, 0, 28] });
       }
 
-      // Closing + signature kept together so they don't split across pages
-      const closingAndSig = {
-        unbreakable: true,
-        stack: [
-          { text: t.closing_line1 ?? 'Thanking you!', fontSize: bodyFs, margin: [0, 0, 0, 5] },
-          { text: t.closing_line2 ?? 'Yours sincerely', fontSize: bodyFs, margin: [0, 0, 0, 70] },
-          ...(sigs.length > 0 ? [{
-            columns: sigs.map(s => ({
-              width: Math.floor(481 / sigs.length),
-              stack: [
-                { text: s.designation, bold: true, color: GOLD, fontSize: 10 },
-                { text: t.society_name ?? 'Urban Trilla MACS', color: NAVY, fontSize: 10 },
-              ],
-            })),
-            columnGap: 20,
-          }] : []),
-        ],
-      };
-      body.push(closingAndSig);
+      // Closing lines — keepWithNext chains them with the signature so they stay
+      // on the same page, but without locking the entire block as unbreakable
+      // (which was pushing the whole ~140pt block to page 2 unnecessarily).
+      body.push({ text: t.closing_line1 ?? 'Thanking you!', fontSize: bodyFs, margin: [0, 0, 0, 5], keepWithNext: true });
+      body.push({ text: t.closing_line2 ?? 'Yours sincerely', fontSize: bodyFs, margin: [0, 0, 0, 50], keepWithNext: sigs.length > 0 });
+      if (sigs.length > 0) {
+        body.push({
+          columns: sigs.map(s => ({
+            width: Math.floor(481 / sigs.length),
+            stack: [
+              { text: s.designation, bold: true, color: GOLD, fontSize: 10 },
+              { text: t.society_name ?? 'Urban Trilla MACS', color: NAVY, fontSize: 10 },
+            ],
+          })),
+          columnGap: 20,
+        });
+      }
 
       // Dynamic top margin: grows with logo so header never overlaps body
       const topMargin = Math.max(140, logoH + 55);
