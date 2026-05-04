@@ -11,6 +11,46 @@ const isNew = id === 'new';
 ---
 
 <PortalLayout title={isNew ? 'New Template' : 'Edit Template'} user={user} activeModule="letters">
+
+  <!-- Carlito font + letterhead preview styles (same as new.astro) -->
+  <style is:global>
+    @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-Regular.ttf') format('truetype'); font-weight:400; }
+    @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-Bold.ttf') format('truetype'); font-weight:700; }
+    @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-Italic.ttf') format('truetype'); font-style:italic; }
+    @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-BoldItalic.ttf') format('truetype'); font-weight:700; font-style:italic; }
+
+    #letter-preview {
+      font-family: 'Carlito', 'Calibri', sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #111827;
+    }
+    .lh-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:0; }
+    .lh-logo-col { flex:0 0 auto; }
+    .lh-logo-col img { height:160px; width:auto; display:block; }
+    .lh-right-col { flex:0 0 210px; padding-top:2px; }
+    .lh-addr { font-weight:700; color:#1a2a6c; font-size:8.5pt; line-height:1.55; }
+    .lh-cmtee { margin-top:10px; }
+    .lh-cmtee-row { display:flex; align-items:baseline; gap:8px; margin-top:3px; }
+    .lh-cmtee-role { color:#c8a84b; font-weight:700; font-size:8.5pt; min-width:62px; }
+    .lh-cmtee-name { font-weight:700; color:#1a2a6c; font-size:8.5pt; }
+    .lh-header-line { height:3px; background:#1a2a6c; margin-top:8px; margin-bottom:20px; }
+    .lh-date { margin-bottom:18px; }
+    .lh-to-block { margin-bottom:14px; }
+    .lh-to-block .to-label { font-weight:700; }
+    .lh-subject { margin-bottom:14px; }
+    .lh-salutation { margin-bottom:18px; }
+    .lh-message { margin-bottom:30px; white-space:pre-wrap; text-align:justify; }
+    .lh-closing { margin-bottom:10px; }
+    .lh-sig-row { display:flex; gap:20px; padding-top:8px; }
+    .lh-sig-cell { flex:1; }
+    .lh-sig-role { font-weight:700; color:#c8a84b; font-size:10pt; }
+    .lh-sig-society { color:#1a2a6c; font-size:10pt; }
+    .lh-footer-line { height:3px; background:#1a2a6c; margin-top:10px; margin-bottom:6px; }
+    .lh-footer { display:flex; flex-direction:row; justify-content:space-between; flex-wrap:nowrap; font-size:8pt; color:#374151; }
+    .lh-footer-item { display:flex; flex-direction:row; align-items:center; gap:5px; white-space:nowrap; }
+  </style>
+
   <div class="mb-6">
     <nav class="text-sm text-text-secondary mb-2">
       <a href="/portal/letters" class="hover:text-primary-600">Letters</a>
@@ -20,132 +60,158 @@ const isNew = id === 'new';
       <span class="text-text-primary" id="page-title-nav">{isNew ? 'New' : 'Edit'}</span>
     </nav>
     <h1 class="text-2xl font-bold text-text-primary" id="page-title">{isNew ? 'New Letterhead Template' : 'Edit Letterhead Template'}</h1>
-    <p class="text-sm text-text-secondary mt-1">Configure header, footer, committee members, and dynamic fields.</p>
+    <p class="text-sm text-text-secondary mt-1">Configure header, footer, committee members, and dynamic fields. The preview updates live as you edit.</p>
   </div>
 
-  <form id="template-form" class="space-y-6">
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
 
-    <!-- ── Basic Info ── -->
-    <div class="bg-white rounded-xl border border-border-light p-6">
-      <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
-        <i class="fas fa-info-circle text-primary-600"></i> Template Details
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-text-primary mb-1">Template Name <span class="text-red-500">*</span></label>
-          <input id="f-name" type="text" required placeholder="e.g. Standard Letterhead" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+    <!-- ── LEFT: Form ── -->
+    <div>
+      <form id="template-form" class="space-y-6">
+
+        <!-- ── Basic Info ── -->
+        <div class="bg-white rounded-xl border border-border-light p-6">
+          <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
+            <i class="fas fa-info-circle text-primary-600"></i> Template Details
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-text-primary mb-1">Template Name <span class="text-red-500">*</span></label>
+              <input id="f-name" type="text" required placeholder="e.g. Standard Letterhead" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="flex items-center gap-2 text-sm font-medium text-text-primary mb-1 cursor-pointer">
+                <input id="f-is-default" type="checkbox" class="rounded text-primary-600" />
+                Set as default template
+              </label>
+            </div>
+          </div>
         </div>
-        <div>
-          <label class="flex items-center gap-2 text-sm font-medium text-text-primary mb-1 cursor-pointer">
-            <input id="f-is-default" type="checkbox" class="rounded text-primary-600" />
-            Set as default template
-          </label>
+
+        <!-- ── Header ── -->
+        <div class="bg-white rounded-xl border border-border-light p-6">
+          <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
+            <i class="fas fa-heading text-primary-600"></i> Header Configuration
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Society Name</label>
+              <input id="f-society-name" type="text" value="Urban Trilla MACS" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Tagline</label>
+              <input id="f-tagline" type="text" value="COMMUNITY • CARE • MAINTENANCE" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-text-primary mb-1">Registration Number</label>
+              <input id="f-reg-no" type="text" value="TG/RRD/MACS/2026-15/FOW & M" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Address Line 1</label>
+              <input id="f-addr1" type="text" value="SY NO4 25/2/1, KONDAKAL(V)," class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Address Line 2</label>
+              <input id="f-addr2" type="text" value="SHANKARPALLE(M), RANGAREDDY(D)," class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Address Line 3</label>
+              <input id="f-addr3" type="text" value="501203, TELANGANA" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Committee Members ── -->
+        <div class="bg-white rounded-xl border border-border-light p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-text-primary flex items-center gap-2">
+              <i class="fas fa-users text-primary-600"></i> Committee Members
+            </h2>
+            <button type="button" onclick="addMember()" class="btn-outline text-xs flex items-center gap-1">
+              <i class="fas fa-plus"></i> Add Member
+            </button>
+          </div>
+          <p class="text-xs text-text-secondary mb-4">These appear in the header (right column) and are available as signatories when generating a letter.</p>
+          <div id="members-list" class="space-y-3"></div>
+        </div>
+
+        <!-- ── Dynamic Fields ── -->
+        <div class="bg-white rounded-xl border border-border-light p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-text-primary flex items-center gap-2">
+              <i class="fas fa-list-alt text-primary-600"></i> Letter Fields
+            </h2>
+            <button type="button" onclick="addField()" class="btn-outline text-xs flex items-center gap-1">
+              <i class="fas fa-plus"></i> Add Field
+            </button>
+          </div>
+          <p class="text-xs text-text-secondary mb-4">These are the input fields shown on the letter generation form. Drag rows to reorder.</p>
+          <div id="fields-list" class="space-y-3"></div>
+        </div>
+
+        <!-- ── Closing & Footer ── -->
+        <div class="bg-white rounded-xl border border-border-light p-6">
+          <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
+            <i class="fas fa-file-signature text-primary-600"></i> Closing & Footer
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Closing Line 1</label>
+              <input id="f-close1" type="text" value="Thanking you!" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Closing Line 2</label>
+              <input id="f-close2" type="text" value="Yours sincerely" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-text-primary mb-1">Subsequent Page Header <span class="text-xs text-text-secondary">(pages 2+)</span></label>
+              <input id="f-subseq" type="text" value="Urban Trilla MACS — Continued" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Footer: Website</label>
+              <input id="f-website" type="text" value="www.utamacs.org" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Footer: Phone</label>
+              <input id="f-phone" type="text" value="+91 7032820247" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Footer: Email</label>
+              <input id="f-email" type="text" value="urbantrillaresidents@gmail.com" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-end gap-3">
+          <a href="/portal/letters/templates" class="btn-outline text-sm">Cancel</a>
+          <button type="submit" id="save-btn" class="btn-primary text-sm">
+            <i class="fas fa-save mr-1"></i> Save Template
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── RIGHT: Live Preview ── -->
+    <div class="sticky top-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-semibold text-text-primary">Live Preview — A4</span>
+        <span class="text-xs bg-gray-100 text-text-secondary px-2 py-1 rounded">Carlito 11pt · greyed text = sample</span>
+      </div>
+      <!-- Scale A4 (794px) to fit container (~560px) -->
+      <div class="bg-gray-300 rounded-xl p-3 overflow-auto" style="max-height:85vh;">
+        <div style="width:794px; transform-origin:top left; transform:scale(0.68); margin-bottom:-360px;">
+          <div id="letter-preview"
+            style="width:794px; min-height:1123px; background:white; padding:50px 57px 50px; box-shadow:0 2px 20px rgba(0,0,0,0.18); font-family:'Carlito','Calibri',sans-serif; font-size:11pt; line-height:1.45; color:#111827; display:flex; flex-direction:column;">
+            <p style="color:#9ca3af; text-align:center; margin-top:200px; font-size:11pt;">
+              Loading preview…
+            </p>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Header ── -->
-    <div class="bg-white rounded-xl border border-border-light p-6">
-      <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
-        <i class="fas fa-heading text-primary-600"></i> Header Configuration
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Society Name</label>
-          <input id="f-society-name" type="text" value="Urban Trilla MACS" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Tagline</label>
-          <input id="f-tagline" type="text" value="COMMUNITY • CARE • MAINTENANCE" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-text-primary mb-1">Registration Number</label>
-          <input id="f-reg-no" type="text" value="TG/RRD/MACS/2026-15/FOW & M" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Address Line 1</label>
-          <input id="f-addr1" type="text" value="SY NO4 25/2/1, KONDAKAL(V)," class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Address Line 2</label>
-          <input id="f-addr2" type="text" value="SHANKARPALLE(M), RANGAREDDY(D)," class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Address Line 3</label>
-          <input id="f-addr3" type="text" value="501203, TELANGANA" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Committee Members ── -->
-    <div class="bg-white rounded-xl border border-border-light p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="font-semibold text-text-primary flex items-center gap-2">
-          <i class="fas fa-users text-primary-600"></i> Committee Members
-        </h2>
-        <button type="button" onclick="addMember()" class="btn-outline text-xs flex items-center gap-1">
-          <i class="fas fa-plus"></i> Add Member
-        </button>
-      </div>
-      <p class="text-xs text-text-secondary mb-4">These appear in the header (right column) and are available as signatories when generating a letter.</p>
-      <div id="members-list" class="space-y-3"></div>
-    </div>
-
-    <!-- ── Dynamic Fields ── -->
-    <div class="bg-white rounded-xl border border-border-light p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="font-semibold text-text-primary flex items-center gap-2">
-          <i class="fas fa-list-alt text-primary-600"></i> Letter Fields
-        </h2>
-        <button type="button" onclick="addField()" class="btn-outline text-xs flex items-center gap-1">
-          <i class="fas fa-plus"></i> Add Field
-        </button>
-      </div>
-      <p class="text-xs text-text-secondary mb-4">These are the input fields shown on the letter generation form. Drag rows to reorder.</p>
-      <div id="fields-list" class="space-y-3"></div>
-    </div>
-
-    <!-- ── Closing & Footer ── -->
-    <div class="bg-white rounded-xl border border-border-light p-6">
-      <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
-        <i class="fas fa-file-signature text-primary-600"></i> Closing & Footer
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Closing Line 1</label>
-          <input id="f-close1" type="text" value="Thanking you!" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Closing Line 2</label>
-          <input id="f-close2" type="text" value="Yours sincerely" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-text-primary mb-1">Subsequent Page Header <span class="text-xs text-text-secondary">(pages 2+)</span></label>
-          <input id="f-subseq" type="text" value="Urban Trilla MACS — Continued" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Footer: Website</label>
-          <input id="f-website" type="text" value="www.utamacs.org" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Footer: Phone</label>
-          <input id="f-phone" type="text" value="+91 7032820247" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Footer: Email</label>
-          <input id="f-email" type="text" value="urbantrillaresidents@gmail.com" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
-      </div>
-    </div>
-
-    <!-- Actions -->
-    <div class="flex items-center justify-end gap-3">
-      <a href="/portal/letters/templates" class="btn-outline text-sm">Cancel</a>
-      <button type="submit" id="save-btn" class="btn-primary text-sm">
-        <i class="fas fa-save mr-1"></i> Save Template
-      </button>
-    </div>
-  </form>
+  </div>
 
   <div id="toast" class="hidden fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-large text-sm z-50"></div>
 
@@ -159,6 +225,102 @@ const isNew = id === 'new';
 
     let memberCount = 0;
     let fieldCount = 0;
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Live preview — mirrors new.astro's updatePreview but with sample body content ──
+    function updateTemplatePreview() {
+      const addr1       = document.getElementById('f-addr1')?.value ?? '';
+      const addr2       = document.getElementById('f-addr2')?.value ?? '';
+      const addr3       = document.getElementById('f-addr3')?.value ?? '';
+      const close1      = document.getElementById('f-close1')?.value ?? 'Thanking you!';
+      const close2      = document.getElementById('f-close2')?.value ?? 'Yours sincerely';
+      const website     = document.getElementById('f-website')?.value ?? 'www.utamacs.org';
+      const phone       = document.getElementById('f-phone')?.value ?? '+91 7032820247';
+      const email       = document.getElementById('f-email')?.value ?? 'urbantrillaresidents@gmail.com';
+      const societyName = document.getElementById('f-society-name')?.value ?? 'Urban Trilla MACS';
+
+      const headerMembers = Array.from(document.querySelectorAll('[data-member-idx]'))
+        .filter(el => el.querySelector('.member-in-header')?.checked)
+        .map(el => ({
+          name:        el.querySelector('.member-name')?.value ?? '',
+          designation: el.querySelector('.member-designation')?.value ?? '',
+        }))
+        .filter(m => m.name && m.designation);
+
+      const sigMembers = Array.from(document.querySelectorAll('[data-member-idx]'))
+        .filter(el => el.querySelector('.member-in-sig')?.checked)
+        .map(el => ({
+          name:        el.querySelector('.member-name')?.value ?? '',
+          designation: el.querySelector('.member-designation')?.value ?? '',
+        }))
+        .filter(m => m.name && m.designation);
+
+      const cmteeRows = headerMembers.map(m => `
+        <div class="lh-cmtee-row">
+          <span class="lh-cmtee-role">${esc(m.designation)}</span>
+          <span class="lh-cmtee-name">${esc(m.name)}</span>
+        </div>`).join('');
+
+      const sigHTML = sigMembers.length === 0 ? '' : `
+        <div class="lh-sig-row">
+          ${sigMembers.map(s => `
+            <div class="lh-sig-cell">
+              <div class="lh-sig-role">${esc(s.designation)}</div>
+              <div class="lh-sig-society">${esc(societyName)}</div>
+            </div>`).join('')}
+        </div>`;
+
+      const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+      const SAMPLE = 'color:#9ca3af;';
+
+      document.getElementById('letter-preview').innerHTML = `
+        <div class="lh-header">
+          <div class="lh-logo-col">
+            <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo" onerror="this.style.visibility='hidden';" />
+          </div>
+          <div class="lh-right-col">
+            <div class="lh-addr">
+              ${esc(addr1)}<br>
+              ${esc(addr2)}<br>
+              ${esc(addr3)}
+            </div>
+            <div class="lh-cmtee">${cmteeRows || '<div style="${SAMPLE} font-size:8.5pt; margin-top:10px;">[Add committee members]</div>'}</div>
+          </div>
+        </div>
+        <div class="lh-header-line"></div>
+
+        <div style="flex:1; display:flex; flex-direction:column;">
+          <div style="flex:1;">
+            <div class="lh-date">${today}</div>
+            <div class="lh-to-block">
+              <div class="to-label">To</div>
+              <div style="${SAMPLE}">[Recipient name and address]</div>
+            </div>
+            <div class="lh-subject" style="${SAMPLE}">Subject: [Letter subject line]</div>
+            <div class="lh-salutation" style="${SAMPLE}">Dear Sir/Madam,</div>
+            <div class="lh-message">
+              <p style="margin:0 0 4px 0; ${SAMPLE}">This is sample body text — the actual content is filled in when generating a letter. This preview shows the header, footer, closing lines, and signature block from your template settings.</p>
+              <p style="margin:0 0 4px 0; ${SAMPLE}">Additional paragraphs appear here, justified to the full page width just as they will in the final PDF.</p>
+            </div>
+            <div class="lh-closing">
+              <div>${esc(close1) || '<span style="${SAMPLE}">[Closing line 1]</span>'}</div>
+              <div>${esc(close2) || '<span style="${SAMPLE}">[Closing line 2]</span>'}</div>
+            </div>
+          </div>
+          ${sigHTML}
+        </div>
+
+        <div class="lh-footer-line"></div>
+        <div class="lh-footer">
+          <div class="lh-footer-item">🌐 <span>${esc(website)}</span></div>
+          <div class="lh-footer-item">📞 <span>${esc(phone)}</span></div>
+          <div class="lh-footer-item">✉ <span>${esc(email)}</span></div>
+        </div>
+      `;
+    }
 
     function addMember(data) {
       memberCount++;
@@ -187,10 +349,11 @@ const isNew = id === 'new';
         </div>
         <div class="col-span-2 text-xs text-text-secondary">Order: ${idx}</div>
         <div class="col-span-1 flex justify-end">
-          <button type="button" onclick="this.closest('[data-member-idx]').remove()"
+          <button type="button" onclick="this.closest('[data-member-idx]').remove(); updateTemplatePreview();"
             class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-times"></i></button>
         </div>`;
       document.getElementById('members-list').appendChild(div);
+      updateTemplatePreview();
     }
 
     function addField(data) {
@@ -264,15 +427,15 @@ const isNew = id === 'new';
 
     async function loadTemplate() {
       if (isNew) {
-        // Seed with sensible defaults
         addMember({ name: 'Sri K. Bal Reddy', designation: 'President', show_in_header: true, show_in_signature: true });
         addMember({ name: 'Sri Prashanth', designation: 'General Secretary', show_in_header: true, show_in_signature: true });
         addMember({ name: 'Sri Suresh Kumar', designation: 'Treasurer', show_in_header: true, show_in_signature: true });
         ['date','to','subject','tosalutation','message'].forEach((k, i) => {
           const labels = { date: 'Date', to: 'To (Recipient)', subject: 'Subject', tosalutation: 'Salutation', message: 'Message Body' };
-          const types = { date: 'date', to: 'textarea', subject: 'text', tosalutation: 'text', message: 'textarea' };
+          const types  = { date: 'date', to: 'textarea', subject: 'text', tosalutation: 'text', message: 'textarea' };
           addField({ field_key: k, display_label: labels[k], field_type: types[k], is_required: true, display_order: i + 1 });
         });
+        updateTemplatePreview();
         return;
       }
 
@@ -280,23 +443,24 @@ const isNew = id === 'new';
       if (!res.ok) { showToast('Failed to load template', true); return; }
       const t = await res.json();
 
-      document.getElementById('f-name').value = t.name ?? '';
+      document.getElementById('f-name').value         = t.name ?? '';
       document.getElementById('f-is-default').checked = t.is_default ?? false;
       document.getElementById('f-society-name').value = t.society_name ?? '';
-      document.getElementById('f-tagline').value = t.society_tagline ?? '';
-      document.getElementById('f-reg-no').value = t.society_reg_no ?? '';
-      document.getElementById('f-addr1').value = t.society_address_line1 ?? '';
-      document.getElementById('f-addr2').value = t.society_address_line2 ?? '';
-      document.getElementById('f-addr3').value = t.society_address_line3 ?? '';
-      document.getElementById('f-close1').value = t.closing_line1 ?? '';
-      document.getElementById('f-close2').value = t.closing_line2 ?? '';
-      document.getElementById('f-subseq').value = t.subsequent_page_header ?? '';
-      document.getElementById('f-website').value = t.footer_website ?? '';
-      document.getElementById('f-phone').value = t.footer_phone ?? '';
-      document.getElementById('f-email').value = t.footer_email ?? '';
+      document.getElementById('f-tagline').value       = t.society_tagline ?? '';
+      document.getElementById('f-reg-no').value        = t.society_reg_no ?? '';
+      document.getElementById('f-addr1').value         = t.society_address_line1 ?? '';
+      document.getElementById('f-addr2').value         = t.society_address_line2 ?? '';
+      document.getElementById('f-addr3').value         = t.society_address_line3 ?? '';
+      document.getElementById('f-close1').value        = t.closing_line1 ?? '';
+      document.getElementById('f-close2').value        = t.closing_line2 ?? '';
+      document.getElementById('f-subseq').value        = t.subsequent_page_header ?? '';
+      document.getElementById('f-website').value       = t.footer_website ?? '';
+      document.getElementById('f-phone').value         = t.footer_phone ?? '';
+      document.getElementById('f-email').value         = t.footer_email ?? '';
 
       (t.letterhead_committee_members ?? []).forEach(addMember);
       (t.letterhead_dynamic_fields ?? []).forEach(addField);
+      updateTemplatePreview();
     }
 
     document.getElementById('template-form').addEventListener('submit', async (e) => {
@@ -306,25 +470,25 @@ const isNew = id === 'new';
       btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Saving…';
 
       const payload = {
-        name: document.getElementById('f-name').value.trim(),
-        is_default: document.getElementById('f-is-default').checked,
-        society_name: document.getElementById('f-society-name').value.trim(),
-        society_tagline: document.getElementById('f-tagline').value.trim(),
-        society_reg_no: document.getElementById('f-reg-no').value.trim(),
-        society_address_line1: document.getElementById('f-addr1').value.trim(),
-        society_address_line2: document.getElementById('f-addr2').value.trim(),
-        society_address_line3: document.getElementById('f-addr3').value.trim(),
-        closing_line1: document.getElementById('f-close1').value.trim(),
-        closing_line2: document.getElementById('f-close2').value.trim(),
-        subsequent_page_header: document.getElementById('f-subseq').value.trim(),
-        footer_website: document.getElementById('f-website').value.trim(),
-        footer_phone: document.getElementById('f-phone').value.trim(),
-        footer_email: document.getElementById('f-email').value.trim(),
-        committee_members: collectMembers(),
-        dynamic_fields: collectFields(),
+        name:                     document.getElementById('f-name').value.trim(),
+        is_default:               document.getElementById('f-is-default').checked,
+        society_name:             document.getElementById('f-society-name').value.trim(),
+        society_tagline:          document.getElementById('f-tagline').value.trim(),
+        society_reg_no:           document.getElementById('f-reg-no').value.trim(),
+        society_address_line1:    document.getElementById('f-addr1').value.trim(),
+        society_address_line2:    document.getElementById('f-addr2').value.trim(),
+        society_address_line3:    document.getElementById('f-addr3').value.trim(),
+        closing_line1:            document.getElementById('f-close1').value.trim(),
+        closing_line2:            document.getElementById('f-close2').value.trim(),
+        subsequent_page_header:   document.getElementById('f-subseq').value.trim(),
+        footer_website:           document.getElementById('f-website').value.trim(),
+        footer_phone:             document.getElementById('f-phone').value.trim(),
+        footer_email:             document.getElementById('f-email').value.trim(),
+        committee_members:        collectMembers(),
+        dynamic_fields:           collectFields(),
       };
 
-      const url = isNew ? '/api/v1/letters/templates' : `/api/v1/letters/templates/${templateId}`;
+      const url    = isNew ? '/api/v1/letters/templates' : `/api/v1/letters/templates/${templateId}`;
       const method = isNew ? 'POST' : 'PUT';
 
       const res = await fetch(url, {
@@ -348,8 +512,13 @@ const isNew = id === 'new';
       }
     });
 
+    // Single delegated listener catches all inputs including dynamically added member rows
+    document.getElementById('template-form').addEventListener('input', updateTemplatePreview);
+    document.getElementById('template-form').addEventListener('change', updateTemplatePreview);
+
     window.addMember = addMember;
     window.addField = addField;
+    window.updateTemplatePreview = updateTemplatePreview;
     loadTemplate();
   </script>
 </PortalLayout>
