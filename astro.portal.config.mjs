@@ -11,6 +11,7 @@ export default defineConfig({
   output: 'hybrid',
   adapter: vercel({
     edgeMiddleware: false,
+    maxDuration: 60,
   }),
   site: 'https://portal.utamacs.org',
   base: '/',
