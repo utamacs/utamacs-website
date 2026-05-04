@@ -39,7 +39,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       flex: 0 0 auto;
     }
     .lh-logo-col img {
-      height: 120px;
+      height: 160px;
       width: auto;
       display: block;
     }
@@ -475,7 +475,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       // Right column holds address + committee only.
       function firstPageHeader() {
         const logoImg = logoB64
-          ? { image: `data:image/png;base64,${logoB64}`, fit: [280, 110], alignment: 'left' }
+          ? { image: `data:image/png;base64,${logoB64}`, fit: [340, 135], alignment: 'left' }
           : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
 
         return {
@@ -600,7 +600,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 
       return {
         pageSize: 'A4',
-        pageMargins: [57, 150, 57, 72],
+        pageMargins: [57, 168, 57, 72],
         defaultStyle: { font: fontName, fontSize: 11, lineHeight: 1.45, color: '#111827' },
         header: (page) => page === 1 ? firstPageHeader() : subsequentHeader(),
         footer: buildFooter,
