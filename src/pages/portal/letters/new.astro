@@ -206,9 +206,9 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
     let logoB64 = null; // data:image/png;base64,…
 
     // ── Utilities ─────────────────────────────────────────────────────────────
-    async function toBase64(url) {
+    async function toBase64(url, opts = {}) {
       try {
-        const res = await fetch(url);
+        const res = await fetch(url, opts);
         if (!res.ok) return null;
         const buf = await res.arrayBuffer();
         const bytes = new Uint8Array(buf);
@@ -235,7 +235,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         toBase64('/fonts/Carlito-Bold.ttf'),
         toBase64('/fonts/Carlito-Italic.ttf'),
         toBase64('/fonts/Carlito-BoldItalic.ttf'),
-        toBase64('/UTA-MACS-Logo.png'),
+        toBase64('/UTA-MACS-Logo.png', { cache: 'reload' }),
       ]);
 
       if (carlitoRegB64 && carlitoBoldB64) {
@@ -533,9 +533,9 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
             { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 481, y2: 0, lineWidth: 3, lineColor: NAVY }], margin: [0, 0, 0, 5] },
             {
               columns: [
-                { text: `🌐 ${t.footer_website ?? 'www.utamacs.org'}`, fontSize: 8, color: '#374151' },
-                { text: `📞 ${t.footer_phone ?? '+91 7032820247'}`, fontSize: 8, color: '#374151', alignment: 'center' },
-                { text: `✉ ${t.footer_email ?? 'urbantrillaresidents@gmail.com'}`, fontSize: 8, color: '#374151', alignment: 'right' },
+                { text: `Web: ${t.footer_website ?? 'www.utamacs.org'}`, fontSize: 8, color: '#374151' },
+                { text: `Ph: ${t.footer_phone ?? '+91 7032820247'}`, fontSize: 8, color: '#374151', alignment: 'center' },
+                { text: `Email: ${t.footer_email ?? 'urbantrillaresidents@gmail.com'}`, fontSize: 8, color: '#374151', alignment: 'right' },
               ],
             },
             { text: String(currentPage), fontSize: 7.5, color: '#6b7280', alignment: 'right', margin: [0, 2, 0, 0] },
@@ -584,31 +584,31 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         body.push({ text: '', margin: [0, 0, 0, 28] });
       }
 
-      // Closing
-      body.push({ text: t.closing_line1 ?? 'Thanking you!', fontSize: bodyFs, margin: [0, 0, 0, 5] });
-      // Large bottom margin = physical signing space above the signature block
-      body.push({ text: t.closing_line2 ?? 'Yours sincerely', fontSize: bodyFs, margin: [0, 0, 0, 90] });
+      // Closing + signature kept together so they don't split across pages
+      const closingAndSig = {
+        unbreakable: true,
+        stack: [
+          { text: t.closing_line1 ?? 'Thanking you!', fontSize: bodyFs, margin: [0, 0, 0, 5] },
+          { text: t.closing_line2 ?? 'Yours sincerely', fontSize: bodyFs, margin: [0, 0, 0, 70] },
+          ...(sigs.length > 0 ? [{
+            columns: sigs.map(s => ({
+              width: Math.floor(481 / sigs.length),
+              stack: [
+                { text: s.designation, bold: true, color: GOLD, fontSize: 10 },
+                { text: t.society_name ?? 'Urban Trilla MACS', color: NAVY, fontSize: 10 },
+              ],
+            })),
+            columnGap: 20,
+          }] : []),
+        ],
+      };
+      body.push(closingAndSig);
 
-      // Signature block — equal-width columns that reflow 1→2→3
-      // No grey line within cells; signing space is the 90pt gap above
-      if (sigs.length > 0) {
-        const colWidth = Math.floor(481 / sigs.length);
-        body.push({
-          columns: sigs.map(s => ({
-            width: colWidth,
-            stack: [
-              { text: s.designation, bold: true, color: GOLD, fontSize: 10 },
-              { text: t.society_name ?? 'Urban Trilla MACS', color: NAVY, fontSize: 10 },
-            ],
-          })),
-          columnGap: 20,
-          margin: [0, 0, 0, 20],
-        });
-      }
-
+      // Dynamic top margin: grows with logo so header never overlaps body
+      const topMargin = Math.max(140, logoH + 55);
       return {
         pageSize: 'A4',
-        pageMargins: [57, 168, 57, 72],
+        pageMargins: [57, topMargin, 57, 60],
         defaultStyle: { font: fontName, fontSize: bodyFs, lineHeight: 1.45, color: '#111827' },
         header: (page) => page === 1 ? firstPageHeader() : subsequentHeader(),
         footer: buildFooter,
@@ -641,7 +641,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 
       const { Document, Paragraph, TextRun, Table, TableRow, TableCell,
               AlignmentType, BorderStyle, WidthType, Packer, Header, Footer,
-              PageNumber, NumberOfPages } = await import('docx');
+              PageNumber } = await import('docx');
 
       const NAVY = '1a2a6c';
       const GOLD = 'c8a84b';
@@ -665,11 +665,15 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       ];
 
       const footerParas = [
-        p(tr(`🌐 ${t.footer_website ?? 'www.utamacs.org'}    📞 ${t.footer_phone ?? '+91 7032820247'}    ✉ ${t.footer_email ?? 'urbantrillaresidents@gmail.com'}`,
+        p(tr(`Web: ${t.footer_website ?? 'www.utamacs.org'}    Ph: ${t.footer_phone ?? '+91 7032820247'}    Email: ${t.footer_email ?? 'urbantrillaresidents@gmail.com'}`,
           { size: 16, color: '374151' }),
           { border: { top: { style: BorderStyle.SINGLE, size: 6, color: NAVY, space: 4 } }, spacing: { after: 40 } }),
-        p([tr('Page ', { size: 14, color: '6b7280' }), new PageNumber(), tr(' of ', { size: 14, color: '6b7280' }), new NumberOfPages()],
-          { alignment: AlignmentType.RIGHT }),
+        p([
+          tr('Page ', { size: 14, color: '6b7280' }),
+          new TextRun({ children: [PageNumber.CURRENT], font: 'Carlito', size: 14, color: '6b7280' }),
+          tr(' of ', { size: 14, color: '6b7280' }),
+          new TextRun({ children: [PageNumber.TOTAL_PAGES], font: 'Carlito', size: 14, color: '6b7280' }),
+        ], { alignment: AlignmentType.RIGHT }),
       ];
 
       const bodyContent = [];
