@@ -113,17 +113,17 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
     .lh-subject     { margin-bottom: 14px; }
     .lh-salutation  { margin-bottom: 18px; }
     .lh-message     { margin-bottom: 30px; white-space: pre-wrap; text-align: justify; }
-    .lh-closing     { margin-bottom: 60px; }
+    .lh-closing     { margin-bottom: 10px; }
 
     /* SIGNATURE BLOCK ───────────────────────────────────── */
-    .lh-sig-row      { display: flex; gap: 20px; margin-bottom: 20px; }
+    /* No underline within cells — signing space comes from flex layout pushing block down */
+    .lh-sig-row      { display: flex; gap: 20px; padding-top: 8px; }
     .lh-sig-cell     { flex: 1; }
-    .lh-sig-space    { height: 36px; border-bottom: 1px solid #9ca3af; margin-bottom: 5px; }
     .lh-sig-role     { font-weight: 700; color: #c8a84b; font-size: 10pt; }
     .lh-sig-society  { color: #1a2a6c; font-size: 10pt; }
 
     /* FOOTER ────────────────────────────────────────────── */
-    .lh-footer-line  { height: 3px; background: #1a2a6c; margin-bottom: 6px; }
+    .lh-footer-line  { height: 3px; background: #1a2a6c; margin-top: 10px; margin-bottom: 6px; }
     .lh-footer       { display: flex; justify-content: space-between; font-size: 8pt; color: #374151; }
     .lh-footer-item  { display: flex; align-items: center; gap: 5px; }
   </style>
@@ -210,9 +210,9 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         </div>
         <!-- Scale A4 (794px) to fit container (~560px) -->
         <div class="bg-gray-300 rounded-xl p-3 overflow-auto" style="max-height:85vh;">
-          <div style="width:794px; transform-origin:top left; transform:scale(0.68); margin-bottom:-238px;">
+          <div style="width:794px; transform-origin:top left; transform:scale(0.68); margin-bottom:-360px;">
             <div id="letter-preview"
-              style="width:794px; min-height:1123px; background:white; padding:50px 57px 50px; box-shadow:0 2px 20px rgba(0,0,0,0.18); font-family:'Carlito','Calibri',sans-serif; font-size:11pt; line-height:1.45; color:#111827;">
+              style="width:794px; min-height:1123px; background:white; padding:50px 57px 50px; box-shadow:0 2px 20px rgba(0,0,0,0.18); font-family:'Carlito','Calibri',sans-serif; font-size:11pt; line-height:1.45; color:#111827; display:flex; flex-direction:column;">
               <p style="color:#9ca3af; text-align:center; margin-top:200px; font-size:11pt;">
                 Select a template and fill in the fields to see a live preview.
               </p>
@@ -396,11 +396,11 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         </div>`).join('');
 
       // Signature block — reflows 1, 2 or 3 columns
+      // No grey underline per cell: the signing space is the white area above (flex pushes block down)
       const sigHTML = sigs.length === 0 ? '' :
         `<div class="lh-sig-row">
           ${sigs.map(s => `
             <div class="lh-sig-cell">
-              <div class="lh-sig-space"></div>
               <div class="lh-sig-role">${esc(s.designation)}</div>
               <div class="lh-sig-society">${esc(t.society_name)}</div>
             </div>`).join('')}
@@ -454,30 +454,37 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         <!-- Thick navy underline -->
         <div class="lh-header-line"></div>
 
-        <!-- ── BODY ──────────────────────────────────────────── -->
-        <div class="lh-date">${esc(dateStr)}</div>
+        <!-- ── BODY: flex:1 fills the page; sig block pushed to bottom ─── -->
+        <div style="flex:1; display:flex; flex-direction:column;">
 
-        ${vals.to ? `<div class="lh-to-block">
-          <div class="to-label">To</div>
-          <div>${vals.to.split('\n').map(l => esc(l)).join('<br>')}</div>
-        </div>` : ''}
+          <!-- Letter content -->
+          <div style="flex:1;">
+            <div class="lh-date">${esc(dateStr)}</div>
 
-        ${vals.subject ? `<div class="lh-subject">
-          <strong>Subject:</strong> ${esc(vals.subject)}
-        </div>` : ''}
+            ${vals.to ? `<div class="lh-to-block">
+              <div class="to-label">To</div>
+              <div>${vals.to.split('\n').map(l => esc(l)).join('<br>')}</div>
+            </div>` : ''}
 
-        ${vals.tosalutation ? `<div class="lh-salutation">Dear ${esc(vals.tosalutation)}</div>` : ''}
+            ${vals.subject ? `<div class="lh-subject">
+              Subject: ${esc(vals.subject)}
+            </div>` : ''}
 
-        <div class="lh-message">${messageHTML}</div>
+            ${vals.tosalutation ? `<div class="lh-salutation">Dear ${esc(vals.tosalutation)}</div>` : ''}
 
-        <div class="lh-closing">
-          <div>${esc(t.closing_line1 ?? 'Thanking you!')}</div>
-          <div>${esc(t.closing_line2 ?? 'Yours sincerely')}</div>
+            <div class="lh-message">${messageHTML}</div>
+
+            <div class="lh-closing">
+              <div>${esc(t.closing_line1 ?? 'Thanking you!')}</div>
+              <div>${esc(t.closing_line2 ?? 'Yours sincerely')}</div>
+            </div>
+          </div>
+
+          <!-- Signature block: sits at bottom of the body area (signing space is whitespace above) -->
+          ${sigHTML}
         </div>
 
-        ${sigHTML}
-
-        <!-- ── FOOTER ────────────────────────────────────────── -->
+        <!-- ── FOOTER: always at the bottom of the page ──────────────── -->
         <div class="lh-footer-line"></div>
         <div class="lh-footer">
           <div class="lh-footer-item">🌐 <span>${esc(t.footer_website ?? 'www.utamacs.org')}</span></div>
@@ -568,8 +575,8 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
               ],
               columnGap: 0,
             },
-            // Thick navy underline
-            { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 680, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 6, 0, 0] },
+            // Thick navy underline (A4 content width: 595.28 - 57 - 57 = 481pt)
+            { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 481, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 6, 0, 0] },
           ],
         };
       }
@@ -590,7 +597,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         return {
           margin: [57, 0, 57, 14],
           stack: [
-            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 680, y2: 0, lineWidth: 3, lineColor: NAVY }], margin: [0, 0, 0, 5] },
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 481, y2: 0, lineWidth: 3, lineColor: NAVY }], margin: [0, 0, 0, 5] },
             {
               columns: [
                 { text: `🌐 ${t.footer_website ?? 'www.utamacs.org'}`, fontSize: 8, color: '#374151' },
@@ -624,7 +631,8 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       // Subject
       if (vals.subject?.trim()) {
         body.push({
-          text: [{ text: 'Subject: ', bold: true, fontSize: 11 }, { text: vals.subject, fontSize: 11 }],
+          text: `Subject: ${vals.subject}`,
+          fontSize: 11,
           margin: [0, 0, 0, 14],
         });
       }
@@ -645,17 +653,17 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 
       // Closing
       body.push({ text: t.closing_line1 ?? 'Thanking you!', fontSize: 11, margin: [0, 0, 0, 5] });
-      body.push({ text: t.closing_line2 ?? 'Yours sincerely', fontSize: 11, margin: [0, 0, 0, 55] });
+      // Large bottom margin = physical signing space above the signature block
+      body.push({ text: t.closing_line2 ?? 'Yours sincerely', fontSize: 11, margin: [0, 0, 0, 90] });
 
       // Signature block — equal-width columns that reflow 1→2→3
+      // No grey line within cells; signing space is the 90pt gap above
       if (sigs.length > 0) {
-        const colWidth = Math.floor(480 / sigs.length);
+        const colWidth = Math.floor(481 / sigs.length);
         body.push({
           columns: sigs.map(s => ({
             width: colWidth,
             stack: [
-              // Signature line (space for physical signing)
-              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: colWidth - 10, y2: 0, lineWidth: 0.5, lineColor: '#9ca3af' }], margin: [0, 36, 0, 5] },
               { text: s.designation, bold: true, color: GOLD, fontSize: 10 },
               { text: t.society_name ?? 'Urban Trilla MACS', color: NAVY, fontSize: 10 },
             ],
