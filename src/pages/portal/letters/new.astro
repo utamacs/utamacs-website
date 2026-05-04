@@ -356,10 +356,11 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       const macsLine = 'M A C S';
 
       // Committee rows for right-column header
+      const hdrFsPt = `${t.header_font_size_pt ?? 8.5}pt`;
       const cmteeRows = headerMembers.map(m =>
         `<div class="lh-cmtee-row">
-          <span class="lh-cmtee-role">${esc(m.designation)}</span>
-          <span class="lh-cmtee-name">${esc(m.name)}</span>
+          <span class="lh-cmtee-role" style="font-size:${hdrFsPt};">${esc(m.designation)}</span>
+          <span class="lh-cmtee-name" style="font-size:${hdrFsPt};">${esc(m.name)}</span>
         </div>`).join('');
 
       // Signature block — reflows 1, 2 or 3 columns
@@ -378,19 +379,22 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         ? vals.message.split('\n').map(l => `<p style="margin:0 0 4px 0;">${esc(l) || '&nbsp;'}</p>`).join('')
         : '<p style="color:#9ca3af;margin:0;">[Message body will appear here]</p>';
 
-      document.getElementById('letter-preview').innerHTML = `
+      const previewEl = document.getElementById('letter-preview');
+      previewEl.style.fontSize = `${t.body_font_size_pt ?? 11}pt`;
+      previewEl.innerHTML = `
         <!-- ── HEADER: full logo image (left) + address/committee (right) ── -->
         <div class="lh-header">
 
           <!-- Full branded logo — contains building, URBAN TRILLA MACS, tagline, reg no -->
           <div class="lh-logo-col">
             <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo"
+              style="height:${t.logo_height_px ?? 160}px; width:auto; display:block;"
               onerror="this.style.visibility='hidden';" />
           </div>
 
           <!-- Right: address + committee -->
-          <div class="lh-right-col">
-            <div class="lh-addr">
+          <div class="lh-right-col" style="flex:0 0 ${t.addr_col_width_px ?? 210}px;">
+            <div class="lh-addr" style="font-size:${t.header_font_size_pt ?? 8.5}pt;">
               ${esc(t.society_address_line1 ?? '')}<br>
               ${esc(t.society_address_line2 ?? '')}<br>
               ${esc(t.society_address_line3 ?? '')}
@@ -459,12 +463,15 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       const fontName = (carlitoRegB64 && carlitoBoldB64) ? 'Carlito' : 'Roboto';
       const NAVY = '#1a2a6c';
       const GOLD = '#c8a84b';
+      const logoH  = Math.round((t.logo_height_px ?? 160) * 0.75);
+      const bodyFs = Number(t.body_font_size_pt ?? 11);
+      const hdrFs  = Number(t.header_font_size_pt ?? 8.5);
 
       // ── Committee rows for right column ─────────────────────────────
       const cmteeContent = headerMembers.map(m => ({
         columns: [
-          { text: m.designation, color: GOLD, bold: true, fontSize: 8.5, width: 70 },
-          { text: m.name, color: NAVY, bold: true, fontSize: 8.5, width: '*' },
+          { text: m.designation, color: GOLD, bold: true, fontSize: hdrFs, width: 70 },
+          { text: m.name, color: NAVY, bold: true, fontSize: hdrFs, width: '*' },
         ],
         columnGap: 4,
         margin: [0, 3, 0, 0],
@@ -475,7 +482,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       // Right column holds address + committee only.
       function firstPageHeader() {
         const logoImg = logoB64
-          ? { image: `data:image/png;base64,${logoB64}`, fit: [340, 135], alignment: 'left' }
+          ? { image: `data:image/png;base64,${logoB64}`, fit: [600, logoH], alignment: 'left' }
           : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
 
         return {
@@ -491,9 +498,9 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
                 {
                   width: 185,
                   stack: [
-                    { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: 8.5, lineHeight: 1.5 },
-                    { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: 8.5, lineHeight: 1.5 },
-                    { text: t.society_address_line3 ?? '', bold: true, color: NAVY, fontSize: 8.5, lineHeight: 1.5 },
+                    { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                    { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                    { text: t.society_address_line3 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
                     ...cmteeContent,
                   ],
                 },
@@ -539,15 +546,15 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       const body = [];
 
       // Date
-      body.push({ text: dateStr, fontSize: 11, margin: [0, 0, 0, 16] });
+      body.push({ text: dateStr, fontSize: bodyFs, margin: [0, 0, 0, 16] });
 
       // To block
       if (vals.to?.trim()) {
         const toLines = vals.to.trim().split('\n');
         body.push({
           stack: [
-            { text: 'To', bold: true, fontSize: 11 },
-            ...toLines.map(l => ({ text: l, fontSize: 11, margin: [0, 1, 0, 0] })),
+            { text: 'To', bold: true, fontSize: bodyFs },
+            ...toLines.map(l => ({ text: l, fontSize: bodyFs, margin: [0, 1, 0, 0] })),
           ],
           margin: [0, 0, 0, 14],
         });
@@ -557,29 +564,29 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       if (vals.subject?.trim()) {
         body.push({
           text: `Subject: ${vals.subject}`,
-          fontSize: 11,
+          fontSize: bodyFs,
           margin: [0, 0, 0, 14],
         });
       }
 
       // Salutation
       if (vals.tosalutation?.trim()) {
-        body.push({ text: `Dear ${vals.tosalutation}`, fontSize: 11, margin: [0, 0, 0, 18] });
+        body.push({ text: `Dear ${vals.tosalutation}`, fontSize: bodyFs, margin: [0, 0, 0, 18] });
       }
 
       // Message body
       const message = vals.message?.trim() ?? '';
       if (message) {
-        const msgParagraphs = message.split('\n').map(l => ({ text: l || ' ', fontSize: 11, alignment: 'justify', margin: [0, 0, 0, 4] }));
+        const msgParagraphs = message.split('\n').map(l => ({ text: l || ' ', fontSize: bodyFs, alignment: 'justify', margin: [0, 0, 0, 4] }));
         body.push({ stack: msgParagraphs, margin: [0, 0, 0, 28] });
       } else {
         body.push({ text: '', margin: [0, 0, 0, 28] });
       }
 
       // Closing
-      body.push({ text: t.closing_line1 ?? 'Thanking you!', fontSize: 11, margin: [0, 0, 0, 5] });
+      body.push({ text: t.closing_line1 ?? 'Thanking you!', fontSize: bodyFs, margin: [0, 0, 0, 5] });
       // Large bottom margin = physical signing space above the signature block
-      body.push({ text: t.closing_line2 ?? 'Yours sincerely', fontSize: 11, margin: [0, 0, 0, 90] });
+      body.push({ text: t.closing_line2 ?? 'Yours sincerely', fontSize: bodyFs, margin: [0, 0, 0, 90] });
 
       // Signature block — equal-width columns that reflow 1→2→3
       // No grey line within cells; signing space is the 90pt gap above
@@ -601,7 +608,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       return {
         pageSize: 'A4',
         pageMargins: [57, 168, 57, 72],
-        defaultStyle: { font: fontName, fontSize: 11, lineHeight: 1.45, color: '#111827' },
+        defaultStyle: { font: fontName, fontSize: bodyFs, lineHeight: 1.45, color: '#111827' },
         header: (page) => page === 1 ? firstPageHeader() : subsequentHeader(),
         footer: buildFooter,
         content: body,

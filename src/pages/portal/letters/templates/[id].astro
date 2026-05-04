@@ -121,6 +121,55 @@ const isNew = id === 'new';
           </div>
         </div>
 
+        <!-- ── Styling ── -->
+        <div class="bg-white rounded-xl border border-border-light p-6">
+          <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
+            <i class="fas fa-paint-brush text-primary-600"></i> Styling
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-2">
+                Logo Height
+                <span class="ml-2 font-normal text-primary-600 tabular-nums" id="logo-height-val">160 px</span>
+              </label>
+              <input id="f-logo-height" type="range" min="60" max="220" step="4" value="160"
+                class="w-full accent-primary-600" />
+              <div class="flex justify-between text-xs text-text-secondary mt-1"><span>60 px</span><span>220 px</span></div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-2">
+                Address Column Width
+                <span class="ml-2 font-normal text-primary-600 tabular-nums" id="addr-col-val">210 px</span>
+              </label>
+              <input id="f-addr-col" type="range" min="150" max="300" step="5" value="210"
+                class="w-full accent-primary-600" />
+              <div class="flex justify-between text-xs text-text-secondary mt-1"><span>150 px</span><span>300 px</span></div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Body Text Size</label>
+              <select id="f-body-fs" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600">
+                <option value="10">10 pt</option>
+                <option value="10.5">10.5 pt</option>
+                <option value="11" selected>11 pt</option>
+                <option value="11.5">11.5 pt</option>
+                <option value="12">12 pt</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Header Block Text Size</label>
+              <p class="text-xs text-text-secondary mb-1">Address lines and committee labels</p>
+              <select id="f-header-fs" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600">
+                <option value="7">7 pt</option>
+                <option value="7.5">7.5 pt</option>
+                <option value="8">8 pt</option>
+                <option value="8.5" selected>8.5 pt</option>
+                <option value="9">9 pt</option>
+                <option value="9.5">9.5 pt</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <!-- ── Committee Members ── -->
         <div class="bg-white rounded-xl border border-border-light p-6">
           <div class="flex items-center justify-between mb-4">
@@ -241,6 +290,10 @@ const isNew = id === 'new';
       const phone       = document.getElementById('f-phone')?.value ?? '+91 7032820247';
       const email       = document.getElementById('f-email')?.value ?? 'urbantrillaresidents@gmail.com';
       const societyName = document.getElementById('f-society-name')?.value ?? 'Urban Trilla MACS';
+      const logoH       = Number(document.getElementById('f-logo-height')?.value ?? 160);
+      const addrColW    = Number(document.getElementById('f-addr-col')?.value ?? 210);
+      const bodyFs      = document.getElementById('f-body-fs')?.value ?? '11';
+      const hdrFs       = document.getElementById('f-header-fs')?.value ?? '8.5';
 
       const headerMembers = Array.from(document.querySelectorAll('[data-member-idx]'))
         .filter(el => el.querySelector('.member-in-header')?.checked)
@@ -260,8 +313,8 @@ const isNew = id === 'new';
 
       const cmteeRows = headerMembers.map(m => `
         <div class="lh-cmtee-row">
-          <span class="lh-cmtee-role">${esc(m.designation)}</span>
-          <span class="lh-cmtee-name">${esc(m.name)}</span>
+          <span class="lh-cmtee-role" style="font-size:${hdrFs}pt;">${esc(m.designation)}</span>
+          <span class="lh-cmtee-name" style="font-size:${hdrFs}pt;">${esc(m.name)}</span>
         </div>`).join('');
 
       const sigHTML = sigMembers.length === 0 ? '' : `
@@ -276,13 +329,17 @@ const isNew = id === 'new';
       const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
       const SAMPLE = 'color:#9ca3af;';
 
-      document.getElementById('letter-preview').innerHTML = `
+      const previewEl = document.getElementById('letter-preview');
+      previewEl.style.fontSize = `${bodyFs}pt`;
+      previewEl.innerHTML = `
         <div class="lh-header">
           <div class="lh-logo-col">
-            <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo" onerror="this.style.visibility='hidden';" />
+            <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo"
+              style="height:${logoH}px; width:auto; display:block;"
+              onerror="this.style.visibility='hidden';" />
           </div>
-          <div class="lh-right-col">
-            <div class="lh-addr">
+          <div class="lh-right-col" style="flex:0 0 ${addrColW}px;">
+            <div class="lh-addr" style="font-size:${hdrFs}pt;">
               ${esc(addr1)}<br>
               ${esc(addr2)}<br>
               ${esc(addr3)}
@@ -458,6 +515,15 @@ const isNew = id === 'new';
       document.getElementById('f-phone').value         = t.footer_phone ?? '';
       document.getElementById('f-email').value         = t.footer_email ?? '';
 
+      const lh = t.logo_height_px ?? 160;
+      const ac = t.addr_col_width_px ?? 210;
+      document.getElementById('f-logo-height').value  = String(lh);
+      document.getElementById('logo-height-val').textContent = `${lh} px`;
+      document.getElementById('f-addr-col').value     = String(ac);
+      document.getElementById('addr-col-val').textContent = `${ac} px`;
+      document.getElementById('f-body-fs').value      = String(t.body_font_size_pt ?? 11);
+      document.getElementById('f-header-fs').value    = String(t.header_font_size_pt ?? 8.5);
+
       (t.letterhead_committee_members ?? []).forEach(addMember);
       (t.letterhead_dynamic_fields ?? []).forEach(addField);
       updateTemplatePreview();
@@ -486,6 +552,10 @@ const isNew = id === 'new';
         footer_email:             document.getElementById('f-email').value.trim(),
         committee_members:        collectMembers(),
         dynamic_fields:           collectFields(),
+        logo_height_px:           Number(document.getElementById('f-logo-height').value),
+        body_font_size_pt:        Number(document.getElementById('f-body-fs').value),
+        header_font_size_pt:      Number(document.getElementById('f-header-fs').value),
+        addr_col_width_px:        Number(document.getElementById('f-addr-col').value),
       };
 
       const url    = isNew ? '/api/v1/letters/templates' : `/api/v1/letters/templates/${templateId}`;
@@ -510,6 +580,14 @@ const isNew = id === 'new';
         const d = await res.json();
         showToast(d.error ?? 'Failed to save template', true);
       }
+    });
+
+    // Update slider labels and preview on range input
+    document.getElementById('f-logo-height').addEventListener('input', e => {
+      document.getElementById('logo-height-val').textContent = e.target.value + ' px';
+    });
+    document.getElementById('f-addr-col').addEventListener('input', e => {
+      document.getElementById('addr-col-val').textContent = e.target.value + ' px';
     });
 
     // Single delegated listener catches all inputs including dynamically added member rows
