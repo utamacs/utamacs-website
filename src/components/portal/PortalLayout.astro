@@ -31,11 +31,14 @@ const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: st
   { moduleKey: 'notifications',    displayName: 'Notifications',          icon: 'fa-envelope' },
   { moduleKey: 'analytics',        displayName: 'Analytics & Reports',    icon: 'fa-chart-bar' },
   { moduleKey: 'compliance',       displayName: 'Compliance & Audit',     icon: 'fa-shield-alt' },
+  { moduleKey: 'letters',          displayName: 'Official Letters',        icon: 'fa-envelope-open-text' },
 ];
 
 const roleFilter = (m: { moduleKey: string }) => {
   if (user.role === 'security_guard') return m.moduleKey === 'visitor_mgmt';
   if (user.role === 'vendor') return m.moduleKey === 'vendors';
+  // Letters module is exec/admin only — not visible to regular members
+  if (m.moduleKey === 'letters') return ['executive', 'admin'].includes(user.role);
   return true;
 };
 
@@ -72,6 +75,7 @@ const MODULE_PATHS: Record<string, string> = {
   analytics: '/portal/analytics',
   compliance: '/portal/admin/audit',
   members: '/portal/members',
+  letters: '/portal/letters',
 };
 ---
 
