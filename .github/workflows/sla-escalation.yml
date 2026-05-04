@@ -1,0 +1,24 @@
+name: Hourly SLA Escalation
+
+on:
+  schedule:
+    # Runs every hour at :00 (UTC). Free on GitHub Actions for public repos;
+    # counts against the 2,000 min/month free quota for private repos (~45 min/month here).
+    - cron: '0 * * * *'
+  # Allow manual trigger from the Actions tab for testing
+  workflow_dispatch:
+
+jobs:
+  escalate:
+    name: Trigger SLA Escalation
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Call SLA escalation endpoint
+        run: |
+          response=$(curl --silent --show-error --fail-with-body \
+            --max-time 30 \
+            --header "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://portal.utamacs.org/api/v1/automation/sla-escalation")
+          echo "Response: $response"
