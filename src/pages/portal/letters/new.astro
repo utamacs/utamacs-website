@@ -647,134 +647,36 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       });
     }
 
-    // ── DOCX generation ───────────────────────────────────────────────────────
-    async function generateDocxBase64() {
-      const t = currentTemplate;
-      const vals = getFieldValues();
-      const sigs = getSelectedSignatories();
-      const headerMembers = t.letterhead_committee_members.filter(m => m.show_in_header);
-      const dateStr = vals.date ? formatDate(vals.date) : formatDate(new Date().toISOString().slice(0,10));
-
-      const { Document, Paragraph, TextRun, Table, TableRow, TableCell,
-              AlignmentType, BorderStyle, WidthType, Packer, Header, Footer,
-              PageNumber } = await import('docx');
-
-      const NAVY = '1a2a6c';
-      const GOLD = 'c8a84b';
-      const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
-
-      function tr(text, opts) {
-        return new TextRun({ text: String(text ?? ''), font: 'Carlito', size: 22, ...opts });
-      }
-      function p(children, opts) {
-        return new Paragraph({ children: Array.isArray(children) ? children : [children], ...opts });
-      }
-
-      // Header paragraphs
-      const headerParas = [
-        p(tr(`${t.society_name ?? 'URBAN TRILLA MACS'}  |  ${t.society_tagline ?? 'COMMUNITY • CARE • MAINTENANCE'}`,
-          { bold: true, color: NAVY, size: 24 }), { spacing: { after: 60 } }),
-        p(tr(`Reg No: ${t.society_reg_no ?? 'TG/RRD/MACS/2026-15/FOW & M'}  |  ${t.society_address_line1 ?? ''} ${t.society_address_line2 ?? ''} ${t.society_address_line3 ?? ''}`,
-          { size: 16, color: '374151' }), { spacing: { after: 60 } }),
-        p(headerMembers.map(m => tr(`${m.designation}: ${m.name}   `, { bold: true, size: 16, color: NAVY })),
-          { spacing: { after: 60 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: NAVY, space: 4 } } }),
-      ];
-
-      const footerParas = [
-        p(tr(`Web: ${t.footer_website ?? 'www.utamacs.org'}    Ph: ${t.footer_phone ?? '+91 7032820247'}    Email: ${t.footer_email ?? 'urbantrillaresidents@gmail.com'}`,
-          { size: 16, color: '374151' }),
-          { border: { top: { style: BorderStyle.SINGLE, size: 6, color: NAVY, space: 4 } }, spacing: { after: 40 } }),
-        p([
-          tr('Page ', { size: 14, color: '6b7280' }),
-          new TextRun({ children: [PageNumber.CURRENT], font: 'Carlito', size: 14, color: '6b7280' }),
-          tr(' of ', { size: 14, color: '6b7280' }),
-          new TextRun({ children: [PageNumber.TOTAL_PAGES], font: 'Carlito', size: 14, color: '6b7280' }),
-        ], { alignment: AlignmentType.RIGHT }),
-      ];
-
-      const bodyContent = [];
-
-      bodyContent.push(p(tr(dateStr), { spacing: { after: 200 } }));
-
-      if (vals.to?.trim()) {
-        bodyContent.push(p(tr('To', { bold: true }), { spacing: { after: 40 } }));
-        vals.to.trim().split('\n').forEach(line =>
-          bodyContent.push(p(tr(line), { spacing: { after: 40 } })));
-        bodyContent.push(p(tr(''), { spacing: { after: 120 } }));
-      }
-
-      if (vals.subject?.trim()) {
-        bodyContent.push(p([tr('Subject: ', { bold: true }), tr(vals.subject)], { spacing: { after: 200 } }));
-      }
-
-      if (vals.tosalutation?.trim()) {
-        bodyContent.push(p(tr(`Dear ${vals.tosalutation}`), { spacing: { after: 200 } }));
-      }
-
-      (vals.message?.trim() ?? '').split('\n').forEach(line =>
-        bodyContent.push(p(tr(line || ' '), { alignment: AlignmentType.JUSTIFIED, spacing: { after: 80 } })));
-
-      bodyContent.push(p(tr(''), { spacing: { after: 200 } }));
-      bodyContent.push(p(tr(t.closing_line1 ?? 'Thanking you!'), { spacing: { after: 80 } }));
-      bodyContent.push(p(tr(t.closing_line2 ?? 'Yours sincerely'), { spacing: { after: 800 } }));
-
-      if (sigs.length > 0) {
-        const colW = Math.floor(9360 / sigs.length);
-        bodyContent.push(new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: [
-            new TableRow({ children: sigs.map(() => new TableCell({
-              borders: { top: NO_BORDER, left: NO_BORDER, right: NO_BORDER,
-                bottom: { style: BorderStyle.SINGLE, size: 4, color: 'd1d5db' } },
-              children: [p(tr(''), { spacing: { before: 500 } })],
-              width: { size: colW, type: WidthType.DXA },
-            })) }),
-            new TableRow({ children: sigs.map(s => new TableCell({
-              borders: { top: NO_BORDER, left: NO_BORDER, right: NO_BORDER, bottom: NO_BORDER },
-              children: [p(tr(s.designation, { bold: true, color: GOLD, size: 18 }), { spacing: { after: 40 } })],
-            })) }),
-            new TableRow({ children: sigs.map(() => new TableCell({
-              borders: { top: NO_BORDER, left: NO_BORDER, right: NO_BORDER, bottom: NO_BORDER },
-              children: [p(tr(t.society_name ?? 'Urban Trilla MACS', { color: NAVY, size: 18 }))],
-            })) }),
-          ],
-        }));
-      }
-
-      const doc = new Document({
-        sections: [{
-          properties: { page: { margin: { top: 2200, bottom: 1100, left: 910, right: 910 } } },
-          headers: { default: new Header({ children: headerParas }) },
-          footers: { default: new Footer({ children: footerParas }) },
-          children: bodyContent,
-        }],
-      });
-
-      // Packer.toString() returns raw binary bytes (not base64) — unusable for GitHub.
-      // Packer.toBuffer() works in both Node and browser (returns Buffer/Uint8Array).
-      // Chunk the byte→char conversion to avoid call-stack limits on large files.
-      const buf = await Packer.toBuffer(doc);
-      const bytes = new Uint8Array(buf);
-      const CHUNK = 8192;
-      let s = '';
-      for (let i = 0; i < bytes.byteLength; i += CHUNK) {
-        s += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-      }
-      return btoa(s);
-    }
-
+    // ── Download DOCX (server-side generation) ────────────────────────────────
+    // 'docx' is a Node.js package and cannot be imported in the browser.
+    // The server generates the DOCX and streams it back as binary.
     async function downloadDocx() {
       if (!currentTemplate) { showToast('Select a template first', true); return; }
       const title = document.getElementById('f-title').value.trim() || 'letter';
       showToast('Generating DOCX…', false);
       try {
-        const b64 = await generateDocxBase64();
-        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const vals = getFieldValues();
+        const sigs = getSelectedSignatories();
+        const res = await fetch('/api/v1/letters/docx', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            template_id: currentTemplate.id,
+            field_values: vals,
+            signatures_used: sigs.map(s => s.designation),
+          }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          showToast('DOCX generation failed: ' + (d.error ?? res.statusText), true);
+          return;
+        }
+        const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = Object.assign(document.createElement('a'), { href: url, download: `${title}.docx` });
         document.body.appendChild(a); a.click();
         document.body.removeChild(a); URL.revokeObjectURL(url);
+        showToast('DOCX downloaded!', false);
       } catch(e) { showToast('DOCX generation failed: ' + e.message, true); }
     }
 
@@ -789,10 +691,11 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating & Saving…';
 
       try {
-        const [pdf_base64, docx_base64] = await Promise.all([generatePdfBase64(), generateDocxBase64()]);
+        const pdf_base64 = await generatePdfBase64();
         const vals = getFieldValues();
         const sigs = getSelectedSignatories();
 
+        // DOCX is generated server-side (docx is a Node.js-only package).
         const res = await fetch('/api/v1/letters', {
           method: 'POST', credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -804,7 +707,6 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
             field_values: vals,
             signatures_used: sigs.map(s => s.designation),
             pdf_base64,
-            docx_base64,
           }),
         });
 
