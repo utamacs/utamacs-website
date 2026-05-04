@@ -381,9 +381,10 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 
       const previewEl = document.getElementById('letter-preview');
       previewEl.style.fontSize = `${t.body_font_size_pt ?? 11}pt`;
+      const logoAlignItems = t.logo_valign === 'center' ? 'center' : t.logo_valign === 'bottom' ? 'flex-end' : 'flex-start';
       previewEl.innerHTML = `
         <!-- ── HEADER: full logo image (left) + address/committee (right) ── -->
-        <div class="lh-header">
+        <div class="lh-header" style="align-items:${logoAlignItems};">
 
           <!-- Full branded logo — contains building, URBAN TRILLA MACS, tagline, reg no -->
           <div class="lh-logo-col">
