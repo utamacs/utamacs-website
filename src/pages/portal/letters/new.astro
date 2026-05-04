@@ -26,68 +26,27 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       color: #111827;
     }
 
-    /* HEADER ─────────────────────────────────────────────── */
+    /* HEADER: logo image (left) + address/committee (right) */
     .lh-header {
       display: flex;
-      align-items: stretch;
+      align-items: flex-start;
+      justify-content: space-between;
       margin-bottom: 0;
     }
 
-    /* Left column: logo — sized to match template exactly */
+    /* Logo — full branded image, height sized to match right-column content */
     .lh-logo-col {
       flex: 0 0 auto;
-      display: flex;
-      align-items: flex-start;
     }
     .lh-logo-col img {
-      height: 125px;
+      height: 120px;
       width: auto;
       display: block;
     }
 
-    /* Gold vertical divider */
-    .lh-vdivider {
-      flex-shrink: 0;
-      width: 2px;
-      background: #c8a84b;
-      margin: 0 12px;
-      align-self: stretch;
-    }
-
-    /* Center column: society name + tagline + reg no */
-    .lh-name-col {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      padding-right: 12px;
-      padding-top: 2px;
-    }
-    .lh-soc-top  {
-      font-size: 20pt; font-weight: 700; color: #1a2a6c;
-      letter-spacing: 2px; line-height: 1.1; margin-bottom: 2px;
-    }
-    .lh-soc-macs {
-      font-size: 34pt; font-weight: 700; color: #1a2a6c;
-      letter-spacing: 22px; line-height: 1.0;
-      border-bottom: 1.5px solid #c8a84b;
-      padding-bottom: 4px; margin-bottom: 6px;
-      display: block;
-    }
-    .lh-soc-tag  { font-size: 7.5pt; color: #1a2a6c; letter-spacing: 2px; margin-bottom: 5px; }
-    .lh-reg-row  {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 7.5pt;
-      color: #c8a84b;
-    }
-    .lh-reg-row .reg-text { white-space: nowrap; }
-    .lh-reg-row .reg-line { flex: 1; height: 1px; background: #c8a84b; }
-
-    /* Right column: address + committee — width matches template proportions */
+    /* Right column: address + committee */
     .lh-right-col {
-      flex: 0 0 235px;
+      flex: 0 0 210px;
       padding-top: 2px;
     }
     .lh-addr {
@@ -420,32 +379,13 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         : '<p style="color:#9ca3af;margin:0;">[Message body will appear here]</p>';
 
       document.getElementById('letter-preview').innerHTML = `
-        <!-- ── HEADER ────────────────────────────────────────── -->
+        <!-- ── HEADER: full logo image (left) + address/committee (right) ── -->
         <div class="lh-header">
 
-          <!-- Logo -->
+          <!-- Full branded logo — contains building, URBAN TRILLA MACS, tagline, reg no -->
           <div class="lh-logo-col">
             <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo"
-              onerror="this.style.display='none';this.nextElementSibling.style.display='block';"
-              style="height:125px;width:auto;display:block;" />
-            <div style="display:none;font-size:10pt;font-weight:700;color:#1a2a6c;padding:10px 0;">UTA MACS</div>
-          </div>
-
-          <!-- Gold vertical divider — align-self:stretch ensures it spans full header height -->
-          <div class="lh-vdivider"></div>
-
-          <!-- Center: society name + tagline + reg no -->
-          <div class="lh-name-col">
-            <div class="lh-soc-top">URBAN TRILLA</div>
-            <div class="lh-soc-macs">MACS</div>
-            <div class="lh-soc-tag">${esc(t.society_tagline ?? 'COMMUNITY • CARE • MAINTENANCE')}</div>
-            <div class="lh-reg-row">
-              <span class="reg-line"></span>
-              <span style="font-size:9pt; line-height:1; margin:0 2px;">→</span>
-              <span class="reg-text">Reg No: ${esc(t.society_reg_no ?? 'TG/RRD/MACS/2026-15/FOW & M')}</span>
-              <span style="font-size:9pt; line-height:1; margin:0 2px;">←</span>
-              <span class="reg-line"></span>
-            </div>
+              onerror="this.style.visibility='hidden';" />
           </div>
 
           <!-- Right: address + committee -->
@@ -531,49 +471,25 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       }));
 
       // ── FIRST PAGE HEADER ────────────────────────────────────────────
+      // Logo PNG is the full branded image (building + URBAN TRILLA MACS + tagline + reg no).
+      // Right column holds address + committee only.
       function firstPageHeader() {
-        const logoCol = logoB64
-          ? { image: `data:image/png;base64,${logoB64}`, height: 115, width: 110, alignment: 'left' }
-          : { text: 'UTA MACS', fontSize: 14, bold: true, color: NAVY };
+        const logoImg = logoB64
+          ? { image: `data:image/png;base64,${logoB64}`, fit: [280, 110], alignment: 'left' }
+          : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
 
         return {
           margin: [57, 28, 57, 0],
           stack: [
             {
               columns: [
-                // Left: logo
-                { stack: [logoCol], width: 'auto' },
-                // Gold vertical divider
+                // Left: full branded logo image
+                { stack: [logoImg], width: 'auto' },
+                // Spacer pushes right column to the far right
+                { text: '', width: '*' },
+                // Right: address + committee
                 {
-                  canvas: [{ type: 'line', x1: 0, y1: 0, x2: 0, y2: 108, lineWidth: 2, lineColor: GOLD }],
-                  width: 12,
-                  margin: [6, 0, 6, 0],
-                },
-                // Center: society name block
-                {
-                  width: '*',
-                  stack: [
-                    { text: 'URBAN TRILLA', fontSize: 20, bold: true, color: NAVY, characterSpacing: 2, lineHeight: 1.1, margin: [0, 2, 0, 1] },
-                    // MACS — large with gold underline canvas
-                    { text: 'MACS', fontSize: 34, bold: true, color: NAVY, characterSpacing: 22, lineHeight: 1.0 },
-                    { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 175, y2: 0, lineWidth: 1.5, lineColor: GOLD }], margin: [0, 3, 0, 5] },
-                    { text: t.society_tagline ?? 'COMMUNITY • CARE • MAINTENANCE', fontSize: 7.5, color: NAVY, characterSpacing: 2, margin: [0, 0, 0, 4] },
-                    // Reg No row with decorative lines
-                    {
-                      columns: [
-                        { canvas: [{ type: 'line', x1: 0, y1: 4, x2: 25, y2: 4, lineWidth: 0.75, lineColor: GOLD }], width: 29 },
-                        { text: '→', fontSize: 8, color: GOLD, width: 9, margin: [0, 0, 0, 0] },
-                        { text: `Reg No: ${t.society_reg_no ?? 'TG/RRD/MACS/2026-15/FOW & M'}`, fontSize: 7.5, color: GOLD, alignment: 'center', width: '*' },
-                        { text: '←', fontSize: 8, color: GOLD, width: 9, margin: [0, 0, 0, 0] },
-                        { canvas: [{ type: 'line', x1: 0, y1: 4, x2: 25, y2: 4, lineWidth: 0.75, lineColor: GOLD }], width: 29 },
-                      ],
-                      columnGap: 2,
-                    },
-                  ],
-                },
-                // Right: address + committee — matches template right-column width
-                {
-                  width: 195,
+                  width: 185,
                   stack: [
                     { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: 8.5, lineHeight: 1.5 },
                     { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: 8.5, lineHeight: 1.5 },
@@ -585,7 +501,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
               columnGap: 0,
             },
             // Thick navy underline (A4 content width: 595.28 - 57 - 57 = 481pt)
-            { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 481, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 6, 0, 0] },
+            { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 481, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 8, 0, 0] },
           ],
         };
       }
@@ -684,7 +600,7 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 
       return {
         pageSize: 'A4',
-        pageMargins: [57, 165, 57, 72],
+        pageMargins: [57, 150, 57, 72],
         defaultStyle: { font: fontName, fontSize: 11, lineHeight: 1.45, color: '#111827' },
         header: (page) => page === 1 ? firstPageHeader() : subsequentHeader(),
         footer: buildFooter,
