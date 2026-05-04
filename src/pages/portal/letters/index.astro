@@ -105,6 +105,7 @@ if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal'
         const createdTime = new Date(l.created_at).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
         const templateName = l.letterhead_templates?.name ?? '—';
 
+        const safeTitle = l.title.replace(/\\/g,'\\\\').replace(/'/g,'\\\'');
         card.innerHTML = `
           <div class="flex items-start gap-3 min-w-0 flex-1">
             <div class="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -126,13 +127,16 @@ if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal'
             </div>
           </div>
           <div class="flex items-center gap-1 flex-shrink-0">
-            ${l.git_path_pdf ? `<a href="/portal/letters/${l.id}?download=pdf" title="Download PDF"
+            <a href="/portal/letters/${l.id}" title="Edit letter"
+              class="p-2 rounded-lg text-text-secondary hover:bg-gray-100 hover:text-primary-600 transition-colors text-sm">
+              <i class="fas fa-edit"></i></a>
+            ${l.git_path_pdf ? `<button onclick="downloadLetter('${l.id}','pdf','${safeTitle}')" title="Download PDF"
               class="p-2 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors text-sm">
-              <i class="fas fa-file-pdf"></i></a>` : ''}
-            ${l.git_path_docx ? `<a href="/portal/letters/${l.id}?download=docx" title="Download DOCX"
+              <i class="fas fa-file-pdf"></i></button>` : ''}
+            ${l.git_path_docx ? `<button onclick="downloadLetter('${l.id}','docx','${safeTitle}')" title="Download DOCX"
               class="p-2 rounded-lg text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors text-sm">
-              <i class="fas fa-file-word"></i></a>` : ''}
-            ${isAdmin ? `<button onclick="openDeleteModal('${l.id}', '${l.title.replace(/'/g,'\\\'')}')"
+              <i class="fas fa-file-word"></i></button>` : ''}
+            ${isAdmin ? `<button onclick="openDeleteModal('${l.id}', '${safeTitle}')"
               title="Delete" class="p-2 rounded-lg text-text-secondary hover:text-red-600 hover:bg-red-50 transition-colors text-sm">
               <i class="fas fa-trash"></i></button>` : ''}
           </div>`;
@@ -143,30 +147,19 @@ if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal'
       document.getElementById('load-more-btn').classList.toggle('hidden', currentOffset >= total);
     }
 
-    // Download via redirect through letter detail API
-    document.addEventListener('click', async (e) => {
-      const a = e.target.closest('a[href*="?download="]');
-      if (!a) return;
-      e.preventDefault();
-      const url = new URL(a.href);
-      const format = url.searchParams.get('download');
-      const id = url.pathname.split('/').pop();
-      const res = await fetch(`/api/v1/letters/${id}`, { credentials: 'include' });
-      if (!res.ok) { showToast('Failed to get download URL', true); return; }
-      const letter = await res.json();
-      const downloadUrl = format === 'pdf' ? letter.download_pdf : letter.download_docx;
-      if (downloadUrl) {
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = '';
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        showToast('File not available', true);
-      }
-    });
+    async function downloadLetter(id, format, title) {
+      showToast(`Downloading ${format.toUpperCase()}…`, false);
+      try {
+        const res = await fetch(`/api/v1/letters/${id}?format=${format}`, { credentials: 'include' });
+        if (!res.ok) { showToast('Download failed', true); return; }
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: blobUrl, download: `${title}.${format}` });
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(blobUrl);
+      } catch (e) { showToast('Download failed: ' + e.message, true); }
+    }
+    window.downloadLetter = downloadLetter;
 
     function openDeleteModal(id, title) {
       pendingDeleteId = id;

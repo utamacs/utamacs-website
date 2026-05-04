@@ -1,0 +1,650 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal/letters');
+
+const { id } = Astro.params;
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+const { data: letter, error } = await sb
+  .from('generated_letters')
+  .select('*')
+  .eq('id', id!)
+  .eq('society_id', SOCIETY_ID)
+  .single();
+
+if (error || !letter) return Astro.redirect('/portal/letters');
+if (user.role === 'executive' && letter.created_by !== user.id) return Astro.redirect('/portal/letters');
+---
+
+<PortalLayout title="Edit Letter" user={user} activeModule="letters">
+
+  <!-- Carlito font for live preview -->
+  <style is:global>
+    @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-Regular.ttf') format('truetype'); font-weight:400; }
+    @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-Bold.ttf') format('truetype'); font-weight:700; }
+    @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-Italic.ttf') format('truetype'); font-style:italic; }
+    @font-face { font-family:'Carlito'; src:url('/fonts/Carlito-BoldItalic.ttf') format('truetype'); font-weight:700; font-style:italic; }
+
+    #letter-preview {
+      font-family: 'Carlito', 'Calibri', sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #111827;
+    }
+    .lh-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0; }
+    .lh-logo-col { flex: 0 0 auto; }
+    .lh-logo-col img { height: 160px; width: auto; display: block; }
+    .lh-right-col { flex: 0 0 210px; padding-top: 2px; }
+    .lh-addr { font-weight: 700; color: #1a2a6c; font-size: 8.5pt; line-height: 1.55; }
+    .lh-cmtee { margin-top: 10px; }
+    .lh-cmtee-row { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; }
+    .lh-cmtee-role { color: #c8a84b; font-weight: 700; font-size: 8.5pt; min-width: 62px; }
+    .lh-cmtee-name { font-weight: 700; color: #1a2a6c; font-size: 8.5pt; }
+    .lh-header-line { height: 3px; background: #1a2a6c; margin-top: 8px; margin-bottom: 20px; }
+    .lh-date        { margin-bottom: 18px; }
+    .lh-to-block    { margin-bottom: 14px; }
+    .lh-to-block .to-label { font-weight: 700; }
+    .lh-subject     { margin-bottom: 14px; }
+    .lh-salutation  { margin-bottom: 18px; }
+    .lh-message     { margin-bottom: 30px; white-space: pre-wrap; text-align: justify; }
+    .lh-closing     { margin-bottom: 10px; }
+    .lh-sig-row      { display: flex; gap: 20px; padding-top: 8px; }
+    .lh-sig-cell     { flex: 1; }
+    .lh-sig-role     { font-weight: 700; color: #c8a84b; font-size: 10pt; }
+    .lh-sig-society  { color: #1a2a6c; font-size: 10pt; }
+    .lh-footer-line  { height: 3px; background: #1a2a6c; margin-top: 10px; margin-bottom: 6px; }
+    .lh-footer       { display: flex; flex-direction: row; justify-content: space-between; flex-wrap: nowrap; font-size: 8pt; color: #374151; }
+    .lh-footer-item  { display: flex; flex-direction: row; align-items: center; gap: 5px; white-space: nowrap; }
+  </style>
+
+  <div class="mb-5">
+    <nav class="text-sm text-text-secondary mb-2">
+      <a href="/portal/letters" class="hover:text-primary-600">Letters</a>
+      <span class="mx-2">›</span>
+      <span class="text-text-primary">Edit Letter</span>
+    </nav>
+    <h1 class="text-2xl font-bold text-text-primary">Edit Letter</h1>
+    <p class="text-sm text-text-secondary mt-1">Modify the letter. Changes will overwrite the saved files in the archive.</p>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+    <!-- ── LEFT: Form ── -->
+    <div class="space-y-5">
+
+      <!-- Template selector -->
+      <div class="bg-white rounded-xl border border-border-light p-5">
+        <label class="block text-sm font-semibold text-text-primary mb-2">
+          <i class="fas fa-file-alt text-primary-600 mr-1"></i> Letterhead Template
+        </label>
+        <select id="template-select" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600">
+          <option value="">Loading templates…</option>
+        </select>
+      </div>
+
+      <!-- Internal title -->
+      <div class="bg-white rounded-xl border border-border-light p-5">
+        <label class="block text-sm font-semibold text-text-primary mb-1">
+          <i class="fas fa-tag text-primary-600 mr-1"></i> Internal Title <span class="text-red-500">*</span>
+        </label>
+        <p class="text-xs text-text-secondary mb-2">Used as the file name in the GitHub archive.</p>
+        <input id="f-title" type="text" required placeholder="e.g. Notice to GHMC regarding road repair"
+          class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+      </div>
+
+      <!-- Dynamic fields -->
+      <div class="bg-white rounded-xl border border-border-light p-5">
+        <h3 class="text-sm font-semibold text-text-primary mb-3">
+          <i class="fas fa-edit text-primary-600 mr-1"></i> Letter Content
+        </h3>
+        <div id="dynamic-fields" class="space-y-4">
+          <div class="text-sm text-text-secondary">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Signature selection -->
+      <div class="bg-white rounded-xl border border-border-light p-5">
+        <h3 class="text-sm font-semibold text-text-primary mb-1">
+          <i class="fas fa-pen-nib text-primary-600 mr-1"></i> Signatories
+        </h3>
+        <p class="text-xs text-text-secondary mb-3">Select who signs this letter.</p>
+        <div id="signature-options" class="space-y-2">
+          <div class="text-sm text-text-secondary">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="bg-white rounded-xl border border-border-light p-5 space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <button id="btn-pdf" class="btn-primary text-sm py-2.5 flex items-center justify-center gap-2" disabled>
+            <i class="fas fa-file-pdf"></i> Download PDF
+          </button>
+          <button id="btn-docx" class="btn-outline text-sm py-2.5 flex items-center justify-center gap-2" disabled>
+            <i class="fas fa-file-word"></i> Download DOCX
+          </button>
+        </div>
+        <button id="btn-save" class="w-full text-sm py-2.5 flex items-center justify-center gap-2 rounded-lg font-medium text-white bg-green-600 hover:bg-green-700 transition-colors" disabled>
+          <i class="fas fa-cloud-upload-alt"></i> Update Archive (GitHub)
+        </button>
+        <p class="text-xs text-text-secondary text-center">Update overwrites the existing PDF and DOCX in the archive.</p>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: Live Preview ── -->
+    <div>
+      <div class="sticky top-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-semibold text-text-primary">Live Preview — A4</span>
+          <span class="text-xs bg-gray-100 text-text-secondary px-2 py-1 rounded">Carlito 11pt</span>
+        </div>
+        <div class="bg-gray-300 rounded-xl p-3 overflow-auto" style="max-height:85vh;">
+          <div style="width:794px; transform-origin:top left; transform:scale(0.68); margin-bottom:-360px;">
+            <div id="letter-preview"
+              style="width:794px; min-height:1123px; background:white; padding:50px 57px 50px; box-shadow:0 2px 20px rgba(0,0,0,0.18); font-family:'Carlito','Calibri',sans-serif; font-size:11pt; line-height:1.45; color:#111827; display:flex; flex-direction:column;">
+              <p style="color:#9ca3af; text-align:center; margin-top:200px; font-size:11pt;">Loading letter…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden fixed bottom-6 right-6 px-4 py-2.5 rounded-lg shadow-large text-sm z-50 text-white max-w-sm"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.min.js" crossorigin="anonymous"></script>
+
+  <script define:vars={{
+    letterId: letter.id,
+    initialTemplateId: letter.template_id,
+    initialFieldValues: letter.field_values ?? {},
+    initialSignaturesUsed: letter.signatures_used ?? [],
+    initialTitle: letter.title,
+  }}>
+    let currentTemplate = null;
+    let carlitoRegB64 = null;
+    let carlitoBoldB64 = null;
+    let carlitoItalicB64 = null;
+    let carlitoBoldItalicB64 = null;
+    let logoB64 = null;
+    let prefilled = false;
+
+    async function toBase64(url, opts = {}) {
+      try {
+        const res = await fetch(url, opts);
+        if (!res.ok) return null;
+        const buf = await res.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let s = '';
+        for (let i = 0; i < bytes.byteLength; i++) s += String.fromCharCode(bytes[i]);
+        return btoa(s);
+      } catch { return null; }
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function initAssets() {
+      [carlitoRegB64, carlitoBoldB64, carlitoItalicB64, carlitoBoldItalicB64, logoB64] = await Promise.all([
+        toBase64('/fonts/Carlito-Regular.ttf'),
+        toBase64('/fonts/Carlito-Bold.ttf'),
+        toBase64('/fonts/Carlito-Italic.ttf'),
+        toBase64('/fonts/Carlito-BoldItalic.ttf'),
+        toBase64('/UTA-MACS-Logo.png', { cache: 'reload' }),
+      ]);
+      if (carlitoRegB64 && carlitoBoldB64) {
+        pdfMake.vfs['Carlito-Regular.ttf']   = carlitoRegB64;
+        pdfMake.vfs['Carlito-Bold.ttf']      = carlitoBoldB64;
+        if (carlitoItalicB64)     pdfMake.vfs['Carlito-Italic.ttf']     = carlitoItalicB64;
+        if (carlitoBoldItalicB64) pdfMake.vfs['Carlito-BoldItalic.ttf'] = carlitoBoldItalicB64;
+        pdfMake.fonts = pdfMake.fonts ?? {};
+        pdfMake.fonts.Carlito = {
+          normal:     'Carlito-Regular.ttf',
+          bold:       'Carlito-Bold.ttf',
+          italics:    carlitoItalicB64     ? 'Carlito-Italic.ttf'     : 'Carlito-Regular.ttf',
+          bolditalics:carlitoBoldItalicB64 ? 'Carlito-BoldItalic.ttf' : 'Carlito-Bold.ttf',
+        };
+      }
+    }
+
+    async function loadTemplates() {
+      const sel = document.getElementById('template-select');
+      const res = await fetch('/api/v1/letters/templates', { credentials: 'include' });
+      const templates = res.ok ? await res.json() : [];
+      if (!templates.length) {
+        sel.innerHTML = '<option value="">No templates found</option>';
+        return;
+      }
+      sel.innerHTML = templates.map(t =>
+        `<option value="${t.id}" ${t.id === initialTemplateId ? 'selected' : ''}>
+          ${esc(t.name)}${t.is_default ? ' (Default)' : ''}</option>`
+      ).join('');
+      loadTemplateDetails(sel.value);
+    }
+
+    async function loadTemplateDetails(id) {
+      if (!id) return;
+      const res = await fetch(`/api/v1/letters/templates/${id}`, { credentials: 'include' });
+      if (!res.ok) return;
+      currentTemplate = await res.json();
+      currentTemplate.letterhead_committee_members =
+        (currentTemplate.letterhead_committee_members ?? []).sort((a, b) => a.display_order - b.display_order);
+      currentTemplate.letterhead_dynamic_fields =
+        (currentTemplate.letterhead_dynamic_fields ?? []).sort((a, b) => a.display_order - b.display_order);
+      renderDynamicFields();
+      renderSignatureOptions();
+      prefillFromLetter();
+      updatePreview();
+      enableButtons();
+    }
+
+    function prefillFromLetter() {
+      if (prefilled) return;
+      prefilled = true;
+
+      const titleEl = document.getElementById('f-title');
+      if (titleEl && initialTitle) titleEl.value = initialTitle;
+
+      if (initialFieldValues) {
+        Object.entries(initialFieldValues).forEach(([key, value]) => {
+          const el = document.getElementById(`df-${key}`);
+          if (el) el.value = value ?? '';
+        });
+      }
+
+      if (initialSignaturesUsed?.length) {
+        document.querySelectorAll('.sig-check').forEach(el => {
+          el.checked = initialSignaturesUsed.includes(el.dataset.designation);
+        });
+      }
+    }
+
+    function renderDynamicFields() {
+      const container = document.getElementById('dynamic-fields');
+      if (!currentTemplate) { container.innerHTML = '<div class="text-sm text-text-secondary">Select a template.</div>'; return; }
+      container.innerHTML = currentTemplate.letterhead_dynamic_fields.map(f => {
+        const domId = `df-${f.field_key}`;
+        const req = f.is_required ? '<span class="text-red-500">*</span>' : '';
+        const base = `class="w-full border border-border-light rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"`;
+        let input;
+        if (f.field_type === 'date') {
+          input = `<input id="${domId}" type="date" ${f.is_required ? 'required' : ''} ${base} />`;
+        } else if (f.field_type === 'textarea' || f.field_type === 'richtext') {
+          input = `<textarea id="${domId}" rows="4" placeholder="${esc(f.placeholder ?? '')}" ${f.is_required ? 'required' : ''} ${base} style="resize:vertical;"></textarea>`;
+        } else {
+          input = `<input id="${domId}" type="text" placeholder="${esc(f.placeholder ?? '')}" ${f.is_required ? 'required' : ''} ${base} />`;
+        }
+        return `<div><label class="block text-sm font-medium text-text-primary mb-1">${esc(f.display_label)} ${req}</label>${input}</div>`;
+      }).join('');
+
+      document.querySelectorAll('input[type="date"][id^="df-"]').forEach(el => {
+        if (!el.value) el.value = new Date().toISOString().slice(0, 10);
+      });
+      container.querySelectorAll('input,textarea').forEach(el => el.addEventListener('input', updatePreview));
+    }
+
+    function renderSignatureOptions() {
+      const container = document.getElementById('signature-options');
+      if (!currentTemplate) { container.innerHTML = '<div class="text-sm text-text-secondary">Select a template.</div>'; return; }
+      const sigs = currentTemplate.letterhead_committee_members.filter(m => m.show_in_signature);
+      container.innerHTML = sigs.map(m => `
+        <label class="flex items-center gap-3 p-2.5 rounded-lg border border-border-light hover:bg-gray-50 cursor-pointer">
+          <input type="checkbox" class="sig-check rounded text-primary-600" value="${m.id}"
+            data-name="${esc(m.name)}" data-designation="${esc(m.designation)}" checked />
+          <div>
+            <div class="text-sm font-medium text-text-primary">${esc(m.name)}</div>
+            <div class="text-xs text-text-secondary">${esc(m.designation)}</div>
+          </div>
+        </label>`).join('');
+      container.querySelectorAll('.sig-check').forEach(el => el.addEventListener('change', updatePreview));
+    }
+
+    function getFieldValues() {
+      const vals = {};
+      if (!currentTemplate) return vals;
+      currentTemplate.letterhead_dynamic_fields.forEach(f => {
+        const el = document.getElementById(`df-${f.field_key}`);
+        if (el) vals[f.field_key] = el.value;
+      });
+      return vals;
+    }
+
+    function getSelectedSignatories() {
+      return Array.from(document.querySelectorAll('.sig-check:checked')).map(el => ({
+        id: el.value, name: el.dataset.name, designation: el.dataset.designation,
+      }));
+    }
+
+    function updatePreview() {
+      if (!currentTemplate) return;
+      const t = currentTemplate;
+      const vals = getFieldValues();
+      const sigs = getSelectedSignatories();
+      const headerMembers = t.letterhead_committee_members.filter(m => m.show_in_header);
+      const dateStr = vals.date ? formatDate(vals.date) : formatDate(new Date().toISOString().slice(0,10));
+      const hdrFsPt = `${t.header_font_size_pt ?? 8.5}pt`;
+      const cmteeRows = headerMembers.map(m =>
+        `<div class="lh-cmtee-row">
+          <span class="lh-cmtee-role" style="font-size:${hdrFsPt};">${esc(m.designation)}</span>
+          <span class="lh-cmtee-name" style="font-size:${hdrFsPt};">${esc(m.name)}</span>
+        </div>`).join('');
+      const sigHTML = sigs.length === 0 ? '' :
+        `<div class="lh-sig-row">
+          ${sigs.map(s => `
+            <div class="lh-sig-cell">
+              <div class="lh-sig-role">${esc(s.designation)}</div>
+              <div class="lh-sig-society">${esc(t.society_name)}</div>
+            </div>`).join('')}
+        </div>`;
+      const messageHTML = (vals.message ?? '')
+        ? vals.message.split('\n').map(l => `<p style="margin:0 0 4px 0;">${esc(l) || '&nbsp;'}</p>`).join('')
+        : '<p style="color:#9ca3af;margin:0;">[Message body will appear here]</p>';
+      const previewEl = document.getElementById('letter-preview');
+      previewEl.style.fontSize = `${t.body_font_size_pt ?? 11}pt`;
+      const logoAlignItems = t.logo_valign === 'center' ? 'center' : t.logo_valign === 'bottom' ? 'flex-end' : 'flex-start';
+      previewEl.innerHTML = `
+        <div class="lh-header" style="align-items:${logoAlignItems};">
+          <div class="lh-logo-col">
+            <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo"
+              style="height:${t.logo_height_px ?? 160}px; width:auto; display:block;"
+              onerror="this.style.visibility='hidden';" />
+          </div>
+          <div class="lh-right-col" style="flex:0 0 ${t.addr_col_width_px ?? 210}px;">
+            <div class="lh-addr" style="font-size:${t.header_font_size_pt ?? 8.5}pt;">
+              ${esc(t.society_address_line1 ?? '')}<br>
+              ${esc(t.society_address_line2 ?? '')}<br>
+              ${esc(t.society_address_line3 ?? '')}
+            </div>
+            <div class="lh-cmtee">${cmteeRows}</div>
+          </div>
+        </div>
+        <div class="lh-header-line"></div>
+        <div style="flex:1; display:flex; flex-direction:column;">
+          <div style="flex:1;">
+            <div class="lh-date">${esc(dateStr)}</div>
+            ${vals.to ? `<div class="lh-to-block">
+              <div class="to-label">To</div>
+              <div>${vals.to.split('\n').map(l => esc(l)).join('<br>')}</div>
+            </div>` : ''}
+            ${vals.subject ? `<div class="lh-subject">Subject: ${esc(vals.subject)}</div>` : ''}
+            ${vals.tosalutation ? `<div class="lh-salutation">Dear ${esc(vals.tosalutation)}</div>` : ''}
+            <div class="lh-message">${messageHTML}</div>
+            <div class="lh-closing">
+              <div>${esc(t.closing_line1 ?? 'Thanking you!')}</div>
+              <div>${esc(t.closing_line2 ?? 'Yours sincerely')}</div>
+            </div>
+          </div>
+          ${sigHTML}
+        </div>
+        <div class="lh-footer-line"></div>
+        <div class="lh-footer">
+          <div class="lh-footer-item">🌐 <span>${esc(t.footer_website ?? 'www.utamacs.org')}</span></div>
+          <div class="lh-footer-item">📞 <span>${esc(t.footer_phone ?? '+91 7032820247')}</span></div>
+          <div class="lh-footer-item">✉ <span>${esc(t.footer_email ?? 'urbantrillaresidents@gmail.com')}</span></div>
+        </div>
+      `;
+    }
+
+    function enableButtons() {
+      ['btn-pdf','btn-docx','btn-save'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = false;
+      });
+    }
+
+    function buildPdfDefinition() {
+      const t = currentTemplate;
+      const vals = getFieldValues();
+      const sigs = getSelectedSignatories();
+      const headerMembers = t.letterhead_committee_members.filter(m => m.show_in_header);
+      const dateStr = vals.date ? formatDate(vals.date) : formatDate(new Date().toISOString().slice(0,10));
+      const fontName = (carlitoRegB64 && carlitoBoldB64) ? 'Carlito' : 'Roboto';
+      const NAVY = '#1a2a6c';
+      const GOLD = '#c8a84b';
+      const logoH  = Math.round((t.logo_height_px ?? 160) * 0.75);
+      const bodyFs = Number(t.body_font_size_pt ?? 11);
+      const hdrFs  = Number(t.header_font_size_pt ?? 8.5);
+
+      const cmteeContent = headerMembers.map(m => ({
+        columns: [
+          { text: m.designation, color: GOLD, bold: true, fontSize: hdrFs, width: 70 },
+          { text: m.name, color: NAVY, bold: true, fontSize: hdrFs, width: '*' },
+        ],
+        columnGap: 4,
+        margin: [0, 3, 0, 0],
+      }));
+
+      function firstPageHeader() {
+        const addrH = (3 * hdrFs * 1.55) + (headerMembers.length * (hdrFs * 1.4 + 3)) + (headerMembers.length > 0 ? 10 : 0);
+        const addrValignOffset = t.logo_valign === 'center' ? Math.max(0, Math.round((logoH - addrH) / 2))
+          : t.logo_valign === 'bottom'  ? Math.max(0, Math.round(logoH - addrH))
+          : 0;
+        const addrColW = Math.round((t.addr_col_width_px ?? 210) * 0.75);
+        const COL_GAP = 16;
+        const logoImgEl = logoB64
+          ? { image: `data:image/png;base64,${logoB64}`, fit: [481 - addrColW - COL_GAP, logoH], alignment: 'left' }
+          : { text: 'URBAN TRILLA MACS', fontSize: 14, bold: true, color: NAVY };
+        return {
+          margin: [57, 28, 57, 0],
+          stack: [
+            {
+              columns: [
+                { stack: [logoImgEl], width: '*' },
+                {
+                  width: addrColW,
+                  margin: [0, addrValignOffset, 0, 0],
+                  stack: [
+                    { text: t.society_address_line1 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                    { text: t.society_address_line2 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                    { text: t.society_address_line3 ?? '', bold: true, color: NAVY, fontSize: hdrFs, lineHeight: 1.5 },
+                    ...cmteeContent,
+                  ],
+                },
+              ],
+              columnGap: COL_GAP,
+            },
+            { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 481, y2: 6, lineWidth: 3, lineColor: NAVY }], margin: [0, 8, 0, 0] },
+          ],
+        };
+      }
+
+      const topMargin = Math.max(140, logoH + 55);
+
+      function subsequentHeader() {
+        const hdrLineH = 10 * 1.45 + 4 + 5;
+        const hdrTop = Math.max(20, topMargin - hdrLineH - 8);
+        return {
+          margin: [57, hdrTop, 57, 0],
+          stack: [
+            { text: t.subsequent_page_header ?? 'Urban Trilla MACS — Continued', bold: true, color: NAVY, fontSize: 10 },
+            { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 481, y2: 5, lineWidth: 1, lineColor: '#e5e7eb' }], margin: [0, 4, 0, 0] },
+          ],
+        };
+      }
+
+      function buildFooter(currentPage, pageCount) {
+        return {
+          margin: [57, 0, 57, 14],
+          stack: [
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 481, y2: 0, lineWidth: 3, lineColor: NAVY }], margin: [0, 0, 0, 5] },
+            {
+              columns: [
+                { text: `Web: ${t.footer_website ?? 'www.utamacs.org'}`, fontSize: 8, color: '#374151' },
+                { text: `Ph: ${t.footer_phone ?? '+91 7032820247'}`, fontSize: 8, color: '#374151', alignment: 'center' },
+                { text: `Email: ${t.footer_email ?? 'urbantrillaresidents@gmail.com'}`, fontSize: 8, color: '#374151', alignment: 'right' },
+              ],
+            },
+            { text: String(currentPage), fontSize: 7.5, color: '#6b7280', alignment: 'right', margin: [0, 2, 0, 0] },
+          ],
+        };
+      }
+
+      const body = [];
+      body.push({ text: dateStr, fontSize: bodyFs, margin: [0, 0, 0, 16] });
+      if (vals.to?.trim()) {
+        const toLines = vals.to.trim().split('\n');
+        body.push({
+          stack: [
+            { text: 'To', bold: true, fontSize: bodyFs },
+            ...toLines.map(l => ({ text: l, fontSize: bodyFs, margin: [0, 1, 0, 0] })),
+          ],
+          margin: [0, 0, 0, 14],
+        });
+      }
+      if (vals.subject?.trim()) {
+        body.push({ text: `Subject: ${vals.subject}`, fontSize: bodyFs, margin: [0, 0, 0, 14] });
+      }
+      if (vals.tosalutation?.trim()) {
+        body.push({ text: `Dear ${vals.tosalutation}`, fontSize: bodyFs, margin: [0, 0, 0, 18] });
+      }
+      const message = vals.message?.trim() ?? '';
+      if (message) {
+        body.push({ stack: message.split('\n').map(l => ({ text: l || ' ', fontSize: bodyFs, alignment: 'justify', margin: [0, 0, 0, 4] })), margin: [0, 0, 0, 28] });
+      } else {
+        body.push({ text: '', margin: [0, 0, 0, 28] });
+      }
+      body.push({ text: t.closing_line1 ?? 'Thanking you!', fontSize: bodyFs, margin: [0, 0, 0, 5], keepWithNext: true });
+      body.push({ text: t.closing_line2 ?? 'Yours sincerely', fontSize: bodyFs, margin: [0, 0, 0, 50], keepWithNext: sigs.length > 0 });
+      if (sigs.length > 0) {
+        body.push({
+          columns: sigs.map(s => ({
+            width: Math.floor(481 / sigs.length),
+            stack: [
+              { text: s.designation, bold: true, color: GOLD, fontSize: 10 },
+              { text: t.society_name ?? 'Urban Trilla MACS', color: NAVY, fontSize: 10 },
+            ],
+          })),
+          columnGap: 20,
+        });
+      }
+
+      return {
+        pageSize: 'A4',
+        pageMargins: [57, topMargin, 57, 60],
+        defaultStyle: { font: fontName, fontSize: bodyFs, lineHeight: 1.45, color: '#111827' },
+        header: (page) => page === 1 ? firstPageHeader() : subsequentHeader(),
+        footer: buildFooter,
+        content: body,
+      };
+    }
+
+    async function downloadPdf() {
+      if (!currentTemplate) { showToast('Template not loaded', true); return; }
+      const title = document.getElementById('f-title').value.trim() || 'letter';
+      pdfMake.createPdf(buildPdfDefinition()).download(`${title}.pdf`);
+    }
+
+    async function generatePdfBase64() {
+      return new Promise((resolve, reject) => {
+        try { pdfMake.createPdf(buildPdfDefinition()).getBase64(resolve); }
+        catch (e) { reject(e); }
+      });
+    }
+
+    async function downloadDocx() {
+      if (!currentTemplate) { showToast('Template not loaded', true); return; }
+      const title = document.getElementById('f-title').value.trim() || 'letter';
+      showToast('Generating DOCX…', false);
+      try {
+        const vals = getFieldValues();
+        const sigs = getSelectedSignatories();
+        const res = await fetch('/api/v1/letters/docx', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            template_id: currentTemplate.id,
+            field_values: vals,
+            signatures_used: sigs.map(s => s.designation),
+          }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          showToast('DOCX generation failed: ' + (d.error ?? res.statusText), true);
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: url, download: `${title}.docx` });
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+        showToast('DOCX downloaded!', false);
+      } catch(e) { showToast('DOCX generation failed: ' + e.message, true); }
+    }
+
+    async function saveToArchive() {
+      const title = document.getElementById('f-title').value.trim();
+      if (!title) { showToast('Enter an internal title before saving', true); return; }
+      if (!currentTemplate) { showToast('Template not loaded', true); return; }
+
+      const btn = document.getElementById('btn-save');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating & Updating…';
+
+      try {
+        const pdf_base64 = await generatePdfBase64();
+        const vals = getFieldValues();
+        const sigs = getSelectedSignatories();
+
+        const res = await fetch(`/api/v1/letters/${letterId}`, {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            template_id: currentTemplate.id,
+            title,
+            subject: vals.subject ?? null,
+            recipient: vals.to ?? null,
+            field_values: vals,
+            signatures_used: sigs.map(s => s.designation),
+            pdf_base64,
+          }),
+        });
+
+        if (res.ok) {
+          showToast('Letter updated in archive!', false);
+          setTimeout(() => window.location.href = '/portal/letters', 1800);
+        } else {
+          const d = await res.json();
+          showToast(d.error ?? 'Update failed', true);
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Update Archive (GitHub)';
+        }
+      } catch (e) {
+        showToast('Error: ' + e.message, true);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Update Archive (GitHub)';
+      }
+    }
+
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = `fixed bottom-6 right-6 px-4 py-2.5 rounded-lg shadow-large text-sm z-50 text-white max-w-sm ${isError ? 'bg-red-600' : 'bg-green-600'}`;
+      setTimeout(() => t.classList.add('hidden'), 4000);
+    }
+
+    document.getElementById('template-select').addEventListener('change', e => {
+      prefilled = false;
+      loadTemplateDetails(e.target.value);
+    });
+    document.getElementById('f-title').addEventListener('input', updatePreview);
+    document.getElementById('btn-pdf').addEventListener('click', downloadPdf);
+    document.getElementById('btn-docx').addEventListener('click', downloadDocx);
+    document.getElementById('btn-save').addEventListener('click', saveToArchive);
+
+    initAssets();
+    loadTemplates();
+  </script>
+</PortalLayout>
