@@ -548,13 +548,9 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       }
 
       // ── SUBSEQUENT PAGE HEADER ───────────────────────────────────────
-      // Position the header just above the content area start (topMargin) so there's
-      // no large gap between the header text and body on page 2+.
       function subsequentHeader() {
-        const hdrLineH = 10 * 1.45 + 4 + 5; // text line + margin + canvas line ≈ 23pt
-        const hdrTop = Math.max(20, topMargin - hdrLineH - 8);
         return {
-          margin: [57, hdrTop, 57, 0],
+          margin: [57, 20, 57, 0],
           stack: [
             { text: t.subsequent_page_header ?? 'Urban Trilla MACS — Continued', bold: true, color: NAVY, fontSize: 10 },
             { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 481, y2: 5, lineWidth: 1, lineColor: '#e5e7eb' }], margin: [0, 4, 0, 0] },
