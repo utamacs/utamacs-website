@@ -381,19 +381,21 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
 
       const previewEl = document.getElementById('letter-preview');
       previewEl.style.fontSize = `${t.body_font_size_pt ?? 11}pt`;
-      const logoAlignItems = t.logo_valign === 'center' ? 'center' : t.logo_valign === 'bottom' ? 'flex-end' : 'flex-start';
+      // Logo justify-content positions the logo within its column only;
+      // the address column always stays top-aligned via align-items:flex-start on header.
+      const logoJustify = t.logo_valign === 'center' ? 'center' : t.logo_valign === 'bottom' ? 'flex-end' : 'flex-start';
       previewEl.innerHTML = `
         <!-- ── HEADER: full logo image (left) + address/committee (right) ── -->
-        <div class="lh-header" style="align-items:${logoAlignItems};">
+        <div class="lh-header" style="align-items:stretch;">
 
-          <!-- Full branded logo — contains building, URBAN TRILLA MACS, tagline, reg no -->
-          <div class="lh-logo-col">
+          <!-- Full branded logo — position within column controlled by logo_valign -->
+          <div class="lh-logo-col" style="display:flex; flex-direction:column; justify-content:${logoJustify};">
             <img src="/UTA-MACS-Logo.png" alt="UTA MACS Logo"
               style="height:${t.logo_height_px ?? 160}px; width:auto; display:block;"
               onerror="this.style.visibility='hidden';" />
           </div>
 
-          <!-- Right: address + committee -->
+          <!-- Right: address + committee — always top-aligned -->
           <div class="lh-right-col" style="flex:0 0 ${t.addr_col_width_px ?? 210}px;">
             <div class="lh-addr" style="font-size:${t.header_font_size_pt ?? 8.5}pt;">
               ${esc(t.society_address_line1 ?? '')}<br>
@@ -736,11 +738,9 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         }],
       });
 
-      const buf = await Packer.toBuffer(doc);
-      const bytes = new Uint8Array(buf);
-      let s = '';
-      for (let i = 0; i < bytes.byteLength; i++) s += String.fromCharCode(bytes[i]);
-      return btoa(s);
+      // Packer.toString() returns base64 directly and works in browser environments;
+      // Packer.toBuffer() is Node.js-only and fails in the browser.
+      return await Packer.toString(doc);
     }
 
     async function downloadDocx() {
