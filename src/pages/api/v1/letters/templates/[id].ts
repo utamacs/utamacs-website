@@ -57,6 +57,7 @@ export const PUT: APIRoute = async ({ request, params }) => {
       footer_website, footer_phone, footer_email,
       subsequent_page_header, closing_line1, closing_line2,
       is_default, committee_members, dynamic_fields,
+      logo_height_px, body_font_size_pt, header_font_size_pt, addr_col_width_px,
     } = body;
 
     const sb = getSupabaseServiceClient();
@@ -99,6 +100,10 @@ export const PUT: APIRoute = async ({ request, params }) => {
     if (closing_line1 !== undefined) updatePayload.closing_line1 = sanitizePlainText(String(closing_line1));
     if (closing_line2 !== undefined) updatePayload.closing_line2 = sanitizePlainText(String(closing_line2));
     if (is_default !== undefined) updatePayload.is_default = Boolean(is_default);
+    if (logo_height_px !== undefined) updatePayload.logo_height_px = Math.min(220, Math.max(60, Number(logo_height_px)));
+    if (body_font_size_pt !== undefined) updatePayload.body_font_size_pt = Math.min(14, Math.max(8, Number(body_font_size_pt)));
+    if (header_font_size_pt !== undefined) updatePayload.header_font_size_pt = Math.min(12, Math.max(6, Number(header_font_size_pt)));
+    if (addr_col_width_px !== undefined) updatePayload.addr_col_width_px = Math.min(300, Math.max(140, Number(addr_col_width_px)));
 
     const { error: updateErr } = await sb
       .from('letterhead_templates')
