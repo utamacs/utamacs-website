@@ -8,7 +8,7 @@ if (!user) return Astro.redirect('/portal/login');
 
 <PortalLayout title="Notices" user={user} activeModule="notices">
   <!-- Process info panel -->
-  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+  <details open class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
     <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
@@ -21,37 +21,33 @@ if (!user) return Astro.redirect('/portal/login');
     </summary>
     <div class="px-5 pb-5">
       <div class="pt-4 border-t border-primary-100 space-y-4">
-        <svg viewBox="0 0 560 90" class="w-full" role="img" aria-label="Notice flow: Draft → Review → Published → Archived">
-          <defs>
-            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
-            </marker>
-          </defs>
-          <!-- Step 1: Draft -->
-          <rect x="10" y="15" width="120" height="55" rx="8" fill="#dbeafe" stroke="#1E3A8A" stroke-width="1.5"/>
-          <text x="70" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Draft</text>
-          <text x="70" y="54" text-anchor="middle" font-size="9" fill="#1e40af">Secretary / President writes</text>
-          <!-- Arrow -->
-          <line x1="131" y1="42" x2="148" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 2: Review -->
-          <rect x="150" y="15" width="120" height="55" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
-          <text x="210" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Review</text>
-          <text x="210" y="54" text-anchor="middle" font-size="9" fill="#92400e">Second executive checks</text>
-          <!-- Arrow -->
-          <line x1="271" y1="42" x2="288" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 3: Published -->
-          <rect x="290" y="15" width="120" height="55" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
-          <text x="350" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#065f46">Published</text>
-          <text x="350" y="54" text-anchor="middle" font-size="9" fill="#065f46">Visible to all members</text>
-          <!-- Notification annotation -->
-          <text x="350" y="78" text-anchor="middle" font-size="8" fill="#059669">&#x2709; Email + portal notification sent</text>
-          <!-- Arrow -->
-          <line x1="411" y1="42" x2="428" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 4: Archived -->
-          <rect x="430" y="15" width="120" height="55" rx="8" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.5"/>
-          <text x="490" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Archived</text>
-          <text x="490" y="54" text-anchor="middle" font-size="9" fill="#6b7280">Stored in Documents</text>
-        </svg>
+        <!-- Main flow -->
+        <div class="flex items-start gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
+          <div class="flex-shrink-0 w-28 rounded-lg border border-primary-300 bg-blue-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-primary-700">Draft</p>
+            <p class="text-[10px] text-primary-600 mt-0.5">Secretary / President writes</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-28 rounded-lg border border-amber-300 bg-amber-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-amber-800">Review</p>
+            <p class="text-[10px] text-amber-700 mt-0.5">Second executive checks</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-28 rounded-lg border border-green-300 bg-green-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-green-800">Published</p>
+            <p class="text-[10px] text-green-700 mt-0.5">Visible to all members</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-28 rounded-lg border border-gray-300 bg-gray-100 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-gray-700">Archived</p>
+            <p class="text-[10px] text-gray-500 mt-0.5">Stored in Documents</p>
+          </div>
+        </div>
+        <!-- Annotation row -->
+        <div class="flex items-center gap-2 text-xs text-text-secondary">
+          <i class="fas fa-info-circle text-primary-400 text-[10px]" aria-hidden="true"></i>
+          <span>Email and portal notification sent automatically when a notice is published</span>
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
             <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
