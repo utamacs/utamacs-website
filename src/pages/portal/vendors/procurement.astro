@@ -15,7 +15,7 @@ if (!canVote) return Astro.redirect('/portal');
 
 <PortalLayout title="Vendor Procurement" user={user} activeModule="vendors_procurement">
   <!-- Process info panel -->
-  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+  <details open class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
     <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
@@ -28,42 +28,38 @@ if (!canVote) return Astro.redirect('/portal');
     </summary>
     <div class="px-5 pb-5">
       <div class="pt-4 border-t border-primary-100 space-y-4">
-        <svg viewBox="0 0 700 90" class="w-full" role="img" aria-label="Vendor procurement flow: Draft → Open → Voting → Selected → Closed">
-          <defs>
-            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
-            </marker>
-          </defs>
-          <!-- Step 1: DRAFT -->
-          <rect x="10" y="10" width="120" height="55" rx="8" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-          <text x="70" y="33" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">DRAFT</text>
-          <text x="70" y="49" text-anchor="middle" font-size="9" fill="#6b7280">Requirement defined</text>
-          <!-- Arrow -->
-          <line x1="131" y1="37" x2="148" y2="37" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 2: OPEN -->
-          <rect x="150" y="10" width="120" height="55" rx="8" fill="#dbeafe" stroke="#1E3A8A" stroke-width="1.5"/>
-          <text x="210" y="33" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">OPEN</text>
-          <text x="210" y="49" text-anchor="middle" font-size="9" fill="#1e40af">Candidates invited</text>
-          <!-- Arrow -->
-          <line x1="271" y1="37" x2="288" y2="37" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 3: VOTING -->
-          <rect x="290" y="10" width="120" height="55" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
-          <text x="350" y="33" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">VOTING</text>
-          <text x="350" y="49" text-anchor="middle" font-size="9" fill="#92400e">Committee votes</text>
-          <text x="350" y="77" text-anchor="middle" font-size="8" fill="#92400e">Quorum: 8 votes min.</text>
-          <!-- Arrow -->
-          <line x1="411" y1="37" x2="428" y2="37" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 4: SELECTED -->
-          <rect x="430" y="10" width="120" height="55" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
-          <text x="490" y="33" text-anchor="middle" font-size="11" font-weight="600" fill="#065f46">SELECTED</text>
-          <text x="490" y="49" text-anchor="middle" font-size="9" fill="#065f46">Vendor chosen</text>
-          <!-- Arrow -->
-          <line x1="551" y1="37" x2="568" y2="37" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 5: CLOSED -->
-          <rect x="570" y="10" width="120" height="55" rx="8" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.5"/>
-          <text x="630" y="33" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">CLOSED</text>
-          <text x="630" y="49" text-anchor="middle" font-size="9" fill="#6b7280">Contract issued</text>
-        </svg>
+        <!-- Main flow -->
+        <div class="flex items-start gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
+          <div class="flex-shrink-0 w-28 rounded-lg border border-gray-200 bg-gray-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-gray-700">DRAFT</p>
+            <p class="text-[10px] text-gray-500 mt-0.5">Requirement defined</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-28 rounded-lg border border-primary-300 bg-blue-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-primary-700">OPEN</p>
+            <p class="text-[10px] text-primary-600 mt-0.5">Candidates invited</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-28 rounded-lg border border-amber-300 bg-amber-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-amber-800">VOTING</p>
+            <p class="text-[10px] text-amber-700 mt-0.5">Committee votes</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-28 rounded-lg border border-green-300 bg-green-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-green-800">SELECTED</p>
+            <p class="text-[10px] text-green-700 mt-0.5">Vendor chosen</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-28 rounded-lg border border-gray-300 bg-gray-100 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-gray-700">CLOSED</p>
+            <p class="text-[10px] text-gray-500 mt-0.5">Contract issued</p>
+          </div>
+        </div>
+        <!-- Annotation row -->
+        <div class="flex items-center gap-2 text-xs text-text-secondary">
+          <i class="fas fa-info-circle text-primary-400 text-[10px]" aria-hidden="true"></i>
+          <span>VOTING stage requires a minimum of 8 committee votes (quorum) before a vendor can be selected</span>
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
             <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
