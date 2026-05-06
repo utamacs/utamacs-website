@@ -152,15 +152,32 @@ Do this every morning (takes 2 minutes):
 **When:** Committee election, resignation, role expansion, or error correction.
 **Who does this:** Admin, after verbal/WhatsApp/email authorization from President or Secretary.
 
-### Steps
+There are **two independent fields** to update: the **Role** (determines permissions) and
+the **Committee Title** (display label only, no permission effect).
+
+### Steps — Role change
 
 1. Admin → Users → find the member → click **[View]** → click **[Change Role]**
-2. Select the new role from the dropdown
-3. Enter a reason: e.g., "Committee election — June 2026 AGM" or "Treasurer resigned, Joint Treasurer stepping up"
-4. Review the preview: "Changing [Name] from Executive to Secretary. Feature access changes: gaining finance.approve_10k, finance.view_member_phones. Losing nothing."
-5. Click **[Confirm Change]**
-6. The member receives an email: "Your UTA MACS access has been updated to [new role]"
-7. The Secretary is notified (FYI)
+2. **Role dropdown** — four choices only: `member`, `executive`, `secretary`, `president`
+   - Do NOT try to encode "Treasurer" or "VP" here — those are titles, not roles
+3. **Committee Title field** — set the display designation, e.g.:
+   - `Vice President`, `Working President`, `Joint Secretary`
+   - `Treasurer`, `Joint Treasurer`, `Executive Member`, `General Secretary`, `President`
+4. Enter a reason: e.g., "Committee election — June 2026 AGM" or "Treasurer resigned"
+5. Review the permission diff preview:
+   - "Changing [Name] from Member to Executive. Gaining: hoto.create, snag.create, vendor.vote, audit.view. Losing: nothing."
+6. **If assigning Treasurer or Joint Treasurer title:** system prompts "Grant finance.view + finance.enter overrides for this user? [Yes] [No]" — click **[Yes]**
+7. Click **[Confirm Change]**
+8. The member receives an email: "Your UTA MACS access has been updated"
+9. The Secretary is notified (FYI)
+
+### Steps — Title-only change (no permission change)
+
+1. Admin → Users → Roles View → find the member → click **[Edit]** next to their name
+2. Update the Committee Title field (e.g., change "Executive Member" → "Vice President")
+3. Click **[Save Title]**
+4. A `role_change_log` entry is created with `change_type = 'TITLE_ONLY'`
+5. No permissions change; member receives a brief FYI email
 
 **Rule:** Admin cannot change their own role. A second admin must do it.
 
@@ -171,6 +188,10 @@ Do this every morning (takes 2 minutes):
 **When:** After the Annual General Body Meeting where new committee members are elected.
 **Who does this:** Admin, after receiving the election outcome from President or Secretary (via minutes, WhatsApp, or meeting).
 
+The election bulk-update workflow handles two types of change simultaneously:
+- **Role changes** — change `portal_role` value (determines permissions)
+- **Title changes** — update `committee_title` (display designation; no permission effect)
+
 ### Steps
 
 1. Admin → Elections → click **[New Election]**
@@ -178,17 +199,32 @@ Do this every morning (takes 2 minutes):
    - Election date (the actual AGM date)
    - Description: "Annual General Body Meeting 2026"
    - Attach AGM minutes document (optional but recommended)
-3. The system shows the current committee roster with dropdowns for each role
-4. For each role, select the new role holder from the dropdown
-   - If someone is re-elected to the same role: keep them in the dropdown
-   - If a role is vacant after the election: leave it as "[Vacant]"
-5. Review the **Change Preview** screen:
-   - Shows only the roles that are actually changing
-   - Outgoing members who are not re-elected automatically revert to "Member"
-6. Click **[Confirm Election]**
-7. All role changes happen simultaneously (atomic — all succeed or none change)
-8. Every affected member receives an email with their new role
-9. The President and Secretary receive a summary email
+3. The system shows the current committee roster as a spreadsheet-like grid with **two columns per person: Role | Title**
+4. For each person, set their new Role (member / executive / secretary / president) and their new Title (free text: "President", "Vice President", "Treasurer", etc.)
+   - If someone is re-elected to the same role with the same title: leave both unchanged
+   - If a person leaves the committee entirely: set Role = `member`, clear the Title
+5. Review the **Change Preview** screen — it shows two sections:
+   - **ROLE CHANGES** — people whose `portal_role` is changing (includes permission diff)
+   - **TITLE-ONLY CHANGES** — people whose role stays the same but title changes (no permission impact)
+   - Outgoing members not re-elected automatically revert to `member` role + blank title
+6. **Finance access prompt:** If any person is newly assigned Treasurer or Joint Treasurer title, the preview highlights them: "Grant finance.view + finance.enter overrides? [Yes for each] [Yes for all] [Skip]" — select **[Yes]** for each Treasurer-title holder
+7. Click **[Confirm Election]**
+8. All changes happen simultaneously (atomic — all succeed or none change)
+9. Every affected member receives an email with their new role and title
+10. The President and Secretary receive a summary email with the full change list
+
+### Role vs. Title quick reference
+
+| Person | Role (`portal_role`) | Title (`committee_title`) |
+|---|---|---|
+| Main leader | `president` | "President" |
+| #2 leader | `executive` | "Vice President" |
+| Day-to-day ops | `secretary` | "General Secretary" |
+| Deputy ops | `executive` | "Joint Secretary" |
+| Finance lead | `executive` | "Treasurer" |
+| Deputy finance | `executive` | "Joint Treasurer" |
+| General committee | `executive` | "Executive Member" |
+| Resident, no committee | `member` | *(blank)* |
 
 ### If the election workflow fails mid-way
 
@@ -204,8 +240,11 @@ Do this every morning (takes 2 minutes):
 
 ### President → Vice President delegation
 
+The VP is an `executive` with `committee_title = 'Vice President'`. Delegation grants
+them `hoto.approve_president` as a user feature override for the delegation period.
+
 1. Admin → Delegation → click **[Activate President Delegation]**
-2. Select: "Vice President" as the delegate
+2. Select the Vice President (system shows executives with VP title) as the delegate
 3. Enter reason: "President [Name] on medical leave from [date] to [date] (per §8.2)"
 4. Click **[Activate]**
 5. All future President-approval actions are now routed to the Vice President
@@ -214,8 +253,11 @@ Do this every morning (takes 2 minutes):
 
 ### Secretary → Joint Secretary delegation
 
+The Joint Secretary is an `executive` with `committee_title = 'Joint Secretary'`.
+Delegation grants them `hoto.approve_secretary` as a user feature override.
+
 1. Admin → Delegation → click **[Activate Secretary Delegation]**
-2. Select: "Joint Secretary" as the delegate
+2. Select the Joint Secretary (system shows executives with Joint Secretary title)
 3. Enter reason
 4. Click **[Activate]**
 

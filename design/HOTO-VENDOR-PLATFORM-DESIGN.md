@@ -1,12 +1,12 @@
 # UTA MACS — HOTO & Vendor Management Platform Design
-## v4.0 — Rules Engine + Async Resilience + Email Draft System + Full RBAC UI + RUNBOOK
+## v4.1 — 4-Role Model + committee_title Separation
 
 **Society:** Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited  
 **Registration No:** TG/RRD/MACS/2026-15/FOW & M (registered 10-02-2026)  
 **Location:** SY NO:425/2/1, Kondakal Village, Shankarpally Mandal, Rangareddy District, Telangana  
 **Builder (Promoter):** Ankura Homes | **HOTO Consultant:** Ascenza Global Infra Care Pvt Ltd  
 **HOTO Start Date:** June 1, 2026 | **Maintenance Tracking From:** May 1, 2025  
-**Document Version:** 4.0 — May 2026 (major redesign: rules engine, async resilience, email drafts, full RBAC UI)
+**Document Version:** 4.1 — May 2026 (role simplification: 9 roles → 4 roles + committee_title display field)
 
 ---
 
@@ -222,27 +222,49 @@ utamacs/governance-data      ← Private data repo (documents + audit trail)
 
 ### 3.4 Committee Structure Mapped to Roles
 
-**Governance roles** (control what a person can approve, vote, or act on):
+**The role is authority. The title is a label.** Only four `portal_role` values exist in the system. They correspond to functionally distinct approval and financial authority levels required by the byelaws. All other committee designations are stored as a human-readable `committee_title` field — visible in the directory and on profile pages, but with zero effect on permissions or system logic.
 
-| Actual Title | System Role | Approval Power |
-|---|---|---|
-| President | `president` | Final approver; casting vote; delegation to VP |
-| Vice President | `vice_president` | Acts as president when delegated |
-| Working President | `working_president` | Executive committee member; same as executive |
-| General Secretary | `secretary` | Co-approver with President |
-| Joint Secretary | `joint_secretary` | Acts as secretary when delegated |
-| Treasurer | `treasurer` | Financial entries; approves ≤₹20K with President |
-| Joint Treasurer | `joint_treasurer` | Acts as treasurer when delegated |
-| Executive Member (×7) | `executive` | Comment, vote, upload, advance status |
-| General Member | `member` | Read-only portal access |
+#### The Four Governance Roles
 
-**System administration flag** (orthogonal to governance role):
+| `portal_role` | Financial authority | Approval authority | Who holds it |
+|---|---|---|---|
+| `president` | Up to ₹20,000 (§9.11a) | Final HOTO gate; casting vote (§7.16c) | President |
+| `secretary` | Up to ₹10,000 (§9.11a) | HOTO co-approval gate; notices; finance open | General Secretary |
+| `executive` | None | Create/edit/upload/comment/vote | All other 12 committee members |
+| `member` | None | Read-only | General apartment owners |
+
+#### Committee Titles (display only — no effect on permissions)
+
+| Committee person | `portal_role` | `committee_title` | Special handling |
+|---|---|---|---|
+| President | `president` | "President" | — |
+| Vice President | `executive` | "Vice President" | Designated as delegation target for president-absence (§8.2) |
+| Working President | `executive` | "Working President" | — |
+| General Secretary | `secretary` | "General Secretary" | — |
+| Joint Secretary | `executive` | "Joint Secretary" | Designated as delegation target for secretary-absence (§8.4) |
+| Treasurer | `executive` | "Treasurer" | Finance features (view + enter) enabled via user feature override |
+| Joint Treasurer | `executive` | "Joint Treasurer" | Finance features enabled via user feature override (if needed) |
+| Executive Member (×7) | `executive` | "Executive Member" | — |
+| General Member | `member` | null | — |
+
+#### Why this collapses 9 roles to 4
+
+Of the previous 9 roles:
+- `working_president` — identical capabilities to executive; title only
+- `vice_president` — executive in base state; gains president powers only when delegation is activated (§8.2) — handled by the `approval_delegations` table, not a role
+- `joint_secretary` — executive in base state; gains secretary powers only when delegation is activated (§8.4) — same mechanism
+- `treasurer` — executive + `finance.view`/`finance.enter` features; these are feature permissions, not a distinct approval authority
+- `joint_treasurer` — effectively identical to executive
+
+Only `secretary` and `president` have unique, byelaw-mandated approval authority that cannot be replicated by feature permissions. They remain as distinct roles.
+
+#### Admin flag (orthogonal to governance role)
 
 | Flag | Who holds it | What it enables |
 |---|---|---|
-| `is_admin = true` | Designated admin person (typically the implementer or a tech-savvy committee member) | Full access to user management, feature permissions, election workflow, delegation management — always with documented President/Secretary authorization |
+| `is_admin = true` | Designated system admin | Full user management, feature permissions, election workflow, delegation management |
 
-A person can be: `is_admin = true` only (non-committee tech admin), or `is_admin = true` + a governance role (e.g., executive + admin), or just a governance role with no admin flag. The President does **not** need `is_admin = true` — the President authorizes; the admin executes.
+A person can be: admin-only (non-committee tech admin), executive + admin, secretary + admin, or president + admin. No governance power comes from `is_admin` — only system management capability.
 
 ---
 
@@ -498,92 +520,142 @@ No one can self-register. All portal access starts with an admin-sent invite —
 ### 5.4 Role Hierarchy (Governance Roles)
 
 ```
-member
-  ↑
-executive = working_president = joint_treasurer
-  ↑
-treasurer = joint_secretary
-  ↑
-vice_president = secretary
-  ↑
-president
+member → executive → secretary → president
 ```
 
-The `is_admin` flag is orthogonal — it is not in this hierarchy. An admin with `portal_role = member` still has full system management capability; they just cannot vote or approve HOTO items in their own name.
+Four roles. Each level adds capability; no capability is removed when moving up. The `is_admin` flag is orthogonal — not in this hierarchy.
 
-**Rule:** The admin can assign any governance role (with President authorization documented). No user — including the admin — can change their own role.
+**What changes when you move up:**
+
+| From | To | What is gained |
+|---|---|---|
+| `member` | `executive` | Create/edit/upload/comment/vote on all governance items |
+| `executive` | `secretary` | HOTO co-approval gate; ≤₹10K financial authority; open Board votes; send notices; view member phones |
+| `secretary` | `president` | HOTO final approval gate; ≤₹20K financial authority; casting vote; delete snags; manage delegation |
+
+**`committee_title` is separate from `portal_role`** — it is a display-only label set by the admin when assigning or changing a person's role. The title "Vice President" does not grant any additional permissions; it is a human-readable indicator of the person's committee designation.
+
+**Rule:** The admin assigns both `portal_role` and `committee_title`. No user — including the admin — can change their own role.
 
 ### 5.5 Role Change Workflow
 
 ```
 1. Admin: /portal/admin/users → Click user → [Change Role]
 
-2. Select new role from dropdown
+2. Two fields to set:
+   a. Portal role: [member ▼ / executive ▼ / secretary ▼ / president ▼]
+   b. Committee title: [text field — e.g. "Vice President", "Treasurer", "Executive Member"]
+      Suggested titles shown as autocomplete options; free text accepted.
 
 3. Enter reason (free text — for the audit trail):
    "Committee election — June 2026 AGM"
-   "Treasurer resigned — Joint Treasurer stepping up"
+   "Secretary resigned — promoted from executive"
    "New apartment owner onboarded"
 
-4. Confirmation dialog:
-   "You are changing [Name]'s role from [executive] to [secretary].
-   This is permanent and will be logged. Continue?"
+4. If role is set to executive and title is "Treasurer" or "Joint Treasurer":
+   System prompts: "This person is being designated as Treasurer. Do you want to enable
+   finance access (view records + enter records) for this user? [Yes, enable finance access]
+   [No, I'll do this separately]"
 
-5. On confirm (API /api/admin/users/[id]/role PATCH):
+5. Confirmation dialog shows both changes:
+   "You are changing [Name]:
+    Role: executive → secretary
+    Title: 'Executive Member' → 'General Secretary'
+   This takes effect immediately and is permanently logged. Continue?"
+
+6. On confirm (API /api/admin/users/[id]/role PATCH):
    → profiles.portal_role updated
-   → role_change_log record created
+   → profiles.committee_title updated
+   → role_change_log record created (records both portal_role AND committee_title change)
    → audit_log record created
-   → All assigned items reviewed for auto-reassignment
-   → User receives email: "Your UTA MACS access has been updated to [new role]"
-   → Secretary notified (FYI): "Admin changed [Name]'s role to secretary"
+   → All assigned items reviewed for auto-reassignment (by portal_role)
+   → User receives email: "Your UTA MACS access has been updated.
+     Role: Secretary | Title: General Secretary"
+   → Secretary notified (FYI) — unless they are the person being changed
 ```
+
+**Title-only changes** (no role change): admin can update `committee_title` without changing `portal_role`. This creates a `role_change_log` entry with `old_role = new_role` and a `title_change` note. Audit trail is preserved.
 
 Role changes are **immediate**. The reason field provides enough context for the audit trail without requiring a separate approval workflow.
 
 ### 5.6 Committee Election Bulk Update
 
-The admin runs this workflow after the General Body election concludes. The President or Secretary communicates the election outcome (via minutes, WhatsApp, or email) — the admin then executes the role changes with that authorization documented.
+The admin runs this workflow after the General Body election concludes. The President or Secretary communicates the election outcome — the admin then executes role and title changes.
+
+In the 4-role model, most election changes are **title changes only** (the person remains `executive`). Role changes are needed only when someone gains or loses Secretary or President authority.
 
 **Election Workflow at `/portal/admin/elections`:**
 
 ```
 Step 1: [New Election]
   Enter: Election date, Description ("Annual General Body Meeting 2026")
-  Attach: AGM minutes or outcome document (optional)
+  Attach: AGM minutes document (optional but recommended)
 
-Step 2: System shows current committee lineup
-  ┌─────────────────────────────────────────────────────────────┐
-  │  COMMITTEE ELECTION — 15 June 2026                          │
-  │  Assign new role holders. Outgoing members auto-revert.     │
-  ├────────────────────┬────────────────────────────────────────┤
-  │  Role              │  Current Holder → New Holder           │
-  ├────────────────────┼────────────────────────────────────────┤
-  │  President         │  Bal Reddy → [Bal Reddy ▼]             │
-  │  Vice President    │  [Name] → [Select member ▼]            │
-  │  General Secretary │  [Name] → [Select member ▼]            │
-  │  Joint Secretary   │  [Name] → [Select member ▼]            │
-  │  Treasurer         │  [Name] → [Select member ▼]            │
-  │  Joint Treasurer   │  [Name] → [Select member ▼]            │
-  │  Executive 1-7     │  [Name] → [Select member ▼] (×7)       │
-  └────────────────────┴────────────────────────────────────────┘
+Step 2: System shows current committee lineup with TWO columns: Role + Title
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │  COMMITTEE ELECTION — 15 June 2026                                     │
+  │  Update roles and titles. Unassigned members revert to 'member'.       │
+  ├───────────────────────┬───────────────────────┬────────────────────────┤
+  │  Committee Position   │  Current Holder       │  New Holder            │
+  ├───────────────────────┼───────────────────────┼────────────────────────┤
+  │  President            │  Bal Reddy            │  [Bal Reddy ▼]         │
+  │  (role: president)    │                       │                        │
+  ├───────────────────────┼───────────────────────┼────────────────────────┤
+  │  Vice President       │  [Name]               │  [Select member ▼]     │
+  │  (role: executive)    │  "Vice President"     │                        │
+  ├───────────────────────┼───────────────────────┼────────────────────────┤
+  │  Working President    │  [Name]               │  [Select member ▼]     │
+  │  (role: executive)    │  "Working President"  │                        │
+  ├───────────────────────┼───────────────────────┼────────────────────────┤
+  │  General Secretary    │  [Name]               │  [Select member ▼]     │
+  │  (role: secretary)    │                       │                        │
+  ├───────────────────────┼───────────────────────┼────────────────────────┤
+  │  Joint Secretary      │  [Name]               │  [Select member ▼]     │
+  │  (role: executive)    │  "Joint Secretary"    │                        │
+  ├───────────────────────┼───────────────────────┼────────────────────────┤
+  │  Treasurer            │  [Name]               │  [Select member ▼]     │
+  │  (role: executive)    │  "Treasurer"          │                        │
+  ├───────────────────────┼───────────────────────┼────────────────────────┤
+  │  Joint Treasurer      │  [Name]               │  [Select member ▼]     │
+  │  (role: executive)    │  "Joint Treasurer"    │                        │
+  ├───────────────────────┼───────────────────────┼────────────────────────┤
+  │  Executive Member ×7  │  [Names]              │  [Select members ▼] ×7 │
+  │  (role: executive)    │                       │                        │
+  └───────────────────────┴───────────────────────┴────────────────────────┘
 
-Step 3: Preview screen
-  CHANGES (5 members affected):
-  [Name] executive → secretary
-  [Name] secretary → member (outgoing)
-  [Name] member    → executive
-
-  [Cancel]   [Confirm Election]
+Step 3: Preview screen — clearly separates role changes from title-only changes
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │  ROLE CHANGES (permission level changes — 2 people):                   │
+  │  [Name A]  executive → secretary  |  title: "Exec Member" → "Gen Sec" │
+  │  [Name B]  secretary → member     |  (outgoing — not re-elected)       │
+  │                                                                        │
+  │  TITLE-ONLY CHANGES (no permission change — 8 people):                 │
+  │  [Name C]  executive, "Joint Secretary" → "Treasurer"                  │
+  │  [Name D]  executive, "Treasurer" → "Joint Treasurer"                  │
+  │  [Name E]  executive, — → "Vice President"                             │
+  │  ... (5 more)                                                          │
+  │                                                                        │
+  │  FINANCE ACCESS (prompted automatically):                              │
+  │  [Name C] is now titled Treasurer — enable finance.view, finance.enter?│
+  │  [Yes ✓]  [No, handle separately]                                      │
+  │                                                                        │
+  │  [Cancel]                    [Confirm Election]                        │
+  └────────────────────────────────────────────────────────────────────────┘
 
 Step 4: On confirm (single database transaction):
-  → All role changes atomically (all succeed or all fail)
+  → All portal_role and committee_title changes atomically
   → All changes linked to election_event_id
-  → Old role holders not re-elected revert to 'member'
-  → Each affected person receives email with their new role
-  → Secretary and President notified (FYI): "Admin applied the June 2026 election results"
+  → Finance feature overrides created if confirmed above
+  → Old designation holders who are not re-elected: title cleared, delegation targets updated
+  → Each affected person receives email:
+    "Role: Executive | Title: Vice President" or
+    "Role: Secretary | Title: General Secretary"
+  → Secretary and President notified (FYI)
 ```
 
-**Why atomic?** A partial failure leaves the system inconsistent. Either the full election applies or nothing does.
+**Why atomic?** A partial failure leaves the system in an inconsistent state (e.g., new Secretary appointed but old one still holds the role). Either the full election applies or nothing changes.
+
+**After the election — delegation targets:** If the VP person changed, the admin must also update the delegation configuration (Admin → Delegation) to point to the new VP. The system prompts this: "The Vice President designation changed. Update the President-absence delegation target? [Go to Delegation Settings]"
 
 ### 5.7 Member Deactivation
 
@@ -631,37 +703,52 @@ All auto-reassignments logged in audit_log:
 
 ### 5.9 User Directory (`/portal/admin/users`)
 
-Visible to: **admin** (full access) + secretary, vice_president, president (read-only view)
+Visible to: **admin** (full access) + secretary, president (read-only view)
+
+The directory shows both `portal_role` (permission badge) and `committee_title` (display label) as separate pieces of information. The role badge is the system authority; the title is the human-readable designation.
 
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│  MEMBER DIRECTORY                    [+ Invite Member]                 │
-│                                                                        │
-│  Filter: [All Roles ▼]  [All Status ▼]   Search: [____________]       │
-│  Tabs: [Active (152)] [Pending Invites (3)] [Inactive (4)]            │
-├──────────────┬──────┬─────────────┬─────────────┬──────────┬──────────┤
-│  Name        │ Flat │ Role        │ Last Active │ Payment  │ Actions  │
-├──────────────┼──────┼─────────────┼─────────────┼──────────┼──────────┤
-│  Bal Reddy   │ 101  │ 🔵 President│ Today       │ ✅ Current│ [View]   │
-│  [Name]      │ 204  │ 🟢 Secretary│ 2 days ago  │ ✅ Current│ [View]   │
-│  [Name]      │ 312  │ 🟡 Executive│ 5 days ago  │ ⚠️ 45d   │ [View]   │
-│  [Name]      │ 108  │ ⚪ Member   │ 12 days ago │ ✅ Current│ [View]   │
-└──────────────┴──────┴─────────────┴─────────────┴──────────┴──────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│  MEMBER DIRECTORY                           [+ Invite Member]            │
+│                                                                          │
+│  Filter: [All Roles ▼]  [All Status ▼]   Search: [______________]       │
+│  Tabs: [Active (14)] [Pending Invites (2)] [Inactive (1)]               │
+├──────────────┬──────┬──────────────────────────────┬──────────┬─────────┤
+│  Name        │ Flat │ Role & Title                 │ Payment  │ Actions │
+├──────────────┼──────┼──────────────────────────────┼──────────┼─────────┤
+│  Bal Reddy   │ 101  │ 🔵 President                 │ ✅ Current│ [View] │
+│              │      │    "President"               │          │         │
+├──────────────┼──────┼──────────────────────────────┼──────────┼─────────┤
+│  [Name]      │ 204  │ 🟢 Secretary                 │ ✅ Current│ [View] │
+│              │      │    "General Secretary"        │          │         │
+├──────────────┼──────┼──────────────────────────────┼──────────┼─────────┤
+│  [Name]      │ 312  │ 🟡 Executive                 │ ⚠️ 45d   │ [View] │
+│              │      │    "Vice President"           │          │         │
+├──────────────┼──────┼──────────────────────────────┼──────────┼─────────┤
+│  [Name]      │ 108  │ 🟡 Executive                 │ ✅ Current│ [View] │
+│              │      │    "Treasurer"               │          │         │
+├──────────────┼──────┼──────────────────────────────┼──────────┼─────────┤
+│  [Name]      │ 215  │ ⚪ Member                    │ ✅ Current│ [View] │
+└──────────────┴──────┴──────────────────────────────┴──────────┴─────────┘
 ```
+
+Role badges (permission level): 🔵 President · 🟢 Secretary · 🟡 Executive · ⚪ Member  
+Title is shown in smaller text below the role badge — no badge, no colour.
+
+**Filter by role** filters on `portal_role` (the authority level). Filter by title is available as a separate search field for quick lookup (e.g., "find everyone titled Treasurer").
 
 **User detail page** shows:
-- Profile info + flat number
-- Role history timeline: `member → executive (Jan 15 by Admin — authorized by Secretary via WhatsApp) → secretary (Jun 1 by Admin — authorized by President, AGM outcome)`
-- All HOTO items assigned to them
-- All votes cast (vendor, resolution)
-- All documents uploaded
-- All comments posted
-- Their feature permissions (inherited from role + any overrides)
-- All authorization records for role changes affecting this user
+- Profile info + flat number + committee_title
+- Role history timeline: `member → executive [title: Exec Member] → executive [title: Treasurer] → secretary [title: General Secretary]`
+- Note: title changes within the same role are shown as timeline events with a distinct "title change" tag, not a "role change" tag
+- All HOTO/snag items assigned to them
+- All votes cast; all documents uploaded; all comments
+- Their feature permissions (role defaults + user overrides)
+- Finance access override (if Treasurer: shows `finance.view ✓`, `finance.enter ✓` — from override)
 
 **What admin sees vs. what leaders see:**
-- Admin: full directory + all actions (Invite, Change Role, Deactivate, Grant Override)
-- President/Secretary/VP (non-admin): read-only directory — can see members, roles, last active; no action buttons. They communicate decisions to the admin; the admin executes.
+- Admin: full directory + all actions (Invite, Change Role & Title, Deactivate, Grant Override)
+- President/Secretary (non-admin): read-only directory — can see members, roles, titles, last active; no action buttons
 
 ### 5.8 Pending Invites Tab
 
@@ -706,15 +793,17 @@ NOT_STARTED → IN_PROGRESS → EVIDENCE_UPLOADED → UNDER_REVIEW
      └──────────────────────────────────────────────── DISPUTED
 ```
 
-State transition role rules:
-- `NOT_STARTED → IN_PROGRESS`: executive or above
-- `IN_PROGRESS → EVIDENCE_UPLOADED`: executive or above (requires ≥1 document)
-- `EVIDENCE_UPLOADED → UNDER_REVIEW`: executive or above
-- `UNDER_REVIEW → PENDING_PRESIDENT`: secretary / joint_secretary only
-- `PENDING_PRESIDENT → PENDING_SECRETARY`: president (or VP if delegated per §8.2)
-- `PENDING_SECRETARY → APPROVED`: secretary (or joint_secretary if delegated per §8.4); cannot be same person who set PENDING_PRESIDENT
-- `APPROVED → COMPLETED`: president or secretary only
-- `COMPLETED → DISPUTED`: president or secretary — requires written reason in `governance_notes`
+State transition role rules (using 4-role model):
+- `NOT_STARTED → IN_PROGRESS`: `executive` or above
+- `IN_PROGRESS → EVIDENCE_UPLOADED`: `executive` or above (requires ≥1 document)
+- `EVIDENCE_UPLOADED → UNDER_REVIEW`: `executive` or above
+- `UNDER_REVIEW → PENDING_PRESIDENT`: `secretary` role only
+- `PENDING_PRESIDENT → PENDING_SECRETARY`: `president` role only (or `executive` with active president-delegation activated by admin per §8.2)
+- `PENDING_SECRETARY → APPROVED`: `secretary` role only (or `executive` with active secretary-delegation activated by admin per §8.4); cannot be same person who set PENDING_PRESIDENT
+- `APPROVED → COMPLETED`: `president` or `secretary` only
+- `COMPLETED → DISPUTED`: `president` or `secretary` — requires written reason in `governance_notes`
+
+**How delegation works in transitions:** When the admin activates president-delegation to a specific executive (the VP-designated person), that executive temporarily gains the `hoto.approve_president` feature. The system checks the `approval_delegations` table on every API call — it does not change the person's `portal_role`. The delegation state is clear in the audit trail: every delegated approval is tagged "Acting per §8.2 delegation".
 
 ### 6.3 Builder SLA Escalation
 
@@ -729,7 +818,7 @@ Every builder-dependent HOTO item has a `builder_sla_date`. Cron job checks dail
 
 ### 6.4 Role-Based Assignment (Turnover-Safe)
 
-Every HOTO item stores both `responsible_role` (e.g., `treasurer`) and `responsible_user_id`. If the person changes roles, the item stays with whoever currently holds the role. All auto-reassignments logged.
+Every HOTO item stores both `responsible_role` (e.g., `executive`) and `responsible_user_id`. If the person changes roles, the item stays with whoever currently holds the role. All auto-reassignments logged.
 
 ---
 
@@ -1310,18 +1399,65 @@ ALTER TABLE user_roles
 -- ─────────────────────────────────────────────────────────────────────
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS
   portal_role TEXT DEFAULT 'executive',
-  -- Governance role: member | executive | working_president | joint_treasurer |
-  --                  treasurer | joint_secretary | secretary | vice_president | president
+  -- FOUR values only: 'member' | 'executive' | 'secretary' | 'president'
+  -- This controls ALL permission and approval logic. No other role values exist.
+  -- Old roles (vice_president, joint_secretary, treasurer, etc.) are removed — see migration below.
+  committee_title TEXT,
+  -- Display label ONLY — no effect on permissions, approval authority, or any system logic.
+  -- Examples: 'President', 'Vice President', 'Working President', 'General Secretary',
+  --           'Joint Secretary', 'Treasurer', 'Joint Treasurer', 'Executive Member', null
+  -- Set by admin when inviting or changing a member's designation.
   is_admin BOOLEAN DEFAULT false,
-  -- is_admin is orthogonal to portal_role. An admin executes user management with
-  -- documented President/Secretary authorization. Having is_admin does NOT grant
-  -- governance powers (voting, HOTO approvals) — those come from portal_role only.
+  -- Orthogonal to portal_role. Admin executes user management. Having is_admin does NOT
+  -- grant governance powers (voting, HOTO approvals) — those come from portal_role only.
   payment_status TEXT DEFAULT 'current',
   last_maintenance_paid_date DATE,
   maintenance_arrears_days INTEGER DEFAULT 0,
   privacy_consent_given BOOLEAN DEFAULT false,
   privacy_consent_at TIMESTAMPTZ,
-  is_active BOOLEAN DEFAULT true;
+  is_active BOOLEAN DEFAULT true,
+  email_digest_enabled BOOLEAN DEFAULT true;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- DATA MIGRATION: Collapse 9 old roles → 4 new roles
+-- Run AFTER adding committee_title column; sets both portal_role and committee_title
+-- from the previous role values. Safe to run multiple times (idempotent).
+-- ─────────────────────────────────────────────────────────────────────
+-- Step 1: Set committee_title from old portal_role values (before collapsing roles)
+UPDATE profiles SET committee_title =
+  CASE portal_role
+    WHEN 'president'        THEN 'President'
+    WHEN 'vice_president'   THEN 'Vice President'
+    WHEN 'working_president'THEN 'Working President'
+    WHEN 'secretary'        THEN 'General Secretary'
+    WHEN 'joint_secretary'  THEN 'Joint Secretary'
+    WHEN 'treasurer'        THEN 'Treasurer'
+    WHEN 'joint_treasurer'  THEN 'Joint Treasurer'
+    WHEN 'executive'        THEN 'Executive Member'
+    WHEN 'member'           THEN NULL
+    ELSE committee_title  -- leave unchanged if already set
+  END
+WHERE committee_title IS NULL;
+
+-- Step 2: Collapse old role values → 4-role model
+UPDATE profiles SET portal_role =
+  CASE portal_role
+    WHEN 'working_president' THEN 'executive'
+    WHEN 'vice_president'    THEN 'executive'
+    WHEN 'joint_secretary'   THEN 'executive'
+    WHEN 'treasurer'         THEN 'executive'
+    WHEN 'joint_treasurer'   THEN 'executive'
+    ELSE portal_role  -- 'member', 'executive', 'secretary', 'president' unchanged
+  END
+WHERE portal_role NOT IN ('member', 'executive', 'secretary', 'president');
+
+-- Step 3 (manual, post-migration): Grant finance feature overrides to Treasurer/Joint Treasurer
+-- These are user-specific overrides — run in the application code or manually:
+-- For each profile WHERE committee_title IN ('Treasurer', 'Joint Treasurer'):
+--   INSERT INTO user_feature_overrides (society_id, user_id, feature, enabled, reason, granted_by)
+--   VALUES (society_id, user_id, 'finance.view', true, 'Treasurer designation', admin_id),
+--          (society_id, user_id, 'finance.enter', true, 'Treasurer designation', admin_id)
+--   ON CONFLICT DO NOTHING;
 
 -- ─────────────────────────────────────────────────────────────────────
 -- Privacy Consents (DPDP Act compliance)
@@ -1373,8 +1509,12 @@ CREATE TABLE role_change_log (
   user_id UUID REFERENCES profiles NOT NULL,
   old_role TEXT NOT NULL,
   new_role TEXT NOT NULL,
+  old_title TEXT,          -- committee_title before change (null if no title set)
+  new_title TEXT,          -- committee_title after change (null if cleared)
   changed_by UUID REFERENCES profiles NOT NULL,   -- always the admin
   reason TEXT NOT NULL,                           -- free-text reason for audit trail
+  change_type TEXT NOT NULL DEFAULT 'ROLE_AND_TITLE',
+  -- Values: 'ROLE_AND_TITLE' | 'ROLE_ONLY' | 'TITLE_ONLY' | 'ELECTION'
   election_event_id UUID,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1952,24 +2092,26 @@ ALTER TABLE feature_permissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_feature_overrides ENABLE ROW LEVEL SECURITY;
 -- (all new tables)
 
--- Feature permissions: readable by committee; writable by president only
+-- Feature permissions: readable by all committee (executive+); writable by admin only
 CREATE POLICY "feature_perms_read" ON feature_permissions
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()
-            AND portal_role != 'member')
+            AND portal_role IN ('executive','secretary','president'))
   );
 
 CREATE POLICY "feature_perms_write" ON feature_permissions
   FOR ALL USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()
-            AND portal_role = 'president')
+            AND is_admin = true)
   );
 ```
 
 RLS test requirement: before go-live, test with role-specific JWTs:
 - `anon` JWT: must be blocked from all sensitive tables
 - `member` JWT: must be blocked from `maintenance_records`, `votes` (others)
-- `executive` JWT: must be blocked from phone numbers in `profiles`
+- `executive` JWT: must be blocked from phone numbers in `profiles`; must not be able to write to `feature_permissions`
+- `secretary` JWT: must be able to read `feature_permissions`; must not be able to write to it (admin-only write)
+- `is_admin = false` with `secretary` JWT: must not access admin-only endpoints
 
 ### 16.3 DPDP Act Compliance
 
@@ -2046,30 +2188,30 @@ export const FEATURES = {
   'hoto.upload':             { label: 'Upload documents',               locked: false },
   'hoto.comment':            { label: 'Add comments',                   locked: false },
   'hoto.advance_status':     { label: 'Advance item status',            locked: false },
-  'hoto.approve_president':  { label: 'President approval gate',        locked: true  }, // president/VP only
-  'hoto.approve_secretary':  { label: 'Secretary approval gate',        locked: true  }, // secretary only
-  'hoto.bypass_required_docs': { label: 'Bypass required document gate', locked: true }, // secretary+
+  'hoto.approve_president':  { label: 'President approval gate',        locked: true  }, // president; or executive with VP title + active delegation
+  'hoto.approve_secretary':  { label: 'Secretary approval gate',        locked: true  }, // secretary; or executive with Joint Secretary title + active delegation
+  'hoto.bypass_required_docs': { label: 'Bypass required document gate', locked: true }, // secretary and president
 
   // Snag
   'snag.view':               { label: 'View snag list',                 locked: true  },
   'snag.create':             { label: 'Create/edit snags',              locked: false },
   'snag.delete':             { label: 'Delete snags',                   locked: true  }, // president only
-  'snag.verify_close':       { label: 'Mark snags as verified closed',  locked: true  }, // president/secretary
+  'snag.verify_close':       { label: 'Mark snags as verified closed',  locked: true  }, // secretary and president
 
   // Vendor
   'vendor.view':             { label: 'View vendor evaluations',        locked: true  },
   'vendor.view_quotes':      { label: 'View vendor quotes',             locked: false },
   'vendor.vote':             { label: 'Cast vendor vote',               locked: false },
   'vendor.open_voting':      { label: 'Open/close voting',             locked: false },
-  'vendor.final_select':     { label: 'Confirm final vendor selection', locked: true  }, // president+secretary
+  'vendor.final_select':     { label: 'Confirm final vendor selection', locked: true  }, // secretary and president
 
   // Finance
   'finance.view':            { label: 'View financial records',                         locked: false },
   'finance.enter':           { label: 'Enter maintenance/expense records',              locked: false },
-  'finance.approve_10k':     { label: 'Approve expenses ≤₹10K (§9.11a)',               locked: true  }, // secretary+
+  'finance.approve_10k':     { label: 'Approve expenses ≤₹10K (§9.11a)',               locked: true  }, // secretary and president
   'finance.approve_20k':     { label: 'Approve expenses ≤₹20K (§9.11a)',               locked: true  }, // president only
   'finance.open_board_vote': { label: 'Open Board resolution vote ≤₹50K (§9.11b)',     locked: true  }, // secretary only — starts the vote
-  'finance.view_member_phones': { label: 'View member phone numbers',                  locked: true  }, // secretary+
+  'finance.view_member_phones': { label: 'View member phone numbers',                  locked: true  }, // secretary and president
 
   // Notices
   'notice.view':             { label: 'View formal notices',            locked: false },
@@ -2092,58 +2234,75 @@ export type Feature = keyof typeof FEATURES;
 
 ### 18.2 Default Role Permissions
 
+Four roles only: `member`, `executive`, `secretary`, `president`. The `committee_title`
+field (e.g., "Treasurer", "Vice President") is display-only and has **no effect** on this
+table. Finance access for Treasurer title-holders and delegation-based approvals for VP /
+Joint Secretary are handled via `user_feature_overrides` (§18.5), not by role.
+
 ```typescript
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, Feature[]> = {
   member: [
-    'hoto.view', 'snag.view', 'vendor.view', 'notice.view',
-  ],
-  executive: [
-    'hoto.view', 'hoto.create', 'hoto.upload', 'hoto.comment', 'hoto.advance_status',
-    'snag.view', 'snag.create',
-    'vendor.view', 'vendor.view_quotes', 'vendor.vote',
+    'hoto.view',
+    'snag.view',
+    'vendor.view',
     'notice.view',
+  ],
+
+  executive: [
+    // HOTO — create and participate, but cannot approve
+    'hoto.view', 'hoto.create', 'hoto.upload', 'hoto.comment', 'hoto.advance_status',
+    // Snag — create items, cannot verify-close or delete
+    'snag.view', 'snag.create',
+    // Vendor — view quotes and cast votes, cannot open voting or select finalist
+    'vendor.view', 'vendor.view_quotes', 'vendor.vote',
+    // Notice — read only
+    'notice.view',
+    // Audit — read-only trail
     'audit.view',
+    // NOTE: finance.view / finance.enter are NOT included here.
+    // They are granted as user_feature_overrides when committee_title = 'Treasurer'
+    // or 'Joint Treasurer' is assigned (prompted by election/role-change workflow).
   ],
-  working_president: [/* same as executive */],
-  joint_treasurer: [/* same as executive + finance.view, finance.enter */],
-  treasurer: [
-    '...executive features...',
-    'finance.view', 'finance.enter',
-    'users.view_directory',
-  ],
-  joint_secretary: [
-    '...treasurer features...',
-    'vendor.open_voting', 'notice.send',
-    'hoto.approve_secretary',   // when delegated per §8.4
-    'users.invite_member', 'users.deactivate', 'users.view_directory',
-    'hoto.bypass_required_docs',
-  ],
+
   secretary: [
-    '...joint_secretary features...',
-    'hoto.approve_secretary',
-    'snag.verify_close',
-    'finance.approve_10k', 'finance.open_board_vote', 'finance.view_member_phones',
+    // All executive features +
+    'hoto.view', 'hoto.create', 'hoto.upload', 'hoto.comment', 'hoto.advance_status',
+    'hoto.approve_secretary', 'hoto.bypass_required_docs',
+    'snag.view', 'snag.create', 'snag.verify_close',
+    'vendor.view', 'vendor.view_quotes', 'vendor.vote',
+    'vendor.open_voting', 'vendor.final_select',
+    'notice.view', 'notice.send',
     'audit.view',
+    'finance.view', 'finance.enter', 'finance.approve_10k',
+    // finance.open_board_vote: opens a board resolution vote for ₹20,001–₹50,000.
+    // Uses vendor_requirements (category='FINANCIAL_APPROVAL') + votes table.
+    // On majority+quorum, API auto-creates corpus_fund_records APPROVED_USE entry (§9.3).
+    'finance.open_board_vote',
+    'finance.view_member_phones',
+    'users.view_directory', 'users.invite_member', 'users.deactivate',
   ],
-  // finance.open_board_vote: Secretary opens a Board resolution vote for amounts
-  // ₹20,001–₹50,000. The vote uses vendor_requirements (category='FINANCIAL_APPROVAL')
-  // and the votes table (vendor_id = null). On majority+quorum completion, the API
-  // auto-creates the corpus_fund_records APPROVED_USE entry. See §9.3 for full chain.
-  vice_president: [
-    '...secretary features...',
-    'hoto.approve_president',   // when delegated per §8.2
-    'users.invite_member', 'users.deactivate',
-  ],
+
   president: [
-    // All features
-    '...all features...',
-    'hoto.approve_president',
-    'admin.delegation', 'admin.elections', 'admin.permissions',
+    // All secretary features +
+    'hoto.view', 'hoto.create', 'hoto.upload', 'hoto.comment', 'hoto.advance_status',
+    'hoto.approve_secretary', 'hoto.approve_president', 'hoto.bypass_required_docs',
+    'snag.view', 'snag.create', 'snag.verify_close', 'snag.delete',
+    'vendor.view', 'vendor.view_quotes', 'vendor.vote',
+    'vendor.open_voting', 'vendor.final_select',
+    'notice.view', 'notice.send',
+    'audit.view',
+    'finance.view', 'finance.enter', 'finance.approve_10k', 'finance.approve_20k',
+    'finance.open_board_vote', 'finance.view_member_phones',
+    'users.view_directory', 'users.invite_member', 'users.deactivate',
     'users.invite_committee', 'users.change_role',
-    'finance.approve_20k',
-    'snag.delete',
+    'admin.delegation', 'admin.elections', 'admin.permissions', 'admin.import',
   ],
 };
+
+// Delegation note: when an executive holds committee_title = 'Vice President' and is the
+// active target in approval_delegations, the system grants 'hoto.approve_president' as a
+// transient user_feature_override for the delegation period. Likewise for Joint Secretary
+// → 'hoto.approve_secretary'. Neither changes portal_role. See §8.2 / §8.4.
 ```
 
 ### 18.3 Permission Resolution at Runtime
@@ -2280,7 +2439,7 @@ Locked features display a tooltip: "This permission is mandated by the society's
 
 **Non-locked features** can be toggled per role by the admin with documented President authorization. Examples of legitimate changes:
 - Give `executive` role access to `finance.view` (see totals, not enter data)
-- Give `joint_treasurer` access to `notice.send` for a specific operational period
+- Give an executive with Joint Treasurer title access to `notice.send` for a specific operational period (via per-user override, §18.6)
 - Remove `vendor.view_quotes` from `executive` during a sensitive procurement
 
 ### 18.6 Per-User Feature Overrides
@@ -2320,60 +2479,70 @@ Overrides:
 
 ### 18.7 Feature Access Summary Matrix
 
-Two orthogonal axes: **governance role** (approval/voting/action power) and **admin flag** (system management power). The President authorizes; the admin executes.
+Two orthogonal axes: **governance role** (`portal_role` — approval/voting/action power) and
+**admin flag** (`is_admin=true` — system management power). The `committee_title` field is
+display-only and does **not** change any column in this matrix.
 
-| Feature | member | executive | treasurer / joint_sec | secretary | vice_president | president | **admin** (`is_admin=true`) |
-|---|---|---|---|---|---|---|---|
-| **User Management** — admin only; no in-portal approval from leaders required | | | | | | | |
-| View member directory (read-only) | - | - | - | ✓ | ✓ | ✓ | ✓ |
-| Invite new member | - | - | - | - | - | - | ✓ |
-| Invite committee member | - | - | - | - | - | - | ✓ |
-| Change any governance role | - | - | - | - | - | - | ✓ |
-| Deactivate member | - | - | - | - | - | - | ✓ |
-| Reactivate member | - | - | - | - | - | - | ✓ |
-| Run election bulk update | - | - | - | - | - | - | ✓ |
-| Manage feature permissions per role | - | - | - | - | - | - | ✓ |
-| Grant per-user feature override | - | - | - | - | - | - | ✓ |
-| Revoke per-user feature override | - | - | - | - | - | - | ✓ |
-| Grant / revoke admin flag | - | - | - | - | - | - | ✓ |
-| Manage delegation settings | - | - | - | - | - | - | ✓ |
-| **HOTO** — governance role controls these | | | | | | | |
-| View items | R | R | R | R | R | R | R |
-| Create/edit items | - | ✓ | ✓ | ✓ | ✓ | ✓ | via governance role only |
-| Upload documents | - | ✓ | ✓ | ✓ | ✓ | ✓ | via governance role only |
-| Advance status | - | ✓ | ✓ | ✓ | ✓ | ✓ | via governance role only |
-| President approval gate | - | - | - | - | ✓(delegated) | ✓ | — (not a governance power) |
-| Secretary approval gate | - | - | ✓(joint_sec) | ✓ | - | - | — |
-| Bypass required docs gate | - | - | - | ✓ | ✓ | ✓ | — |
-| **Snag** | | | | | | | |
-| View | R | R | R | R | R | R | R |
-| Create/edit | - | ✓ | ✓ | ✓ | ✓ | ✓ | via governance role only |
-| Delete (soft) | - | - | - | - | - | ✓ | — |
-| Verify-close | - | - | - | ✓ | - | ✓ | — |
-| **Vendor** | | | | | | | |
-| View evaluations | R | R | R | R | R | R | R |
-| View quotes | - | ✓ | ✓ | ✓ | ✓ | ✓ | via governance role only |
-| Cast vote | - | ✓ | ✓ | ✓ | ✓ | ✓ | via governance role only |
-| Open voting | - | - | ✓ | ✓ | ✓ | ✓ | — |
-| Final selection confirm | - | - | - | ✓ | ✓ | ✓ | — |
-| **Finance** | | | | | | | |
-| View records | - | - | ✓ | ✓ | ✓ | ✓ | — |
-| Enter records | - | - | ✓(treasurer) | ✓ | ✓ | ✓ | — |
-| Approve ≤₹10K | - | - | - | ✓ | - | - | — |
-| Approve ≤₹20K | - | - | - | - | - | ✓ | — |
-| Open Board vote ≤₹50K | - | - | - | ✓(sec only) | - | - | — |
-| View member phones | - | - | - | ✓ | ✓ | ✓ | ✓ (operational) |
-| **Notices** | | | | | | | |
-| View | R | R | R | R | R | R | R |
-| Send | - | - | ✓(joint_sec) | ✓ | ✓ | ✓ | — |
-| **Audit** | | | | | | | |
-| View audit log | - | - | ✓(sec/joint_sec) | ✓ | ✓ | ✓ | ✓ |
-| View role change history (all users) | - | - | - | ✓ | ✓ | ✓ | ✓ |
+Special cases handled via `user_feature_overrides` (not shown as separate columns):
+- **Treasurer / Joint Treasurer title** → grants `finance.view` + `finance.enter` to an `executive`
+- **VP / Joint Secretary title + active delegation** → grants `hoto.approve_president` / `hoto.approve_secretary` to an `executive` for the delegation period
+
+| Feature | member | executive | secretary | president | **admin** (`is_admin=true`) |
+|---|:---:|:---:|:---:|:---:|:---:|
+| **User Management** — admin only | | | | | |
+| View member directory | - | - | ✓ | ✓ | ✓ |
+| Invite new member | - | - | ✓ | - | ✓ |
+| Invite committee member | - | - | - | - | ✓ |
+| Change any governance role | - | - | - | - | ✓ |
+| Set committee_title | - | - | - | - | ✓ |
+| Deactivate / reactivate member | - | - | - | - | ✓ |
+| Run election bulk update | - | - | - | - | ✓ |
+| Manage feature permissions per role | - | - | - | - | ✓ |
+| Grant / revoke per-user feature override | - | - | - | - | ✓ |
+| Grant / revoke admin flag | - | - | - | - | ✓ |
+| Manage delegation settings | - | - | - | - | ✓ |
+| **HOTO** — governance role controls these | | | | | |
+| View items | R | R | R | R | R |
+| Create / edit items | - | ✓ | ✓ | ✓ | via governance role |
+| Upload documents | - | ✓ | ✓ | ✓ | via governance role |
+| Advance status | - | ✓ | ✓ | ✓ | via governance role |
+| President approval gate | - | ✓¹ | - | ✓ | — |
+| Secretary approval gate | - | ✓² | ✓ | ✓ | — |
+| Bypass required docs gate | - | - | ✓ | ✓ | — |
+| **Snag** | | | | | |
+| View | R | R | R | R | R |
+| Create / edit | - | ✓ | ✓ | ✓ | via governance role |
+| Verify-close | - | - | ✓ | ✓ | — |
+| Delete (soft) | - | - | - | ✓ | — |
+| **Vendor** | | | | | |
+| View evaluations | R | R | R | R | R |
+| View quotes | - | ✓ | ✓ | ✓ | via governance role |
+| Cast vote | - | ✓ | ✓ | ✓ | via governance role |
+| Open voting | - | - | ✓ | ✓ | — |
+| Final selection confirm | - | - | ✓ | ✓ | — |
+| **Finance** | | | | | |
+| View records | - | ✓³ | ✓ | ✓ | — |
+| Enter records | - | ✓³ | ✓ | ✓ | — |
+| Approve ≤₹10K | - | - | ✓ | ✓ | — |
+| Approve ≤₹20K | - | - | - | ✓ | — |
+| Open board vote (₹20K–₹50K) | - | - | ✓ | - | — |
+| View member phone numbers | - | - | ✓ | ✓ | ✓ |
+| **Notices** | | | | | |
+| View | R | R | R | R | R |
+| Send / publish | - | - | ✓ | ✓ | — |
+| **Audit** | | | | | |
+| View audit log | - | ✓ | ✓ | ✓ | ✓ |
+| View role-change history (all users) | - | - | ✓ | ✓ | ✓ |
+
+**Footnotes:**
+- ¹ `executive` gets `hoto.approve_president` only when committee_title = 'Vice President' or 'Working President' **and** an active `approval_delegations` row points to them. Granted as a time-bounded `user_feature_override`.
+- ² `executive` gets `hoto.approve_secretary` only when committee_title = 'Joint Secretary' and an active `approval_delegations` row points to them.
+- ³ `executive` gets `finance.view` and `finance.enter` only when committee_title = 'Treasurer' or 'Joint Treasurer'. Granted as `user_feature_overrides` during the role-assignment workflow (§5.5).
 
 **Reading the matrix:**
-- `president` column has no user-management ✓ marks — the President governs, not administers. The admin has full system management authority.
-- Admin accountability comes from the audit log (every action permanently recorded) and from the President/Secretary being able to see the role history in the portal, not from an in-portal approval workflow.
-- If the admin also holds a governance role (e.g., `executive`), they get both sets of capabilities for their governance role actions.
+- `president` has no user-management ✓ marks — the President governs; the admin administers. These are orthogonal.
+- Admin accountability flows from the audit log (every action permanently recorded) and from Secretary/President viewing role-change history — not from in-portal approval workflows.
+- An admin who also holds a governance role (e.g., `secretary`) gets both sets of capabilities simultaneously.
 
 ---
 
@@ -2399,12 +2568,12 @@ New version uploaded → old version gets `superseded_by = new_id`. Old version 
 
 | Data | Visible to |
 |---|---|
-| Member phone numbers | secretary, joint_secretary, treasurer, vice_president, president |
+| Member phone numbers | secretary and president (plus executives with finance.view_member_phones override) |
 | Vendor quotes | All committee (executive and above) |
 | Legal notices | All committee |
-| Financial records | treasurer, joint_treasurer, secretary, vice_president, president |
+| Financial records | secretary and president; executives with Treasurer/Joint Treasurer title (finance.view override) |
 | Proxy documents | secretary, president |
-| Audit log | secretary, vice_president, president |
+| Audit log | executive and above (all committee) |
 
 ---
 
@@ -2850,8 +3019,8 @@ CREATE INDEX idx_rules_society ON rules(society_id, rule_category, rule_code);
 | `rule_code` | Label | Default value | Locked |
 |---|---|---|---|
 | `HOTO_APPROVAL_CHAIN` | Roles required to approve HOTO items (in order) | `["secretary","president"]` | ✓ |
-| `HOTO_APPROVAL_ALTERNATE_VP` | VP substitutes for President if delegated | `true` | ✓ |
-| `HOTO_APPROVAL_ALTERNATE_JOINT_SEC` | Joint Secretary substitutes for Secretary if delegated | `true` | ✓ |
+| `HOTO_APPROVAL_ALTERNATE_VP` | Executive with VP title substitutes for President when delegation is active | `true` | ✓ |
+| `HOTO_APPROVAL_ALTERNATE_JOINT_SEC` | Executive with Joint Secretary title substitutes for Secretary when delegation is active | `true` | ✓ |
 | `VENDOR_DECISION_REQUIRES_BOTH` | Vendor final selection requires President + Secretary | `true` | ✓ |
 | `EXPENSE_APPROVAL_CHAIN_10K` | Role(s) who can approve expenses ≤ limit | `["secretary"]` | ✓ |
 | `EXPENSE_APPROVAL_CHAIN_20K` | Role(s) who can approve expenses ≤ limit | `["president"]` | ✓ |
@@ -3263,109 +3432,147 @@ The primary RBAC configuration interface. Shows a full matrix of roles × featur
 
 ```
 FEATURE PERMISSIONS MATRIX
-────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────
 View mode: [Matrix ▼]        [Preview as User…]   [Export CSV]
 
-            member  exec  jt_sec  sec   vp    pres   LEGEND
-────────────────────────────────────────────────────────────────────────────
+                              member  exec  sec   pres   LEGEND
+────────────────────────────────────────────────────────────────────────────────
 USER MANAGEMENT (admin controls these via the admin flag — not shown here)
-────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────
 HOTO MODULE
-  View items   🔒✅   🔒✅   🔒✅   🔒✅  🔒✅  🔒✅   🔒 = locked
-  Create/edit   —     ✅    ✅    ✅    ✅   ✅   ✅ = enabled
-  Upload docs   —     ✅    ✅    ✅    ✅   ✅   — = disabled (role default)
-  Add comments  —     ✅    ✅    ✅    ✅   ✅
-  Advance status—     ✅    ✅    ✅    ✅   ✅
-  Pres. gate  🔒—   🔒—   🔒—   🔒—  🔒✅ 🔒✅
-  Sec. gate   🔒—   🔒—   🔒✅  🔒✅  🔒—  🔒—
-────────────────────────────────────────────────────────────────────────────
+  View items                   🔒✅   🔒✅  🔒✅  🔒✅   🔒 = locked (byelaw)
+  Create/edit                   —     ✅    ✅    ✅   ✅ = enabled
+  Upload docs                   —     ✅    ✅    ✅   — = disabled (role default)
+  Add comments                  —     ✅    ✅    ✅
+  Advance status                —     ✅    ✅    ✅   † = via user_feature_override
+  Pres. approval gate          🔒—   🔒—†  🔒—   🔒✅    only; not this matrix
+  Sec. approval gate           🔒—   🔒—†  🔒✅  🔒✅
+  Bypass required-docs gate    🔒—   🔒—   🔒✅  🔒✅
+────────────────────────────────────────────────────────────────────────────────
 SNAG MODULE
-  View         🔒✅   🔒✅   🔒✅   🔒✅  🔒✅  🔒✅
-  Create/edit   —     ✅    ✅    ✅    ✅   ✅
-  Delete       🔒—   🔒—   🔒—   🔒—  🔒—  🔒✅
-  Verify-close 🔒—   🔒—   🔒—   🔒✅  🔒—  🔒✅
-────────────────────────────────────────────────────────────────────────────
+  View                         🔒✅   🔒✅  🔒✅  🔒✅
+  Create/edit                   —     ✅    ✅    ✅
+  Verify-close                 🔒—   🔒—   🔒✅  🔒✅
+  Delete (soft)                🔒—   🔒—   🔒—   🔒✅
+────────────────────────────────────────────────────────────────────────────────
 VENDOR MODULE
-  View         🔒✅   🔒✅   🔒✅   🔒✅  🔒✅  🔒✅
-  View quotes   —     ✅    ✅    ✅    ✅   ✅
-  Cast vote     —     ✅    ✅    ✅    ✅   ✅
-  Open voting   —     —     ✅    ✅    ✅   ✅
-  Final select 🔒—   🔒—   🔒—   🔒✅  🔒✅  🔒✅
-────────────────────────────────────────────────────────────────────────────
+  View evaluations             🔒✅   🔒✅  🔒✅  🔒✅
+  View quotes                   —     ✅    ✅    ✅
+  Cast vote                     —     ✅    ✅    ✅
+  Open voting                   —     —     ✅    ✅
+  Confirm final selection      🔒—   🔒—   🔒✅  🔒✅
+────────────────────────────────────────────────────────────────────────────────
 FINANCE MODULE
-  View records  —     —     ✅    ✅    ✅   ✅
-  Enter records —     —     ✅    ✅    ✅   ✅
-  Approve ≤10K 🔒—   🔒—   🔒—   🔒✅  🔒—  🔒—
-  Approve ≤20K 🔒—   🔒—   🔒—   🔒—  🔒—  🔒✅
-  Board vote   🔒—   🔒—   🔒—   🔒✅  🔒—  🔒—
-  Member phones🔒—   🔒—   🔒—   🔒✅  🔒✅  🔒✅
-────────────────────────────────────────────────────────────────────────────
+  View records                  —    —†     ✅    ✅
+  Enter records                 —    —†     ✅    ✅
+  Approve ≤₹10K                🔒—   🔒—   🔒✅  🔒✅
+  Approve ≤₹20K                🔒—   🔒—   🔒—   🔒✅
+  Open Board vote (≤₹50K)      🔒—   🔒—   🔒✅  🔒—
+  View member phone numbers    🔒—   🔒—   🔒✅  🔒✅
+────────────────────────────────────────────────────────────────────────────────
+NOTICES
+  View                         🔒✅   🔒✅  🔒✅  🔒✅
+  Send / publish                —     —     ✅    ✅
+────────────────────────────────────────────────────────────────────────────────
+AUDIT
+  View audit log                —     ✅    ✅    ✅
+  View role-change history      —     —     ✅    ✅
+────────────────────────────────────────────────────────────────────────────────
 [Save All Changes]    [Reset to Defaults]    [View Change Log]
+
+† Delegation overrides (for Pres./Sec. approval gates) and Treasurer finance access are
+  granted as user_feature_overrides (§25.4), not via this matrix. Editing them here has
+  no effect — a tooltip explains this when the cell is hovered.
 ```
 
 **Interaction rules:**
 - Click an unlocked cell (✅/—) to toggle it; it turns amber to indicate an unsaved change
-- Clicking a locked (🔒) cell shows tooltip: "This is required by the society's byelaws. Contact Admin if a byelaw amendment is needed."
+- Clicking a locked (🔒) cell shows a tooltip: "This is required by the society's byelaws and cannot be changed here."
+- Clicking a delegation-override cell (†) shows: "This access is granted per-user via delegation or title assignment. Manage it in User → Per-User Overrides."
 - "Save All Changes" shows a diff summary modal before committing: "You are enabling 'Finance → View records' for Executive and disabling 'Vendor → View quotes' for Executive. These changes take effect immediately."
 - "Preview as User" → select any user → screen shows exactly what buttons and sections that user would see on the HOTO, Snag, Vendor, and Finance pages
 
 ### 25.3 Role Assignment with Visual Hierarchy (`/portal/admin/users`)
 
-Beyond the list view in §5.9, the admin has a **Roles View** tab showing who holds each governance role:
+Beyond the list view in §5.9, the admin has a **Roles View** tab showing who holds each
+governance role and their display title. The **role** determines authority; the
+**committee_title** is the label shown in the directory.
 
 ```
 COMMITTEE ROLES                          [+ Invite Member]  [Run Election]
 ─────────────────────────────────────────────────────────────────────────
 
-  🔵 PRESIDENT                 Bal Reddy (Flat 101)       [Change]
-  🔵 VICE PRESIDENT            [Vacant — no one assigned] [Assign]  ⚠️
-  🔵 WORKING PRESIDENT         [Name] (Flat 204)          [Change]
-  🟢 GENERAL SECRETARY         [Name] (Flat 312)          [Change]
-  🟢 JOINT SECRETARY           [Name] (Flat 108)          [Change]
-  🟡 TREASURER                 [Name] (Flat 207)          [Change]
-  🟡 JOINT TREASURER           [Name] (Flat 415)          [Change]
-  ⚪ EXECUTIVE MEMBER (7)      [Name], [Name], [Name]...  [Manage]
+  🔵 PRESIDENT
+     Bal Reddy (Flat 101)  · President                    [Edit] [Change Role]
+
+  🟢 SECRETARY
+     [Name] (Flat 312)     · General Secretary            [Edit] [Change Role]
+
+  ⚪ EXECUTIVES (9 members)
+     [Name] (Flat 204)     · Vice President               [Edit] [Change Role]
+     [Name] (Flat 108)     · Joint Secretary              [Edit] [Change Role]
+     [Name] (Flat 207)     · Treasurer          💰        [Edit] [Change Role]
+     [Name] (Flat 415)     · Joint Treasurer    💰        [Edit] [Change Role]
+     [Name] (Flat 306)     · Working President            [Edit] [Change Role]
+     [Name] (Flat 512)     · Executive Member             [Edit] [Change Role]
+     [Name] (Flat 203)     · Executive Member             [Edit] [Change Role]
+     … 2 more
+
+  ⚫ MEMBERS (48) — shown in list view only
 
 ─────────────────────────────────────────────────────────────────────────
   ADMIN FLAG (orthogonal to governance roles)
   🔴 System Admin              [Your name] (Flat —)       [Manage Admins]
 ─────────────────────────────────────────────────────────────────────────
 
-⚠️ Vice President is vacant. If the President is unavailable and delegation
-   is activated, no one can act. Assign a VP before go-live.
+💰 = has finance.view + finance.enter overrides (Treasurer title grants these)
 ```
 
-**[Change] role flow (single user):**
-1. Click [Change] → drawer slides in showing: current role, dropdown for new role, reason field, preview of permission changes
-2. Permission diff shown: "Removing: finance.view, finance.enter / Adding: hoto.approve_secretary"
-3. Confirmation modal: "Change [Name] from Executive to Joint Secretary? This affects their feature access immediately."
-4. On confirm: role updated, role_change_log created, email sent to user
+**[Edit] title flow (title-only change, no permission impact):**
+1. Click [Edit] → inline text input appears for `committee_title`; role dropdown grayed out (use [Change Role] for that)
+2. Admin types new title (e.g., "Vice President"), presses Save
+3. `role_change_log` created with `change_type = 'TITLE_ONLY'`; no permission change; user notified
+
+**[Change Role] flow (role change, may affect permissions):**
+1. Click [Change Role] → drawer slides in showing:
+   - Current role badge + current title
+   - Role dropdown (4 choices: member / executive / secretary / president)
+   - Committee title field (pre-filled from current title; admin can update)
+   - Reason field (mandatory)
+   - Permission diff preview: lists features being added and removed
+2. If new title = 'Treasurer' or 'Joint Treasurer': system prompts "Grant finance.view + finance.enter overrides for this user? [Yes — grant] [No — skip]"
+3. If new role = 'executive' from higher role: "This removes hoto.approve_secretary and/or financial approval access. Confirm?"
+4. On confirm: role updated, title updated, overrides granted if elected, `role_change_log` created, email sent to user
 
 ### 25.4 Per-User Permission Overrides (`/portal/admin/users/[id]/permissions`)
 
 Two-panel layout showing inherited + overrides:
 
 ```
-[Name] (Flat 207) — Joint Treasurer
+[Name] (Flat 207) — Executive  ·  Treasurer
 ─────────────────────────────────────────────────────────────────────────
-INHERITED FROM JOINT TREASURER ROLE          │ USER-SPECIFIC OVERRIDES
-                                             │
-✅ hoto.view                                 │  finance.view   ENABLED
-✅ hoto.create                               │  Reason: Acting financial
-✅ hoto.upload                               │  coordinator (Treasurer absent)
-✅ hoto.comment                              │  Granted: Admin, Jun 15
-✅ hoto.advance_status                       │  Expires: Aug 31, 2026 (78 days)
-✅ snag.view                                 │  [✗ Revoke Now]
-✅ snag.create                               │
-✅ vendor.view                               │  [+ Add Override]
-✅ vendor.vote                               │
-✅ finance.view  ← overridden (role: ❌)     │
-✅ finance.enter                             │
-❌ finance.approve_10k  (not in role)        │
-❌ finance.approve_20k  (not in role)        │
+INHERITED FROM EXECUTIVE ROLE               │ USER-SPECIFIC OVERRIDES
+                                            │
+✅ hoto.view                                │  finance.view   ENABLED
+✅ hoto.create                              │  Reason: Treasurer title —
+✅ hoto.upload                              │  finance access per §5.5
+✅ hoto.comment                             │  Granted: Admin, Jun 15
+✅ hoto.advance_status                      │  Expires: never
+✅ snag.view                                │  [✗ Revoke]
+✅ snag.create                              │
+✅ vendor.view                              │  finance.enter  ENABLED
+✅ vendor.view_quotes                       │  Reason: Treasurer title
+✅ vendor.vote                              │  Granted: Admin, Jun 15
+✅ audit.view                               │  Expires: never
+❌ finance.view    ← role default: ❌       │  [✗ Revoke]
+                    override → ✅ ENABLED   │
+❌ finance.enter   ← role default: ❌       │  [+ Add Override]
+                    override → ✅ ENABLED   │
+❌ finance.approve_10k  (not in role)       │
+❌ finance.approve_20k  (not in role)       │
 ─────────────────────────────────────────────────────────────────────────
-Note: The effective permission for 'finance.view' is ENABLED (override wins).
-Override expiry is checked server-side on every API call — not just on login.
+Effective: finance.view = ✅ ENABLED (override wins over role default)
+Override expiry is enforced server-side on every API call — not just login.
 ```
 
 **[+ Add Override] form:**
@@ -3402,7 +3609,7 @@ SYSTEM ADMINISTRATORS
 
 ---
 
-## 26. Post-Redesign Regression Analysis (v4.0 Self-Check)
+## 26. Post-Redesign Regression Analysis (v4.0 / v4.1 Self-Check)
 
 This section verifies that the six new design areas introduced in v4.0 do not create new gaps, contradict existing sections, or break existing functionality.
 
@@ -3473,7 +3680,8 @@ These gaps surfaced during the v4.0 self-check and are documented for resolution
 
 *These 5 items are low-priority (no blockers) and can be addressed in Phase 2.*
 
-*Document Version 4.0 · Revised May 2026 — Rules Engine + Async Resilience + Email Draft System + Full RBAC UI + RUNBOOK*  
+*Document Version 4.1 · Revised May 2026 — 4-Role Model + committee_title Display Field*  
+*Changes from v4.0: Reduced portal_role from 9 values to 4 (member, executive, secretary, president); added committee_title TEXT to profiles as a display-only label with no permission effect; VP/Working President/Joint Secretary collapse to executive + title + delegation-based feature override; Treasurer/Joint Treasurer collapse to executive + title + finance.view/finance.enter user_feature_overrides; §3.4 committee structure rewritten; §5.4 role hierarchy simplified; §5.5 role change workflow updated (role dropdown now 4 choices + title field); §5.6 election bulk update updated (Role + Title as separate columns; finance override prompt); §5.9 user directory updated (role badge + title below); §6.2 HOTO state machine role references updated; §15 schema: committee_title column + full data migration SQL (2-step collapse); §16.2 RLS updated for 4-role names; §18.1 locked feature comments updated; §18.2 DEFAULT_ROLE_PERMISSIONS rewritten to 4-role structure with delegation note; §18.7 Feature Access Matrix rewritten from 7 columns to 4 columns with footnote system; §23.3 APPROVAL rules labels updated for delegation via title; §25.2 RBAC matrix updated to 4 columns with † delegation override markers; §25.3 role assignment UI shows role + title as separate editable fields; §25.4 per-user override example updated to Executive · Treasurer; RUNBOOK §5 and §6 updated for 4-role + title workflow; RUNBOOK §7 delegation steps note that VP/Joint Secretary are executives with titles*  
 *Changes from v3.2: §23 general-purpose Rules Engine (5 categories: PARAMETER, APPROVAL, ESCALATION, NOTIFICATION, VALIDATION) with 35+ configurable rules and full tab-based admin UI; §24 Email Draft System (3-tier model, email_drafts table, review UI, weekly digest spec, 13-event trigger mapping); §25 full RBAC Administration UI spec (role-feature matrix with visual toggles, role assignment with hierarchy view, per-user overrides with two-panel layout, admin flag management); §26 post-redesign regression analysis (6 categories, 5 new gaps identified and documented); §4.5 Async Resilience Patterns (exponential backoff, circuit breaker, idempotency locks, cron heartbeat monitoring, DLQ dashboard); §4.4 updated to reference new RUNBOOK.md; proxy voting disabled by default via rules engine; new DB tables: rules, email_drafts, cron_heartbeats, cron_locks, system_config; upload_queue backoff fields; profiles.email_digest_enabled; design/RUNBOOK.md created (20 sections, 600+ lines)*  
 *Changes from v3.1: Added `societies` table (FK anchor for all society_id columns); clarified `member_invites.accepted_user_id` FK creation timing and token timing-attack prevention; added `responsible_role`/`responsible_user_id` to `snag_items`; added `reopen_reason` to `snag_items`; specified proxy authorization expiry enforcement mechanism with proactive cron alert; defined Corpus Fund APPROVED_USE approval chain (presidential vs board vs blocked); changed health-check cron from write-based (96 commits/day) to read-only GET; added path traversal validation spec for `upload_queue.target_github_path`; added `finance.open_board_vote` feature for Board resolution votes ≤₹50K; specified board financial vote mechanism reusing vendor_requirements+votes tables with FINANCIAL_APPROVAL category; added `pdf_generation_jobs.purged_at` with 30-day PII scrub retention policy; added §12.5 Validation Messages & Blocked Feature UX (full message catalog, display patterns, non-tech user vote screen, My Actions overflow/pagination, no-403-pages rule); added corpus fund §9.3 with three-tier approval chain table*  
 *Changes from v3: Added Module 0 (User & Role Management); invite-only registration; committee election bulk update; member deactivation; auto-reassignment; feature registry with locked/unlocked features; runtime permission resolution; UI enforcement pattern; admin permissions UI; per-user feature overrides; fixed user_roles unique constraint bug; RBAC risk register; pre-launch checklist*  
