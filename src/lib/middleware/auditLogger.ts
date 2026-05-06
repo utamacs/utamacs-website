@@ -4,7 +4,7 @@ import { stripPII } from '../utils/pii';
 
 export type AuditAction =
   | 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT'
-  | 'EXPORT' | 'ROLE_CHANGE' | 'PAYMENT' | 'DATA_ERASURE';
+  | 'EXPORT' | 'ROLE_CHANGE' | 'PAYMENT' | 'DATA_ERASURE' | 'PASSWORD_RESET';
 
 export interface AuditEntry {
   userId: string;

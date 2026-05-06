@@ -55,7 +55,7 @@ export const POST: APIRoute = async ({ request }) => {
     const signatories = (signatures_used ?? []).map(d => ({ designation: d }));
     const buf = await generateDocxBuffer(template, field_values ?? {}, signatories, logoBase64);
 
-    return new Response(buf, {
+    return new Response(new Uint8Array(buf), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       },
