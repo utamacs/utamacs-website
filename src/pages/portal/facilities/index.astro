@@ -8,7 +8,7 @@ if (!user) return Astro.redirect('/portal/login');
 
 <PortalLayout title="Facility Booking" user={user} activeModule="facility_booking">
   <!-- Process info panel -->
-  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+  <details open class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
     <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
@@ -21,52 +21,39 @@ if (!user) return Astro.redirect('/portal/login');
     </summary>
     <div class="px-5 pb-5">
       <div class="pt-4 border-t border-primary-100 space-y-4">
-        <svg viewBox="0 0 660 100" class="w-full" role="img" aria-label="Facility booking flow: Select Slot → Request Sent → Under Review → Confirmed or Rejected → Completed">
-          <defs>
-            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
-            </marker>
-            <marker id="arr-green" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L8,3 z" fill="#059669"/>
-            </marker>
-            <marker id="arr-red" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L8,3 z" fill="#dc2626"/>
-            </marker>
-          </defs>
-          <!-- Step 1: Select Slot -->
-          <rect x="10" y="22" width="110" height="50" rx="8" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-          <text x="65" y="43" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Select Slot</text>
-          <text x="65" y="58" text-anchor="middle" font-size="9" fill="#6b7280">Choose facility &amp; time</text>
-          <!-- Arrow -->
-          <line x1="121" y1="47" x2="138" y2="47" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 2: Request Sent -->
-          <rect x="140" y="22" width="110" height="50" rx="8" fill="#dbeafe" stroke="#1E3A8A" stroke-width="1.5"/>
-          <text x="195" y="43" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Request Sent</text>
-          <text x="195" y="58" text-anchor="middle" font-size="9" fill="#1e40af">Booking submitted</text>
-          <!-- Arrow -->
-          <line x1="251" y1="47" x2="268" y2="47" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 3: Under Review -->
-          <rect x="270" y="22" width="110" height="50" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
-          <text x="325" y="43" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Under Review</text>
-          <text x="325" y="58" text-anchor="middle" font-size="9" fill="#92400e">Committee checks</text>
-          <!-- Arrow up-right to Confirmed -->
-          <line x1="381" y1="37" x2="418" y2="22" stroke="#059669" stroke-width="1.5" marker-end="url(#arr-green)"/>
-          <!-- Step 4a: Confirmed -->
-          <rect x="420" y="10" width="110" height="50" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
-          <text x="475" y="31" text-anchor="middle" font-size="11" font-weight="600" fill="#065f46">Confirmed</text>
-          <text x="475" y="47" text-anchor="middle" font-size="9" fill="#065f46">Slot reserved</text>
-          <!-- Arrow from Confirmed to Completed -->
-          <line x1="531" y1="35" x2="548" y2="35" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
-          <!-- Step 5: Completed -->
-          <rect x="550" y="22" width="100" height="50" rx="8" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.5"/>
-          <text x="600" y="43" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Completed</text>
-          <text x="600" y="58" text-anchor="middle" font-size="9" fill="#6b7280">Usage recorded</text>
-          <!-- Arrow down-right to Rejected -->
-          <line x1="381" y1="57" x2="418" y2="72" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arr-red)"/>
-          <!-- Step 4b: Rejected -->
-          <rect x="420" y="65" width="110" height="30" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
-          <text x="475" y="80" text-anchor="middle" font-size="10" font-weight="600" fill="#991b1b">Rejected — Slot unavailable</text>
-        </svg>
+        <!-- Main flow -->
+        <div class="flex items-start gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
+          <div class="flex-shrink-0 w-24 rounded-lg border border-gray-200 bg-gray-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-gray-700">Select Slot</p>
+            <p class="text-[10px] text-gray-500 mt-0.5">Choose facility &amp; time</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-24 rounded-lg border border-primary-300 bg-blue-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-primary-700">Request Sent</p>
+            <p class="text-[10px] text-primary-600 mt-0.5">Booking submitted</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-24 rounded-lg border border-amber-300 bg-amber-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-amber-800">Under Review</p>
+            <p class="text-[10px] text-amber-700 mt-0.5">Committee checks</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-24 rounded-lg border border-green-300 bg-green-50 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-green-800">Confirmed</p>
+            <p class="text-[10px] text-green-700 mt-0.5">Slot reserved</p>
+          </div>
+          <i class="fas fa-arrow-right text-gray-300 text-xs self-center flex-shrink-0" aria-hidden="true"></i>
+          <div class="flex-shrink-0 w-24 rounded-lg border border-gray-300 bg-gray-100 px-2 py-2 text-center">
+            <p class="text-[11px] font-semibold text-gray-700">Completed</p>
+            <p class="text-[10px] text-gray-500 mt-0.5">Usage recorded</p>
+          </div>
+        </div>
+        <!-- Exception row -->
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Rejected</span>
+          <span class="text-red-500">— Slot unavailable or booking declined by committee</span>
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
             <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
