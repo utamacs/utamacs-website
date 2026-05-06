@@ -47,7 +47,7 @@ if (!user.isAdmin) return Astro.redirect('/portal/admin');
   <!-- Edit modal -->
   <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
-      <h2 class="font-semibold text-text-primary text-lg mb-1" id="edit-modal-title">Edit Rule</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-lg mb-1" id="edit-modal-title">Edit Rule</h2>
       <p class="text-xs text-text-secondary mb-4" id="edit-modal-desc"></p>
       <div id="edit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
       <div class="space-y-4">
@@ -74,7 +74,7 @@ if (!user.isAdmin) return Astro.redirect('/portal/admin');
   <div id="history-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large max-h-[85vh] flex flex-col">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="font-semibold text-text-primary text-lg" id="history-modal-title">Change History</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg" id="history-modal-title">Change History</h2>
         <button id="history-close-btn" class="text-text-secondary hover:text-text-primary text-xl leading-none">&times;</button>
       </div>
       <div id="history-content" class="overflow-y-auto flex-1 text-sm">
@@ -86,7 +86,7 @@ if (!user.isAdmin) return Astro.redirect('/portal/admin');
   <!-- Reset confirm modal -->
   <div id="reset-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
-      <h2 class="font-semibold text-text-primary text-lg mb-2">Reset to Default</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-lg mb-2">Reset to Default</h2>
       <p class="text-sm text-text-secondary mb-4">This will reset <strong id="reset-rule-label"></strong> to its default value of <code id="reset-default-val" class="text-xs bg-gray-100 px-1 py-0.5 rounded"></code>.</p>
       <div id="reset-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
       <div class="space-y-3">

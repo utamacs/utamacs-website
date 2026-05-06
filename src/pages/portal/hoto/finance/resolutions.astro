@@ -78,7 +78,7 @@ if (!canView) return Astro.redirect('/portal/hoto/finance');
         { label: 'Total Resolutions', val: items.length, color: 'bg-gray-50' },
         { label: 'Total Amount', val: `₹${total.toLocaleString('en-IN')}`, color: 'bg-amber-50' },
         { label: 'Avg Resolution', val: items.length ? `₹${Math.round(total / items.length).toLocaleString('en-IN')}` : '—', color: 'bg-blue-50' },
-      ].map(s => `<div class="${s.color} rounded-xl border border-border-light p-4 text-center"><div class="text-xl font-bold text-text-primary">${s.val}</div><div class="text-xs text-text-secondary mt-1">${s.label}</div></div>`).join('');
+      ].map(s => `<div class="${s.color} rounded-xl border border-border-light p-4 text-center"><div class="text-2xl font-bold text-text-primary">${s.val}</div><div class="text-xs text-text-secondary mt-1">${s.label}</div></div>`).join('');
 
       if (!items.length) {
         document.getElementById('resolutions-body')!.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-text-secondary text-sm">No board resolutions recorded.</td></tr>';

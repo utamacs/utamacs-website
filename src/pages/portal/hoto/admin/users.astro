@@ -74,7 +74,7 @@ if (!user.isAdmin) return Astro.redirect('/portal');
   <!-- Deactivate Modal -->
   <div id="deactivate-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
-      <h2 class="font-semibold text-text-primary text-lg mb-1">Deactivate Account</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-lg mb-1">Deactivate Account</h2>
       <p id="deactivate-name" class="text-sm text-text-secondary mb-1"></p>
       <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
         <i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>
@@ -98,7 +98,7 @@ if (!user.isAdmin) return Astro.redirect('/portal');
   <!-- Invite Modal -->
   <div id="invite-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
-      <h2 class="font-semibold text-text-primary text-lg mb-4">Invite New Member</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Invite New Member</h2>
       <div id="invite-success" class="hidden mb-3 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"></div>
       <div id="invite-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
       <div class="space-y-4">
@@ -201,7 +201,7 @@ if (!user.isAdmin) return Astro.redirect('/portal');
   <div id="panel-invites" class="hidden">
     <div class="bg-white rounded-xl border border-border-light overflow-hidden">
       <div class="px-4 py-3 border-b border-border-light flex items-center justify-between">
-        <h2 class="font-semibold text-text-primary text-sm">Pending Invites</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-sm">Pending Invites</h2>
         <select id="invite-status-filter" class="text-xs px-2 py-1.5 border border-border-light rounded-lg bg-white focus:outline-none">
           <option value="pending">Pending</option>
           <option value="accepted">Accepted</option>

@@ -45,7 +45,7 @@ if (!canAccess) return Astro.redirect('/portal/admin');
   <div id="preview-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-2xl w-full shadow-large flex flex-col max-h-[90vh]">
       <div class="px-6 py-4 border-b border-border-light flex items-center justify-between flex-shrink-0">
-        <h2 class="font-semibold text-text-primary">Email Preview</h2>
+        <h2 class="text-lg font-semibold text-text-primary">Email Preview</h2>
         <button id="preview-close-btn" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
       </div>
       <div class="p-6 overflow-y-auto flex-1">
@@ -65,7 +65,7 @@ if (!canAccess) return Astro.redirect('/portal/admin');
   <!-- Edit modal -->
   <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-large max-h-[90vh] overflow-y-auto">
-      <h2 class="font-semibold text-text-primary text-lg mb-4">Edit Draft</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Edit Draft</h2>
       <div id="edit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
       <div class="space-y-4">
         <div>
@@ -89,7 +89,7 @@ if (!canAccess) return Astro.redirect('/portal/admin');
   <!-- Discard modal -->
   <div id="discard-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
-      <h2 class="font-semibold text-text-primary text-lg mb-2">Discard Draft</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-lg mb-2">Discard Draft</h2>
       <p class="text-sm text-text-secondary mb-4">This email will not be sent and cannot be undone. The record is retained for auditing.</p>
       <div id="discard-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
       <div class="space-y-3">

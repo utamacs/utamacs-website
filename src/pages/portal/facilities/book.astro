@@ -104,7 +104,7 @@ const selected = facilities?.find((f: {id: string}) => f.id === facilityId) ?? f
       <div id="facility-info" class="bg-white rounded-xl border border-border-light p-5 sticky top-6">
         {selected ? (
           <div>
-            <h2 class="font-semibold text-text-primary mb-3">{selected.name}</h2>
+            <h2 class="text-lg font-semibold text-text-primary mb-3">{selected.name}</h2>
             {selected.description && <p class="text-sm text-text-secondary mb-4">{selected.description}</p>}
             <div class="space-y-2 text-sm">
               {selected.capacity && <div class="flex justify-between"><span class="text-text-secondary">Capacity</span><span>{selected.capacity} persons</span></div>}
@@ -137,7 +137,7 @@ const selected = facilities?.find((f: {id: string}) => f.id === facilityId) ?? f
       if (!f) return;
       const panel = document.getElementById('facility-info');
       panel.innerHTML = `
-        <h2 class="font-semibold text-text-primary mb-3">${f.name}</h2>
+        <h2 class="text-lg font-semibold text-text-primary mb-3">${f.name}</h2>
         ${f.description ? `<p class="text-sm text-text-secondary mb-4">${f.description}</p>` : ''}
         <div class="space-y-2 text-sm">
           ${f.capacity ? `<div class="flex justify-between"><span class="text-text-secondary">Capacity</span><span>${f.capacity} persons</span></div>` : ''}

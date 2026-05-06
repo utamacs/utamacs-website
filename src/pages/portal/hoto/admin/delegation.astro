@@ -35,7 +35,7 @@ if (!user.isAdmin) return Astro.redirect('/portal');
   <!-- Create Modal -->
   <div id="create-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
-      <h2 class="font-semibold text-text-primary text-lg mb-4">Create Approval Delegation</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Create Approval Delegation</h2>
       <div id="create-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
       <div class="space-y-4">
         <div>
@@ -73,7 +73,7 @@ if (!user.isAdmin) return Astro.redirect('/portal');
 
   <!-- Active Delegations -->
   <div class="mb-8">
-    <h2 class="font-semibold text-text-primary mb-3 flex items-center gap-2">
+    <h2 class="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
       <i class="fas fa-shield-alt text-primary-600" aria-hidden="true"></i> Active Delegations
     </h2>
     <div id="delegations-list" class="space-y-4">
@@ -83,7 +83,7 @@ if (!user.isAdmin) return Astro.redirect('/portal');
 
   <!-- Delegation History -->
   <div>
-    <h2 class="font-semibold text-text-primary mb-3 flex items-center gap-2">
+    <h2 class="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
       <i class="fas fa-history text-text-secondary" aria-hidden="true"></i> Delegation History
     </h2>
     <div id="history-list" class="bg-white rounded-xl border border-border-light overflow-hidden">

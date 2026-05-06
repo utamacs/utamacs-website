@@ -39,7 +39,7 @@ if (!user || user.role !== 'admin') return Astro.redirect('/portal');
         container.innerHTML = Object.entries(grouped).map(([moduleKey, moduleFlags]) => `
           <div class="bg-white rounded-xl border border-border-light overflow-hidden">
             <div class="px-5 py-4 bg-gray-50 border-b border-border-light">
-              <h2 class="font-semibold text-text-primary">${modMap[moduleKey] ?? moduleKey}</h2>
+              <h2 class="text-lg font-semibold text-text-primary">${modMap[moduleKey] ?? moduleKey}</h2>
             </div>
             <div class="divide-y divide-border-light">
               ${(moduleFlags as any[]).map((f: any) => `

@@ -37,7 +37,7 @@ const canUpload = canEdit;
       <!-- Description card -->
       <div class="bg-white rounded-2xl border border-border-light p-5">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold text-text-primary">Description</h2>
+          <h2 class="text-lg font-semibold text-text-primary">Description</h2>
           {canEdit && (
             <button id="edit-btn" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
               <i class="fas fa-pen mr-1"></i> Edit
@@ -50,7 +50,7 @@ const canUpload = canEdit;
       <!-- Files -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
-          <h2 class="font-semibold text-text-primary">Documents</h2>
+          <h2 class="text-lg font-semibold text-text-primary">Documents</h2>
           {canUpload && (
             <button id="upload-btn" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
               + Upload file
@@ -87,7 +87,7 @@ const canUpload = canEdit;
       <!-- Comments -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
-          <h2 class="font-semibold text-text-primary">Comments</h2>
+          <h2 class="text-lg font-semibold text-text-primary">Comments</h2>
         </div>
         <div id="comments-list" class="p-5 space-y-3">
           <div class="text-sm text-text-secondary">Loading…</div>
@@ -107,7 +107,7 @@ const canUpload = canEdit;
       <!-- Status & Actions -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
-          <h2 class="font-semibold text-text-primary">Status &amp; Actions</h2>
+          <h2 class="text-lg font-semibold text-text-primary">Status &amp; Actions</h2>
         </div>
         <div id="actions-content" class="p-5 space-y-3 animate-pulse">
           <div class="h-8 bg-gray-100 rounded"></div>
@@ -117,7 +117,7 @@ const canUpload = canEdit;
       <!-- Metadata -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
-          <h2 class="font-semibold text-text-primary">Details</h2>
+          <h2 class="text-lg font-semibold text-text-primary">Details</h2>
         </div>
         <div id="metadata-content" class="p-5 animate-pulse">
           <div class="space-y-2">
@@ -133,7 +133,7 @@ const canUpload = canEdit;
   {canEdit && (
     <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large max-h-[90vh] overflow-y-auto">
-        <h2 class="font-semibold text-text-primary text-lg mb-4">Edit Snag</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Edit Snag</h2>
         <div id="edit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-3">
@@ -186,7 +186,7 @@ const canUpload = canEdit;
   <!-- Reopen modal -->
   <div id="reopen-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
-      <h2 class="font-semibold text-text-primary text-lg mb-4">Reopen Snag</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Reopen Snag</h2>
       <div id="reopen-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
       <div class="space-y-4">
         <div>
@@ -206,7 +206,7 @@ const canUpload = canEdit;
   {canDelete && (
     <div id="delete-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
-        <h2 class="font-semibold text-text-primary text-lg mb-4">Delete Snag</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Delete Snag</h2>
         <p class="text-sm text-text-secondary mb-4">This is a permanent soft-delete. The record will be hidden but retained in the audit log.</p>
         <div id="delete-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
         <div class="space-y-4">
@@ -277,7 +277,7 @@ const canUpload = canEdit;
               <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[snag.status] ?? 'bg-gray-100 text-gray-600'}">${STATUS_LABEL[snag.status] ?? snag.status}</span>
               <span class="text-xs text-text-secondary">${snag.snag_scope === 'APARTMENT' ? (snag.flat_number ? `Apt ${snag.flat_number}` : 'Apartment') : 'Common Area'}</span>
             </div>
-            <h1 class="text-xl font-bold text-text-primary">${snag.category}${snag.location ? ` — ${snag.location}` : ''}</h1>
+            <h1 class="text-2xl font-bold text-text-primary">${snag.category}${snag.location ? ` — ${snag.location}` : ''}</h1>
           </div>
         </div>
       `;
