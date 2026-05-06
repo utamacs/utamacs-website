@@ -14,14 +14,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
   member: [
     'hoto.view',
     'snag.view',
-    'vendor.view',
+    'vendor.view', 'vendor.vote',
     'notice.view',
   ],
 
   executive: [
     'hoto.view', 'hoto.create', 'hoto.upload', 'hoto.comment', 'hoto.advance_status',
     'snag.view', 'snag.create',
-    'vendor.view', 'vendor.view_quotes', 'vendor.vote',
+    'vendor.view', 'vendor.view_quotes', 'vendor.create', 'vendor.advance_status', 'vendor.vote',
     'notice.view',
     'audit.view',
     // finance.view / finance.enter: NOT included — granted as user_feature_overrides
@@ -34,7 +34,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
     'hoto.view', 'hoto.create', 'hoto.upload', 'hoto.comment', 'hoto.advance_status',
     'hoto.approve_secretary', 'hoto.bypass_required_docs',
     'snag.view', 'snag.create', 'snag.verify_close',
-    'vendor.view', 'vendor.view_quotes', 'vendor.vote',
+    'vendor.view', 'vendor.view_quotes', 'vendor.create', 'vendor.advance_status', 'vendor.vote',
     'vendor.open_voting', 'vendor.final_select',
     'notice.view', 'notice.send',
     'audit.view',
@@ -49,7 +49,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
     'hoto.view', 'hoto.create', 'hoto.upload', 'hoto.comment', 'hoto.advance_status',
     'hoto.approve_secretary', 'hoto.approve_president', 'hoto.bypass_required_docs',
     'snag.view', 'snag.create', 'snag.verify_close', 'snag.delete',
-    'vendor.view', 'vendor.view_quotes', 'vendor.vote',
+    'vendor.view', 'vendor.view_quotes', 'vendor.create', 'vendor.advance_status', 'vendor.vote',
     'vendor.open_voting', 'vendor.final_select',
     'notice.view', 'notice.send',
     'audit.view',

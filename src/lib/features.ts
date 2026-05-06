@@ -29,6 +29,8 @@ export const FEATURES = {
   // ── Vendor ────────────────────────────────────────────────────────────────
   'vendor.view':               { label: 'View vendor evaluations',                  locked: true  },
   'vendor.view_quotes':        { label: 'View vendor quotes',                       locked: false },
+  'vendor.create':             { label: 'Create/edit vendor requirements & candidates', locked: false },
+  'vendor.advance_status':     { label: 'Advance vendor requirement status',        locked: false },
   'vendor.vote':               { label: 'Cast vendor vote',                         locked: false },
   'vendor.open_voting':        { label: 'Open/close voting',                        locked: false },
   'vendor.final_select':       { label: 'Confirm final vendor selection',           locked: true  },
