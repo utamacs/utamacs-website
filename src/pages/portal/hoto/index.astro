@@ -1,0 +1,287 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+// hoto.view is required; members have it by default
+const canCreate = ['executive','secretary','president'].includes(user.portalRole) || user.isAdmin;
+const isAdmin = user.isAdmin;
+---
+
+<PortalLayout title="HOTO Tracker" user={user} activeModule="hoto">
+  <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">HOTO Tracker</h1>
+      <p class="text-sm text-text-secondary mt-1">Handover of Assets tracking — Ascenza-aligned categories.</p>
+    </div>
+    {canCreate && (
+      <button id="create-btn" class="btn-primary text-sm flex items-center gap-2">
+        <i class="fas fa-plus" aria-hidden="true"></i> New Item
+      </button>
+    )}
+  </div>
+
+  <!-- Stats bar -->
+  <div id="stats-bar" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    {[
+      { id:'stat-total',    label:'Total',           cls:'bg-gray-50 border-border-light' },
+      { id:'stat-overdue',  label:'Overdue',         cls:'bg-red-50 border-red-200' },
+      { id:'stat-pending',  label:'Pending Approval', cls:'bg-amber-50 border-amber-200' },
+      { id:'stat-closed',   label:'Closed',          cls:'bg-green-50 border-green-200' },
+    ].map(s => (
+      <div class={`rounded-xl border p-4 ${s.cls}`}>
+        <div id={s.id} class="text-2xl font-bold text-text-primary">—</div>
+        <div class="text-xs text-text-secondary mt-0.5">{s.label}</div>
+      </div>
+    ))}
+  </div>
+
+  <!-- Filters -->
+  <div class="mb-5 flex flex-wrap gap-3">
+    <div class="relative flex-1 min-w-[180px] max-w-xs">
+      <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
+      <input type="search" id="search-input" placeholder="Search items…"
+        class="w-full pl-10 pr-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+    </div>
+    <select id="status-filter" class="px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+      <option value="">All statuses</option>
+      <option value="NOT_STARTED">Not Started</option>
+      <option value="IN_PROGRESS">In Progress</option>
+      <option value="UNDER_REVIEW">Under Review</option>
+      <option value="PENDING_PRESIDENT">Pending President</option>
+      <option value="PENDING_SECRETARY">Pending Secretary</option>
+      <option value="APPROVED">Approved</option>
+      <option value="REJECTED">Rejected</option>
+      <option value="CLOSED">Closed</option>
+    </select>
+    <select id="priority-filter" class="px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+      <option value="">All priorities</option>
+      <option value="CRITICAL">Critical</option>
+      <option value="HIGH">High</option>
+      <option value="MEDIUM">Medium</option>
+      <option value="LOW">Low</option>
+    </select>
+  </div>
+
+  <!-- Create modal -->
+  {canCreate && (
+    <div id="create-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large max-h-[90vh] overflow-y-auto">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">New HOTO Item</h2>
+        <div id="create-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Category <span class="text-red-500">*</span></label>
+            <select id="new-category" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+              <option value="">Select category…</option>
+              {[
+                'Statutory Compliance','Technical - Electrical','Technical - Lifts',
+                'Technical - Fire & Safety','Technical - HVAC','Technical - Water & Plumbing',
+                'Technical - Security & IT','MEP - Miscellaneous','AMC Due Diligence',
+                'Snagging','Asset/Inventory','Financial Handover',
+              ].map(c => <option value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Title <span class="text-red-500">*</span></label>
+            <input type="text" id="new-title" placeholder="e.g. Lift 1 commissioning certificate"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Description</label>
+            <textarea id="new-description" rows="2" placeholder="What needs to happen?"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Priority</label>
+              <select id="new-priority" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+                <option value="LOW">Low</option>
+                <option value="MEDIUM" selected>Medium</option>
+                <option value="HIGH">High</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Deadline</label>
+              <input type="date" id="new-deadline"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Builder SLA Date</label>
+            <input type="date" id="new-sla"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Builder Contact</label>
+            <input type="text" id="new-builder-contact" placeholder="Name or phone"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button id="create-save-btn" class="btn-primary flex-1">Create Item</button>
+            <button id="create-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <div id="item-count" class="text-xs text-text-secondary mb-3">Loading…</div>
+  <div id="items-list" class="space-y-3">
+    {Array.from({length: 4}).map(() => (
+      <div class="bg-white rounded-xl border border-border-light p-4 animate-pulse flex gap-4">
+        <div class="flex-1">
+          <div class="h-3 bg-gray-200 rounded w-48 mb-2"></div>
+          <div class="h-2.5 bg-gray-100 rounded w-32"></div>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <script define:vars={{ canCreate }}>
+    const STATUS_LABEL = {
+      NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress',
+      UNDER_REVIEW: 'Under Review', PENDING_PRESIDENT: 'Pending President',
+      PENDING_SECRETARY: 'Pending Secretary', APPROVED: 'Approved',
+      REJECTED: 'Rejected', CLOSED: 'Closed',
+    };
+    const STATUS_CLS = {
+      NOT_STARTED: 'bg-gray-100 text-gray-600',
+      IN_PROGRESS: 'bg-blue-100 text-blue-700',
+      UNDER_REVIEW: 'bg-indigo-100 text-indigo-700',
+      PENDING_PRESIDENT: 'bg-amber-100 text-amber-700',
+      PENDING_SECRETARY: 'bg-orange-100 text-orange-700',
+      APPROVED: 'bg-green-100 text-green-700',
+      REJECTED: 'bg-red-100 text-red-700',
+      CLOSED: 'bg-gray-200 text-gray-600',
+    };
+    const PRIORITY_CLS = {
+      CRITICAL: 'bg-red-600 text-white',
+      HIGH: 'bg-orange-100 text-orange-700',
+      MEDIUM: 'bg-amber-100 text-amber-700',
+      LOW: 'bg-gray-100 text-gray-500',
+    };
+
+    let debounceTimer;
+
+    async function loadItems(q = '', status = '', priority = '') {
+      const params = new URLSearchParams({ limit: '200' });
+      if (q) params.set('q', q);
+      if (status) params.set('status', status);
+      if (priority) params.set('priority', priority);
+
+      const res = await fetch(`/api/v1/hoto/items?${params}`, { credentials: 'include' });
+      const items = res.ok ? await res.json() : [];
+
+      // Stats
+      document.getElementById('stat-total').textContent = items.length;
+      document.getElementById('stat-overdue').textContent = items.filter(i => i.days_overdue > 0).length;
+      document.getElementById('stat-pending').textContent = items.filter(i =>
+        ['PENDING_PRESIDENT','PENDING_SECRETARY'].includes(i.status)
+      ).length;
+      document.getElementById('stat-closed').textContent = items.filter(i => i.status === 'CLOSED').length;
+
+      document.getElementById('item-count').textContent = `${items.length} item${items.length !== 1 ? 's' : ''} found`;
+
+      const list = document.getElementById('items-list');
+      if (!items.length) {
+        list.innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">No HOTO items found.</div>';
+        return;
+      }
+
+      list.innerHTML = items.map(item => {
+        const overdueNote = item.days_overdue > 0
+          ? `<span class="text-xs text-red-600 font-medium ml-2"><i class="fas fa-clock"></i> ${item.days_overdue}d overdue</span>`
+          : '';
+        const deadline = item.deadline
+          ? `<span class="text-xs text-text-secondary ml-3"><i class="fas fa-calendar-alt mr-1"></i>${new Date(item.deadline).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span>`
+          : '';
+        return `
+          <a href="/portal/hoto/${item.id}" class="block bg-white rounded-xl border border-border-light p-4 hover:shadow-soft transition-shadow">
+            <div class="flex items-start gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <span class="text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_CLS[item.priority] ?? 'bg-gray-100 text-gray-500'}">${item.priority}</span>
+                  <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[item.status] ?? 'bg-gray-100 text-gray-600'}">${STATUS_LABEL[item.status] ?? item.status}</span>
+                  ${overdueNote}${deadline}
+                </div>
+                <div class="font-medium text-text-primary text-sm">${item.title}</div>
+                <div class="text-xs text-text-secondary mt-0.5">${item.ascenza_category}</div>
+              </div>
+              <i class="fas fa-chevron-right text-text-secondary text-xs flex-shrink-0 mt-1" aria-hidden="true"></i>
+            </div>
+          </a>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('search-input')?.addEventListener('input', e => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadItems(e.target.value.trim(),
+          document.getElementById('status-filter').value,
+          document.getElementById('priority-filter').value);
+      }, 350);
+    });
+
+    ['status-filter','priority-filter'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', () => {
+        loadItems(document.getElementById('search-input').value.trim(),
+          document.getElementById('status-filter').value,
+          document.getElementById('priority-filter').value);
+      });
+    });
+
+    if (canCreate) {
+      document.getElementById('create-btn')?.addEventListener('click', () => {
+        document.getElementById('create-error').classList.add('hidden');
+        document.getElementById('create-modal').classList.remove('hidden');
+      });
+      document.getElementById('create-cancel-btn')?.addEventListener('click', () => {
+        document.getElementById('create-modal').classList.add('hidden');
+      });
+      document.getElementById('create-save-btn')?.addEventListener('click', async () => {
+        const category = document.getElementById('new-category').value;
+        const title = document.getElementById('new-title').value.trim();
+        const errEl = document.getElementById('create-error');
+        errEl.classList.add('hidden');
+
+        if (!category) { errEl.textContent = 'Category is required.'; errEl.classList.remove('hidden'); return; }
+        if (!title) { errEl.textContent = 'Title is required.'; errEl.classList.remove('hidden'); return; }
+
+        const btn = document.getElementById('create-save-btn');
+        btn.disabled = true; btn.textContent = 'Creating…';
+
+        const res = await fetch('/api/v1/hoto/items', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ascenza_category: category,
+            title,
+            description: document.getElementById('new-description').value.trim() || undefined,
+            priority: document.getElementById('new-priority').value,
+            deadline: document.getElementById('new-deadline').value || undefined,
+            builder_sla_date: document.getElementById('new-sla').value || undefined,
+            builder_contact: document.getElementById('new-builder-contact').value.trim() || undefined,
+          }),
+        });
+
+        btn.disabled = false; btn.textContent = 'Create Item';
+
+        if (res.ok) {
+          const item = await res.json();
+          document.getElementById('create-modal').classList.add('hidden');
+          window.location.href = `/portal/hoto/${item.id}`;
+        } else {
+          const d = await res.json().catch(() => ({}));
+          errEl.textContent = d.message ?? d.error ?? 'Failed to create item.';
+          errEl.classList.remove('hidden');
+        }
+      });
+    }
+
+    loadItems();
+  </script>
+</PortalLayout>
