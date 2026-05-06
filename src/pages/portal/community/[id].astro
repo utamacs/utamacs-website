@@ -74,7 +74,7 @@ const p = post as any;
         </div>
       </div>
 
-      <h1 class="text-xl font-bold text-text-primary mb-3">{p.title}</h1>
+      <h1 class="text-2xl font-bold text-text-primary mb-3">{p.title}</h1>
       <div class="text-sm text-text-secondary leading-relaxed prose prose-sm max-w-none" set:html={p.body}></div>
 
       <div class="mt-5 pt-4 border-t border-border-light flex items-center gap-4">
@@ -98,7 +98,7 @@ const p = post as any;
     <!-- Comments -->
     <div class="bg-white rounded-xl border border-border-light overflow-hidden mb-4">
       <div class="px-5 py-4 border-b border-border-light bg-gray-50">
-        <h2 class="font-semibold text-text-primary">{(comments ?? []).length} Comment{(comments ?? []).length !== 1 ? 's' : ''}</h2>
+        <h2 class="text-lg font-semibold text-text-primary">{(comments ?? []).length} Comment{(comments ?? []).length !== 1 ? 's' : ''}</h2>
       </div>
       <div id="comments-list" class="divide-y divide-border-light">
         {!(comments?.length) && (

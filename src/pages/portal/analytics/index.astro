@@ -32,20 +32,20 @@ if (!user || !['executive', 'admin'].includes(user.role)) {
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Complaints by status -->
       <div class="bg-white rounded-xl border border-border-light p-5">
-        <h2 class="font-semibold text-text-primary mb-4">Complaints by Status</h2>
+        <h2 class="text-lg font-semibold text-text-primary mb-4">Complaints by Status</h2>
         <div id="complaint-chart" class="space-y-2.5"></div>
       </div>
 
       <!-- Finance collection -->
       <div class="bg-white rounded-xl border border-border-light p-5">
-        <h2 class="font-semibold text-text-primary mb-4">Finance Collection</h2>
+        <h2 class="text-lg font-semibold text-text-primary mb-4">Finance Collection</h2>
         <div id="finance-chart"></div>
       </div>
     </div>
 
     <!-- Visitor trend -->
     <div class="bg-white rounded-xl border border-border-light p-5">
-      <h2 class="font-semibold text-text-primary mb-1">Visitor Traffic (Last 14 Days)</h2>
+      <h2 class="text-lg font-semibold text-text-primary mb-1">Visitor Traffic (Last 14 Days)</h2>
       <p class="text-xs text-text-secondary mb-4">Daily entry count across all visitor types.</p>
       <div id="visitor-trend" class="flex items-end gap-1 h-32"></div>
       <div id="visitor-dates" class="flex gap-1 mt-1"></div>
@@ -54,13 +54,13 @@ if (!user || !['executive', 'admin'].includes(user.role)) {
     <!-- Visitor types -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="bg-white rounded-xl border border-border-light p-5">
-        <h2 class="font-semibold text-text-primary mb-4">Visitor Types (Last 30 Days)</h2>
+        <h2 class="text-lg font-semibold text-text-primary mb-4">Visitor Types (Last 30 Days)</h2>
         <div id="visitor-types" class="space-y-2.5"></div>
       </div>
 
       <!-- Members overview -->
       <div class="bg-white rounded-xl border border-border-light p-5">
-        <h2 class="font-semibold text-text-primary mb-4">Member Composition</h2>
+        <h2 class="text-lg font-semibold text-text-primary mb-4">Member Composition</h2>
         <div id="member-composition"></div>
       </div>
     </div>

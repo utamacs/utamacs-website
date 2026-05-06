@@ -74,7 +74,7 @@ if (!user) return Astro.redirect('/portal/login');
           return `
           <div class="bg-white rounded-xl border border-l-4 ${CATEGORY_COLORS[n.category] ?? 'border-gray-300'} p-5">
             <div class="flex items-start justify-between gap-4 mb-2">
-              <h2 class="font-semibold text-text-primary">${n.is_pinned ? '📌 ' : ''}${n.title}</h2>
+              <h2 class="text-lg font-semibold text-text-primary">${n.is_pinned ? '📌 ' : ''}${n.title}</h2>
               <span class="flex-shrink-0 text-xs px-2 py-1 rounded-full font-medium ${CATEGORY_BADGE[n.category] ?? 'bg-gray-100 text-gray-600'}">${n.category}</span>
             </div>
             ${n.body ? `<div class="prose prose-sm text-text-secondary max-w-none mt-3 line-clamp-3">${n.body}</div>` : ''}

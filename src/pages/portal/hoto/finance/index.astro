@@ -45,7 +45,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
   <!-- Corpus Fund Tab -->
   <div id="tab-corpus" class="tab-panel">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-text-primary">Corpus Fund Transactions</h2>
+      <h2 class="text-lg font-semibold text-text-primary">Corpus Fund Transactions</h2>
       <div class="flex gap-2">
         <button id="export-corpus-btn" class="btn-outline text-sm flex items-center gap-1.5">
           <i class="fas fa-download text-xs" aria-hidden="true"></i> CSV
@@ -66,7 +66,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
   {canEnter && (
     <div id="maintenance-edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
-        <h2 class="font-semibold text-text-primary text-lg mb-4">Edit Maintenance Record</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Edit Maintenance Record</h2>
         <div id="maintenance-edit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-3">
@@ -131,7 +131,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
   <!-- Expenses Tab -->
   <div id="tab-expenses" class="tab-panel hidden">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-text-primary">Governance Expenses</h2>
+      <h2 class="text-lg font-semibold text-text-primary">Governance Expenses</h2>
       <div class="flex gap-2">
         <button id="export-expenses-btn" class="btn-outline text-sm flex items-center gap-1.5">
           <i class="fas fa-download text-xs" aria-hidden="true"></i> CSV
@@ -152,7 +152,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
   {canEnter && (
     <div id="corpus-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
-        <h2 class="font-semibold text-text-primary text-lg mb-4">Add Corpus Entry</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Add Corpus Entry</h2>
         <div id="corpus-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
         <div class="space-y-4">
           <div>
@@ -204,7 +204,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
   {canEnter && (
     <div id="maintenance-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
-        <h2 class="font-semibold text-text-primary text-lg mb-4">Record Maintenance Payment</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Record Maintenance Payment</h2>
         <div id="maintenance-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
@@ -264,7 +264,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
   {canApprove10k && (
     <div id="expense-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large max-h-[90vh] overflow-y-auto">
-        <h2 class="font-semibold text-text-primary text-lg mb-4">Record Governance Expense</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Record Governance Expense</h2>
         <div id="expense-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-700">
           <strong>Approval tiers:</strong> ≤ ₹10,000 — Secretary; ≤ ₹20,000 — President; ≤ ₹50,000 — Board resolution required. Expenses above ₹50,000 must use formal process.
@@ -329,7 +329,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
     <!-- Expense confirm modal -->
     <div id="expense-confirm-modal" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
-        <h2 class="font-semibold text-text-primary text-lg mb-1">Confirm Expense</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg mb-1">Confirm Expense</h2>
         <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
           <i class="fas fa-exclamation-triangle mr-1"></i>
           By confirming, you are acting as both the recorder and approving authority for this expense. Ensure this complies with society byelaws.

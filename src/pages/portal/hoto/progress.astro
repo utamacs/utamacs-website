@@ -25,7 +25,7 @@ if (!user) return Astro.redirect('/portal/login');
   <!-- Per-category breakdown -->
   <div id="category-breakdown" class="bg-white rounded-2xl border border-border-light overflow-hidden mb-6">
     <div class="p-4 border-b border-border-light flex items-center justify-between">
-      <h2 class="font-semibold text-text-primary text-sm">By Ascenza Category</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-sm">By Ascenza Category</h2>
       <span class="text-xs text-text-secondary">Click a category to expand items</span>
     </div>
     <div id="category-rows" class="divide-y divide-border-light">
@@ -37,7 +37,7 @@ if (!user) return Astro.redirect('/portal/login');
   <div class="bg-white rounded-2xl border border-red-200 overflow-hidden">
     <div class="p-4 border-b border-red-100 flex items-center gap-2">
       <i class="fas fa-exclamation-triangle text-red-500 text-sm"></i>
-      <h2 class="font-semibold text-text-primary text-sm">Overdue Builder SLA Commitments</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-sm">Overdue Builder SLA Commitments</h2>
     </div>
     <div id="overdue-list" class="divide-y divide-border-light">
       <div class="p-4 text-center text-sm text-text-secondary animate-pulse">Loading…</div>

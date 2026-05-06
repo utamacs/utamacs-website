@@ -34,7 +34,7 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
       <!-- Candidates table -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
-          <h2 class="font-semibold text-text-primary">Vendor Candidates</h2>
+          <h2 class="text-lg font-semibold text-text-primary">Vendor Candidates</h2>
           {canCreate && (
             <button id="add-candidate-btn" class="text-xs btn-outline py-1.5">
               <i class="fas fa-plus mr-1" aria-hidden="true"></i> Add Candidate
@@ -49,7 +49,7 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
       <!-- Voting section -->
       <div id="voting-section" class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
-          <h2 class="font-semibold text-text-primary">Voting</h2>
+          <h2 class="text-lg font-semibold text-text-primary">Voting</h2>
         </div>
         <div id="voting-content" class="p-5">
           <div class="text-sm text-text-secondary">Loading vote data…</div>
@@ -62,7 +62,7 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
       <!-- Status + actions -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
-          <h2 class="font-semibold text-text-primary">Status &amp; Actions</h2>
+          <h2 class="text-lg font-semibold text-text-primary">Status &amp; Actions</h2>
         </div>
         <div id="actions-content" class="p-5 space-y-3">
           <div class="text-sm text-text-secondary animate-pulse">Loading…</div>
@@ -72,7 +72,7 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
       <!-- Metadata -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
-          <h2 class="font-semibold text-text-primary">Details</h2>
+          <h2 class="text-lg font-semibold text-text-primary">Details</h2>
         </div>
         <div id="metadata-content" class="p-5">
           <div class="text-sm text-text-secondary animate-pulse">Loading…</div>
@@ -85,7 +85,7 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
   {canCreate && (
     <div id="add-candidate-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large max-h-[90vh] overflow-y-auto">
-        <h2 class="font-semibold text-text-primary text-lg mb-4">Add Vendor Candidate</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Add Vendor Candidate</h2>
         <div id="candidate-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
         <div class="space-y-4">
           <div>
@@ -144,7 +144,7 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
   <!-- Vote modal -->
   <div id="vote-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
-      <h2 class="font-semibold text-text-primary text-lg mb-4">Cast Your Vote</h2>
+      <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Cast Your Vote</h2>
       <div id="vote-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
       <div class="space-y-4">
         <div>
@@ -180,7 +180,7 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
   {canFinalSelect && (
     <div id="final-select-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
-        <h2 class="font-semibold text-text-primary text-lg mb-4">Finalize Vendor Selection</h2>
+        <h2 class="text-lg font-semibold text-text-primary text-lg mb-4">Finalize Vendor Selection</h2>
         <div id="final-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
         <div class="space-y-4">
           <div>
@@ -246,7 +246,7 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
               <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[req.status] ?? 'bg-gray-100 text-gray-600'}">${STATUS_LABEL[req.status] ?? req.status}</span>
               <span class="text-xs text-text-secondary">${req.category}</span>
             </div>
-            <h1 class="text-xl font-bold text-text-primary">${req.title}</h1>
+            <h1 class="text-2xl font-bold text-text-primary">${req.title}</h1>
             ${req.description ? `<p class="text-sm text-text-secondary mt-1">${req.description}</p>` : ''}
           </div>
         </div>

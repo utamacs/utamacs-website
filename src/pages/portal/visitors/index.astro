@@ -30,7 +30,7 @@ const isMember = user.role === 'member';
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <!-- Log Entry -->
       <div class="bg-white rounded-xl border border-border-light p-6">
-        <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
+        <h2 class="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
           <i class="fas fa-sign-in-alt text-green-600" aria-hidden="true"></i>
           Log Entry
         </h2>
@@ -57,7 +57,7 @@ const isMember = user.role === 'member';
 
       <!-- Active Visitors / Log Exit -->
       <div class="bg-white rounded-xl border border-border-light p-6">
-        <h2 class="font-semibold text-text-primary mb-4 flex items-center gap-2">
+        <h2 class="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
           <i class="fas fa-sign-out-alt text-red-600" aria-hidden="true"></i>
           Active Visitors
         </h2>
@@ -72,7 +72,7 @@ const isMember = user.role === 'member';
   {!isGuard && (
     <div id="pre-approvals-panel" class="bg-white rounded-xl border border-border-light overflow-hidden mb-6">
       <div class="px-5 py-4 border-b border-border-light bg-gray-50">
-        <h2 class="font-semibold text-text-primary">My Pre-Approvals</h2>
+        <h2 class="text-lg font-semibold text-text-primary">My Pre-Approvals</h2>
       </div>
       <div id="pre-approvals-list" class="p-5">
         <p class="text-sm text-text-secondary text-center py-4">Loading…</p>
@@ -103,7 +103,7 @@ const isMember = user.role === 'member';
   <div id="panel-deliveries" class="hidden">
     <div class="bg-white rounded-xl border border-border-light overflow-hidden mb-4">
       <div class="px-5 py-4 border-b border-border-light bg-gray-50 flex items-center justify-between">
-        <h2 class="font-semibold text-text-primary">Delivery Log</h2>
+        <h2 class="text-lg font-semibold text-text-primary">Delivery Log</h2>
         <div class="flex items-center gap-2">
           <input type="date" id="delivery-date"
             class="text-sm border border-border-light rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-600" />
@@ -116,7 +116,7 @@ const isMember = user.role === 'member';
 
     {isGuard && (
       <div class="bg-white rounded-xl border border-border-light p-5">
-        <h2 class="font-semibold text-text-primary mb-4">Log New Delivery</h2>
+        <h2 class="text-lg font-semibold text-text-primary mb-4">Log New Delivery</h2>
         <form id="delivery-form" class="space-y-3">
           <div class="grid grid-cols-2 gap-3">
             <div>
