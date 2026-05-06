@@ -442,14 +442,16 @@ if (isGuard) {
 
         rows.forEach((rowCards, rowIdx) => {
           const isRTL = rowIdx % 2 === 1;
-          const display = isRTL ? [...rowCards].reverse() : rowCards;
 
           const rowEl = document.createElement('div');
-          rowEl.className = 'flex items-center gap-2';
+          // flex-row-reverse: items fill from the right edge, so a partial RTL row
+          // (e.g. a single trailing card) stays right-aligned, directly below the
+          // last card of the previous LTR row — correct snake column alignment.
+          rowEl.className = `flex items-center gap-2${isRTL ? ' flex-row-reverse' : ''}`;
 
-          display.forEach((card, i) => {
+          rowCards.forEach((card, i) => {
             rowEl.appendChild(card);
-            if (i < display.length - 1) {
+            if (i < rowCards.length - 1) {
               const arr = document.createElement('i');
               arr.className = `fas fa-arrow-${isRTL ? 'left' : 'right'} text-gray-300 text-sm flex-shrink-0`;
               arr.setAttribute('aria-hidden', 'true');
