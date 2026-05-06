@@ -79,12 +79,11 @@ export async function resolveUserPermissions(
 ): Promise<ResolvedUser> {
   const sb = getSupabaseServiceClient();
 
-  // 1. Fetch profile (role + title + admin flag)
-  const { data: profile, error: profileErr } = await sb
-    .from('profiles')
-    .select('portal_role, committee_title, is_admin')
-    .eq('id', userId)
-    .single();
+  // 1. Fetch profile (role + title + admin flag) and user_roles in parallel
+  const [{ data: profile, error: profileErr }, { data: userRole }] = await Promise.all([
+    sb.from('profiles').select('portal_role, committee_title, is_admin').eq('id', userId).single(),
+    sb.from('user_roles').select('role').eq('user_id', userId).single(),
+  ]);
 
   if (profileErr || !profile) {
     throw Object.assign(new Error('User profile not found'), { status: 401 });
@@ -137,7 +136,7 @@ export async function resolveUserPermissions(
     email: authUser?.user?.email ?? '',
     portalRole,
     committeeTitle: profile.committee_title ?? null,
-    isAdmin: profile.is_admin ?? false,
+    isAdmin: (profile.is_admin ?? false) || userRole?.role === 'admin',
     societyId,
     permissions,
   };

@@ -84,7 +84,7 @@ export class SupabaseAuthService implements IAuthService {
       if (profileResult.data) {
         portalRole = profileResult.data.portal_role ?? 'member';
         committeeTitle = profileResult.data.committee_title ?? null;
-        isAdmin = profileResult.data.is_admin ?? false;
+        isAdmin = (profileResult.data.is_admin ?? false) || role === 'admin';
         if (!societyId) societyId = profileResult.data.society_id ?? '';
       }
     } catch {
