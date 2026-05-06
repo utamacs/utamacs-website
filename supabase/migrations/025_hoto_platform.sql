@@ -3,6 +3,9 @@
 -- HOTO & Vendor Management Platform — Phase 1 Schema
 -- Design: design/HOTO-VENDOR-PLATFORM-DESIGN.md v4.1
 --
+
+-- pgcrypto required for gen_random_bytes() used in member_invites.token
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- TABLE NAMING NOTES (conflicts with existing migrations avoided):
 --   governance_files    ← was "documents" in design (existing `documents` = community doc library)
 --   vendor_candidates   ← was "vendors"   in design (existing `vendors` = maintenance contractors)
