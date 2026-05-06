@@ -652,10 +652,10 @@ CREATE INDEX IF NOT EXISTS idx_rules_category
 
 -- Seed all rules for UTA MACS
 -- PARAMETER category (byelaw-mandated values + operational parameters)
-INSERT INTO rules (society_id, rule_category, rule_code, label, description, byelaw_reference, value_type, current_value, default_value, is_locked)
+INSERT INTO rules (society_id, rule_category, rule_code, label, byelaw_reference, value_type, current_value, default_value, is_locked)
 SELECT
   '00000000-0000-0000-0000-000000000001',
-  r.rule_category, r.rule_code, r.label, r.description, r.byelaw_reference,
+  r.rule_category, r.rule_code, r.label, r.byelaw_reference,
   r.value_type, r.current_value::jsonb, r.default_value::jsonb, r.is_locked
 FROM (VALUES
   -- PARAMETER: byelaw-locked values
@@ -710,7 +710,7 @@ FROM (VALUES
   ('VALIDATION','HOTO_EVIDENCE_REQUIRED_BEFORE_UPLOAD','Must select an HOTO item before uploading doc',      null, 'BOOLEAN', 'true',  'true',  false),
   ('VALIDATION','SNAG_SCOPE_REQUIRED_ON_CREATE',       'snag_scope mandatory on snag creation',              null, 'BOOLEAN', 'true',  'true',  false),
   ('VALIDATION','INVITE_EMAIL_DOMAIN_ALLOWLIST',       'Restrict invites to specific email domains (empty = any)', null, 'JSON_ARRAY', '[]', '[]', false)
-) AS r(rule_category, rule_code, label, description, byelaw_reference, value_type, current_value, default_value, is_locked)
+) AS r(rule_category, rule_code, label, byelaw_reference, value_type, current_value, default_value, is_locked)
 ON CONFLICT (society_id, rule_code) DO NOTHING;
 
 -- ─────────────────────────────────────────────────────────────────────────────
