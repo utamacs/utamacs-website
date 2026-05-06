@@ -1,7 +1,7 @@
 import { getSupabaseAnonClient, getSupabaseServiceClient } from './SupabaseDB';
 import type { IAuthService, AuthSession, UserClaims, MFASetup } from '../../interfaces/IAuthService';
 
-function sessionFromSupabase(session: { access_token: string; refresh_token: string; expires_at?: number }, user: { id: string; email?: string; user_metadata?: { role?: string; society_id?: string } }): AuthSession {
+function sessionFromSupabase(session: { access_token: string; refresh_token: string; expires_at?: number }, user: { id: string; email?: string; user_metadata?: { role?: string; society_id?: string } }, profile?: { portal_role?: string; committee_title?: string | null; is_admin?: boolean }): AuthSession {
   return {
     accessToken: session.access_token,
     refreshToken: session.refresh_token,
@@ -10,6 +10,9 @@ function sessionFromSupabase(session: { access_token: string; refresh_token: str
       id: user.id,
       email: user.email ?? '',
       role: user.user_metadata?.role ?? 'member',
+      portalRole: profile?.portal_role ?? 'member',
+      committeeTitle: profile?.committee_title ?? null,
+      isAdmin: profile?.is_admin ?? false,
       societyId: user.user_metadata?.society_id ?? '',
     },
   };
@@ -25,32 +28,25 @@ export class SupabaseAuthService implements IAuthService {
     }
     let role = 'member';
     let societyId = '';
+    let profile: { portal_role?: string; committee_title?: string | null; is_admin?: boolean } = {};
     try {
       const serviceClient = getSupabaseServiceClient();
-      const { data: roleData } = await serviceClient
-        .from('user_roles')
-        .select('role, society_id')
-        .eq('user_id', data.user.id)
-        .single();
-      if (roleData) {
-        role = roleData.role ?? 'member';
-        societyId = roleData.society_id ?? '';
+      const [roleResult, profileResult] = await Promise.all([
+        serviceClient.from('user_roles').select('role, society_id').eq('user_id', data.user.id).single(),
+        serviceClient.from('profiles').select('portal_role, committee_title, is_admin').eq('id', data.user.id).single(),
+      ]);
+      if (roleResult.data) {
+        role = roleResult.data.role ?? 'member';
+        societyId = roleResult.data.society_id ?? '';
+      }
+      if (profileResult.data) {
+        profile = profileResult.data;
       }
     } catch {
-      // Service key not configured — proceed with member role default
+      // Service key not configured — proceed with member role defaults
     }
 
-    return {
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-      expiresAt: data.session.expires_at ?? 0,
-      user: {
-        id: data.user.id,
-        email: data.user.email ?? '',
-        role,
-        societyId,
-      },
-    };
+    return sessionFromSupabase(data.session, data.user, profile);
   }
 
   async signOut(accessToken: string): Promise<void> {
@@ -69,20 +65,27 @@ export class SupabaseAuthService implements IAuthService {
       throw Object.assign(new Error('Invalid or expired token'), { status: 401 });
     }
 
-    // Role lookup via service client — non-fatal: defaults to 'member' if
-    // the service key isn't configured or user_roles row doesn't exist yet.
+    // Role + profile lookup — non-fatal: defaults to 'member' if service key not configured
     let role = 'member';
     let societyId = '';
+    let portalRole = 'member';
+    let committeeTitle: string | null = null;
+    let isAdmin = false;
     try {
       const svc = getSupabaseServiceClient();
-      const { data: roleData } = await svc
-        .from('user_roles')
-        .select('role, society_id')
-        .eq('user_id', data.user.id)
-        .single();
-      if (roleData) {
-        role = roleData.role ?? 'member';
-        societyId = roleData.society_id ?? '';
+      const [roleResult, profileResult] = await Promise.all([
+        svc.from('user_roles').select('role, society_id').eq('user_id', data.user.id).single(),
+        svc.from('profiles').select('portal_role, committee_title, is_admin, society_id').eq('id', data.user.id).single(),
+      ]);
+      if (roleResult.data) {
+        role = roleResult.data.role ?? 'member';
+        societyId = roleResult.data.society_id ?? '';
+      }
+      if (profileResult.data) {
+        portalRole = profileResult.data.portal_role ?? 'member';
+        committeeTitle = profileResult.data.committee_title ?? null;
+        isAdmin = profileResult.data.is_admin ?? false;
+        if (!societyId) societyId = profileResult.data.society_id ?? '';
       }
     } catch {
       // Service key not configured or DB unavailable — member role is the safe default
@@ -92,6 +95,9 @@ export class SupabaseAuthService implements IAuthService {
       id: data.user.id,
       email: data.user.email ?? '',
       role,
+      portalRole,
+      committeeTitle,
+      isAdmin,
       societyId,
     };
   }

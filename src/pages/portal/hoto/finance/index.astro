@@ -1,0 +1,739 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const canEnter       = ['executive','secretary','president'].includes(user.portalRole) || user.isAdmin;
+const canApprove10k  = ['secretary','president'].includes(user.portalRole) || user.isAdmin;
+const canApprove20k  = user.portalRole === 'president' || user.isAdmin;
+const canBoardVote   = ['secretary','president'].includes(user.portalRole) || user.isAdmin;
+---
+
+<PortalLayout title="Finance" user={user} activeModule="finance">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-text-primary">Finance</h1>
+    <p class="text-sm text-text-secondary mt-1">Corpus fund, maintenance records, and governance expenses.</p>
+  </div>
+
+  <!-- Corpus summary -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+    <div class="bg-white rounded-2xl border border-border-light p-5">
+      <div class="text-xs text-text-secondary uppercase tracking-wide mb-1">Corpus Fund Balance</div>
+      <div id="corpus-balance" class="text-3xl font-bold text-primary-600">—</div>
+    </div>
+    <div class="bg-white rounded-2xl border border-border-light p-5">
+      <div class="text-xs text-text-secondary uppercase tracking-wide mb-1">This Year Maintenance</div>
+      <div id="maintenance-total" class="text-3xl font-bold text-text-primary">—</div>
+    </div>
+    <div class="bg-white rounded-2xl border border-border-light p-5">
+      <div class="text-xs text-text-secondary uppercase tracking-wide mb-1">YTD Expenses</div>
+      <div id="expenses-total" class="text-3xl font-bold text-text-primary">—</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="border-b border-border-light mb-6 flex gap-0">
+    {['corpus','maintenance','expenses'].map((tab, i) => (
+      <button class={`tab-btn px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${i === 0 ? 'border-primary-600 text-primary-600' : 'border-transparent text-text-secondary hover:text-text-primary'}`} data-tab={tab}>
+        {tab === 'corpus' ? 'Corpus Fund' : tab === 'maintenance' ? 'Maintenance Records' : 'Governance Expenses'}
+      </button>
+    ))}
+  </div>
+
+  <!-- Corpus Fund Tab -->
+  <div id="tab-corpus" class="tab-panel">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-text-primary">Corpus Fund Transactions</h2>
+      <div class="flex gap-2">
+        <button id="export-corpus-btn" class="btn-outline text-sm flex items-center gap-1.5">
+          <i class="fas fa-download text-xs" aria-hidden="true"></i> CSV
+        </button>
+        {canEnter && (
+          <button id="add-corpus-btn" class="btn-primary text-sm">
+            <i class="fas fa-plus mr-1"></i> Add Entry
+          </button>
+        )}
+      </div>
+    </div>
+    <div id="corpus-list" class="bg-white rounded-2xl border border-border-light overflow-hidden">
+      <div class="p-5 text-sm text-text-secondary">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Edit Maintenance Modal -->
+  {canEnter && (
+    <div id="maintenance-edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">Edit Maintenance Record</h2>
+        <div id="maintenance-edit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Amount (₹)</label>
+              <input type="number" id="me-amount" min="0"
+                class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Paid Date</label>
+              <input type="date" id="me-paid-date"
+                class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Payment Mode</label>
+            <input type="text" id="me-mode" placeholder="UPI / NEFT"
+              class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Reference No.</label>
+            <input type="text" id="me-ref"
+              class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button id="me-save-btn" class="btn-primary flex-1">Save Changes</button>
+            <button id="me-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Maintenance Records Tab -->
+  <div id="tab-maintenance" class="tab-panel hidden">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <div class="flex gap-3">
+        <select id="maintenance-year" class="px-3 py-2 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+          {Array.from({length: 5}).map((_, i) => {
+            const y = new Date().getFullYear() - i;
+            return <option value={y}>{y}</option>;
+          })}
+        </select>
+        <input type="text" id="maintenance-flat" placeholder="Flat no." class="px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 w-28" />
+      </div>
+      <div class="flex gap-2">
+        <button id="export-maintenance-btn" class="btn-outline text-sm flex items-center gap-1.5">
+          <i class="fas fa-download text-xs" aria-hidden="true"></i> CSV
+        </button>
+        {canEnter && (
+          <button id="add-maintenance-btn" class="btn-primary text-sm">
+            <i class="fas fa-plus mr-1"></i> Record Payment
+          </button>
+        )}
+      </div>
+    </div>
+    <div id="maintenance-list" class="bg-white rounded-2xl border border-border-light overflow-hidden">
+      <div class="p-5 text-sm text-text-secondary">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Expenses Tab -->
+  <div id="tab-expenses" class="tab-panel hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-text-primary">Governance Expenses</h2>
+      <div class="flex gap-2">
+        <button id="export-expenses-btn" class="btn-outline text-sm flex items-center gap-1.5">
+          <i class="fas fa-download text-xs" aria-hidden="true"></i> CSV
+        </button>
+        {canApprove10k && (
+          <button id="add-expense-btn" class="btn-primary text-sm">
+            <i class="fas fa-plus mr-1"></i> Record Expense
+          </button>
+        )}
+      </div>
+    </div>
+    <div id="expenses-list" class="bg-white rounded-2xl border border-border-light overflow-hidden">
+      <div class="p-5 text-sm text-text-secondary">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Add Corpus Modal -->
+  {canEnter && (
+    <div id="corpus-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">Add Corpus Entry</h2>
+        <div id="corpus-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Type <span class="text-red-500">*</span></label>
+            <select id="c-type" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+              <option value="RECEIVED_FROM_BUILDER">Received from Builder</option>
+              <option value="INTEREST_EARNED">Interest Earned</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Amount (₹) <span class="text-red-500">*</span></label>
+              <input type="number" id="c-amount" placeholder="0.00" min="0"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Date <span class="text-red-500">*</span></label>
+              <input type="date" id="c-date"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Description</label>
+            <input type="text" id="c-description" placeholder="e.g. Corpus fund received at handover"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Payment Mode</label>
+              <input type="text" id="c-mode" placeholder="NEFT / Cheque"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Reference No.</label>
+              <input type="text" id="c-ref"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button id="corpus-save-btn" class="btn-primary flex-1">Save Entry</button>
+            <button id="corpus-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Add Maintenance Modal -->
+  {canEnter && (
+    <div id="maintenance-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">Record Maintenance Payment</h2>
+        <div id="maintenance-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Flat No. <span class="text-red-500">*</span></label>
+              <input type="text" id="m-flat" placeholder="e.g. A-101"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Amount (₹) <span class="text-red-500">*</span></label>
+              <input type="number" id="m-amount" placeholder="0.00" min="0"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Month <span class="text-red-500">*</span></label>
+              <select id="m-month" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+                {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                  <option value={i + 1}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Year <span class="text-red-500">*</span></label>
+              <input type="number" id="m-year" placeholder="2025"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Paid Date</label>
+              <input type="date" id="m-paid-date"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Payment Mode</label>
+              <input type="text" id="m-mode" placeholder="UPI / NEFT"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Reference No.</label>
+            <input type="text" id="m-ref"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button id="maintenance-save-btn" class="btn-primary flex-1">Record Payment</button>
+            <button id="maintenance-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Add Expense Modal -->
+  {canApprove10k && (
+    <div id="expense-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large max-h-[90vh] overflow-y-auto">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">Record Governance Expense</h2>
+        <div id="expense-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-700">
+          <strong>Approval tiers:</strong> ≤ ₹10,000 — Secretary; ≤ ₹20,000 — President; ≤ ₹50,000 — Board resolution required. Expenses above ₹50,000 must use formal process.
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Payee <span class="text-red-500">*</span></label>
+            <input type="text" id="e-payee" placeholder="Vendor / service provider name"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Purpose <span class="text-red-500">*</span></label>
+            <textarea id="e-purpose" rows="2" placeholder="What was this expense for?"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Amount (₹) <span class="text-red-500">*</span></label>
+              <input type="number" id="e-amount" placeholder="0.00" min="0" max="50000"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Date <span class="text-red-500">*</span></label>
+              <input type="date" id="e-date"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Payment Mode <span class="text-red-500">*</span></label>
+              <input type="text" id="e-mode" placeholder="NEFT / UPI / Cheque"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Reference No.</label>
+              <input type="text" id="e-ref"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div id="board-res-field" class="hidden">
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Board Resolution Reference <span class="text-red-500">*</span></label>
+            <input type="text" id="e-board-ref" placeholder="Meeting date / resolution number"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Byelaw Authority</label>
+            <input type="text" id="e-byelaw" placeholder="e.g. §9.11a"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <label class="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+            <input type="checkbox" id="e-recurring" class="rounded" />
+            Recurring expense
+          </label>
+          <div class="flex gap-3 pt-1">
+            <button id="expense-preview-btn" class="btn-primary flex-1">Preview & Confirm</button>
+            <button id="expense-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expense confirm modal -->
+    <div id="expense-confirm-modal" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
+        <h2 class="font-semibold text-text-primary text-lg mb-1">Confirm Expense</h2>
+        <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+          <i class="fas fa-exclamation-triangle mr-1"></i>
+          By confirming, you are acting as both the recorder and approving authority for this expense. Ensure this complies with society byelaws.
+        </p>
+        <div id="expense-confirm-summary" class="mb-4 space-y-2 text-sm"></div>
+        <div id="expense-confirm-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="flex gap-3">
+          <button id="expense-confirm-btn" class="btn-primary flex-1 flex items-center justify-center gap-2">
+            <i class="fas fa-check-circle"></i> Confirm & Record
+          </button>
+          <button id="expense-confirm-back-btn" class="btn-outline flex-1">Go Back</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ canEnter, canApprove10k, canApprove20k, canBoardVote }}>
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    let corpusRecords = [];
+    let maintenanceRecords = [];
+    let expenseRecords = [];
+
+    function fmt(n) {
+      return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function downloadCSV(rows, headers, filename) {
+      const escape = v => {
+        const s = String(v ?? '');
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const lines = [headers.join(','), ...rows.map(r => r.map(escape).join(','))];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.remove('border-primary-600','text-primary-600');
+          b.classList.add('border-transparent','text-text-secondary');
+        });
+        btn.classList.add('border-primary-600','text-primary-600');
+        btn.classList.remove('border-transparent','text-text-secondary');
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+      });
+    });
+
+    // Load corpus
+    async function loadCorpus() {
+      const res = await fetch('/api/v1/hoto/finance/corpus', { credentials: 'include' });
+      if (!res.ok) return;
+      const { balance, records } = await res.json();
+      corpusRecords = records;
+      document.getElementById('corpus-balance').textContent = fmt(balance);
+      const list = document.getElementById('corpus-list');
+      if (!records.length) {
+        list.innerHTML = '<div class="p-5 text-sm text-text-secondary">No corpus records yet.</div>';
+        return;
+      }
+      list.innerHTML = `<table class="w-full text-sm"><thead><tr class="border-b border-border-light">
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Date</th>
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Type</th>
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Description</th>
+        <th class="text-right p-4 text-xs text-text-secondary font-medium">Amount</th>
+      </tr></thead><tbody>` +
+      records.map(r => {
+        const isCredit = r.transaction_type !== 'APPROVED_USE';
+        return `<tr class="border-b border-border-light last:border-0 hover:bg-gray-50">
+          <td class="p-4 text-text-secondary">${new Date(r.date).toLocaleDateString('en-IN')}</td>
+          <td class="p-4"><span class="text-xs px-2 py-0.5 rounded-full ${isCredit ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${r.transaction_type.replace(/_/g,' ')}</span></td>
+          <td class="p-4 text-text-secondary">${r.description ?? '—'}</td>
+          <td class="p-4 text-right font-medium ${isCredit ? 'text-green-600' : 'text-red-600'}">${isCredit ? '+' : '-'}${fmt(r.amount)}</td>
+        </tr>`;
+      }).join('') + '</tbody></table>';
+    }
+
+    // Load maintenance
+    async function loadMaintenance() {
+      const year  = document.getElementById('maintenance-year').value;
+      const flat  = document.getElementById('maintenance-flat').value.trim();
+      const params = new URLSearchParams({ period_year: year, limit: '500' });
+      if (flat) params.set('flat_number', flat);
+      const res = await fetch(`/api/v1/hoto/finance/maintenance?${params}`, { credentials: 'include' });
+      if (!res.ok) return;
+      const records = await res.json();
+      maintenanceRecords = records;
+      const yearTotal = records.reduce((s, r) => s + Number(r.amount), 0);
+      document.getElementById('maintenance-total').textContent = fmt(yearTotal);
+      const list = document.getElementById('maintenance-list');
+      if (!records.length) {
+        list.innerHTML = '<div class="p-5 text-sm text-text-secondary">No maintenance records found.</div>';
+        return;
+      }
+      list.innerHTML = `<table class="w-full text-sm"><thead><tr class="border-b border-border-light">
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Flat</th>
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Period</th>
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Paid Date</th>
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Mode</th>
+        <th class="text-right p-4 text-xs text-text-secondary font-medium">Amount</th>
+        ${canEnter ? '<th class="p-4"></th>' : ''}
+      </tr></thead><tbody>` +
+      records.map(r => `<tr class="border-b border-border-light last:border-0 hover:bg-gray-50">
+        <td class="p-4 font-medium text-text-primary">${r.flat_number}</td>
+        <td class="p-4 text-text-secondary">${MONTHS[r.period_month - 1]} ${r.period_year}</td>
+        <td class="p-4 text-text-secondary">${r.paid_date ? new Date(r.paid_date).toLocaleDateString('en-IN') : '—'}</td>
+        <td class="p-4 text-text-secondary">${r.payment_mode ?? '—'}</td>
+        <td class="p-4 text-right font-medium text-green-600">${fmt(r.amount)}</td>
+        ${canEnter ? `<td class="p-4"><button onclick="openMaintenanceEdit('${r.id}', ${r.amount}, '${r.paid_date ?? ''}', '${r.payment_mode ?? ''}', '${r.reference_number ?? ''}')" class="text-xs text-primary-600 hover:underline">Edit</button></td>` : ''}
+      </tr>`).join('') + '</tbody></table>';
+    }
+
+    // Load expenses
+    async function loadExpenses() {
+      const res = await fetch('/api/v1/hoto/finance/expenses?limit=100', { credentials: 'include' });
+      if (!res.ok) return;
+      const records = await res.json();
+      expenseRecords = records;
+      const year = new Date().getFullYear();
+      const ytd = records.filter(r => r.expense_date?.startsWith(String(year))).reduce((s, r) => s + Number(r.amount), 0);
+      document.getElementById('expenses-total').textContent = fmt(ytd);
+      const list = document.getElementById('expenses-list');
+      if (!records.length) {
+        list.innerHTML = '<div class="p-5 text-sm text-text-secondary">No expenses recorded yet.</div>';
+        return;
+      }
+      list.innerHTML = `<table class="w-full text-sm"><thead><tr class="border-b border-border-light">
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Date</th>
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Payee</th>
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Purpose</th>
+        <th class="text-left p-4 text-xs text-text-secondary font-medium">Approved By</th>
+        <th class="text-right p-4 text-xs text-text-secondary font-medium">Amount</th>
+      </tr></thead><tbody>` +
+      records.map(r => `<tr class="border-b border-border-light last:border-0 hover:bg-gray-50">
+        <td class="p-4 text-text-secondary">${new Date(r.expense_date).toLocaleDateString('en-IN')}</td>
+        <td class="p-4 font-medium text-text-primary">${r.payee}</td>
+        <td class="p-4 text-text-secondary max-w-[200px] truncate">${r.purpose}</td>
+        <td class="p-4 text-text-secondary">${r.sanctioned_by_role?.replace(/_/g,' ') ?? '—'}</td>
+        <td class="p-4 text-right font-medium text-text-primary">${fmt(r.amount)}</td>
+      </tr>`).join('') + '</tbody></table>';
+    }
+
+    // CSV exports
+    document.getElementById('export-corpus-btn')?.addEventListener('click', () => {
+      if (!corpusRecords.length) return;
+      downloadCSV(
+        corpusRecords.map(r => [r.date, r.transaction_type, r.description ?? '', r.amount, r.payment_mode ?? '', r.reference_number ?? '']),
+        ['Date','Type','Description','Amount','Payment Mode','Reference'],
+        'corpus_fund.csv'
+      );
+    });
+
+    document.getElementById('export-maintenance-btn')?.addEventListener('click', () => {
+      if (!maintenanceRecords.length) return;
+      downloadCSV(
+        maintenanceRecords.map(r => [r.flat_number, MONTHS[r.period_month - 1] + ' ' + r.period_year, r.paid_date ?? '', r.payment_mode ?? '', r.reference_number ?? '', r.amount]),
+        ['Flat','Period','Paid Date','Payment Mode','Reference','Amount'],
+        'maintenance_records.csv'
+      );
+    });
+
+    document.getElementById('export-expenses-btn')?.addEventListener('click', () => {
+      if (!expenseRecords.length) return;
+      downloadCSV(
+        expenseRecords.map(r => [r.expense_date, r.payee, r.purpose, r.amount, r.payment_mode ?? '', r.reference_number ?? '', r.sanctioned_by_role ?? '']),
+        ['Date','Payee','Purpose','Amount','Payment Mode','Reference','Approved By'],
+        'governance_expenses.csv'
+      );
+    });
+
+    // Show board resolution field when amount > 20000
+    document.getElementById('e-amount')?.addEventListener('input', e => {
+      const boardField = document.getElementById('board-res-field');
+      if (Number(e.target.value) > 20000) boardField.classList.remove('hidden');
+      else boardField.classList.add('hidden');
+    });
+
+    // Corpus modal
+    document.getElementById('add-corpus-btn')?.addEventListener('click', () => {
+      document.getElementById('corpus-error').classList.add('hidden');
+      document.getElementById('corpus-modal').classList.remove('hidden');
+    });
+    document.getElementById('corpus-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('corpus-modal').classList.add('hidden');
+    });
+    document.getElementById('corpus-save-btn')?.addEventListener('click', async () => {
+      const amount = Number(document.getElementById('c-amount').value);
+      const date = document.getElementById('c-date').value;
+      const errEl = document.getElementById('corpus-error');
+      errEl.classList.add('hidden');
+      if (!amount || amount <= 0) { errEl.textContent = 'Amount is required.'; errEl.classList.remove('hidden'); return; }
+      if (!date) { errEl.textContent = 'Date is required.'; errEl.classList.remove('hidden'); return; }
+      const btn = document.getElementById('corpus-save-btn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const res = await fetch('/api/v1/hoto/finance/corpus', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transaction_type: document.getElementById('c-type').value,
+          amount,
+          date,
+          description: document.getElementById('c-description').value.trim() || undefined,
+          payment_mode: document.getElementById('c-mode').value.trim() || undefined,
+          reference_number: document.getElementById('c-ref').value.trim() || undefined,
+        }),
+      });
+      btn.disabled = false; btn.textContent = 'Save Entry';
+      if (res.ok) {
+        document.getElementById('corpus-modal').classList.add('hidden');
+        loadCorpus();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? 'Failed to save entry.'; errEl.classList.remove('hidden');
+      }
+    });
+
+    // Maintenance modal
+    document.getElementById('add-maintenance-btn')?.addEventListener('click', () => {
+      document.getElementById('maintenance-error').classList.add('hidden');
+      document.getElementById('m-year').value = new Date().getFullYear();
+      document.getElementById('m-month').value = new Date().getMonth() + 1;
+      document.getElementById('maintenance-modal').classList.remove('hidden');
+    });
+    document.getElementById('maintenance-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('maintenance-modal').classList.add('hidden');
+    });
+    document.getElementById('maintenance-save-btn')?.addEventListener('click', async () => {
+      const flat = document.getElementById('m-flat').value.trim();
+      const amount = Number(document.getElementById('m-amount').value);
+      const month = Number(document.getElementById('m-month').value);
+      const year = Number(document.getElementById('m-year').value);
+      const errEl = document.getElementById('maintenance-error');
+      errEl.classList.add('hidden');
+      if (!flat) { errEl.textContent = 'Flat number is required.'; errEl.classList.remove('hidden'); return; }
+      if (!amount || amount <= 0) { errEl.textContent = 'Amount is required.'; errEl.classList.remove('hidden'); return; }
+      const btn = document.getElementById('maintenance-save-btn');
+      btn.disabled = true; btn.textContent = 'Recording…';
+      const res = await fetch('/api/v1/hoto/finance/maintenance', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flat_number: flat, amount, period_month: month, period_year: year,
+          paid_date: document.getElementById('m-paid-date').value || undefined,
+          payment_mode: document.getElementById('m-mode').value.trim() || undefined,
+          reference_number: document.getElementById('m-ref').value.trim() || undefined,
+        }),
+      });
+      btn.disabled = false; btn.textContent = 'Record Payment';
+      if (res.ok) {
+        document.getElementById('maintenance-modal').classList.add('hidden');
+        loadMaintenance();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? 'Failed to record payment.'; errEl.classList.remove('hidden');
+      }
+    });
+
+    // Expense modal
+    let pendingExpensePayload = null;
+
+    function getExpenseTier(amount) {
+      if (amount > 20_000) return 'Board Resolution Required';
+      if (amount > 10_000) return 'President Approval';
+      return 'Secretary Approval';
+    }
+
+    document.getElementById('add-expense-btn')?.addEventListener('click', () => {
+      document.getElementById('expense-error').classList.add('hidden');
+      document.getElementById('expense-modal').classList.remove('hidden');
+    });
+    document.getElementById('expense-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('expense-modal').classList.add('hidden');
+    });
+
+    document.getElementById('expense-preview-btn')?.addEventListener('click', () => {
+      const payee = document.getElementById('e-payee').value.trim();
+      const purpose = document.getElementById('e-purpose').value.trim();
+      const amount = Number(document.getElementById('e-amount').value);
+      const date = document.getElementById('e-date').value;
+      const mode = document.getElementById('e-mode').value.trim();
+      const errEl = document.getElementById('expense-error');
+      errEl.classList.add('hidden');
+      if (!payee) { errEl.textContent = 'Payee is required.'; errEl.classList.remove('hidden'); return; }
+      if (!purpose) { errEl.textContent = 'Purpose is required.'; errEl.classList.remove('hidden'); return; }
+      if (!amount || amount <= 0) { errEl.textContent = 'Amount is required.'; errEl.classList.remove('hidden'); return; }
+      if (!date) { errEl.textContent = 'Date is required.'; errEl.classList.remove('hidden'); return; }
+      if (!mode) { errEl.textContent = 'Payment mode is required.'; errEl.classList.remove('hidden'); return; }
+      if (amount > 20_000 && !document.getElementById('e-board-ref')?.value.trim()) {
+        errEl.textContent = 'Board resolution reference is required for amounts above ₹20,000.'; errEl.classList.remove('hidden'); return;
+      }
+
+      pendingExpensePayload = {
+        payee, purpose, amount, expense_date: date, payment_mode: mode,
+        reference_number: document.getElementById('e-ref').value.trim() || undefined,
+        board_resolution_ref: document.getElementById('e-board-ref')?.value.trim() || undefined,
+        byelaw_authority: document.getElementById('e-byelaw').value.trim() || undefined,
+        is_recurring: document.getElementById('e-recurring').checked,
+      };
+
+      const tier = getExpenseTier(amount);
+      document.getElementById('expense-confirm-summary').innerHTML = `
+        <div class="flex justify-between"><span class="text-text-secondary">Payee</span><span class="font-medium">${payee}</span></div>
+        <div class="flex justify-between"><span class="text-text-secondary">Amount</span><span class="font-bold text-text-primary">${fmt(amount)}</span></div>
+        <div class="flex justify-between"><span class="text-text-secondary">Date</span><span>${date}</span></div>
+        <div class="flex justify-between"><span class="text-text-secondary">Approval tier</span><span class="font-medium text-amber-700">${tier}</span></div>
+        <div class="mt-2 text-xs text-text-secondary truncate" title="${purpose}"><em>Purpose: ${purpose}</em></div>
+      `;
+      document.getElementById('expense-confirm-error').classList.add('hidden');
+      document.getElementById('expense-confirm-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('expense-confirm-back-btn')?.addEventListener('click', () => {
+      document.getElementById('expense-confirm-modal').classList.add('hidden');
+    });
+
+    document.getElementById('expense-confirm-btn')?.addEventListener('click', async () => {
+      if (!pendingExpensePayload) return;
+      const btn = document.getElementById('expense-confirm-btn');
+      const errEl = document.getElementById('expense-confirm-error');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Recording…';
+
+      const res = await fetch('/api/v1/hoto/finance/expenses', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pendingExpensePayload),
+      });
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Record';
+
+      if (res.ok) {
+        document.getElementById('expense-confirm-modal').classList.add('hidden');
+        document.getElementById('expense-modal').classList.add('hidden');
+        pendingExpensePayload = null;
+        loadExpenses();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? 'Failed to record expense.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // Maintenance edit modal
+    let editingMaintenanceId = null;
+
+    window.openMaintenanceEdit = (id, amount, paidDate, mode, ref) => {
+      editingMaintenanceId = id;
+      document.getElementById('me-amount').value = amount;
+      document.getElementById('me-paid-date').value = paidDate;
+      document.getElementById('me-mode').value = mode;
+      document.getElementById('me-ref').value = ref;
+      document.getElementById('maintenance-edit-error').classList.add('hidden');
+      document.getElementById('maintenance-edit-modal').classList.remove('hidden');
+    };
+
+    document.getElementById('me-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('maintenance-edit-modal').classList.add('hidden');
+    });
+
+    document.getElementById('me-save-btn')?.addEventListener('click', async () => {
+      if (!editingMaintenanceId) return;
+      const btn = document.getElementById('me-save-btn');
+      const errEl = document.getElementById('maintenance-edit-error');
+      const amount = Number(document.getElementById('me-amount').value);
+      errEl.classList.add('hidden');
+      if (amount <= 0) { errEl.textContent = 'Amount must be positive.'; errEl.classList.remove('hidden'); return; }
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      const res = await fetch(`/api/v1/hoto/finance/maintenance/${editingMaintenanceId}`, {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount,
+          paid_date: document.getElementById('me-paid-date').value || null,
+          payment_mode: document.getElementById('me-mode').value.trim() || null,
+          reference_number: document.getElementById('me-ref').value.trim() || null,
+        }),
+      });
+
+      btn.disabled = false; btn.textContent = 'Save Changes';
+      if (res.ok) {
+        document.getElementById('maintenance-edit-modal').classList.add('hidden');
+        loadMaintenance();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? 'Failed to save.'; errEl.classList.remove('hidden');
+      }
+    });
+
+    // Maintenance filter changes
+    document.getElementById('maintenance-year')?.addEventListener('change', loadMaintenance);
+    let maintenanceDebounce;
+    document.getElementById('maintenance-flat')?.addEventListener('input', () => {
+      clearTimeout(maintenanceDebounce);
+      maintenanceDebounce = setTimeout(loadMaintenance, 400);
+    });
+
+    // Initial loads
+    loadCorpus();
+    loadMaintenance();
+    loadExpenses();
+  </script>
+</PortalLayout>

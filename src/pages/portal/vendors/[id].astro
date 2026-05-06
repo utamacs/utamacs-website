@@ -1,0 +1,665 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const reqId = Astro.params.id!;
+
+const canCreate     = ['executive','secretary','president'].includes(user.portalRole) || user.isAdmin;
+const canAdvance    = ['secretary','president'].includes(user.portalRole) || user.isAdmin;
+const canFinalSelect = ['secretary','president'].includes(user.portalRole) || user.isAdmin;
+const canVote       = true; // vendor.vote — all active members; eligibility checked server-side
+---
+
+<PortalLayout title="Vendor Requirement" user={user} activeModule="vendors">
+  <div class="mb-5">
+    <a href="/portal/vendors" class="text-sm text-text-secondary hover:text-primary-600 flex items-center gap-1.5">
+      <i class="fas fa-arrow-left text-xs" aria-hidden="true"></i> Back to Vendor Evaluation
+    </a>
+  </div>
+
+  <!-- Header skeleton replaced by JS -->
+  <div id="req-header" class="mb-6">
+    <div class="animate-pulse">
+      <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+      <div class="h-6 bg-gray-300 rounded w-64 mb-1"></div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main column -->
+    <div class="lg:col-span-2 space-y-6">
+      <!-- Candidates table -->
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
+          <h2 class="font-semibold text-text-primary">Vendor Candidates</h2>
+          {canCreate && (
+            <button id="add-candidate-btn" class="text-xs btn-outline py-1.5">
+              <i class="fas fa-plus mr-1" aria-hidden="true"></i> Add Candidate
+            </button>
+          )}
+        </div>
+        <div id="candidates-list" class="divide-y divide-border-light">
+          <div class="p-4 text-sm text-text-secondary animate-pulse">Loading candidates…</div>
+        </div>
+      </div>
+
+      <!-- Voting section -->
+      <div id="voting-section" class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light">
+          <h2 class="font-semibold text-text-primary">Voting</h2>
+        </div>
+        <div id="voting-content" class="p-5">
+          <div class="text-sm text-text-secondary">Loading vote data…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Side column -->
+    <div class="space-y-6">
+      <!-- Status + actions -->
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light">
+          <h2 class="font-semibold text-text-primary">Status &amp; Actions</h2>
+        </div>
+        <div id="actions-content" class="p-5 space-y-3">
+          <div class="text-sm text-text-secondary animate-pulse">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Metadata -->
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light">
+          <h2 class="font-semibold text-text-primary">Details</h2>
+        </div>
+        <div id="metadata-content" class="p-5">
+          <div class="text-sm text-text-secondary animate-pulse">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Candidate modal -->
+  {canCreate && (
+    <div id="add-candidate-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large max-h-[90vh] overflow-y-auto">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">Add Vendor Candidate</h2>
+        <div id="candidate-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Vendor Name <span class="text-red-500">*</span></label>
+            <input type="text" id="c-vendor-name" placeholder="e.g. CleanMaster Services Pvt Ltd"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Contact Person</label>
+              <input type="text" id="c-contact-person" placeholder="Name"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Phone</label>
+              <input type="text" id="c-contact-phone" placeholder="+91 9XXXXXXXXX"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Email</label>
+            <input type="email" id="c-contact-email" placeholder="contact@vendor.com"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Monthly Quote (₹)</label>
+              <input type="number" id="c-quote-monthly" placeholder="0.00" min="0"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Setup Cost (₹)</label>
+              <input type="number" id="c-quote-setup" placeholder="0.00" min="0"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <label class="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+            <input type="checkbox" id="c-site-visited" class="rounded" />
+            Site visited
+          </label>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Quote Document (PDF/image)</label>
+            <input type="file" id="c-quote-file" accept=".pdf,.jpg,.jpeg,.png"
+              class="w-full text-sm text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-600 file:text-white hover:file:bg-primary-700" />
+            <div id="c-upload-status" class="hidden mt-1 text-xs"></div>
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button id="candidate-save-btn" class="btn-primary flex-1">Add Candidate</button>
+            <button id="candidate-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Vote modal -->
+  <div id="vote-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+      <h2 class="font-semibold text-text-primary text-lg mb-4">Cast Your Vote</h2>
+      <div id="vote-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Select Vendor <span class="text-red-500">*</span></label>
+          <select id="vote-vendor-id" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+            <option value="">Select a candidate…</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Reason / Justification <span class="text-red-500">*</span></label>
+          <textarea id="vote-reason" rows="3" placeholder="Briefly explain your choice…"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+          <label class="flex items-start gap-2 text-sm text-text-primary cursor-pointer">
+            <input type="checkbox" id="vote-conflict" class="mt-0.5 rounded flex-shrink-0" />
+            <span>I declare that I have no conflict of interest with any candidate (required)</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+            <input type="checkbox" id="vote-recuse" class="rounded flex-shrink-0" />
+            <span>Recuse myself from this vote</span>
+          </label>
+        </div>
+        <div class="flex gap-3">
+          <button id="vote-submit-btn" class="btn-primary flex-1">Submit Vote</button>
+          <button id="vote-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Final select modal -->
+  {canFinalSelect && (
+    <div id="final-select-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">Finalize Vendor Selection</h2>
+        <div id="final-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Selected Vendor <span class="text-red-500">*</span></label>
+            <select id="final-vendor-id" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+              <option value="">Select finalist…</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Notes</label>
+            <textarea id="final-notes" rows="2" placeholder="Rationale for selection…"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+          </div>
+          <div class="flex gap-3">
+            <button id="final-submit-btn" class="btn-primary flex-1">Confirm Selection</button>
+            <button id="final-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ reqId, canCreate, canAdvance, canFinalSelect, canVote }}>
+    const STATUS_LABEL = {
+      DRAFT: 'Draft', OPEN_FOR_QUOTES: 'Open for Quotes',
+      VOTING_OPEN: 'Voting Open', VOTING_CLOSED: 'Voting Closed',
+      FINALIST_SELECTED: 'Finalist Selected', CONTRACT_SIGNED: 'Contract Signed',
+      CANCELLED: 'Cancelled',
+    };
+    const STATUS_CLS = {
+      DRAFT: 'bg-gray-100 text-gray-600',
+      OPEN_FOR_QUOTES: 'bg-blue-100 text-blue-700',
+      VOTING_OPEN: 'bg-amber-100 text-amber-700',
+      VOTING_CLOSED: 'bg-indigo-100 text-indigo-700',
+      FINALIST_SELECTED: 'bg-green-100 text-green-700',
+      CONTRACT_SIGNED: 'bg-green-200 text-green-800',
+      CANCELLED: 'bg-red-100 text-red-600',
+    };
+
+    let state = { requirement: null, candidates: [], vote_summary: null };
+
+    function fmt(n) {
+      if (!n && n !== 0) return '—';
+      return '₹' + Number(n).toLocaleString('en-IN');
+    }
+
+    async function loadData() {
+      const res = await fetch(`/api/v1/vendors/requirements/${reqId}`, { credentials: 'include' });
+      if (!res.ok) { document.getElementById('req-header').innerHTML = '<p class="text-red-600 text-sm">Failed to load requirement.</p>'; return; }
+      state = await res.json();
+      render();
+    }
+
+    function render() {
+      const { requirement: req, candidates, vote_summary } = state;
+      if (!req) return;
+
+      // Header
+      document.getElementById('req-header').innerHTML = `
+        <div class="flex items-start gap-3 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[req.status] ?? 'bg-gray-100 text-gray-600'}">${STATUS_LABEL[req.status] ?? req.status}</span>
+              <span class="text-xs text-text-secondary">${req.category}</span>
+            </div>
+            <h1 class="text-xl font-bold text-text-primary">${req.title}</h1>
+            ${req.description ? `<p class="text-sm text-text-secondary mt-1">${req.description}</p>` : ''}
+          </div>
+        </div>
+      `;
+
+      // Voting deadline countdown
+      if (req.voting_closes_at && req.status === 'VOTING_OPEN') {
+        const closesAt = new Date(req.voting_closes_at);
+        const msLeft = closesAt.getTime() - Date.now();
+        if (msLeft > 0) {
+          const days = Math.floor(msLeft / 86_400_000);
+          const hrs  = Math.floor((msLeft % 86_400_000) / 3_600_000);
+          const mins = Math.floor((msLeft % 3_600_000) / 60_000);
+          const countdownText = days > 0 ? `${days}d ${hrs}h remaining` : hrs > 0 ? `${hrs}h ${mins}m remaining` : `${mins}m remaining`;
+          const urgency = msLeft < 86_400_000 ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800';
+          const existingBanner = document.getElementById('deadline-banner');
+          if (!existingBanner) {
+            const banner = document.createElement('div');
+            banner.id = 'deadline-banner';
+            banner.className = `mb-4 p-3 ${urgency} border rounded-xl text-sm flex items-center gap-2`;
+            banner.innerHTML = `<i class="fas fa-clock"></i> Voting closes ${closesAt.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} — <strong>${countdownText}</strong>`;
+            document.getElementById('req-header').after(banner);
+          }
+        }
+      }
+
+      // Candidates
+      const candEl = document.getElementById('candidates-list');
+      if (!candidates.length) {
+        candEl.innerHTML = '<div class="p-5 text-sm text-text-secondary text-center">No candidates added yet.</div>';
+      } else {
+        const canRemove = canCreate && ['DRAFT','OPEN_FOR_QUOTES'].includes(req.status);
+        candEl.innerHTML = candidates.map(c => {
+          const isSelected = req.selected_vendor_id === c.id;
+          const tallyCount = vote_summary?.tally?.[c.id] ?? 0;
+          const quoteLink = c.github_path
+            ? `<a href="${c.github_path}" target="_blank" rel="noopener" class="text-xs text-primary-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Quote doc</a>`
+            : '';
+          return `
+            <div class="p-4 ${isSelected ? 'bg-green-50' : ''}">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-medium text-sm text-text-primary">${c.vendor_name}</span>
+                    ${isSelected ? '<span class="text-xs px-1.5 py-0.5 bg-green-600 text-white rounded">Selected</span>' : ''}
+                    ${c.site_visited ? '<span class="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Site Visited</span>' : ''}
+                    ${quoteLink}
+                  </div>
+                  <div class="flex gap-4 mt-1 text-xs text-text-secondary flex-wrap">
+                    ${c.contact_person ? `<span><i class="fas fa-user mr-1"></i>${c.contact_person}</span>` : ''}
+                    ${c.contact_phone ? `<span><i class="fas fa-phone mr-1"></i>${c.contact_phone}</span>` : ''}
+                    ${c.quote_monthly ? `<span><i class="fas fa-rupee-sign mr-1"></i>${fmt(c.quote_monthly)}/mo</span>` : ''}
+                    ${c.quote_setup ? `<span>Setup: ${fmt(c.quote_setup)}</span>` : ''}
+                  </div>
+                </div>
+                <div class="flex items-center gap-3 flex-shrink-0">
+                  <div class="text-right">
+                    <div class="text-lg font-bold text-text-primary">${tallyCount}</div>
+                    <div class="text-xs text-text-secondary">vote${tallyCount !== 1 ? 's' : ''}</div>
+                  </div>
+                  ${canRemove ? `<button class="remove-candidate text-xs text-red-500 hover:text-red-700" data-id="${c.id}" title="Remove candidate"><i class="fas fa-times"></i></button>` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        if (canRemove) {
+          candEl.querySelectorAll('.remove-candidate').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const candidateId = btn.dataset.id;
+              const name = btn.closest('.p-4').querySelector('.font-medium.text-sm').textContent.trim();
+              if (!confirm(`Remove ${name} from this evaluation?`)) return;
+              const res = await fetch(`/api/v1/vendors/requirements/${reqId}/candidates/${candidateId}`, {
+                method: 'DELETE', credentials: 'include',
+              });
+              if (res.ok || res.status === 204) { await loadData(); }
+              else { const d = await res.json().catch(() => ({})); alert(d.message ?? 'Failed to remove candidate.'); }
+            });
+          });
+        }
+      }
+
+      // Voting section
+      renderVoting(req, candidates, vote_summary);
+
+      // Actions panel
+      renderActions(req, candidates, vote_summary);
+
+      // Metadata
+      document.getElementById('metadata-content').innerHTML = `
+        <dl class="space-y-3 text-sm">
+          <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Category</dt><dd class="text-text-primary">${req.category}</dd></div>
+          <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Quorum Required</dt><dd class="text-text-primary">${req.quorum_required} votes</dd></div>
+          ${req.voting_opens_at ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Voting Opened</dt><dd class="text-text-primary">${new Date(req.voting_opens_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</dd></div>` : ''}
+          ${req.voting_closes_at ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Voting Closed</dt><dd class="text-text-primary">${new Date(req.voting_closes_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</dd></div>` : ''}
+          <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Voting Policy</dt><dd class="${req.voting_policy_committed ? 'text-green-600' : 'text-amber-600'}">${req.voting_policy_committed ? 'Committed' : 'Not yet committed'}</dd></div>
+          <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Created</dt><dd class="text-text-primary">${new Date(req.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</dd></div>
+        </dl>
+        ${canCreate && req.status === 'DRAFT' && !req.voting_policy_committed ? `
+          <button id="commit-policy-btn" class="mt-4 w-full btn-outline text-sm py-2">
+            <i class="fas fa-check-circle mr-1"></i> Commit Voting Policy
+          </button>
+        ` : ''}
+      `;
+
+      if (canCreate && req.status === 'DRAFT' && !req.voting_policy_committed) {
+        document.getElementById('commit-policy-btn')?.addEventListener('click', () => advanceStatus('OPEN_FOR_QUOTES'));
+      }
+    }
+
+    function renderVoting(req, candidates, vs) {
+      const el = document.getElementById('voting-content');
+
+      if (req.status === 'DRAFT' || req.status === 'OPEN_FOR_QUOTES') {
+        el.innerHTML = '<p class="text-sm text-text-secondary">Voting has not started yet.</p>';
+        return;
+      }
+
+      const userVote = vs?.user_vote;
+      const activeVotes = vs?.active_votes ?? 0;
+      const quorumMet = vs?.quorum_met ?? false;
+
+      let voteHtml = `
+        <div class="flex items-center gap-4 mb-4">
+          <div class="text-center">
+            <div class="text-2xl font-bold text-text-primary">${activeVotes}</div>
+            <div class="text-xs text-text-secondary">votes cast</div>
+          </div>
+          <div class="text-center">
+            <div class="text-2xl font-bold ${quorumMet ? 'text-green-600' : 'text-amber-600'}">${req.quorum_required}</div>
+            <div class="text-xs text-text-secondary">quorum required</div>
+          </div>
+          <div class="flex-1">
+            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full ${quorumMet ? 'bg-green-500' : 'bg-amber-400'} rounded-full transition-all" style="width:${Math.min(100, (activeVotes / req.quorum_required) * 100)}%"></div>
+            </div>
+            <div class="text-xs text-text-secondary mt-1">${quorumMet ? 'Quorum met' : `${req.quorum_required - activeVotes} more needed`}</div>
+          </div>
+        </div>
+      `;
+
+      if (userVote) {
+        voteHtml += `
+          <div class="p-3 bg-green-50 border border-green-200 rounded-xl text-sm">
+            <div class="flex items-center gap-2 text-green-700 font-medium mb-1"><i class="fas fa-check-circle"></i> You have voted</div>
+            ${userVote.recused ? '<div class="text-text-secondary">Recused from voting</div>' : `<div class="text-text-secondary">Voted for: <strong class="text-text-primary">${candidates.find(c => c.id === userVote.vendor_id)?.vendor_name ?? 'N/A'}</strong></div>`}
+          </div>
+        `;
+      } else if (req.status === 'VOTING_OPEN' && canVote) {
+        // Show candidate quote docs for reference
+        const withDocs = candidates.filter(c => c.github_path);
+        if (withDocs.length) {
+          voteHtml += `
+            <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+              <div class="font-medium text-blue-800 mb-1.5"><i class="fas fa-file-pdf mr-1"></i> Quote Documents</div>
+              <div class="space-y-1">
+                ${withDocs.map(c => `<div><a href="${c.github_path}" target="_blank" rel="noopener" class="text-primary-600 hover:underline text-xs">${c.vendor_name}</a></div>`).join('')}
+              </div>
+            </div>
+          `;
+        }
+        // Populate vote modal candidates
+        const sel = document.getElementById('vote-vendor-id');
+        if (sel) {
+          sel.innerHTML = '<option value="">Select a candidate…</option>' + candidates.map(c => `<option value="${c.id}">${c.vendor_name}</option>`).join('');
+        }
+        voteHtml += `
+          <button id="open-vote-btn" class="btn-primary w-full text-sm mt-2">
+            <i class="fas fa-vote-yea mr-1"></i> Cast My Vote
+          </button>
+        `;
+      }
+
+      el.innerHTML = voteHtml;
+
+      document.getElementById('open-vote-btn')?.addEventListener('click', () => {
+        document.getElementById('vote-error').classList.add('hidden');
+        document.getElementById('vote-modal').classList.remove('hidden');
+      });
+    }
+
+    function renderActions(req, candidates, vs) {
+      const el = document.getElementById('actions-content');
+      const currentStatus = req.status;
+
+      const NEXT: Record<string, string> = {
+        DRAFT:            'OPEN_FOR_QUOTES',
+        OPEN_FOR_QUOTES:  'VOTING_OPEN',
+        VOTING_OPEN:      'VOTING_CLOSED',
+        VOTING_CLOSED:    'FINALIST_SELECTED',
+        FINALIST_SELECTED:'CONTRACT_SIGNED',
+      };
+
+      const ACTION_LABEL: Record<string, string> = {
+        OPEN_FOR_QUOTES:  'Open for Quotes',
+        VOTING_OPEN:      'Open Voting',
+        VOTING_CLOSED:    'Close Voting',
+        FINALIST_SELECTED:'Select Finalist',
+        CONTRACT_SIGNED:  'Mark Contract Signed',
+      };
+
+      let html = `<div class="text-sm font-medium text-text-secondary mb-2">Current Status</div>
+        <span class="text-sm px-2.5 py-1 rounded-full font-medium ${STATUS_CLS[currentStatus] ?? 'bg-gray-100 text-gray-600'}">${STATUS_LABEL[currentStatus] ?? currentStatus}</span>`;
+
+      const nextStatus = NEXT[currentStatus];
+      if (nextStatus && canAdvance && currentStatus !== 'CANCELLED') {
+        if (nextStatus === 'FINALIST_SELECTED' && canFinalSelect) {
+          // Special modal for finalist selection
+          const sel = document.getElementById('final-vendor-id');
+          if (sel) {
+            sel.innerHTML = '<option value="">Select finalist…</option>' + candidates.map(c => {
+              const votes = vs?.tally?.[c.id] ?? 0;
+              return `<option value="${c.id}">${c.vendor_name} (${votes} vote${votes !== 1 ? 's' : ''})</option>`;
+            }).join('');
+          }
+          html += `<button id="open-final-btn" class="w-full btn-primary text-sm mt-3">
+            <i class="fas fa-award mr-1"></i> ${ACTION_LABEL[nextStatus]}
+          </button>`;
+        } else if (nextStatus !== 'FINALIST_SELECTED') {
+          html += `<button id="advance-btn" data-to="${nextStatus}" class="w-full btn-primary text-sm mt-3">
+            <i class="fas fa-arrow-right mr-1"></i> ${ACTION_LABEL[nextStatus] ?? nextStatus}
+          </button>`;
+        }
+      }
+
+      if (canAdvance && !['CANCELLED','CONTRACT_SIGNED'].includes(currentStatus)) {
+        html += `<button id="cancel-btn" class="w-full btn-outline text-sm text-red-600 border-red-200 hover:bg-red-50 mt-2">
+          <i class="fas fa-times mr-1"></i> Cancel Requirement
+        </button>`;
+      }
+
+      html += `<div id="action-error" class="hidden mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>`;
+      el.innerHTML = html;
+
+      document.getElementById('advance-btn')?.addEventListener('click', e => {
+        const toStatus = e.currentTarget.dataset.to;
+        advanceStatus(toStatus);
+      });
+      document.getElementById('open-final-btn')?.addEventListener('click', () => {
+        document.getElementById('final-error').classList.add('hidden');
+        document.getElementById('final-select-modal').classList.remove('hidden');
+      });
+      document.getElementById('cancel-btn')?.addEventListener('click', () => {
+        if (confirm('Are you sure you want to cancel this requirement? This cannot be undone.')) {
+          advanceStatus('CANCELLED');
+        }
+      });
+    }
+
+    async function advanceStatus(toStatus) {
+      const errEl = document.getElementById('action-error') ?? document.getElementById('create-error');
+      const res = await fetch(`/api/v1/vendors/requirements/${reqId}/status`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_status: toStatus }),
+      });
+      if (res.ok) {
+        await loadData();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        if (errEl) { errEl.textContent = d.message ?? d.error ?? 'Action failed.'; errEl.classList.remove('hidden'); }
+      }
+    }
+
+    // Vote submit
+    document.getElementById('vote-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('vote-modal').classList.add('hidden');
+    });
+
+    document.getElementById('vote-submit-btn')?.addEventListener('click', async () => {
+      const vendorId = document.getElementById('vote-vendor-id').value;
+      const reason = document.getElementById('vote-reason').value.trim();
+      const conflictDeclared = document.getElementById('vote-conflict').checked;
+      const recused = document.getElementById('vote-recuse').checked;
+      const errEl = document.getElementById('vote-error');
+      errEl.classList.add('hidden');
+
+      if (!reason) { errEl.textContent = 'Reason is required.'; errEl.classList.remove('hidden'); return; }
+      if (!conflictDeclared && !recused) { errEl.textContent = 'You must declare conflict of interest status.'; errEl.classList.remove('hidden'); return; }
+      if (!vendorId && !recused) { errEl.textContent = 'Please select a vendor or choose to recuse.'; errEl.classList.remove('hidden'); return; }
+
+      const btn = document.getElementById('vote-submit-btn');
+      btn.disabled = true; btn.textContent = 'Submitting…';
+
+      const res = await fetch(`/api/v1/vendors/requirements/${reqId}/votes`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendorId || null, reason, conflict_declared: conflictDeclared, recused }),
+      });
+
+      btn.disabled = false; btn.textContent = 'Submit Vote';
+
+      if (res.ok) {
+        document.getElementById('vote-modal').classList.add('hidden');
+        await loadData();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to cast vote.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // Final select submit
+    document.getElementById('final-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('final-select-modal').classList.add('hidden');
+    });
+
+    document.getElementById('final-submit-btn')?.addEventListener('click', async () => {
+      const vendorId = document.getElementById('final-vendor-id').value;
+      const notes = document.getElementById('final-notes').value.trim();
+      const errEl = document.getElementById('final-error');
+      errEl.classList.add('hidden');
+
+      if (!vendorId) { errEl.textContent = 'Please select a vendor.'; errEl.classList.remove('hidden'); return; }
+
+      const btn = document.getElementById('final-submit-btn');
+      btn.disabled = true; btn.textContent = 'Confirming…';
+
+      const res = await fetch(`/api/v1/vendors/requirements/${reqId}/final-select`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendorId, notes: notes || undefined }),
+      });
+
+      btn.disabled = false; btn.textContent = 'Confirm Selection';
+
+      if (res.ok) {
+        document.getElementById('final-select-modal').classList.add('hidden');
+        await loadData();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to finalize selection.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // Add candidate
+    document.getElementById('add-candidate-btn')?.addEventListener('click', () => {
+      document.getElementById('candidate-error').classList.add('hidden');
+      document.getElementById('add-candidate-modal').classList.remove('hidden');
+    });
+    document.getElementById('candidate-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('add-candidate-modal').classList.add('hidden');
+    });
+    document.getElementById('candidate-save-btn')?.addEventListener('click', async () => {
+      const vendorName = document.getElementById('c-vendor-name').value.trim();
+      const errEl = document.getElementById('candidate-error');
+      const uploadStatus = document.getElementById('c-upload-status');
+      errEl.classList.add('hidden');
+      uploadStatus.classList.add('hidden');
+
+      if (!vendorName) { errEl.textContent = 'Vendor name is required.'; errEl.classList.remove('hidden'); return; }
+
+      const btn = document.getElementById('candidate-save-btn');
+      btn.disabled = true; btn.textContent = 'Adding…';
+
+      const res = await fetch(`/api/v1/vendors/requirements/${reqId}/candidates`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_name: vendorName,
+          contact_person: document.getElementById('c-contact-person').value.trim() || undefined,
+          contact_phone: document.getElementById('c-contact-phone').value.trim() || undefined,
+          contact_email: document.getElementById('c-contact-email').value.trim() || undefined,
+          quote_monthly: Number(document.getElementById('c-quote-monthly').value) || undefined,
+          quote_setup: Number(document.getElementById('c-quote-setup').value) || undefined,
+          site_visited: document.getElementById('c-site-visited').checked,
+        }),
+      });
+
+      if (!res.ok) {
+        btn.disabled = false; btn.textContent = 'Add Candidate';
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to add candidate.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      const newCandidate = await res.json();
+
+      // Optionally upload quote document
+      const quoteFile = document.getElementById('c-quote-file').files?.[0];
+      if (quoteFile && newCandidate.id) {
+        btn.textContent = 'Uploading quote…';
+        uploadStatus.textContent = 'Uploading quote document…';
+        uploadStatus.className = 'mt-1 text-xs text-text-secondary';
+        uploadStatus.classList.remove('hidden');
+        const safeName = quoteFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const fd = new FormData();
+        fd.append('file', quoteFile);
+        fd.append('item_id', newCandidate.id);
+        fd.append('item_type', 'vendor_candidate');
+        fd.append('target_path', `vendors/${reqId}/${newCandidate.id}/${Date.now()}_${safeName}`);
+        fd.append('source_description', `Quote from ${vendorName}`);
+        const upRes = await fetch('/api/v1/hoto/upload', { method: 'POST', credentials: 'include', body: fd });
+        if (upRes.ok) {
+          uploadStatus.textContent = 'Quote document queued for upload.';
+          uploadStatus.className = 'mt-1 text-xs text-green-600';
+        } else {
+          uploadStatus.textContent = 'Candidate added but quote upload failed.';
+          uploadStatus.className = 'mt-1 text-xs text-amber-600';
+        }
+      }
+
+      btn.disabled = false; btn.textContent = 'Add Candidate';
+      document.getElementById('add-candidate-modal').classList.add('hidden');
+      // Reset form
+      ['c-vendor-name','c-contact-person','c-contact-phone','c-contact-email','c-quote-monthly','c-quote-setup'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('c-site-visited').checked = false;
+      document.getElementById('c-quote-file').value = '';
+      uploadStatus.classList.add('hidden');
+      await loadData();
+    });
+
+    loadData();
+  </script>
+</PortalLayout>

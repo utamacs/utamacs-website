@@ -1,0 +1,304 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const canAccess = ['secretary','president'].includes(user.portalRole) || user.isAdmin;
+if (!canAccess) return Astro.redirect('/portal/admin');
+---
+
+<PortalLayout title="Email Drafts" user={user} activeModule="admin">
+  <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Email Drafts</h1>
+      <p class="text-sm text-text-secondary mt-1">Formal communications awaiting secretary or president review before sending.</p>
+    </div>
+    <a href="/portal/admin" class="btn-outline text-sm">Back</a>
+  </div>
+
+  <!-- Status tabs -->
+  <div class="border-b border-border-light mb-6 flex gap-0">
+    {[
+      { status: 'DRAFT',     label: 'Pending Review' },
+      { status: 'REVIEWED',  label: 'Reviewed' },
+      { status: 'SENT',      label: 'Sent' },
+      { status: 'DISCARDED', label: 'Discarded' },
+    ].map((tab, i) => (
+      <button class={`tab-btn px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${i === 0 ? 'border-primary-600 text-primary-600' : 'border-transparent text-text-secondary hover:text-text-primary'}`} data-status={tab.status}>
+        {tab.label} <span class="ml-1 text-xs" id={`count-${tab.status}`}></span>
+      </button>
+    ))}
+  </div>
+
+  <div id="drafts-list" class="space-y-4">
+    {Array.from({length: 3}).map(() => (
+      <div class="bg-white rounded-xl border border-border-light p-5 animate-pulse">
+        <div class="h-3 bg-gray-200 rounded w-48 mb-2"></div>
+        <div class="h-2.5 bg-gray-100 rounded w-64"></div>
+      </div>
+    ))}
+  </div>
+
+  <!-- Preview modal -->
+  <div id="preview-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-large flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-border-light flex items-center justify-between flex-shrink-0">
+        <h2 class="font-semibold text-text-primary">Email Preview</h2>
+        <button id="preview-close-btn" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="p-6 overflow-y-auto flex-1">
+        <div class="mb-3 text-sm text-text-secondary space-y-1">
+          <div><strong>To:</strong> <span id="preview-to"></span></div>
+          <div><strong>Subject:</strong> <span id="preview-subject"></span></div>
+          <div><strong>From:</strong> <span id="preview-from"></span></div>
+        </div>
+        <div class="border border-border-light rounded-xl p-4 bg-gray-50">
+          <div id="preview-body" class="text-sm"></div>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-border-light flex gap-3 flex-shrink-0" id="preview-actions"></div>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-large max-h-[90vh] overflow-y-auto">
+      <h2 class="font-semibold text-text-primary text-lg mb-4">Edit Draft</h2>
+      <div id="edit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Subject</label>
+          <input type="text" id="edit-subject"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Body (plain text)</label>
+          <textarea id="edit-body-text" rows="10"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none font-mono"></textarea>
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button id="edit-save-btn" class="btn-primary flex-1">Save Draft</button>
+          <button id="edit-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Discard modal -->
+  <div id="discard-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
+      <h2 class="font-semibold text-text-primary text-lg mb-2">Discard Draft</h2>
+      <p class="text-sm text-text-secondary mb-4">This email will not be sent and cannot be undone. The record is retained for auditing.</p>
+      <div id="discard-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Reason <span class="text-red-500">*</span></label>
+          <input type="text" id="discard-reason" placeholder="Why is this being discarded?"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div class="flex gap-3">
+          <button id="discard-confirm-btn" class="btn-primary flex-1 bg-red-600 hover:bg-red-700 border-red-600">Discard</button>
+          <button id="discard-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeStatus = 'DRAFT';
+    let activeDraftId = '';
+    let editingDraftId = '';
+    let discardingDraftId = '';
+
+    const TRIGGER_LABELS: Record<string, string> = {
+      BUILDER_SLA_7D_OVERDUE: 'Builder SLA 7 days overdue',
+      BUILDER_SLA_14D_OVERDUE: 'Builder SLA 14 days overdue',
+      BUILDER_SLA_30D_OVERDUE: 'Builder SLA 30 days overdue — Legal Notice',
+      HOTO_NEEDS_PRESIDENT_APPROVAL: 'HOTO pending president approval',
+      HOTO_NEEDS_SECRETARY_APPROVAL: 'HOTO pending secretary approval',
+      DEFAULTER_90D: 'Member 90-day maintenance default',
+      VENDOR_VOTE_OPENED: 'Vendor vote opened',
+      VENDOR_VOTE_RESULT: 'Vendor vote result',
+    };
+
+    async function loadDrafts(status: string) {
+      activeStatus = status;
+      const res = await fetch(`/api/v1/admin/email-drafts?status=${status}&tier=3&limit=50`, { credentials: 'include' });
+      const drafts = res.ok ? await res.json() : [];
+
+      document.getElementById(`count-${status}`)!.textContent = drafts.length ? `(${drafts.length})` : '';
+
+      const list = document.getElementById('drafts-list')!;
+      if (!drafts.length) {
+        list.innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">No drafts in this status.</div>';
+        return;
+      }
+
+      list.innerHTML = drafts.map((d: any) => `
+        <div class="bg-white rounded-2xl border border-border-light p-5">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium ${d.status === 'DRAFT' ? 'bg-amber-100 text-amber-700' : d.status === 'REVIEWED' ? 'bg-blue-100 text-blue-700' : d.status === 'SENT' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">${d.status}</span>
+                <span class="text-xs text-text-secondary">${TRIGGER_LABELS[d.triggered_by] ?? d.triggered_by}</span>
+              </div>
+              <div class="font-medium text-text-primary mb-0.5">${d.subject}</div>
+              <div class="text-xs text-text-secondary">
+                To: ${d.recipient_name ? `${d.recipient_name} &lt;${d.recipient_email ?? '—'}&gt;` : d.recipient_email ?? d.recipient_type}
+                · ${new Date(d.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+              </div>
+              <div class="mt-2 text-sm text-text-secondary line-clamp-2">${d.body_text?.slice(0, 200) ?? ''}</div>
+            </div>
+            ${d.status !== 'SENT' && d.status !== 'DISCARDED' ? `
+            <div class="flex gap-2 flex-shrink-0 flex-wrap">
+              <button class="btn-outline text-xs py-1.5 preview-btn" data-id="${d.id}"><i class="fas fa-eye mr-1"></i> Preview</button>
+              <button class="btn-outline text-xs py-1.5 edit-btn" data-id="${d.id}"><i class="fas fa-edit mr-1"></i> Edit</button>
+              <button class="btn-primary text-xs py-1.5 send-btn" data-id="${d.id}"><i class="fas fa-paper-plane mr-1"></i> Send</button>
+              <button class="btn-outline text-xs py-1.5 text-red-600 border-red-200 discard-btn" data-id="${d.id}"><i class="fas fa-times mr-1"></i> Discard</button>
+            </div>
+            ` : `<div class="text-xs text-text-secondary">${d.status === 'SENT' ? `Sent ${d.sent_at ? new Date(d.sent_at).toLocaleDateString('en-IN') : ''}` : `Discarded: ${d.discarded_reason ?? ''}`}</div>`}
+          </div>
+        </div>
+      `).join('');
+
+      // Wire buttons
+      document.querySelectorAll('.preview-btn').forEach(btn => {
+        btn.addEventListener('click', () => openPreview((btn as HTMLElement).dataset.id!));
+      });
+      document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => openEdit((btn as HTMLElement).dataset.id!));
+      });
+      document.querySelectorAll('.send-btn').forEach(btn => {
+        btn.addEventListener('click', () => sendDraft((btn as HTMLElement).dataset.id!));
+      });
+      document.querySelectorAll('.discard-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          discardingDraftId = (btn as HTMLElement).dataset.id!;
+          (document.getElementById('discard-reason') as HTMLInputElement).value = '';
+          document.getElementById('discard-error')!.classList.add('hidden');
+          document.getElementById('discard-modal')!.classList.remove('hidden');
+        });
+      });
+    }
+
+    async function openPreview(id: string) {
+      activeDraftId = id;
+      const res = await fetch(`/api/v1/admin/email-drafts/${id}`, { credentials: 'include' });
+      if (!res.ok) return;
+      const d = await res.json();
+      document.getElementById('preview-to')!.textContent = d.recipient_name ? `${d.recipient_name} <${d.recipient_email}>` : d.recipient_email ?? d.recipient_type;
+      document.getElementById('preview-subject')!.textContent = d.subject;
+      document.getElementById('preview-from')!.textContent = `${d.suggested_sender_name} <${d.suggested_sender_email}>`;
+      document.getElementById('preview-body')!.innerHTML = d.body_html ?? `<pre class="whitespace-pre-wrap text-sm">${d.body_text}</pre>`;
+      const actionsEl = document.getElementById('preview-actions')!;
+      if (d.status !== 'SENT' && d.status !== 'DISCARDED') {
+        actionsEl.innerHTML = `
+          <button id="preview-send-btn" class="btn-primary text-sm"><i class="fas fa-paper-plane mr-1"></i> Send Now</button>
+          <button id="preview-edit-btn" class="btn-outline text-sm"><i class="fas fa-edit mr-1"></i> Edit</button>
+        `;
+        document.getElementById('preview-send-btn')?.addEventListener('click', () => sendDraft(id));
+        document.getElementById('preview-edit-btn')?.addEventListener('click', () => { document.getElementById('preview-modal')!.classList.add('hidden'); openEdit(id); });
+      } else {
+        actionsEl.innerHTML = '';
+      }
+      document.getElementById('preview-modal')!.classList.remove('hidden');
+    }
+
+    async function openEdit(id: string) {
+      editingDraftId = id;
+      const res = await fetch(`/api/v1/admin/email-drafts/${id}`, { credentials: 'include' });
+      if (!res.ok) return;
+      const d = await res.json();
+      (document.getElementById('edit-subject') as HTMLInputElement).value = d.subject;
+      (document.getElementById('edit-body-text') as HTMLTextAreaElement).value = d.body_text;
+      document.getElementById('edit-error')!.classList.add('hidden');
+      document.getElementById('edit-modal')!.classList.remove('hidden');
+    }
+
+    async function sendDraft(id: string) {
+      if (!confirm('Send this email now? This cannot be undone.')) return;
+      const res = await fetch(`/api/v1/admin/email-drafts/${id}/send`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        document.getElementById('preview-modal')!.classList.add('hidden');
+        await loadDrafts(activeStatus);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert((d as any).message ?? 'Failed to send.');
+      }
+    }
+
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.remove('border-primary-600','text-primary-600');
+          b.classList.add('border-transparent','text-text-secondary');
+        });
+        btn.classList.add('border-primary-600','text-primary-600');
+        btn.classList.remove('border-transparent','text-text-secondary');
+        loadDrafts((btn as HTMLElement).dataset.status!);
+      });
+    });
+
+    // Preview modal close
+    document.getElementById('preview-close-btn')?.addEventListener('click', () => {
+      document.getElementById('preview-modal')!.classList.add('hidden');
+    });
+
+    // Edit modal
+    document.getElementById('edit-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('edit-modal')!.classList.add('hidden');
+    });
+    document.getElementById('edit-save-btn')?.addEventListener('click', async () => {
+      const subject  = (document.getElementById('edit-subject') as HTMLInputElement).value;
+      const bodyText = (document.getElementById('edit-body-text') as HTMLTextAreaElement).value;
+      const errEl = document.getElementById('edit-error')!;
+      errEl.classList.add('hidden');
+      const btn = document.getElementById('edit-save-btn') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const res = await fetch(`/api/v1/admin/email-drafts/${editingDraftId}`, {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, body_text: bodyText }),
+      });
+      btn.disabled = false; btn.textContent = 'Save Draft';
+      if (res.ok) {
+        document.getElementById('edit-modal')!.classList.add('hidden');
+        await loadDrafts(activeStatus);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = (d as any).message ?? 'Failed to save.'; errEl.classList.remove('hidden');
+      }
+    });
+
+    // Discard modal
+    document.getElementById('discard-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('discard-modal')!.classList.add('hidden');
+    });
+    document.getElementById('discard-confirm-btn')?.addEventListener('click', async () => {
+      const reason = (document.getElementById('discard-reason') as HTMLInputElement).value.trim();
+      const errEl = document.getElementById('discard-error')!;
+      if (!reason) { errEl.textContent = 'Reason is required.'; errEl.classList.remove('hidden'); return; }
+      const btn = document.getElementById('discard-confirm-btn') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Discarding…';
+      const res = await fetch(`/api/v1/admin/email-drafts/${discardingDraftId}/discard`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discarded_reason: reason }),
+      });
+      btn.disabled = false; btn.textContent = 'Discard';
+      if (res.ok) {
+        document.getElementById('discard-modal')!.classList.add('hidden');
+        await loadDrafts(activeStatus);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = (d as any).message ?? 'Failed to discard.'; errEl.classList.remove('hidden');
+      }
+    });
+
+    loadDrafts('DRAFT');
+  </script>
+</PortalLayout>

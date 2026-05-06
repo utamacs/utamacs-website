@@ -1,0 +1,278 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!user.isAdmin) return Astro.redirect('/portal');
+---
+
+<PortalLayout title="Approval Delegations" user={user} activeModule="hoto">
+  <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/hoto/admin/users" class="hover:text-primary-600">Manage Roles</a>
+        <span class="mx-2">›</span><span class="text-text-primary">Delegations</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-text-primary">Approval Delegations</h1>
+      <p class="text-sm text-text-secondary mt-1">
+        Temporarily delegate HOTO approval authority to VP or Joint Secretary while office-bearer is unavailable.
+      </p>
+    </div>
+    <button id="create-btn" class="btn-primary text-sm flex items-center gap-2">
+      <i class="fas fa-plus" aria-hidden="true"></i> New Delegation
+    </button>
+  </div>
+
+  <!-- Info callout -->
+  <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+    <i class="fas fa-info-circle mr-1.5" aria-hidden="true"></i>
+    <strong>Note:</strong> Only one active delegation per <code class="font-mono">from_role</code> is allowed at a time.
+    The delegate must be an <strong>Executive</strong> with the appropriate committee title (VP or Joint Secretary).
+    Deactivate the current delegation before creating a replacement.
+  </div>
+
+  <!-- Create Modal -->
+  <div id="create-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+      <h2 class="font-semibold text-text-primary text-lg mb-4">Create Approval Delegation</h2>
+      <div id="create-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Delegation Type <span class="text-red-500">*</span></label>
+          <select id="delegation-type" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">Select type…</option>
+            <option value="PRESIDENT_TO_VP">President → VP (grants hoto.approve_president)</option>
+            <option value="SECRETARY_TO_JOINT_SEC">Secretary → Joint Secretary (grants hoto.approve_secretary)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Delegate (Executive) <span class="text-red-500">*</span></label>
+          <select id="delegate-user" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">Select delegate…</option>
+          </select>
+          <p class="text-xs text-text-secondary mt-1">Only executives are eligible delegates.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Reason <span class="text-red-500">*</span></label>
+          <input type="text" id="delegation-reason" placeholder="e.g. President travelling, delegation from 10 Jan – 20 Jan 2025"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">End Date <span class="text-text-secondary font-normal">(optional — auto-deactivates on this date)</span></label>
+          <input type="date" id="delegation-end-date"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button id="create-save-btn" class="btn-primary flex-1">Create Delegation</button>
+          <button id="create-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Delegations -->
+  <div class="mb-8">
+    <h2 class="font-semibold text-text-primary mb-3 flex items-center gap-2">
+      <i class="fas fa-shield-alt text-primary-600" aria-hidden="true"></i> Active Delegations
+    </h2>
+    <div id="delegations-list" class="space-y-4">
+      <div class="text-sm text-text-secondary">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Delegation History -->
+  <div>
+    <h2 class="font-semibold text-text-primary mb-3 flex items-center gap-2">
+      <i class="fas fa-history text-text-secondary" aria-hidden="true"></i> Delegation History
+    </h2>
+    <div id="history-list" class="bg-white rounded-xl border border-border-light overflow-hidden">
+      <div class="p-4 text-sm text-text-secondary text-center">Loading history…</div>
+    </div>
+  </div>
+
+  <script>
+    let executives: Array<{ id: string; full_name: string; committee_title: string | null }> = [];
+
+    function showToast(msg: string, ok = true) {
+      const t = document.createElement('div');
+      t.textContent = msg;
+      t.className = `fixed bottom-6 right-6 ${ok ? 'bg-green-600' : 'bg-red-600'} text-white text-sm px-4 py-2.5 rounded-lg shadow-large z-50 max-w-sm`;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 4500);
+    }
+
+    async function loadExecutives() {
+      const res = await fetch('/api/v1/hoto/users?role=executive&limit=200', { credentials: 'include' });
+      const members = res.ok ? await res.json() : [];
+      executives = members;
+
+      const sel = document.getElementById('delegate-user') as HTMLSelectElement;
+      sel.innerHTML = '<option value="">Select delegate…</option>' +
+        executives.map((m) =>
+          `<option value="${m.id}">${m.full_name}${m.committee_title ? ` — ${m.committee_title}` : ''}</option>`
+        ).join('');
+    }
+
+    async function loadDelegations() {
+      const res = await fetch('/api/v1/hoto/delegations', { credentials: 'include' });
+      const delegations = res.ok ? await res.json() : [];
+      const container = document.getElementById('delegations-list')!;
+
+      if (!delegations.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary bg-white rounded-xl border border-border-light p-6 text-center">No active delegations.</div>';
+        return;
+      }
+
+      const TYPE_LABEL: Record<string, string> = {
+        PRESIDENT_TO_VP: 'President → VP',
+        SECRETARY_TO_JOINT_SEC: 'Secretary → Joint Secretary',
+      };
+      const TYPE_BADGE: Record<string, string> = {
+        PRESIDENT_TO_VP: 'bg-primary-600 text-white',
+        SECRETARY_TO_JOINT_SEC: 'bg-blue-100 text-blue-700',
+      };
+
+      container.innerHTML = delegations.map((d: any) => {
+        const delegateName = d.delegate?.full_name ?? 'Unknown';
+        const delegateTitle = d.delegate?.committee_title ?? null;
+        const typeLabel = TYPE_LABEL[d.delegation_type] ?? d.delegation_type;
+        const typeCls = TYPE_BADGE[d.delegation_type] ?? 'bg-gray-100 text-gray-600';
+        const createdAt = new Date(d.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        const endDate = d.end_date ? new Date(d.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+        const isExpiringSoon = d.end_date && new Date(d.end_date).getTime() - Date.now() < 3 * 86_400_000;
+
+        return `
+          <div class="bg-white rounded-xl border ${isExpiringSoon ? 'border-amber-300' : 'border-border-light'} p-5">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-2">
+                  <span class="text-xs px-2.5 py-0.5 rounded-full font-medium ${typeCls}">${typeLabel}</span>
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Active</span>
+                  ${endDate ? `<span class="text-xs px-2 py-0.5 rounded-full ${isExpiringSoon ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'} font-medium">Ends ${endDate}</span>` : ''}
+                </div>
+                <div class="font-medium text-text-primary">
+                  ${delegateName}${delegateTitle ? ` <span class="text-text-secondary font-normal italic">· ${delegateTitle}</span>` : ''}
+                </div>
+                <div class="text-xs text-text-secondary mt-1">Reason: ${d.reason}</div>
+                <div class="text-xs text-text-secondary mt-0.5">Created ${createdAt}</div>
+              </div>
+              <button onclick="deactivate('${d.id}')"
+                class="flex-shrink-0 px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                <i class="fas fa-times-circle" aria-hidden="true"></i> Deactivate
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    (window as any).deactivate = async (id: string) => {
+      if (!confirm('Deactivate this delegation? The delegate will lose the approval permission immediately.')) return;
+
+      const res = await fetch(`/api/v1/hoto/delegations/${id}/deactivate`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      if (res.ok) {
+        showToast('Delegation deactivated.');
+        loadDelegations();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showToast(d.message ?? d.error ?? 'Failed to deactivate.', false);
+      }
+    };
+
+    async function loadHistory() {
+      const res = await fetch('/api/v1/hoto/delegations?active=false', { credentials: 'include' });
+      const delegations = res.ok ? await res.json() : [];
+      const container = document.getElementById('history-list')!;
+      if (!delegations.length) {
+        container.innerHTML = '<div class="px-4 py-6 text-center text-sm text-text-secondary">No past delegations.</div>';
+        return;
+      }
+      const TYPE_LABEL: Record<string, string> = {
+        PRESIDENT_TO_VP: 'President → VP',
+        SECRETARY_TO_JOINT_SEC: 'Secretary → Joint Sec',
+      };
+      container.innerHTML = `<table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-border-light">
+          <tr>
+            <th class="px-4 py-2.5 text-left text-xs font-medium text-text-secondary">Type</th>
+            <th class="px-4 py-2.5 text-left text-xs font-medium text-text-secondary">Delegate</th>
+            <th class="px-4 py-2.5 text-left text-xs font-medium text-text-secondary">Reason</th>
+            <th class="px-4 py-2.5 text-left text-xs font-medium text-text-secondary">Created</th>
+            <th class="px-4 py-2.5 text-left text-xs font-medium text-text-secondary">Ended</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border-light">
+          ${delegations.map((d: any) => `
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-2.5 text-xs text-text-primary">${TYPE_LABEL[d.delegation_type] ?? d.delegation_type}</td>
+              <td class="px-4 py-2.5 text-xs text-text-primary">${d.delegate?.full_name ?? '—'}</td>
+              <td class="px-4 py-2.5 text-xs text-text-secondary max-w-[200px] truncate">${d.reason}</td>
+              <td class="px-4 py-2.5 text-xs text-text-secondary">${new Date(d.created_at).toLocaleDateString('en-IN')}</td>
+              <td class="px-4 py-2.5 text-xs text-text-secondary">${d.deactivated_at ? new Date(d.deactivated_at).toLocaleDateString('en-IN') : d.end_date ? new Date(d.end_date).toLocaleDateString('en-IN') : '—'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+    }
+
+    document.getElementById('create-btn')!.addEventListener('click', () => {
+      (document.getElementById('delegation-type') as HTMLSelectElement).value = '';
+      (document.getElementById('delegate-user') as HTMLSelectElement).value = '';
+      (document.getElementById('delegation-reason') as HTMLInputElement).value = '';
+      (document.getElementById('delegation-end-date') as HTMLInputElement).value = '';
+      document.getElementById('create-error')!.classList.add('hidden');
+      document.getElementById('create-modal')!.classList.remove('hidden');
+    });
+
+    document.getElementById('create-save-btn')!.addEventListener('click', async () => {
+      const type = (document.getElementById('delegation-type') as HTMLSelectElement).value;
+      const toUserId = (document.getElementById('delegate-user') as HTMLSelectElement).value;
+      const reason = (document.getElementById('delegation-reason') as HTMLInputElement).value.trim();
+      const errEl = document.getElementById('create-error')!;
+      errEl.classList.add('hidden');
+
+      if (!type || !toUserId || !reason) {
+        errEl.textContent = 'All fields are required.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      const fromRole = type === 'PRESIDENT_TO_VP' ? 'president' : 'secretary';
+
+      const btn = document.getElementById('create-save-btn') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = 'Creating…';
+
+      const endDate = (document.getElementById('delegation-end-date') as HTMLInputElement).value;
+
+      const res = await fetch('/api/v1/hoto/delegations', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_role: fromRole, to_user_id: toUserId, reason, delegation_type: type, ...(endDate ? { end_date: endDate } : {}) }),
+      });
+
+      btn.disabled = false;
+      btn.textContent = 'Create Delegation';
+
+      if (res.ok) {
+        document.getElementById('create-modal')!.classList.add('hidden');
+        showToast('Delegation created successfully.');
+        loadDelegations();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to create delegation.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('create-cancel-btn')!.addEventListener('click', () => {
+      document.getElementById('create-modal')!.classList.add('hidden');
+    });
+
+    Promise.all([loadDelegations(), loadExecutives(), loadHistory()]);
+  </script>
+</PortalLayout>

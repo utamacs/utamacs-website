@@ -1,0 +1,562 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!user.isAdmin) return Astro.redirect('/portal');
+---
+
+<PortalLayout title="Role & Title Management" user={user} activeModule="hoto">
+  <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/hoto/users" class="hover:text-primary-600">Members</a>
+        <span class="mx-2">›</span><span class="text-text-primary">Manage Roles</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-text-primary">Role &amp; Title Management</h1>
+      <p class="text-sm text-text-secondary mt-1">Update portal roles, committee titles, and account status.</p>
+    </div>
+    <div class="flex gap-2">
+      <button id="invite-btn" class="btn-outline text-sm flex items-center gap-2">
+        <i class="fas fa-user-plus" aria-hidden="true"></i> Invite Member
+      </button>
+      <a href="/portal/hoto/admin/elections" class="btn-primary text-sm flex items-center gap-2">
+        <i class="fas fa-vote-yea" aria-hidden="true"></i> Run Election
+      </a>
+    </div>
+  </div>
+
+  <!-- Role Change Modal -->
+  <div id="role-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="role-modal-title">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+      <h2 id="role-modal-title" class="font-semibold text-text-primary text-lg mb-1">Change Role &amp; Title</h2>
+      <p id="role-modal-name" class="text-sm text-text-secondary mb-4"></p>
+      <div id="role-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Portal Role <span class="text-red-500">*</span></label>
+          <select id="role-select" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="member">Member</option>
+            <option value="executive">Executive</option>
+            <option value="secretary">Secretary</option>
+            <option value="president">President</option>
+          </select>
+          <p class="text-xs text-text-secondary mt-1">The role determines permissions. Treasurer finance access is granted automatically via committee title.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Committee Title <span class="text-text-secondary font-normal">(optional)</span></label>
+          <select id="title-input" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">— None —</option>
+            <option value="President">President</option>
+            <option value="Vice President">Vice President</option>
+            <option value="Secretary">Secretary</option>
+            <option value="Joint Secretary">Joint Secretary</option>
+            <option value="Treasurer">Treasurer</option>
+            <option value="Joint Treasurer">Joint Treasurer</option>
+            <option value="Executive Member">Executive Member</option>
+          </select>
+          <p class="text-xs text-text-secondary mt-1">Treasurer / Joint Treasurer automatically grants finance access.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Reason <span class="text-red-500">*</span></label>
+          <input type="text" id="role-reason" placeholder="e.g. AGM election 2025"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button id="role-save-btn" class="btn-primary flex-1">Save Changes</button>
+          <button id="role-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deactivate Modal -->
+  <div id="deactivate-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
+      <h2 class="font-semibold text-text-primary text-lg mb-1">Deactivate Account</h2>
+      <p id="deactivate-name" class="text-sm text-text-secondary mb-1"></p>
+      <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+        <i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>
+        The member will lose portal access immediately.
+      </p>
+      <div id="deactivate-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Reason <span class="text-red-500">*</span></label>
+          <input type="text" id="deactivate-reason" placeholder="e.g. Flat sold, member relocated"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button id="deactivate-save-btn" class="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors">Deactivate</button>
+          <button id="deactivate-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invite Modal -->
+  <div id="invite-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+      <h2 class="font-semibold text-text-primary text-lg mb-4">Invite New Member</h2>
+      <div id="invite-success" class="hidden mb-3 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"></div>
+      <div id="invite-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Email <span class="text-red-500">*</span></label>
+          <input type="email" id="invite-email" placeholder="resident@example.com"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Flat Number <span class="text-red-500">*</span></label>
+          <input type="text" id="invite-flat" placeholder="e.g. A-101"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Intended Role</label>
+          <select id="invite-role" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="member">Member</option>
+            <option value="executive">Executive</option>
+            <option value="secretary">Secretary</option>
+            <option value="president">President</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Committee Title <span class="text-text-secondary font-normal">(optional)</span></label>
+          <select id="invite-title" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">— None —</option>
+            <option value="President">President</option>
+            <option value="Vice President">Vice President</option>
+            <option value="Secretary">Secretary</option>
+            <option value="Joint Secretary">Joint Secretary</option>
+            <option value="Treasurer">Treasurer</option>
+            <option value="Joint Treasurer">Joint Treasurer</option>
+            <option value="Executive Member">Executive Member</option>
+          </select>
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button id="invite-save-btn" class="btn-primary flex-1">Send Invite</button>
+          <button id="invite-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="mb-5 flex flex-wrap gap-3">
+    <div class="relative flex-1 min-w-[200px] max-w-sm">
+      <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
+      <input type="search" id="search-input" placeholder="Search by name…"
+        class="w-full pl-10 pr-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+    </div>
+    <select id="role-filter" class="px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+      <option value="">All roles</option>
+      <option value="president">President</option>
+      <option value="secretary">Secretary</option>
+      <option value="executive">Executive</option>
+      <option value="member">Member</option>
+    </select>
+  </div>
+
+  <div id="member-count" class="text-xs text-text-secondary mb-4">Loading…</div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-4 border-b border-border-light">
+    <button id="tab-members" class="tab-btn px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px">Members</button>
+    <button id="tab-invites" class="tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary border-b-2 border-transparent -mb-px">Pending Invites</button>
+  </div>
+
+  <!-- Members tab -->
+  <div id="panel-members">
+  <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-border-light">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Member</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary hidden md:table-cell">Unit</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Role</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary hidden lg:table-cell">Title</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Status</th>
+          <th class="px-4 py-3 text-right text-xs font-medium text-text-secondary">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="members-table" class="divide-y divide-border-light">
+        {Array.from({length: 5}).map(() => (
+          <tr class="animate-pulse">
+            <td class="px-4 py-3"><div class="h-3 bg-gray-200 rounded w-32"></div></td>
+            <td class="px-4 py-3 hidden md:table-cell"><div class="h-3 bg-gray-100 rounded w-16"></div></td>
+            <td class="px-4 py-3"><div class="h-3 bg-gray-100 rounded w-20"></div></td>
+            <td class="px-4 py-3 hidden lg:table-cell"><div class="h-3 bg-gray-100 rounded w-24"></div></td>
+            <td class="px-4 py-3"><div class="h-3 bg-gray-100 rounded w-12"></div></td>
+            <td class="px-4 py-3"></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  </div> <!-- end panel-members -->
+
+  <!-- Invites tab -->
+  <div id="panel-invites" class="hidden">
+    <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+      <div class="px-4 py-3 border-b border-border-light flex items-center justify-between">
+        <h2 class="font-semibold text-text-primary text-sm">Pending Invites</h2>
+        <select id="invite-status-filter" class="text-xs px-2 py-1.5 border border-border-light rounded-lg bg-white focus:outline-none">
+          <option value="pending">Pending</option>
+          <option value="accepted">Accepted</option>
+          <option value="expired">Expired</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="">All</option>
+        </select>
+      </div>
+      <div id="invites-list" class="divide-y divide-border-light">
+        <div class="px-4 py-6 text-center text-sm text-text-secondary animate-pulse">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ROLE_BADGE: Record<string, string> = {
+      president: 'bg-primary-600 text-white',
+      secretary: 'bg-blue-100 text-blue-700',
+      executive: 'bg-purple-100 text-purple-700',
+      member:    'bg-gray-100 text-gray-600',
+    };
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    let roleTargetId: string | null = null;
+    let deactivateTargetId: string | null = null;
+
+    function showToast(msg: string, ok = true) {
+      const t = document.createElement('div');
+      t.textContent = msg;
+      t.className = `fixed bottom-6 right-6 ${ok ? 'bg-green-600' : 'bg-red-600'} text-white text-sm px-4 py-2.5 rounded-lg shadow-large z-50 max-w-sm`;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 4500);
+    }
+
+    async function loadMembers(q = '', roleF = '') {
+      const params = new URLSearchParams({ limit: '200' });
+      if (q) params.set('q', q);
+      if (roleF) params.set('role', roleF);
+
+      const res = await fetch(`/api/v1/hoto/users?${params}`, { credentials: 'include' });
+      const members = res.ok ? await res.json() : [];
+
+      document.getElementById('member-count')!.textContent =
+        `${members.length} member${members.length !== 1 ? 's' : ''} found`;
+
+      const tbody = document.getElementById('members-table')!;
+      if (!members.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-10 text-center text-text-secondary text-sm">No members found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = members.map((m: any) => {
+        const role = m.portal_role ?? 'member';
+        const roleCls = ROLE_BADGE[role] ?? 'bg-gray-100 text-gray-600';
+        const unit = [m.unit_number, m.block ? `Block ${m.block}` : null].filter(Boolean).join(' · ') || '—';
+        const statusBadge = m.is_active
+          ? '<span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Active</span>'
+          : '<span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Inactive</span>';
+
+        return `
+          <tr class="hover:bg-gray-50 ${!m.is_active ? 'opacity-60' : ''}">
+            <td class="px-4 py-3">
+              <div class="font-medium text-text-primary">${m.full_name}</div>
+              ${m.is_admin ? '<div class="text-xs text-red-600 font-medium">Admin</div>' : ''}
+            </td>
+            <td class="px-4 py-3 text-text-secondary hidden md:table-cell">${unit}</td>
+            <td class="px-4 py-3">
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium ${roleCls} capitalize">${role}</span>
+            </td>
+            <td class="px-4 py-3 text-text-secondary text-sm hidden lg:table-cell">${m.committee_title ?? '—'}</td>
+            <td class="px-4 py-3">${statusBadge}</td>
+            <td class="px-4 py-3 text-right">
+              <div class="flex items-center justify-end gap-3">
+                <button onclick="openRoleModal('${m.id}','${m.full_name.replace(/'/g,"\\'")}','${role}','${m.committee_title ?? ''}')"
+                  class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
+                  <i class="fas fa-user-edit" aria-hidden="true"></i><span class="hidden sm:inline">Edit</span>
+                </button>
+                ${m.is_active ? `
+                  <button onclick="openDeactivateModal('${m.id}','${m.full_name.replace(/'/g,"\\'")}') "
+                    class="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1">
+                    <i class="fas fa-user-slash" aria-hidden="true"></i><span class="hidden sm:inline">Deactivate</span>
+                  </button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openRoleModal(id: string, name: string, role: string, title: string) {
+      roleTargetId = id;
+      document.getElementById('role-modal-name')!.textContent = `Member: ${name}`;
+      (document.getElementById('role-select') as HTMLSelectElement).value = role;
+      (document.getElementById('title-input') as HTMLInputElement).value = title;
+      (document.getElementById('role-reason') as HTMLInputElement).value = '';
+      document.getElementById('role-error')!.classList.add('hidden');
+      document.getElementById('role-modal')!.classList.remove('hidden');
+    }
+
+    function openDeactivateModal(id: string, name: string) {
+      deactivateTargetId = id;
+      document.getElementById('deactivate-name')!.textContent = `Member: ${name}`;
+      (document.getElementById('deactivate-reason') as HTMLInputElement).value = '';
+      document.getElementById('deactivate-error')!.classList.add('hidden');
+      document.getElementById('deactivate-modal')!.classList.remove('hidden');
+    }
+
+    document.getElementById('role-save-btn')!.addEventListener('click', async () => {
+      if (!roleTargetId) return;
+      const role = (document.getElementById('role-select') as HTMLSelectElement).value;
+      const title = (document.getElementById('title-input') as HTMLInputElement).value.trim();
+      const reason = (document.getElementById('role-reason') as HTMLInputElement).value.trim();
+      const errEl = document.getElementById('role-error')!;
+
+      if (!reason) {
+        errEl.textContent = 'Reason is required.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      const btn = document.getElementById('role-save-btn') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      errEl.classList.add('hidden');
+
+      const res = await fetch(`/api/v1/hoto/users/${roleTargetId}/portal-role`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portal_role: role, committee_title: title || null, reason }),
+      });
+
+      btn.disabled = false;
+      btn.textContent = 'Save Changes';
+
+      if (res.ok) {
+        document.getElementById('role-modal')!.classList.add('hidden');
+        roleTargetId = null;
+        showToast('Role updated successfully.');
+        loadMembers(
+          (document.getElementById('search-input') as HTMLInputElement).value.trim(),
+          (document.getElementById('role-filter') as HTMLSelectElement).value,
+        );
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to update role.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('role-cancel-btn')!.addEventListener('click', () => {
+      document.getElementById('role-modal')!.classList.add('hidden');
+      roleTargetId = null;
+    });
+
+    document.getElementById('deactivate-save-btn')!.addEventListener('click', async () => {
+      if (!deactivateTargetId) return;
+      const reason = (document.getElementById('deactivate-reason') as HTMLInputElement).value.trim();
+      const errEl = document.getElementById('deactivate-error')!;
+
+      if (!reason) {
+        errEl.textContent = 'Reason is required.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      const btn = document.getElementById('deactivate-save-btn') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = 'Deactivating…';
+      errEl.classList.add('hidden');
+
+      const res = await fetch(`/api/v1/hoto/users/${deactivateTargetId}/deactivate`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+
+      btn.disabled = false;
+      btn.textContent = 'Deactivate';
+
+      if (res.ok) {
+        document.getElementById('deactivate-modal')!.classList.add('hidden');
+        deactivateTargetId = null;
+        showToast('Account deactivated.');
+        loadMembers(
+          (document.getElementById('search-input') as HTMLInputElement).value.trim(),
+          (document.getElementById('role-filter') as HTMLSelectElement).value,
+        );
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to deactivate.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('deactivate-cancel-btn')!.addEventListener('click', () => {
+      document.getElementById('deactivate-modal')!.classList.add('hidden');
+      deactivateTargetId = null;
+    });
+
+    // Invite
+    document.getElementById('invite-btn')!.addEventListener('click', () => {
+      (document.getElementById('invite-email') as HTMLInputElement).value = '';
+      (document.getElementById('invite-flat') as HTMLInputElement).value = '';
+      (document.getElementById('invite-role') as HTMLSelectElement).value = 'member';
+      (document.getElementById('invite-title') as HTMLInputElement).value = '';
+      document.getElementById('invite-error')!.classList.add('hidden');
+      document.getElementById('invite-success')!.classList.add('hidden');
+      document.getElementById('invite-modal')!.classList.remove('hidden');
+    });
+
+    document.getElementById('invite-save-btn')!.addEventListener('click', async () => {
+      const email = (document.getElementById('invite-email') as HTMLInputElement).value.trim();
+      const flat = (document.getElementById('invite-flat') as HTMLInputElement).value.trim();
+      const role = (document.getElementById('invite-role') as HTMLSelectElement).value;
+      const title = (document.getElementById('invite-title') as HTMLInputElement).value.trim();
+      const errEl = document.getElementById('invite-error')!;
+      const successEl = document.getElementById('invite-success')!;
+
+      errEl.classList.add('hidden');
+      successEl.classList.add('hidden');
+
+      const btn = document.getElementById('invite-save-btn') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      const res = await fetch('/api/v1/hoto/users/invite', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, flat_number: flat, intended_role: role, committee_title: title || undefined }),
+      });
+
+      btn.disabled = false;
+      btn.textContent = 'Send Invite';
+
+      if (res.ok) {
+        const d = await res.json();
+        const origin = window.location.origin;
+        const inviteUrl = d.token ? `${origin}/portal/join?token=${d.token}` : null;
+        if (inviteUrl) {
+          successEl.innerHTML = `
+            Invite created for <strong>${d.email}</strong>. Share this registration link:<br>
+            <div class="mt-2 flex items-center gap-2">
+              <code class="text-xs bg-gray-100 px-2 py-1 rounded break-all flex-1">${inviteUrl}</code>
+              <button id="copy-invite-url" class="text-xs text-primary-600 hover:text-primary-700 font-medium shrink-0">Copy</button>
+            </div>
+            <div class="text-xs text-text-secondary mt-1">Expires: ${new Date(d.token_expires_at).toLocaleDateString('en-IN')}</div>
+          `;
+          document.getElementById('copy-invite-url')?.addEventListener('click', () => {
+            navigator.clipboard.writeText(inviteUrl).then(() => {
+              const btn = document.getElementById('copy-invite-url');
+              if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); }
+            });
+          });
+        } else {
+          successEl.textContent = `Invite created for ${d.email}. Expires: ${new Date(d.token_expires_at).toLocaleDateString('en-IN')}`;
+        }
+        successEl.classList.remove('hidden');
+        loadInvites();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to send invite.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('invite-cancel-btn')!.addEventListener('click', () => {
+      document.getElementById('invite-modal')!.classList.add('hidden');
+    });
+
+    document.getElementById('search-input')!.addEventListener('input', (e) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const roleF = (document.getElementById('role-filter') as HTMLSelectElement).value;
+        loadMembers((e.target as HTMLInputElement).value.trim(), roleF);
+      }, 350);
+    });
+
+    document.getElementById('role-filter')!.addEventListener('change', (e) => {
+      const q = (document.getElementById('search-input') as HTMLInputElement).value.trim();
+      loadMembers(q, (e.target as HTMLSelectElement).value);
+    });
+
+    // Tab switching
+    document.getElementById('tab-members')?.addEventListener('click', () => {
+      document.getElementById('tab-members')!.className = 'tab-btn px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+      document.getElementById('tab-invites')!.className = 'tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary border-b-2 border-transparent -mb-px';
+      document.getElementById('panel-members')!.classList.remove('hidden');
+      document.getElementById('panel-invites')!.classList.add('hidden');
+    });
+    document.getElementById('tab-invites')?.addEventListener('click', () => {
+      document.getElementById('tab-invites')!.className = 'tab-btn px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+      document.getElementById('tab-members')!.className = 'tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary border-b-2 border-transparent -mb-px';
+      document.getElementById('panel-members')!.classList.add('hidden');
+      document.getElementById('panel-invites')!.classList.remove('hidden');
+      loadInvites();
+    });
+
+    // Pending invites
+    async function loadInvites() {
+      const statusF = (document.getElementById('invite-status-filter') as HTMLSelectElement).value;
+      const params = new URLSearchParams({ limit: '50' });
+      if (statusF) params.set('status', statusF);
+      const res = await fetch(`/api/v1/hoto/users/invites?${params}`, { credentials: 'include' });
+      const el = document.getElementById('invites-list')!;
+      if (!res.ok) { el.innerHTML = '<div class="px-4 py-4 text-sm text-red-600">Failed to load invites.</div>'; return; }
+      const { invites } = await res.json();
+      if (!invites.length) {
+        el.innerHTML = '<div class="px-4 py-6 text-center text-sm text-text-secondary">No invites found.</div>';
+        return;
+      }
+      const STATUS_CLS: Record<string,string> = {
+        PENDING: 'bg-amber-100 text-amber-700', ACCEPTED: 'bg-green-100 text-green-700',
+        EXPIRED: 'bg-gray-100 text-gray-500', CANCELLED: 'bg-red-100 text-red-600',
+      };
+      el.innerHTML = invites.map((inv: any) => `
+        <div class="px-4 py-3 flex items-center gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-text-primary">${inv.email}</div>
+            <div class="text-xs text-text-secondary">${inv.flat_number} · ${inv.intended_role} · Created ${new Date(inv.created_at).toLocaleDateString('en-IN')}</div>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[inv.status] ?? 'bg-gray-100 text-gray-600'}">${inv.status}</span>
+          ${inv.status === 'PENDING' ? `
+            <button class="resend-invite text-xs text-primary-600 hover:text-primary-700 font-medium" data-id="${inv.id}">Resend</button>
+            <button class="cancel-invite text-xs text-red-600 hover:text-red-700 font-medium" data-id="${inv.id}">Cancel</button>
+          ` : ''}
+        </div>
+      `).join('');
+
+      el.querySelectorAll('.resend-invite').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const inviteId = (btn as HTMLElement).dataset.id!;
+          const res = await fetch('/api/v1/hoto/users/invites', {
+            method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invite_id: inviteId }),
+          });
+          if (res.ok) { showToast('Invite resent.'); loadInvites(); }
+          else { const d = await res.json().catch(() => ({})); showToast(d.message ?? 'Failed to resend invite.', false); }
+        });
+      });
+
+      el.querySelectorAll('.cancel-invite').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const inviteId = (btn as HTMLElement).dataset.id!;
+          if (!confirm('Cancel this invite?')) return;
+          const res = await fetch(`/api/v1/hoto/users/invites?invite_id=${inviteId}`, {
+            method: 'DELETE', credentials: 'include',
+          });
+          if (res.ok || res.status === 204) { showToast('Invite cancelled.'); loadInvites(); }
+          else { const d = await res.json().catch(() => ({})); showToast(d.message ?? 'Failed to cancel.', false); }
+        });
+      });
+    }
+
+    document.getElementById('invite-status-filter')?.addEventListener('change', loadInvites);
+
+    (window as any).openRoleModal = openRoleModal;
+    (window as any).openDeactivateModal = openDeactivateModal;
+    loadMembers();
+  </script>
+</PortalLayout>

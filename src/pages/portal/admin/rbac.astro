@@ -1,0 +1,341 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { FEATURES } from '@lib/features';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!user.isAdmin) return Astro.redirect('/portal/admin');
+
+// Group features by module prefix for section headers
+const MODULE_LABELS: Record<string, string> = {
+  users: 'User Management', hoto: 'HOTO', snag: 'Snag List',
+  vendor: 'Vendor Evaluation', finance: 'Finance',
+  notice: 'Notices', admin: 'Admin', audit: 'Audit',
+};
+
+const featuresByModule: Record<string, { key: string; label: string; locked: boolean }[]> = {};
+for (const [key, meta] of Object.entries(FEATURES)) {
+  const mod = key.split('.')[0];
+  if (!featuresByModule[mod]) featuresByModule[mod] = [];
+  featuresByModule[mod].push({ key, label: meta.label, locked: meta.locked });
+}
+---
+
+<PortalLayout title="RBAC Matrix" user={user} activeModule="admin">
+  <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Role-Feature Matrix</h1>
+      <p class="text-sm text-text-secondary mt-1">Toggle which features each role can access. Locked rows (🔒) are byelaw-mandated.</p>
+    </div>
+    <div class="flex gap-2">
+      <button id="save-btn" class="btn-primary text-sm hidden">
+        <i class="fas fa-save mr-1"></i> Save Changes
+      </button>
+      <a href="/portal/admin" class="btn-outline text-sm">Back</a>
+    </div>
+  </div>
+
+  <div id="save-banner" class="hidden mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2">
+    <i class="fas fa-exclamation-triangle"></i>
+    <span id="pending-count">0 unsaved changes</span>
+    <button id="save-btn-2" class="ml-auto btn-primary text-xs py-1.5">Save All</button>
+    <button id="discard-changes-btn" class="btn-outline text-xs py-1.5">Discard</button>
+  </div>
+
+  <div id="matrix-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm border-collapse" id="matrix-table">
+      <thead>
+        <tr class="bg-gray-50 border-b border-border-light">
+          <th class="text-left p-4 text-xs font-medium text-text-secondary min-w-[220px]">Feature</th>
+          {['member','executive','secretary','president'].map(r => (
+            <th class="text-center p-4 text-xs font-medium text-text-secondary w-28 capitalize">{r}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody id="matrix-body">
+        <tr><td colspan="5" class="p-8 text-center text-text-secondary animate-pulse">Loading matrix…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Per-user overrides section -->
+  <div class="mt-10">
+    <h2 class="text-lg font-semibold text-text-primary mb-2">Per-User Permission Overrides</h2>
+    <p class="text-sm text-text-secondary mb-4">Search for a member to view or edit their individual permission exceptions.</p>
+    <div class="flex gap-3">
+      <input type="text" id="override-search" placeholder="Search by name or email…"
+        class="flex-1 max-w-xs px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+      <button id="override-search-btn" class="btn-primary text-sm">Search</button>
+    </div>
+    <div id="override-results" class="mt-3 space-y-2"></div>
+  </div>
+
+  <!-- Override management panel -->
+  <div id="override-panel" class="hidden mt-6 bg-white rounded-2xl border border-border-light overflow-hidden">
+    <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
+      <h3 class="font-semibold text-text-primary" id="override-panel-title">Overrides</h3>
+      <button id="add-override-btn" class="text-xs btn-outline py-1.5">
+        <i class="fas fa-plus mr-1"></i> Add Override
+      </button>
+    </div>
+    <div id="override-list" class="p-5 divide-y divide-border-light"></div>
+  </div>
+
+  <!-- Add override modal -->
+  <div id="add-override-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+      <h2 class="font-semibold text-text-primary text-lg mb-4">Add Permission Override</h2>
+      <div id="override-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Feature <span class="text-red-500">*</span></label>
+          <select id="o-feature" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+            <option value="">Select feature…</option>
+            {Object.entries(FEATURES).map(([key, meta]) => (
+              <option value={key}>{meta.label} ({key})</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Access</label>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="radio" name="o-enabled" value="true" checked class="accent-primary-600" /> Grant access
+            </label>
+            <label class="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="radio" name="o-enabled" value="false" class="accent-primary-600" /> Revoke access
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Reason <span class="text-red-500">*</span></label>
+          <input type="text" id="o-reason" placeholder="e.g. Treasurer role — finance access needed"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Expires (optional)</label>
+          <input type="date" id="o-expires"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button id="override-save-btn" class="btn-primary flex-1">Add Override</button>
+          <button id="override-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ROLES = ['member','executive','secretary','president'];
+    let matrix: Record<string, Record<string, { enabled: boolean; is_locked: boolean }>> = {};
+    let pendingChanges: Array<{ role: string; feature: string; enabled: boolean }> = [];
+    let selectedUserId = '';
+
+    // ── Matrix ──────────────────────────────────────────────────────────────
+    async function loadMatrix() {
+      const res = await fetch('/api/v1/admin/permissions/matrix', { credentials: 'include' });
+      if (!res.ok) { return; }
+      const { matrix: m } = await res.json();
+      matrix = m;
+      renderMatrix();
+    }
+
+    function renderMatrix() {
+      const body = document.getElementById('matrix-body')!;
+      const featureGroups: Record<string, string[]> = {};
+      for (const feat of Object.keys(matrix)) {
+        const mod = feat.split('.')[0];
+        if (!featureGroups[mod]) featureGroups[mod] = [];
+        featureGroups[mod].push(feat);
+      }
+
+      const MODULE_LABELS: Record<string, string> = {
+        users:'User Management', hoto:'HOTO', snag:'Snag List',
+        vendor:'Vendor', finance:'Finance', notice:'Notices', admin:'Admin', audit:'Audit',
+      };
+
+      let html = '';
+      for (const [mod, features] of Object.entries(featureGroups)) {
+        html += `<tr class="bg-gray-50"><td colspan="5" class="px-4 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wide">${MODULE_LABELS[mod] ?? mod}</td></tr>`;
+        for (const feat of features) {
+          const row = matrix[feat] ?? {};
+          html += `<tr class="border-b border-border-light hover:bg-gray-50" data-feature="${feat}">
+            <td class="p-4 text-sm text-text-primary">${feat}</td>
+            ${ROLES.map(role => {
+              const cell = row[role];
+              if (!cell) return `<td class="text-center p-4 text-text-secondary text-xs">—</td>`;
+              if (cell.is_locked) {
+                return `<td class="text-center p-4"><span title="Byelaw-locked">${cell.enabled ? '🔒✅' : '🔒—'}</span></td>`;
+              }
+              const pending = pendingChanges.find(c => c.role === role && c.feature === feat);
+              const effectiveEnabled = pending !== undefined ? pending.enabled : cell.enabled;
+              return `<td class="text-center p-4">
+                <button class="toggle-cell w-6 h-6 rounded-full border-2 transition-all ${effectiveEnabled ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'} ${pending ? 'ring-2 ring-amber-400' : ''}"
+                  data-role="${role}" data-feature="${feat}" data-enabled="${effectiveEnabled}"
+                  title="${effectiveEnabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}">
+                  ${effectiveEnabled ? '<span class="text-white text-xs">✓</span>' : ''}
+                </button>
+              </td>`;
+            }).join('')}
+          </tr>`;
+        }
+      }
+      body.innerHTML = html;
+
+      document.querySelectorAll('.toggle-cell').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const role = (btn as HTMLElement).dataset.role!;
+          const feat = (btn as HTMLElement).dataset.feature!;
+          const cur  = (btn as HTMLElement).dataset.enabled === 'true';
+          const newVal = !cur;
+          const idx = pendingChanges.findIndex(c => c.role === role && c.feature === feat);
+          if (idx >= 0) pendingChanges.splice(idx, 1);
+          const orig = matrix[feat]?.[role]?.enabled ?? false;
+          if (newVal !== orig) {
+            pendingChanges.push({ role, feature: feat, enabled: newVal });
+          }
+          updateSaveBanner();
+          renderMatrix();
+        });
+      });
+    }
+
+    function updateSaveBanner() {
+      const banner = document.getElementById('save-banner')!;
+      const count = pendingChanges.length;
+      if (count > 0) {
+        banner.classList.remove('hidden');
+        document.getElementById('save-btn')!.classList.remove('hidden');
+        document.getElementById('pending-count')!.textContent = `${count} unsaved change${count !== 1 ? 's' : ''}`;
+      } else {
+        banner.classList.add('hidden');
+        document.getElementById('save-btn')!.classList.add('hidden');
+      }
+    }
+
+    async function saveChanges() {
+      if (!pendingChanges.length) return;
+      const errEl = document.getElementById('matrix-error')!;
+      errEl.classList.add('hidden');
+      const res = await fetch('/api/v1/admin/permissions/matrix', {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changes: pendingChanges }),
+      });
+      if (res.ok) {
+        pendingChanges = [];
+        updateSaveBanner();
+        await loadMatrix();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = (d as any).message ?? 'Failed to save changes.';
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    ['save-btn','save-btn-2'].forEach(id => {
+      document.getElementById(id)?.addEventListener('click', saveChanges);
+    });
+
+    document.getElementById('discard-changes-btn')?.addEventListener('click', () => {
+      pendingChanges = [];
+      updateSaveBanner();
+      renderMatrix();
+    });
+
+    // ── Per-user overrides ──────────────────────────────────────────────────
+    document.getElementById('override-search-btn')?.addEventListener('click', async () => {
+      const q = (document.getElementById('override-search') as HTMLInputElement).value.trim();
+      if (!q) return;
+      const res = await fetch(`/api/v1/hoto/users?q=${encodeURIComponent(q)}&limit=10`, { credentials: 'include' });
+      const users = res.ok ? await res.json() : [];
+      const resultsEl = document.getElementById('override-results')!;
+      if (!users.length) { resultsEl.innerHTML = '<div class="text-sm text-text-secondary">No members found.</div>'; return; }
+      resultsEl.innerHTML = users.map((u: any) => `
+        <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-border-light hover:border-primary-600 cursor-pointer select-user-row" data-user-id="${u.id}" data-user-name="${u.full_name}">
+          <div class="flex-1">
+            <div class="text-sm font-medium text-text-primary">${u.full_name}</div>
+            <div class="text-xs text-text-secondary">${u.email} · ${u.portal_role}${u.committee_title ? ` · ${u.committee_title}` : ''}</div>
+          </div>
+          <i class="fas fa-chevron-right text-xs text-text-secondary"></i>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.select-user-row').forEach(row => {
+        row.addEventListener('click', () => loadUserOverrides((row as HTMLElement).dataset.userId!, (row as HTMLElement).dataset.userName!));
+      });
+    });
+
+    async function loadUserOverrides(userId: string, name: string) {
+      selectedUserId = userId;
+      const res = await fetch(`/api/v1/admin/users/${userId}/permission-overrides`, { credentials: 'include' });
+      if (!res.ok) return;
+      const { overrides } = await res.json();
+      document.getElementById('override-panel-title')!.textContent = `Overrides for ${name}`;
+      document.getElementById('override-panel')!.classList.remove('hidden');
+      const list = document.getElementById('override-list')!;
+      if (!overrides.length) {
+        list.innerHTML = '<div class="text-sm text-text-secondary py-2">No overrides set. Role defaults apply.</div>';
+        return;
+      }
+      list.innerHTML = overrides.map((o: any) => `
+        <div class="py-3 flex items-center gap-3">
+          <span class="w-5 h-5 rounded-full flex items-center justify-center text-xs ${o.enabled ? 'bg-green-500 text-white' : 'bg-red-100 text-red-600'}">${o.enabled ? '✓' : '✗'}</span>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-text-primary">${o.feature}</div>
+            <div class="text-xs text-text-secondary">${o.reason}${o.expires_at ? ` · Expires ${new Date(o.expires_at).toLocaleDateString('en-IN')}` : ''}</div>
+          </div>
+          <button class="revoke-override text-xs text-red-600 hover:underline" data-feature="${o.feature}">Revoke</button>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.revoke-override').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const feat = (btn as HTMLElement).dataset.feature!;
+          if (!confirm(`Revoke override for ${feat}?`)) return;
+          const res = await fetch(`/api/v1/admin/users/${selectedUserId}/permission-overrides/${feat}`, {
+            method: 'DELETE', credentials: 'include',
+          });
+          if (res.ok) loadUserOverrides(selectedUserId, name);
+        });
+      });
+    }
+
+    // Add override modal
+    document.getElementById('add-override-btn')?.addEventListener('click', () => {
+      document.getElementById('override-error')!.classList.add('hidden');
+      document.getElementById('add-override-modal')!.classList.remove('hidden');
+    });
+    document.getElementById('override-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('add-override-modal')!.classList.add('hidden');
+    });
+    document.getElementById('override-save-btn')?.addEventListener('click', async () => {
+      const feature = (document.getElementById('o-feature') as HTMLSelectElement).value;
+      const enabled = (document.querySelector('input[name="o-enabled"]:checked') as HTMLInputElement).value === 'true';
+      const reason  = (document.getElementById('o-reason') as HTMLInputElement).value.trim();
+      const expires = (document.getElementById('o-expires') as HTMLInputElement).value;
+      const errEl   = document.getElementById('override-error')!;
+      errEl.classList.add('hidden');
+      if (!feature) { errEl.textContent = 'Feature is required.'; errEl.classList.remove('hidden'); return; }
+      if (!reason)  { errEl.textContent = 'Reason is required.'; errEl.classList.remove('hidden'); return; }
+      const btn = document.getElementById('override-save-btn') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const res = await fetch(`/api/v1/admin/users/${selectedUserId}/permission-overrides`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feature, enabled, reason, expires_at: expires || undefined }),
+      });
+      btn.disabled = false; btn.textContent = 'Add Override';
+      if (res.ok) {
+        document.getElementById('add-override-modal')!.classList.add('hidden');
+        loadUserOverrides(selectedUserId, document.getElementById('override-panel-title')!.textContent!.replace('Overrides for ',''));
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = (d as any).message ?? 'Failed to add override.'; errEl.classList.remove('hidden');
+      }
+    });
+
+    loadMatrix();
+  </script>
+</PortalLayout>

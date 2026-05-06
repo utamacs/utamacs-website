@@ -1,0 +1,339 @@
+export const prerender = false;
+// Master daily cron — replaces all per-feature cron endpoints.
+// Vercel Hobby allows max 2 crons at daily-minimum intervals.
+// This single endpoint runs everything at 07:00 IST (01:30 UTC) daily.
+// Each task is time-boxed: skip and continue on any individual failure.
+import type { APIRoute } from 'astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+import { loadRules, r, RULE } from '@lib/rules';
+import { normalizeError } from '@lib/middleware/errorNormalizer';
+
+const SOCIETY_ID    = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const CRON_SECRET   = import.meta.env.CRON_SECRET;
+const GITHUB_REPO   = import.meta.env.GITHUB_HOTO_REPO ?? '';
+const GITHUB_TOKEN  = import.meta.env.GITHUB_HOTO_TOKEN ?? import.meta.env.GITHUB_LETTERS_TOKEN ?? '';
+const RESEND_API_KEY = import.meta.env.RESEND_API_KEY ?? '';
+const SENDER_NAME   = 'UTA MACS Society';
+const SENDER_EMAIL  = import.meta.env.SOCIETY_SENDER_EMAIL ?? 'no-reply@utamacs.org';
+
+export const GET: APIRoute = async ({ request }) => {
+  const t0 = Date.now();
+  if (CRON_SECRET && request.headers.get('authorization') !== `Bearer ${CRON_SECRET}`) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const sb = getSupabaseServiceClient();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const todayStr = nowIso.slice(0, 10);
+  const results: Record<string, unknown> = {};
+
+  // ── 1. Supabase ping (keep-alive: free tier pauses after 7 days) ──────────
+  try {
+    await sb.from('profiles').select('id', { count: 'exact', head: true });
+    results.supabase_ping = 'OK';
+  } catch { results.supabase_ping = 'ERROR'; }
+
+  // ── 2. GitHub health check + circuit breaker ──────────────────────────────
+  try {
+    results.github_health = await runGitHubHealth(sb, nowIso);
+  } catch (err) {
+    results.github_health = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 3. Upload queue cleanup (mark permanently failed, alert admins) ────────
+  try {
+    results.upload_queue = await runUploadQueueCleanup(sb, nowIso);
+  } catch (err) {
+    results.upload_queue = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 4. Builder SLA escalation (overdue hoto_items) ────────────────────────
+  try {
+    results.sla_escalation = await runSlaEscalation(sb, now, todayStr);
+  } catch (err) {
+    results.sla_escalation = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 5. Weekly digest (Monday only) ────────────────────────────────────────
+  if (now.getDay() === 1) { // 1 = Monday
+    try {
+      results.weekly_digest = await runWeeklyDigest(sb, now, todayStr);
+    } catch (err) {
+      results.weekly_digest = { error: err instanceof Error ? err.message : String(err) };
+    }
+  } else {
+    results.weekly_digest = 'SKIPPED_NOT_MONDAY';
+  }
+
+  // ── 6. Payment reminders (overdue maintenance dues) ───────────────────────
+  try {
+    results.payment_reminders = await runPaymentReminders(sb, todayStr);
+  } catch (err) {
+    results.payment_reminders = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 7. Expire marketplace listings + visitor pre-approvals ────────────────
+  try {
+    const [listings, preapprovals] = await Promise.all([
+      sb.from('marketplace_listings').update({ status: 'expired' })
+        .eq('society_id', SOCIETY_ID).eq('status', 'active').lt('expires_at', nowIso).select('id'),
+      sb.from('visitor_pre_approvals').update({ status: 'expired' })
+        .eq('society_id', SOCIETY_ID).in('status', ['pending', 'approved']).lt('expires_at', nowIso).select('id'),
+    ]);
+    results.expirations = { listings: listings.data?.length ?? 0, preapprovals: preapprovals.data?.length ?? 0 };
+  } catch (err) {
+    results.expirations = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 8. Auto-send Tier 1 email drafts (operational alerts, no manual review needed) ──
+  try {
+    results.auto_send = await runAutoSendTier1(sb);
+  } catch (err) {
+    results.auto_send = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── Write master heartbeat ─────────────────────────────────────────────────
+  try {
+    await sb.from('cron_heartbeats').insert({
+      cron_name: 'master', status: 'OK', items_processed: 1, items_failed: 0,
+      duration_ms: Date.now() - t0, error_message: null,
+    });
+  } catch { /* non-fatal */ }
+
+  return Response.json({ status: 'OK', duration_ms: Date.now() - t0, tasks: results });
+};
+
+// ── Task implementations ────────────────────────────────────────────────────
+
+async function runGitHubHealth(sb: ReturnType<typeof getSupabaseServiceClient>, nowIso: string) {
+  if (!GITHUB_REPO || !GITHUB_TOKEN) return 'SKIPPED_NOT_CONFIGURED';
+
+  const [{ data: cbRow }, { data: failRow }] = await Promise.all([
+    sb.from('system_config').select('value').eq('key', 'github_circuit_breaker').single(),
+    sb.from('system_config').select('value').eq('key', 'github_consecutive_failures').single(),
+  ]);
+  const wasOpen = (cbRow?.value as string) === 'OPEN';
+  const prevFailures = (failRow?.value as number) ?? 0;
+
+  let ok = false;
+  let errMsg = '';
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, {
+      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+      signal: AbortSignal.timeout(5_000),
+    });
+    ok = res.ok;
+    if (!res.ok) errMsg = `HTTP ${res.status}`;
+  } catch (e) { errMsg = e instanceof Error ? e.message.slice(0, 100) : String(e); }
+
+  if (ok) {
+    await Promise.all([
+      sb.from('system_config').update({ value: 0, updated_at: nowIso }).eq('key', 'github_consecutive_failures'),
+      sb.from('system_config').update({ value: 'CLOSED', updated_at: nowIso }).eq('key', 'github_circuit_breaker'),
+    ]);
+    if (wasOpen) await alertCommittee(sb, '[RESOLVED] GitHub storage back online', 'The GitHub document storage circuit breaker has been closed. Uploads will resume on next attempt.');
+    return { circuit: 'CLOSED', was_open: wasOpen };
+  }
+
+  const newFailures = prevFailures + 1;
+  await sb.from('system_config').update({ value: newFailures, updated_at: nowIso }).eq('key', 'github_consecutive_failures');
+  if (newFailures >= 3 && !wasOpen) {
+    await sb.from('system_config').update({ value: 'OPEN', updated_at: nowIso }).eq('key', 'github_circuit_breaker');
+    await alertCommittee(sb, '[ALERT] GitHub document storage unavailable',
+      `GitHub has been unreachable for ${newFailures} consecutive checks. Document uploads are paused. Error: ${errMsg}`);
+  }
+  return { circuit: newFailures >= 3 ? 'OPEN' : 'CLOSED', failures: newFailures, error: errMsg };
+}
+
+async function runUploadQueueCleanup(sb: ReturnType<typeof getSupabaseServiceClient>, nowIso: string) {
+  const { data: items } = await sb
+    .from('upload_queue').select('id, attempts, file_name, target_github_path, item_type, item_id, error_message')
+    .eq('society_id', SOCIETY_ID).in('status', ['PENDING', 'FAILED'])
+    .or(`backoff_until.is.null,backoff_until.lte.${nowIso}`)
+    .order('created_at', { ascending: true }).limit(5);
+
+  let processed = 0;
+  for (const q of items ?? []) {
+    const row = q as any;
+    if ((row.attempts ?? 0) >= 3) {
+      await sb.from('upload_queue').update({ status: 'PERMANENTLY_FAILED', last_attempt_at: nowIso,
+        error_message: 'Max retries exceeded — please re-upload.' }).eq('id', row.id);
+      try {
+        await sb.from('email_drafts').insert({
+          society_id: SOCIETY_ID, tier: 1, triggered_by: 'cron:master:upload-cleanup',
+          trigger_resource_type: 'upload_queue', trigger_resource_id: row.id,
+          recipient_type: 'ADMIN',
+          subject: `[ACTION REQUIRED] Document upload failed permanently: ${row.file_name}`,
+          body_html: `<p>File <strong>${row.file_name}</strong> could not be uploaded after 3 attempts. Please ask the member to re-upload.</p><ul><li>Path: ${row.target_github_path}</li><li>Item: ${row.item_type}/${row.item_id}</li></ul>`,
+          body_text: `Document upload failed permanently: ${row.file_name}\nPath: ${row.target_github_path}\nItem: ${row.item_type}/${row.item_id}\n\nPlease re-upload manually.`,
+          suggested_sender_name: SENDER_NAME, suggested_sender_email: SENDER_EMAIL, status: 'DRAFT',
+        });
+      } catch { /* non-fatal */ }
+      processed++;
+    }
+  }
+  return { processed };
+}
+
+async function runSlaEscalation(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, todayStr: string) {
+  const rules = await loadRules(SOCIETY_ID);
+  const escalationDays = r<number[]>(rules, RULE.HOTO_SLA_ESCALATION_DAYS, [7, 14, 30]);
+  const [d7, d14, d30] = [escalationDays[0] ?? 7, escalationDays[1] ?? 14, escalationDays[2] ?? 30];
+
+  const { data: items } = await sb
+    .from('hoto_items').select('id, title, ascenza_category, builder_sla_date, priority, status')
+    .eq('society_id', SOCIETY_ID).not('builder_sla_date', 'is', null)
+    .not('status', 'in', '("CLOSED","REJECTED")').lt('builder_sla_date', todayStr).limit(5);
+
+  let escalated = 0;
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+
+  for (const item of items ?? []) {
+    const it = item as any;
+    const daysOverdue = Math.floor((today.getTime() - new Date(it.builder_sla_date).getTime()) / 86_400_000);
+    let tier: number, triggerKey: string;
+    if (daysOverdue >= d30) { tier = 3; triggerKey = `sla_${d30}d`; }
+    else if (daysOverdue >= d14) { tier = 2; triggerKey = `sla_${d14}d`; }
+    else if (daysOverdue >= d7) { tier = 2; triggerKey = `sla_${d7}d`; }
+    else continue;
+
+    const { count } = await sb.from('email_drafts').select('id', { count: 'exact', head: true })
+      .eq('triggered_by', `cron:sla-escalation:${triggerKey}`).eq('trigger_resource_id', it.id)
+      .gte('created_at', `${todayStr}T00:00:00.000Z`);
+    if (count && count > 0) continue;
+
+    const subject = tier === 3
+      ? `[URGENT] Builder SLA ${daysOverdue}d overdue — legal notice required: ${it.title}`
+      : `[ESCALATION] Builder SLA ${daysOverdue}d overdue: ${it.title}`;
+    const committee = await getCommitteeEmails(sb);
+    for (const person of committee) {
+      try {
+        await sb.from('email_drafts').insert({
+          society_id: SOCIETY_ID, tier,
+          triggered_by: `cron:sla-escalation:${triggerKey}`,
+          trigger_resource_type: 'hoto_item', trigger_resource_id: it.id,
+          recipient_type: 'COMMITTEE', recipient_email: person.email, recipient_name: person.name,
+          subject,
+          body_html: `<p>HOTO item <strong>${it.title}</strong> (${it.ascenza_category}) has an overdue builder SLA commitment.</p><ul><li>SLA Date: ${it.builder_sla_date}</li><li>Days Overdue: ${daysOverdue}</li><li>Priority: ${it.priority}</li><li>Status: ${it.status}</li></ul>${tier === 3 ? '<p style="color:red"><strong>Consider formal legal notice to the builder.</strong></p>' : ''}`,
+          body_text: `${subject}\n\nSLA Date: ${it.builder_sla_date}\nDays Overdue: ${daysOverdue}\nPriority: ${it.priority}\nStatus: ${it.status}`,
+          suggested_sender_name: SENDER_NAME, suggested_sender_email: SENDER_EMAIL, status: 'DRAFT',
+        });
+      } catch { /* non-fatal */ }
+    }
+    escalated++;
+  }
+  return { escalated };
+}
+
+async function runWeeklyDigest(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, todayStr: string) {
+  const rules = await loadRules(SOCIETY_ID);
+  if (!r<boolean>(rules, RULE.WEEKLY_DIGEST_ENABLED, true)) return 'DISABLED';
+
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+
+  const { count: existing } = await sb.from('email_drafts').select('id', { count: 'exact', head: true })
+    .eq('triggered_by', 'cron:weekly-digest').gte('created_at', monday.toISOString());
+  if (existing && existing > 0) return 'ALREADY_RAN';
+
+  const [{ count: hotoOpen }, { count: snagsOpen }, { count: vendorActive }, { count: pendingUploads }] = await Promise.all([
+    sb.from('hoto_items').select('id', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).not('status', 'in', '("CLOSED","REJECTED")'),
+    sb.from('snag_items').select('id', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).in('status', ['OPEN', 'REOPENED', 'IN_PROGRESS']).eq('deleted', false),
+    sb.from('vendor_requirements').select('id', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).not('status', 'in', '("CANCELLED","CONTRACT_SIGNED")'),
+    sb.from('upload_queue').select('id', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).in('status', ['PENDING', 'FAILED']),
+  ]);
+
+  const weekLabel = `Week of ${monday.toISOString().slice(0, 10)}`;
+  const subject = `HOTO Weekly Digest — ${weekLabel}`;
+  const bodyHtml = `<h2 style="color:#1E3A8A">UTA MACS HOTO — Weekly Status Digest</h2><p>${weekLabel}</p><table border="0" cellpadding="4"><tr><td>HOTO Items (active):</td><td><strong>${hotoOpen ?? 0}</strong></td></tr><tr><td>Snag Items (open/in-progress):</td><td><strong>${snagsOpen ?? 0}</strong></td></tr><tr><td>Vendor Requirements (active):</td><td><strong>${vendorActive ?? 0}</strong></td></tr>${(pendingUploads ?? 0) > 0 ? `<tr><td style="color:#B45309">Pending Uploads:</td><td><strong>${pendingUploads}</strong></td></tr>` : ''}</table><p><a href="https://portal.utamacs.org">View full dashboard →</a></p>`;
+  const bodyText = `HOTO Weekly Digest (${weekLabel})\n\nHOTO active: ${hotoOpen ?? 0}\nSnags open: ${snagsOpen ?? 0}\nVendors active: ${vendorActive ?? 0}${(pendingUploads ?? 0) > 0 ? `\nPending uploads: ${pendingUploads}` : ''}\n\nhttps://portal.utamacs.org`;
+
+  const committee = await getCommitteeEmails(sb);
+  for (const person of committee) {
+    try {
+      await sb.from('email_drafts').insert({
+        society_id: SOCIETY_ID, tier: 2, triggered_by: 'cron:weekly-digest',
+        trigger_resource_type: 'digest', trigger_resource_id: todayStr,
+        recipient_type: 'COMMITTEE', recipient_email: person.email, recipient_name: person.name,
+        subject, body_html: bodyHtml, body_text: bodyText,
+        suggested_sender_name: SENDER_NAME, suggested_sender_email: SENDER_EMAIL, status: 'DRAFT',
+      });
+    } catch { /* non-fatal */ }
+  }
+  return { sent_to: committee.length };
+}
+
+async function runPaymentReminders(sb: ReturnType<typeof getSupabaseServiceClient>, todayStr: string) {
+  const { data: overdue } = await sb.from('maintenance_dues').select('id, user_id, total_amount, due_date')
+    .eq('society_id', SOCIETY_ID).in('status', ['pending', 'partially_paid', 'overdue']).lt('due_date', todayStr).limit(20);
+  if (!overdue?.length) return { reminded: 0 };
+  await sb.from('maintenance_dues').update({ status: 'overdue' })
+    .in('id', overdue.map((d: any) => d.id)).eq('society_id', SOCIETY_ID);
+  try {
+    await sb.from('notifications').insert(overdue.map((d: any) => ({
+      society_id: SOCIETY_ID, user_id: d.user_id,
+      title: 'Maintenance Overdue', type: 'payment',
+      body: `Your maintenance of ₹${Number(d.total_amount).toLocaleString('en-IN')} was due on ${d.due_date}.`,
+      reference_table: 'maintenance_dues', reference_id: d.id, channel: 'in_app', status: 'sent',
+    })));
+  } catch { /* non-fatal */ }
+  return { reminded: overdue.length };
+}
+
+async function runAutoSendTier1(sb: ReturnType<typeof getSupabaseServiceClient>) {
+  // Auto-send Tier 1 drafts (operational alerts) that have a recipient email
+  if (!RESEND_API_KEY) return 'SKIPPED_NO_RESEND_KEY';
+
+  const { data: drafts } = await sb.from('email_drafts').select('id, recipient_email, recipient_name, subject, body_html, body_text, suggested_sender_name, suggested_sender_email')
+    .eq('society_id', SOCIETY_ID).eq('status', 'DRAFT').eq('tier', 1)
+    .not('recipient_email', 'is', null).order('created_at', { ascending: true }).limit(3);
+
+  let sent = 0;
+  for (const draft of drafts ?? []) {
+    const d = draft as any;
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: `${d.suggested_sender_name} <${d.suggested_sender_email}>`, to: [d.recipient_email], subject: d.subject, html: d.body_html, text: d.body_text }),
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (res.ok) {
+        const { id: resendId } = await res.json() as { id?: string };
+        await sb.from('email_drafts').update({ status: 'SENT', sent_at: new Date().toISOString(), resend_message_id: resendId ?? null }).eq('id', d.id);
+        sent++;
+      }
+    } catch { /* skip and retry tomorrow */ }
+  }
+  return { sent };
+}
+
+// ── Shared helpers ───────────────────────────────────────────────────────────
+
+async function getCommitteeEmails(sb: ReturnType<typeof getSupabaseServiceClient>) {
+  const { data: members } = await sb.from('profiles').select('id, full_name')
+    .eq('society_id', SOCIETY_ID).in('portal_role', ['secretary', 'president']).eq('is_active', true);
+  const result: { id: string; name: string; email: string }[] = [];
+  for (const m of members ?? []) {
+    const { data: auth } = await (sb as any).auth.admin.getUserById(m.id);
+    if (auth?.user?.email) result.push({ id: m.id, name: m.full_name, email: auth.user.email });
+  }
+  return result;
+}
+
+async function alertCommittee(sb: ReturnType<typeof getSupabaseServiceClient>, subject: string, body: string) {
+  const committee = await getCommitteeEmails(sb);
+  for (const person of committee) {
+    try {
+      await sb.from('email_drafts').insert({
+        society_id: SOCIETY_ID, tier: 1, triggered_by: 'cron:master:system-alert',
+        trigger_resource_type: 'system_config', trigger_resource_id: 'github_circuit_breaker',
+        recipient_type: 'COMMITTEE', recipient_email: person.email, recipient_name: person.name,
+        subject, body_html: `<p>${body}</p>`, body_text: body,
+        suggested_sender_name: SENDER_NAME, suggested_sender_email: SENDER_EMAIL, status: 'DRAFT',
+      });
+    } catch { /* non-fatal */ }
+  }
+}
