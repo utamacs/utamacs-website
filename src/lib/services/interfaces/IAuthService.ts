@@ -8,7 +8,10 @@ export interface AuthSession {
 export interface UserClaims {
   id: string;
   email: string;
-  role: string;
+  role: string;          // legacy: from user_roles table (existing modules)
+  portalRole: string;    // new: from profiles.portal_role (HOTO platform)
+  committeeTitle: string | null;
+  isAdmin: boolean;
   societyId: string;
 }
 
