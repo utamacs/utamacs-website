@@ -13,6 +13,8 @@ const { title, user, activeModule } = Astro.props;
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
+// ── Module system (DB-backed with hardcoded fallback) ─────────────────────────
+
 const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: string }> = [
   { moduleKey: 'members',          displayName: 'Member Directory',      icon: 'fa-users' },
   { moduleKey: 'complaints',       displayName: 'Complaints',             icon: 'fa-tools' },
@@ -27,44 +29,15 @@ const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: st
   { moduleKey: 'snags',            displayName: 'Snag List',              icon: 'fa-bug' },
   { moduleKey: 'community',        displayName: 'Community Board',        icon: 'fa-comments' },
   { moduleKey: 'documents',        displayName: 'Documents',              icon: 'fa-file-alt' },
-  { moduleKey: 'asset_mgmt',       displayName: 'Asset Management',       icon: 'fa-cogs' },
   { moduleKey: 'parking',          displayName: 'Parking Management',     icon: 'fa-car' },
   { moduleKey: 'agm',              displayName: 'AGM & Governance',       icon: 'fa-landmark' },
   { moduleKey: 'notifications',    displayName: 'Notifications',          icon: 'fa-envelope' },
   { moduleKey: 'analytics',        displayName: 'Analytics & Reports',    icon: 'fa-chart-bar' },
-  { moduleKey: 'compliance',       displayName: 'Compliance & Audit',     icon: 'fa-shield-alt' },
   { moduleKey: 'letters',          displayName: 'Official Letters',        icon: 'fa-envelope-open-text' },
 ];
 
-const roleFilter = (m: { moduleKey: string }) => {
-  if (user.role === 'security_guard') return m.moduleKey === 'visitor_mgmt';
-  if (user.role === 'vendor') return m.moduleKey === 'vendors';
-  // Letters: exec/admin only (legacy role) or committee members (portalRole)
-  if (m.moduleKey === 'letters') {
-    return ['executive', 'admin'].includes(user.role) ||
-           ['executive', 'secretary', 'president'].includes(user.portalRole) ||
-           user.isAdmin;
-  }
-  // HOTO and snags: hide from security guards and vendors (handled above)
-  return true;
-};
-
-// Start with the hardcoded fallback so all built modules always appear.
-// Overlay with DB active modules: if DB has an entry for a key, use its display name/icon;
-// otherwise keep the fallback entry. This way missing or inactive DB seeds never hide modules.
-let modules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = FALLBACK_MODULES;
-try {
-  const dbModules = await featureFlagService.getModules(SOCIETY_ID);
-  if (dbModules.length > 0) {
-    const dbMap = new Map(dbModules.map((m) => [m.moduleKey, m]));
-    modules = FALLBACK_MODULES.map((f) => dbMap.get(f.moduleKey) ?? f);
-  }
-} catch {
-  // keep FALLBACK_MODULES
-}
-modules = modules.filter(roleFilter);
-
 const MODULE_PATHS: Record<string, string> = {
+  members:          '/portal/members',
   complaints:       '/portal/complaints',
   notices:          '/portal/notices',
   events:           '/portal/events',
@@ -77,43 +50,132 @@ const MODULE_PATHS: Record<string, string> = {
   snags:            '/portal/snags',
   community:        '/portal/community',
   documents:        '/portal/documents',
-  asset_mgmt:       '/portal/admin/assets',
   parking:          '/portal/parking',
   agm:              '/portal/agm',
   notifications:    '/portal/notifications',
   analytics:        '/portal/analytics',
-  compliance:       '/portal/admin/audit',
-  members:          '/portal/members',
   letters:          '/portal/letters',
 };
 
-const NAV_GROUPS: Array<{ label: string; keys: string[] }> = [
-  {
-    label: 'Community',
-    keys: ['members', 'complaints', 'notices', 'events', 'polls', 'community', 'documents', 'notifications'],
-  },
-  {
-    label: 'Services',
-    keys: ['finance', 'facility_booking', 'visitor_mgmt', 'parking'],
-  },
-  {
-    label: 'HOTO Platform',
-    keys: ['hoto', 'snags', 'vendors'],
-  },
-  {
-    label: 'Governance',
-    keys: ['agm', 'letters', 'analytics', 'compliance', 'asset_mgmt'],
-  },
-];
+let allModules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = FALLBACK_MODULES;
+try {
+  const dbModules = await featureFlagService.getModules(SOCIETY_ID);
+  if (dbModules.length > 0) {
+    const dbMap = new Map(dbModules.map((m) => [m.moduleKey, m]));
+    allModules = FALLBACK_MODULES.map((f) => dbMap.get(f.moduleKey) ?? f);
+  }
+} catch {
+  // keep FALLBACK_MODULES
+}
+const moduleMap = new Map(allModules.map((m) => [m.moduleKey, m]));
 
-const moduleMap = new Map(modules.map((m) => [m.moduleKey, m]));
+// ── Role helpers ──────────────────────────────────────────────────────────────
 
-const navGroups = NAV_GROUPS
-  .map((g) => ({
-    label: g.label,
-    mods: g.keys.map((k) => moduleMap.get(k)).filter((m) => m != null) as Array<{ moduleKey: string; displayName: string; icon: string | null }>,
-  }))
-  .filter((g) => g.mods.length > 0);
+const isGuard  = user.role === 'security_guard';
+const isVendor = user.role === 'vendor';
+const isPrivileged =
+  ['executive', 'secretary', 'president'].includes(user.portalRole) ||
+  ['executive', 'admin'].includes(user.role) ||
+  user.isAdmin;
+const isHotoAdmin = ['secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+const isAdmin = user.isAdmin;
+const canSeeLetters =
+  ['executive', 'admin'].includes(user.role) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole) ||
+  user.isAdmin;
+
+// ── Nav item builder ──────────────────────────────────────────────────────────
+
+type NavItem = { label: string; href: string; icon: string; activeKey: string };
+
+function modItem(key: string): NavItem | null {
+  const m = moduleMap.get(key);
+  if (!m) return null;
+  return {
+    label: m.displayName,
+    href: MODULE_PATHS[key] ?? `/portal/${key}`,
+    icon: m.icon ?? 'fa-circle',
+    activeKey: key,
+  };
+}
+
+function link(label: string, href: string, icon: string, activeKey: string): NavItem {
+  return { label, href, icon, activeKey };
+}
+
+// ── Build grouped nav ─────────────────────────────────────────────────────────
+
+type NavGroup = { label: string; items: NavItem[] };
+const navGroups: NavGroup[] = [];
+
+if (isGuard) {
+  // Security guards: visitor management only (no groups, flat)
+  const vi = modItem('visitor_mgmt');
+  if (vi) navGroups.push({ label: 'Operations', items: [vi] });
+} else if (isVendor) {
+  // Vendors: their work orders only
+  const vi = modItem('vendors');
+  if (vi) navGroups.push({ label: 'My Work', items: [vi] });
+} else {
+  // ── Community ────────────────────────────────────────────────────────────
+  const communityItems = (
+    ['members','complaints','notices','events','polls','community','documents','notifications'] as const
+  ).map(modItem).filter((x) => x != null) as NavItem[];
+  if (communityItems.length) navGroups.push({ label: 'Community', items: communityItems });
+
+  // ── Services ─────────────────────────────────────────────────────────────
+  const serviceItems = (
+    ['finance','facility_booking','visitor_mgmt','parking'] as const
+  ).map(modItem).filter((x) => x != null) as NavItem[];
+  if (serviceItems.length) navGroups.push({ label: 'Services', items: serviceItems });
+
+  // ── HOTO Platform ─────────────────────────────────────────────────────────
+  const hotoItems: NavItem[] = [];
+  const hotoMod = modItem('hoto');   if (hotoMod)  hotoItems.push(hotoMod);
+  const snagsMod = modItem('snags'); if (snagsMod) hotoItems.push(snagsMod);
+  const vendorsMod = modItem('vendors'); if (vendorsMod) hotoItems.push(vendorsMod);
+  if (isPrivileged) {
+    hotoItems.push(link('HOTO Progress',     '/portal/hoto/progress',              'fa-chart-pie',   'hoto_progress'));
+    hotoItems.push(link('Pending Approvals', '/portal/hoto/pending',               'fa-clock',        'hoto_pending'));
+    hotoItems.push(link('HOTO Finance',      '/portal/hoto/finance',               'fa-coins',        'hoto_finance'));
+    hotoItems.push(link('Board Resolutions', '/portal/hoto/finance/resolutions',   'fa-scroll',       'hoto_resolutions'));
+  }
+  if (hotoItems.length) navGroups.push({ label: 'HOTO Platform', items: hotoItems });
+
+  // ── Governance ────────────────────────────────────────────────────────────
+  const govItems: NavItem[] = [];
+  const agmMod = modItem('agm'); if (agmMod) govItems.push(agmMod);
+  if (canSeeLetters) {
+    const lm = modItem('letters'); if (lm) govItems.push(lm);
+  }
+  if (isPrivileged) {
+    const am = modItem('analytics'); if (am) govItems.push(am);
+  }
+  if (isHotoAdmin) {
+    govItems.push(link('Role Management', '/portal/hoto/admin/users',     'fa-user-cog',  'hoto_roles'));
+    govItems.push(link('Elections',       '/portal/hoto/admin/elections', 'fa-vote-yea',  'hoto_elections'));
+    govItems.push(link('Delegations',     '/portal/hoto/admin/delegation','fa-handshake', 'hoto_delegation'));
+  }
+  if (govItems.length) navGroups.push({ label: 'Governance', items: govItems });
+
+  // ── Administration (admin only) ───────────────────────────────────────────
+  if (isAdmin) {
+    navGroups.push({
+      label: 'Administration',
+      items: [
+        link('Audit Logs',       '/portal/admin/audit',         'fa-shield-alt',       'admin_audit'),
+        link('Asset Management', '/portal/admin/assets',        'fa-cogs',             'admin_assets'),
+        link('Rules Engine',     '/portal/admin/rules',         'fa-sliders-h',        'admin_rules'),
+        link('RBAC & Permissions','/portal/admin/rbac',         'fa-lock',             'admin_rbac'),
+        link('Email Drafts',     '/portal/admin/email-drafts',  'fa-envelope-open-text','admin_email'),
+        link('Feature Config',   '/portal/admin/features',      'fa-toggle-on',        'admin_features'),
+        link('Staff Attendance', '/portal/admin/staff',         'fa-user-clock',       'admin_staff'),
+        link('TDS Tracking',     '/portal/admin/tds',           'fa-file-invoice',     'admin_tds'),
+        link('Consent Mgmt',     '/portal/admin/consent',       'fa-user-shield',      'admin_consent'),
+      ],
+    });
+  }
+}
 ---
 
 <!DOCTYPE html>
@@ -194,24 +256,23 @@ const navGroups = NAV_GROUPS
         </a>
 
         {navGroups.map((group) => (
-          <div class="mb-3">
+          <div class="mb-4">
             <div class="px-3 mb-1 text-xs font-semibold text-text-secondary uppercase tracking-wider">
               {group.label}
             </div>
-            {group.mods.map((mod) => {
-              const href = MODULE_PATHS[mod.moduleKey] ?? `/portal/${mod.moduleKey}`;
-              const isActive = activeModule === mod.moduleKey;
+            {group.items.map((item) => {
+              const isActive = activeModule === item.activeKey;
               return (
                 <a
-                  href={href}
+                  href={item.href}
                   class={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium mb-0.5 transition-colors ${
                     isActive
                       ? 'bg-primary-50 text-primary-600'
                       : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
                   }`}
                 >
-                  {mod.icon && <i class={`fas ${mod.icon} w-4 text-center`} aria-hidden="true"></i>}
-                  {mod.displayName}
+                  <i class={`fas ${item.icon} w-4 text-center`} aria-hidden="true"></i>
+                  {item.label}
                 </a>
               );
             })}

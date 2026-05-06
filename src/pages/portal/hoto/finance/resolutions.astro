@@ -9,7 +9,7 @@ const canView = ['secretary','president'].includes(user.portalRole) || user.isAd
 if (!canView) return Astro.redirect('/portal/hoto/finance');
 ---
 
-<PortalLayout title="Board Resolution Register" user={user} activeModule="hoto">
+<PortalLayout title="Board Resolution Register" user={user} activeModule="hoto_resolutions">
   <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">Board Resolution Register</h1>

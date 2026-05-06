@@ -6,7 +6,7 @@ const user = Astro.locals.user;
 if (!user || !['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal/admin');
 ---
 
-<PortalLayout title="Infrastructure Assets" user={user} activeModule="compliance">
+<PortalLayout title="Infrastructure Assets" user={user} activeModule="admin_assets">
   <div class="mb-6 flex items-center justify-between">
     <div>
       <nav class="text-sm text-text-secondary mb-2">

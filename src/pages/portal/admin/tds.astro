@@ -7,7 +7,7 @@ if (!user) return Astro.redirect('/portal/login');
 if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal');
 ---
 
-<PortalLayout title="TDS Tracking" user={user} activeModule="compliance">
+<PortalLayout title="TDS Tracking" user={user} activeModule="admin_tds">
   <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">TDS Tracking</h1>
