@@ -419,12 +419,15 @@ if (isGuard) {
     (function () {
       const CARD_W = 208; // w-52
       const GAP    = 8;   // gap-2
-      const ARR_W  = 24;  // arrow icon + gap
-      const UNIT   = CARD_W + GAP + ARR_W;
+      const ARR_W  = 14;  // approx font-icon width
+      const UNIT   = CARD_W + GAP + ARR_W + GAP; // ~238px per card+arrow slot
 
       const savedCards = new WeakMap<HTMLElement, HTMLElement[]>();
 
       function buildSnake(container: HTMLElement) {
+        const cRect = container.getBoundingClientRect();
+        if (cRect.width < 10) return; // inside a closed <details> — width is 0, skip
+
         let cards = savedCards.get(container);
         if (!cards) {
           cards = [...container.querySelectorAll<HTMLElement>(':scope > .flex-shrink-0')];
@@ -433,25 +436,38 @@ if (isGuard) {
         }
 
         container.innerHTML = '';
-
-        const w = container.getBoundingClientRect().width || container.offsetWidth || 600;
-        const perRow = Math.max(2, Math.floor((w + GAP) / UNIT));
+        const w = cRect.width;
+        const perRow = Math.max(2, Math.floor((w + GAP + ARR_W) / UNIT));
 
         const rows: HTMLElement[][] = [];
         for (let i = 0; i < cards.length; i += perRow) rows.push(cards.slice(i, i + perRow));
 
+        // prevEndCenterX: center-X (relative to container left) of the turn card from the previous row.
+        // Used to pixel-align each next row's starting card under the turn card above it.
+        let prevEndCenterX = 0;
+
         rows.forEach((rowCards, rowIdx) => {
           const isRTL = rowIdx % 2 === 1;
+          // Reverse display order for RTL rows so steps flow right→left visually
+          const displayCards = isRTL ? [...rowCards].reverse() : rowCards;
 
           const rowEl = document.createElement('div');
-          // flex-row-reverse: items fill from the right edge, so a partial RTL row
-          // (e.g. a single trailing card) stays right-aligned, directly below the
-          // last card of the previous LTR row — correct snake column alignment.
-          rowEl.className = `flex items-center gap-2${isRTL ? ' flex-row-reverse' : ''}`;
+          rowEl.className = 'flex items-center gap-2';
 
-          rowCards.forEach((card, i) => {
+          if (isRTL) {
+            // justify-end + padding-right: the last DOM card (step N+1, rightmost visual)
+            // lands exactly at prevEndCenterX — directly below the last card of the LTR row above.
+            rowEl.style.justifyContent = 'flex-end';
+            rowEl.style.paddingRight = `${Math.max(0, w - prevEndCenterX - CARD_W / 2)}px`;
+          } else if (rowIdx > 0) {
+            // padding-left: the first card of this LTR row starts at prevEndCenterX,
+            // directly below the leftmost card of the RTL row above.
+            rowEl.style.paddingLeft = `${Math.max(0, prevEndCenterX - CARD_W / 2)}px`;
+          }
+
+          displayCards.forEach((card, i) => {
             rowEl.appendChild(card);
-            if (i < rowCards.length - 1) {
+            if (i < displayCards.length - 1) {
               const arr = document.createElement('i');
               arr.className = `fas fa-arrow-${isRTL ? 'left' : 'right'} text-gray-300 text-sm flex-shrink-0`;
               arr.setAttribute('aria-hidden', 'true');
@@ -462,29 +478,52 @@ if (isGuard) {
           container.appendChild(rowEl);
 
           if (rowIdx < rows.length - 1) {
-            // Outer div aligns to the end of this row (right for LTR, left for RTL).
-            // Inner w-52 div matches the card width so the arrow is centred over the card below.
+            // Measure the turn card after it's in the DOM to get its true pixel position.
+            const cLeft = container.getBoundingClientRect().left;
+            const cardEls = [...rowEl.children].filter(
+              el => (el as HTMLElement).tagName === 'DIV'
+            ) as HTMLElement[];
+
+            // LTR: turn card = last DOM card (rightmost visual)
+            // RTL: turn card = first DOM card (leftmost visual, since displayCards is reversed + justify-end)
+            const turnCard = isRTL ? cardEls[0] : cardEls[cardEls.length - 1];
+            const tr = turnCard.getBoundingClientRect();
+            prevEndCenterX = tr.left + tr.width / 2 - cLeft;
+
+            // Down arrow: padding-left positions it precisely at prevEndCenterX
             const turnEl = document.createElement('div');
-            turnEl.className = `flex ${isRTL ? 'justify-start' : 'justify-end'}`;
-            const centreEl = document.createElement('div');
-            centreEl.className = 'w-52 flex justify-center py-1';
+            turnEl.style.cssText = `display:flex; padding-left:${Math.max(0, prevEndCenterX - 7)}px; padding-top:3px; padding-bottom:3px;`;
             const turnArr = document.createElement('i');
             turnArr.className = 'fas fa-arrow-down text-gray-400 text-sm';
             turnArr.setAttribute('aria-hidden', 'true');
-            centreEl.appendChild(turnArr);
-            turnEl.appendChild(centreEl);
+            turnEl.appendChild(turnArr);
             container.appendChild(turnEl);
           }
         });
       }
 
-      const containers = [...document.querySelectorAll<HTMLElement>('.process-snake-flow')];
-      containers.forEach(c => buildSnake(c));
+      // Initial build for any panels already visible on load
+      document.querySelectorAll<HTMLElement>('.process-snake-flow').forEach(c => buildSnake(c));
 
+      // Build when a <details> panel is opened (panels start collapsed by default)
+      document.querySelectorAll('details').forEach(det => {
+        det.addEventListener('toggle', () => {
+          if ((det as HTMLDetailsElement).open) {
+            det.querySelectorAll<HTMLElement>('.process-snake-flow').forEach(c => buildSnake(c));
+          }
+        });
+      });
+
+      // Rebuild open panels on resize
       let resizeTimer: ReturnType<typeof setTimeout>;
       window.addEventListener('resize', () => {
         clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => containers.forEach(c => buildSnake(c)), 250);
+        resizeTimer = setTimeout(() => {
+          document.querySelectorAll<HTMLElement>('.process-snake-flow').forEach(c => {
+            const det = c.closest('details');
+            if (!det || (det as HTMLDetailsElement).open) buildSnake(c);
+          });
+        }, 250);
       });
     })();
   </script>
