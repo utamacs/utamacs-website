@@ -1,0 +1,256 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!user.isAdmin) return Astro.redirect('/portal/admin');
+---
+
+<PortalLayout title="Rules Engine" user={user} activeModule="admin">
+  <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Rules Engine</h1>
+      <p class="text-sm text-text-secondary mt-1">Configurable business logic — changes take effect immediately for new operations.</p>
+    </div>
+    <a href="/portal/admin" class="text-sm text-text-secondary hover:text-primary-600 flex items-center gap-1.5">
+      <i class="fas fa-arrow-left text-xs"></i> Admin Home
+    </a>
+  </div>
+
+  <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-800">
+    <i class="fas fa-lock mr-1.5"></i> <strong>Locked rules</strong> (🔒) are mandated by the byelaws and cannot be changed via the portal. Only unlocked rules can be edited.
+  </div>
+
+  <!-- Category tabs -->
+  <div class="border-b border-border-light mb-6 flex gap-0 overflow-x-auto">
+    {['PARAMETER','APPROVAL','ESCALATION','NOTIFICATION','VALIDATION'].map((cat, i) => (
+      <button class={`tab-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${i === 0 ? 'border-primary-600 text-primary-600' : 'border-transparent text-text-secondary hover:text-text-primary'}`} data-cat={cat}>
+        {cat.charAt(0) + cat.slice(1).toLowerCase().replace('_', ' ')}
+      </button>
+    ))}
+  </div>
+
+  <div id="rules-container">
+    <div class="text-sm text-text-secondary animate-pulse">Loading rules…</div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+      <h2 class="font-semibold text-text-primary text-lg mb-1" id="edit-modal-title">Edit Rule</h2>
+      <p class="text-xs text-text-secondary mb-4" id="edit-modal-desc"></p>
+      <div id="edit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">New Value <span class="text-red-500">*</span></label>
+          <input type="text" id="edit-value"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <div class="text-xs text-text-secondary mt-1" id="edit-value-hint"></div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Reason for change <span class="text-red-500">*</span></label>
+          <textarea id="edit-reason" rows="2" placeholder="Why is this being changed?"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button id="edit-save-btn" class="btn-primary flex-1">Save Change</button>
+          <button id="edit-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset confirm modal -->
+  <div id="reset-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
+      <h2 class="font-semibold text-text-primary text-lg mb-2">Reset to Default</h2>
+      <p class="text-sm text-text-secondary mb-4">This will reset <strong id="reset-rule-label"></strong> to its default value of <code id="reset-default-val" class="text-xs bg-gray-100 px-1 py-0.5 rounded"></code>.</p>
+      <div id="reset-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Reason <span class="text-red-500">*</span></label>
+          <input type="text" id="reset-reason" placeholder="Why resetting?"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div class="flex gap-3">
+          <button id="reset-confirm-btn" class="btn-primary flex-1">Confirm Reset</button>
+          <button id="reset-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allRules: Record<string, unknown[]> = {};
+    let activeCategory = 'PARAMETER';
+    let editingRuleCode = '';
+    let resetRuleCode = '';
+
+    function displayValue(rule: any): string {
+      const v = rule.current_value;
+      if (typeof v === 'object' && v !== null) return JSON.stringify(v);
+      return String(v);
+    }
+
+    function isChanged(rule: any): boolean {
+      return JSON.stringify(rule.current_value) !== JSON.stringify(rule.default_value);
+    }
+
+    async function loadRules() {
+      const res = await fetch('/api/v1/admin/rules', { credentials: 'include' });
+      if (!res.ok) { document.getElementById('rules-container').innerHTML = '<p class="text-red-600 text-sm">Failed to load rules.</p>'; return; }
+      const { grouped } = await res.json();
+      allRules = grouped;
+      renderCategory(activeCategory);
+    }
+
+    function renderCategory(cat: string) {
+      activeCategory = cat;
+      const rules: any[] = (allRules[cat] ?? []) as any[];
+      const container = document.getElementById('rules-container');
+
+      if (!rules.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary py-8 text-center">No rules in this category.</div>';
+        return;
+      }
+
+      container.innerHTML = `<div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-border-light bg-gray-50">
+              <th class="text-left p-4 text-xs font-medium text-text-secondary">Rule</th>
+              <th class="text-left p-4 text-xs font-medium text-text-secondary">Current Value</th>
+              <th class="text-left p-4 text-xs font-medium text-text-secondary">Default</th>
+              <th class="text-right p-4 text-xs font-medium text-text-secondary">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rules.map((rule: any) => `
+              <tr class="border-b border-border-light last:border-0 hover:bg-gray-50" data-rule="${rule.rule_code}">
+                <td class="p-4">
+                  <div class="flex items-center gap-2">
+                    ${rule.is_locked ? '<i class="fas fa-lock text-xs text-text-secondary" title="Byelaw-locked"></i>' : ''}
+                    <div>
+                      <div class="font-medium text-text-primary">${rule.label}</div>
+                      <div class="text-xs text-text-secondary mt-0.5">${rule.rule_code}${rule.byelaw_reference ? ` · ${rule.byelaw_reference}` : ''}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="p-4">
+                  <code class="text-xs bg-gray-100 px-2 py-1 rounded ${isChanged(rule) ? 'text-amber-700 bg-amber-50' : ''}">${displayValue(rule)}</code>
+                  ${isChanged(rule) ? '<span class="ml-1 text-xs text-amber-600">modified</span>' : ''}
+                </td>
+                <td class="p-4 text-xs text-text-secondary">
+                  <code class="bg-gray-50 px-1.5 py-0.5 rounded">${JSON.stringify(rule.default_value)}</code>
+                </td>
+                <td class="p-4 text-right">
+                  ${rule.is_locked ? '<span class="text-xs text-text-secondary">Locked</span>' : `
+                    <button class="edit-btn text-xs text-primary-600 hover:underline mr-3" data-code="${rule.rule_code}" data-label="${rule.label}" data-value='${JSON.stringify(rule.current_value)}' data-type="${rule.value_type}" data-desc="${rule.description ?? ''}">Edit</button>
+                    ${isChanged(rule) ? `<button class="reset-btn text-xs text-text-secondary hover:text-red-600" data-code="${rule.rule_code}" data-label="${rule.label}" data-default='${JSON.stringify(rule.default_value)}'>Reset</button>` : ''}
+                  `}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+      // Wire edit buttons
+      document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          editingRuleCode = (btn as HTMLElement).dataset.code!;
+          document.getElementById('edit-modal-title')!.textContent = `Edit: ${(btn as HTMLElement).dataset.label}`;
+          document.getElementById('edit-modal-desc')!.textContent = (btn as HTMLElement).dataset.desc ?? '';
+          (document.getElementById('edit-value') as HTMLInputElement).value = (btn as HTMLElement).dataset.value ?? '';
+          document.getElementById('edit-value-hint')!.textContent = `Type: ${(btn as HTMLElement).dataset.type}`;
+          document.getElementById('edit-error')!.classList.add('hidden');
+          (document.getElementById('edit-reason') as HTMLTextAreaElement).value = '';
+          document.getElementById('edit-modal')!.classList.remove('hidden');
+        });
+      });
+
+      // Wire reset buttons
+      document.querySelectorAll('.reset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          resetRuleCode = (btn as HTMLElement).dataset.code!;
+          document.getElementById('reset-rule-label')!.textContent = (btn as HTMLElement).dataset.label ?? resetRuleCode;
+          document.getElementById('reset-default-val')!.textContent = (btn as HTMLElement).dataset.default ?? '';
+          (document.getElementById('reset-reason') as HTMLInputElement).value = '';
+          document.getElementById('reset-error')!.classList.add('hidden');
+          document.getElementById('reset-modal')!.classList.remove('hidden');
+        });
+      });
+    }
+
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.remove('border-primary-600','text-primary-600');
+          b.classList.add('border-transparent','text-text-secondary');
+        });
+        btn.classList.add('border-primary-600','text-primary-600');
+        btn.classList.remove('border-transparent','text-text-secondary');
+        renderCategory((btn as HTMLElement).dataset.cat!);
+      });
+    });
+
+    // Edit modal
+    document.getElementById('edit-cancel-btn')!.addEventListener('click', () => {
+      document.getElementById('edit-modal')!.classList.add('hidden');
+    });
+    document.getElementById('edit-save-btn')!.addEventListener('click', async () => {
+      const rawValue = (document.getElementById('edit-value') as HTMLInputElement).value.trim();
+      const reason = (document.getElementById('edit-reason') as HTMLTextAreaElement).value.trim();
+      const errEl = document.getElementById('edit-error')!;
+      errEl.classList.add('hidden');
+      if (!rawValue) { errEl.textContent = 'Value is required.'; errEl.classList.remove('hidden'); return; }
+      if (!reason) { errEl.textContent = 'Reason is required.'; errEl.classList.remove('hidden'); return; }
+
+      let parsedValue: unknown;
+      try { parsedValue = JSON.parse(rawValue); } catch { parsedValue = rawValue; }
+
+      const btn = document.getElementById('edit-save-btn') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const res = await fetch(`/api/v1/admin/rules/${editingRuleCode}`, {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_value: parsedValue, change_reason: reason }),
+      });
+      btn.disabled = false; btn.textContent = 'Save Change';
+      if (res.ok) {
+        document.getElementById('edit-modal')!.classList.add('hidden');
+        await loadRules();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = (d as any).message ?? 'Failed to save.'; errEl.classList.remove('hidden');
+      }
+    });
+
+    // Reset modal
+    document.getElementById('reset-cancel-btn')!.addEventListener('click', () => {
+      document.getElementById('reset-modal')!.classList.add('hidden');
+    });
+    document.getElementById('reset-confirm-btn')!.addEventListener('click', async () => {
+      const reason = (document.getElementById('reset-reason') as HTMLInputElement).value.trim();
+      const errEl = document.getElementById('reset-error')!;
+      if (!reason) { errEl.textContent = 'Reason is required.'; errEl.classList.remove('hidden'); return; }
+      const btn = document.getElementById('reset-confirm-btn') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Resetting…';
+      const res = await fetch(`/api/v1/admin/rules/${resetRuleCode}/reset`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ change_reason: reason }),
+      });
+      btn.disabled = false; btn.textContent = 'Confirm Reset';
+      if (res.ok) {
+        document.getElementById('reset-modal')!.classList.add('hidden');
+        await loadRules();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = (d as any).message ?? 'Failed to reset.'; errEl.classList.remove('hidden');
+      }
+    });
+
+    loadRules();
+  </script>
+</PortalLayout>
