@@ -4,8 +4,6 @@
 -- Design: design/HOTO-VENDOR-PLATFORM-DESIGN.md v4.1
 --
 
--- pgcrypto required for gen_random_bytes() used in member_invites.token
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- TABLE NAMING NOTES (conflicts with existing migrations avoided):
 --   governance_files    ← was "documents" in design (existing `documents` = community doc library)
 --   vendor_candidates   ← was "vendors"   in design (existing `vendors` = maintenance contractors)
@@ -87,7 +85,7 @@ CREATE TABLE IF NOT EXISTS member_invites (
   flat_number      TEXT,
   intended_role    TEXT NOT NULL DEFAULT 'member',
   invited_by       UUID NOT NULL REFERENCES profiles(id),
-  token            TEXT UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(32), 'hex'),
+  token            TEXT UNIQUE NOT NULL DEFAULT replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''),
   token_expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '7 days',
   accepted         BOOLEAN NOT NULL DEFAULT false,
   accepted_at      TIMESTAMPTZ,
