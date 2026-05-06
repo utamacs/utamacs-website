@@ -21,6 +21,8 @@ ALTER TABLE post_comments
 
 -- audit_logs.user_id → profiles(id)  (was unkeyed uuid)
 ALTER TABLE audit_logs
+  DROP CONSTRAINT IF EXISTS audit_logs_user_id_fkey;
+ALTER TABLE audit_logs
   ADD CONSTRAINT audit_logs_user_id_fkey
       FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE SET NULL
       NOT VALID;                       -- skips row-level validation on existing rows
