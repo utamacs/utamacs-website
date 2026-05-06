@@ -414,6 +414,72 @@ if (isGuard) {
 
     document.getElementById('collapse-all-btn')?.addEventListener('click', () => setAllGroups(true));
     document.getElementById('expand-all-btn')?.addEventListener('click', () => setAllGroups(false));
+
+    // Snake process-flow layout
+    (function () {
+      const CARD_W = 208; // w-52
+      const GAP    = 8;   // gap-2
+      const ARR_W  = 24;  // arrow icon + gap
+      const UNIT   = CARD_W + GAP + ARR_W;
+
+      const savedCards = new WeakMap<HTMLElement, HTMLElement[]>();
+
+      function buildSnake(container: HTMLElement) {
+        let cards = savedCards.get(container);
+        if (!cards) {
+          cards = [...container.querySelectorAll<HTMLElement>(':scope > .flex-shrink-0')];
+          if (cards.length < 2) return;
+          savedCards.set(container, cards);
+        }
+
+        container.innerHTML = '';
+
+        const w = container.getBoundingClientRect().width || container.offsetWidth || 600;
+        const perRow = Math.max(2, Math.floor((w + GAP) / UNIT));
+
+        const rows: HTMLElement[][] = [];
+        for (let i = 0; i < cards.length; i += perRow) rows.push(cards.slice(i, i + perRow));
+
+        rows.forEach((rowCards, rowIdx) => {
+          const isRTL = rowIdx % 2 === 1;
+          const display = isRTL ? [...rowCards].reverse() : rowCards;
+
+          const rowEl = document.createElement('div');
+          rowEl.className = 'flex items-center gap-2';
+
+          display.forEach((card, i) => {
+            rowEl.appendChild(card);
+            if (i < display.length - 1) {
+              const arr = document.createElement('i');
+              arr.className = `fas fa-arrow-${isRTL ? 'left' : 'right'} text-gray-300 text-sm flex-shrink-0`;
+              arr.setAttribute('aria-hidden', 'true');
+              rowEl.appendChild(arr);
+            }
+          });
+
+          container.appendChild(rowEl);
+
+          if (rowIdx < rows.length - 1) {
+            const turnEl = document.createElement('div');
+            turnEl.className = `flex items-center py-0.5 ${isRTL ? 'justify-start' : 'justify-end'}`;
+            const turnArr = document.createElement('i');
+            turnArr.className = `fas fa-arrow-down text-gray-400 text-sm`;
+            turnArr.setAttribute('aria-hidden', 'true');
+            turnEl.appendChild(turnArr);
+            container.appendChild(turnEl);
+          }
+        });
+      }
+
+      const containers = [...document.querySelectorAll<HTMLElement>('.process-snake-flow')];
+      containers.forEach(c => buildSnake(c));
+
+      let resizeTimer: ReturnType<typeof setTimeout>;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => containers.forEach(c => buildSnake(c)), 250);
+      });
+    })();
   </script>
 </body>
 </html>
