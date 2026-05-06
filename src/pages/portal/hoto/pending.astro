@@ -93,8 +93,9 @@ const myPendingStatuses = isAdmin
           ${items.map(item => {
             const overdue = item.builder_sla_date && item.builder_sla_date < new Date().toISOString().slice(0,10);
             const prioStyle = PRIORITY_COLOR[item.priority] ?? 'text-gray-600 bg-gray-50';
-            const daysSince = item.last_updated_at
-              ? Math.floor((Date.now() - new Date(item.last_updated_at).getTime()) / 86_400_000)
+            const waitingSince = item.status_changed_at ?? item.last_updated_at;
+            const daysSince = waitingSince
+              ? Math.floor((Date.now() - new Date(waitingSince).getTime()) / 86_400_000)
               : null;
             return `
               <a href="/portal/hoto/${item.id}" class="block bg-white rounded-2xl border border-border-light hover:border-primary-600 hover:shadow-medium transition-all p-5">

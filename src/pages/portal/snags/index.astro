@@ -65,7 +65,7 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
     </select>
     <select id="category-filter" class="px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
       <option value="">All categories</option>
-      {['Civil & Structural','Seepage / Water','Electrical','Plumbing','Flooring','Painting','Exterior & Facade','Common Area','Lift & Elevator','Other'].map(c => <option value={c}>{c}</option>)}
+      {['Civil & Structural','Seepage / Water','Electrical','Electrical - HT Infrastructure','Plumbing','Flooring','Painting','Exterior & Facade','Common Area','Lift & Elevator','Fire Safety','Other'].map(c => <option value={c}>{c}</option>)}
     </select>
   </div>
 
@@ -95,7 +95,7 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
               <label class="block text-sm font-medium text-text-primary mb-1.5">Category <span class="text-red-500">*</span></label>
               <select id="new-category" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
                 <option value="">Select…</option>
-                {['Civil & Structural','Seepage / Water','Electrical','Plumbing','Flooring','Painting','Exterior & Facade','Common Area','Lift & Elevator','Other'].map(c => <option value={c}>{c}</option>)}
+                {['Civil & Structural','Seepage / Water','Electrical','Electrical - HT Infrastructure','Plumbing','Flooring','Painting','Exterior & Facade','Common Area','Lift & Elevator','Fire Safety','Other'].map(c => <option value={c}>{c}</option>)}
               </select>
             </div>
             <div>
@@ -202,10 +202,12 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
               <div class="flex items-center gap-2 flex-wrap mb-1">
                 <span class="text-xs px-2 py-0.5 rounded-full font-medium ${SEVERITY_CLS[item.severity] ?? 'bg-gray-100 text-gray-500'}">${item.severity}</span>
                 <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[item.status] ?? 'bg-gray-100 text-gray-600'}">${STATUS_LABEL[item.status] ?? item.status}</span>
+                ${item.snag_source === 'EXTERNAL_AUDIT' ? '<span class="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">Audit</span>' : ''}
                 <span class="text-xs text-text-secondary">${item.snag_scope === 'APARTMENT' ? (item.flat_number ?? 'Apt') : 'Common'}</span>
               </div>
-              <div class="font-medium text-text-primary text-sm">${item.description.slice(0, 100)}${item.description.length > 100 ? '…' : ''}</div>
-              <div class="text-xs text-text-secondary mt-0.5">${item.category}${item.location ? ` · ${item.location}` : ''}</div>
+              <div class="font-medium text-text-primary text-sm">${item.description.slice(0, 120)}${item.description.length > 120 ? '…' : ''}</div>
+              <div class="text-xs text-text-secondary mt-0.5">${item.category}${item.subcategory ? ` › ${item.subcategory}` : ''}${item.location ? ` · ${item.location}` : ''}${item.audit_ref_no ? ` · Ref #${item.audit_ref_no}` : ''}</div>
+              ${item.equipment_machinery ? `<div class="text-xs text-text-secondary mt-0.5"><i class="fas fa-cog text-xs mr-1"></i>${item.equipment_machinery}</div>` : ''}
             </div>
             <i class="fas fa-chevron-right text-text-secondary text-xs flex-shrink-0 mt-1" aria-hidden="true"></i>
           </div>

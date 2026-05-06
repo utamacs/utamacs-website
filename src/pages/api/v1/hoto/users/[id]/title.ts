@@ -7,6 +7,13 @@ import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
+const VALID_TITLES = [
+  'President', 'Vice President',
+  'General Secretary', 'Joint Secretary',
+  'Treasurer', 'Joint Treasurer',
+  'Executive Member',
+] as const;
+
 // PATCH — update only a member's committee_title (no role change, no feature overrides)
 // Auth: admin required
 // Body: { committee_title }
@@ -32,6 +39,13 @@ export const PATCH: APIRoute = async ({ request, params }) => {
     const newTitle = typeof body.committee_title === 'string'
       ? (body.committee_title.trim() || null)
       : null;
+
+    if (newTitle && !VALID_TITLES.includes(newTitle as typeof VALID_TITLES[number])) {
+      return Response.json(
+        { error: 'VALIDATION_ERROR', message: `committee_title must be one of: ${VALID_TITLES.join(', ')} (or blank)` },
+        { status: 400 },
+      );
+    }
 
     const sb = getSupabaseServiceClient();
 
