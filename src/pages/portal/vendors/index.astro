@@ -5,7 +5,9 @@ import PortalLayout from '@portal/PortalLayout.astro';
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
 
-const isExec = ['executive', 'admin'].includes(user.role);
+const isExec = ['executive', 'admin'].includes(user.role) ||
+               ['executive', 'secretary', 'president'].includes(user.portalRole) ||
+               user.isAdmin;
 const isVendor = user.role === 'vendor';
 if (!isExec && !isVendor) return Astro.redirect('/portal');
 ---

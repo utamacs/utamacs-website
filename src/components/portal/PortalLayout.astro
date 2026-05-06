@@ -23,6 +23,8 @@ const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: st
   { moduleKey: 'facility_booking', displayName: 'Facility Booking',       icon: 'fa-building' },
   { moduleKey: 'visitor_mgmt',     displayName: 'Visitor Management',     icon: 'fa-id-badge' },
   { moduleKey: 'vendors',          displayName: 'Vendors & Work Orders',  icon: 'fa-hard-hat' },
+  { moduleKey: 'hoto',             displayName: 'HOTO Tracker',           icon: 'fa-tasks' },
+  { moduleKey: 'snags',            displayName: 'Snag List',              icon: 'fa-bug' },
   { moduleKey: 'community',        displayName: 'Community Board',        icon: 'fa-comments' },
   { moduleKey: 'documents',        displayName: 'Documents',              icon: 'fa-file-alt' },
   { moduleKey: 'asset_mgmt',       displayName: 'Asset Management',       icon: 'fa-cogs' },
@@ -37,8 +39,13 @@ const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: st
 const roleFilter = (m: { moduleKey: string }) => {
   if (user.role === 'security_guard') return m.moduleKey === 'visitor_mgmt';
   if (user.role === 'vendor') return m.moduleKey === 'vendors';
-  // Letters module is exec/admin only — not visible to regular members
-  if (m.moduleKey === 'letters') return ['executive', 'admin'].includes(user.role);
+  // Letters: exec/admin only (legacy role) or committee members (portalRole)
+  if (m.moduleKey === 'letters') {
+    return ['executive', 'admin'].includes(user.role) ||
+           ['executive', 'secretary', 'president'].includes(user.portalRole) ||
+           user.isAdmin;
+  }
+  // HOTO and snags: hide from security guards and vendors (handled above)
   return true;
 };
 
@@ -58,25 +65,48 @@ try {
 modules = modules.filter(roleFilter);
 
 const MODULE_PATHS: Record<string, string> = {
-  complaints: '/portal/complaints',
-  notices: '/portal/notices',
-  events: '/portal/events',
-  polls: '/portal/polls',
-  finance: '/portal/finance',
+  complaints:       '/portal/complaints',
+  notices:          '/portal/notices',
+  events:           '/portal/events',
+  polls:            '/portal/polls',
+  finance:          '/portal/finance',
   facility_booking: '/portal/facilities',
-  visitor_mgmt: '/portal/visitors',
-  vendors: '/portal/vendors',
-  community: '/portal/community',
-  documents: '/portal/documents',
-  asset_mgmt: '/portal/admin/assets',
-  parking: '/portal/parking',
-  agm: '/portal/agm',
-  notifications: '/portal/notifications',
-  analytics: '/portal/analytics',
-  compliance: '/portal/admin/audit',
-  members: '/portal/members',
-  letters: '/portal/letters',
+  visitor_mgmt:     '/portal/visitors',
+  vendors:          '/portal/vendors',
+  hoto:             '/portal/hoto',
+  snags:            '/portal/snags',
+  community:        '/portal/community',
+  documents:        '/portal/documents',
+  asset_mgmt:       '/portal/admin/assets',
+  parking:          '/portal/parking',
+  agm:              '/portal/agm',
+  notifications:    '/portal/notifications',
+  analytics:        '/portal/analytics',
+  compliance:       '/portal/admin/audit',
+  members:          '/portal/members',
+  letters:          '/portal/letters',
 };
+
+const NAV_GROUPS: Array<{ label: string; keys: string[] }> = [
+  {
+    label: 'Community',
+    keys: ['members', 'complaints', 'notices', 'events', 'polls', 'community', 'documents', 'notifications'],
+  },
+  {
+    label: 'Services',
+    keys: ['finance', 'facility_booking', 'visitor_mgmt', 'parking'],
+  },
+  {
+    label: 'HOTO Platform',
+    keys: ['hoto', 'snags', 'vendors'],
+  },
+  {
+    label: 'Governance',
+    keys: ['agm', 'letters', 'analytics', 'compliance', 'asset_mgmt'],
+  },
+];
+
+const moduleMap = new Map(modules.map((m) => [m.moduleKey, m]));
 ---
 
 <!DOCTYPE html>
@@ -136,16 +166,17 @@ const MODULE_PATHS: Record<string, string> = {
           </div>
           <div class="min-w-0">
             <div class="text-sm font-medium text-text-primary truncate">{user.email}</div>
-            <div class="text-xs text-text-secondary capitalize">{user.role.replace('_', ' ')}</div>
+            <div class="text-xs text-text-secondary capitalize">{user.committeeTitle ?? user.role.replace('_', ' ')}</div>
           </div>
         </div>
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 overflow-y-auto py-4 px-3" aria-label="Module navigation">
+      <nav class="flex-1 overflow-y-auto py-3 px-3" aria-label="Module navigation">
+        <!-- Dashboard -->
         <a
           href="/portal"
-          class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-colors ${
+          class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-3 transition-colors ${
             activeModule === 'dashboard'
               ? 'bg-primary-50 text-primary-600'
               : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
@@ -155,21 +186,34 @@ const MODULE_PATHS: Record<string, string> = {
           Dashboard
         </a>
 
-        {modules.map((mod) => {
-          const href = MODULE_PATHS[mod.moduleKey] ?? `/portal/${mod.moduleKey}`;
-          const isActive = activeModule === mod.moduleKey;
+        {NAV_GROUPS.map((group) => {
+          const groupMods = group.keys
+            .map((k) => moduleMap.get(k))
+            .filter((m): m is NonNullable<typeof m> => m !== undefined);
+          if (!groupMods.length) return null;
           return (
-            <a
-              href={href}
-              class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-colors ${
-                isActive
-                  ? 'bg-primary-50 text-primary-600'
-                  : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
-              }`}
-            >
-              {mod.icon && <i class={`fas ${mod.icon} w-4 text-center`} aria-hidden="true"></i>}
-              {mod.displayName}
-            </a>
+            <div class="mb-3">
+              <div class="px-3 mb-1 text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                {group.label}
+              </div>
+              {groupMods.map((mod) => {
+                const href = MODULE_PATHS[mod.moduleKey] ?? `/portal/${mod.moduleKey}`;
+                const isActive = activeModule === mod.moduleKey;
+                return (
+                  <a
+                    href={href}
+                    class={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium mb-0.5 transition-colors ${
+                      isActive
+                        ? 'bg-primary-50 text-primary-600'
+                        : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
+                    }`}
+                  >
+                    {mod.icon && <i class={`fas ${mod.icon} w-4 text-center`} aria-hidden="true"></i>}
+                    {mod.displayName}
+                  </a>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
