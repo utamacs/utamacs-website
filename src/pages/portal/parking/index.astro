@@ -9,6 +9,67 @@ const isExec = ['executive', 'admin'].includes(user.role);
 ---
 
 <PortalLayout title="Parking Management" user={user} activeModule="parking">
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Parking slots are tracked per flat — open slots, guest parking, and vehicle-slot assignments are managed here.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <svg viewBox="0 0 560 90" class="w-full" role="img" aria-label="Parking flow: Slot Request → Review → Assigned → Released">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+            </marker>
+          </defs>
+          <!-- Step 1: Slot Request -->
+          <rect x="10" y="20" width="125" height="55" rx="8" fill="#dbeafe" stroke="#1E3A8A" stroke-width="1.5"/>
+          <text x="72" y="43" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Slot Request</text>
+          <text x="72" y="59" text-anchor="middle" font-size="9" fill="#1e40af">Member applies</text>
+          <!-- Arrow -->
+          <line x1="136" y1="47" x2="153" y2="47" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 2: Review -->
+          <rect x="155" y="20" width="125" height="55" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+          <text x="217" y="43" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Review</text>
+          <text x="217" y="59" text-anchor="middle" font-size="9" fill="#92400e">Availability checked</text>
+          <!-- Arrow -->
+          <line x1="281" y1="47" x2="298" y2="47" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 3: Assigned -->
+          <rect x="300" y="20" width="125" height="55" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
+          <text x="362" y="43" text-anchor="middle" font-size="11" font-weight="600" fill="#065f46">Assigned</text>
+          <text x="362" y="59" text-anchor="middle" font-size="9" fill="#065f46">Slot confirmed</text>
+          <!-- Arrow -->
+          <line x1="426" y1="47" x2="443" y2="47" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 4: Released -->
+          <rect x="445" y="20" width="105" height="55" rx="8" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.5"/>
+          <text x="497" y="43" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Released</text>
+          <text x="497" y="59" text-anchor="middle" font-size="9" fill="#6b7280">Slot freed / transferred</text>
+        </svg>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Each flat is entitled to one covered parking slot per its allotment agreement</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Guest parking slots are managed separately and cannot be permanently assigned</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Slot disputes are escalated to the Secretary for resolution</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">Parking Management</h1>

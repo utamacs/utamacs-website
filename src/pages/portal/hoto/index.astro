@@ -11,6 +11,83 @@ const isAdmin = user.isAdmin;
 ---
 
 <PortalLayout title="HOTO Tracker" user={user} activeModule="hoto">
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Each HOTO item tracks a builder handover commitment through a dual sign-off process before it can be marked complete.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <svg viewBox="0 0 800 90" class="w-full" role="img" aria-label="HOTO item lifecycle: Open → Docs Pending → Secretary Review → President Review → Approved → Closed">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+            </marker>
+          </defs>
+          <!-- Step 1: Open -->
+          <rect x="10" y="15" width="110" height="60" rx="8" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+          <text x="65" y="41" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Open</text>
+          <text x="65" y="56" text-anchor="middle" font-size="9" fill="#6b7280">Item raised</text>
+          <!-- Arrow 1 -->
+          <line x1="121" y1="45" x2="138" y2="45" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 2: Docs Pending -->
+          <rect x="140" y="15" width="110" height="60" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+          <text x="195" y="41" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Docs Pending</text>
+          <text x="195" y="56" text-anchor="middle" font-size="9" fill="#92400e">Evidence required</text>
+          <!-- Arrow 2 -->
+          <line x1="251" y1="45" x2="268" y2="45" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 3: Sec Review -->
+          <rect x="270" y="15" width="110" height="60" rx="8" fill="#dbeafe" stroke="#1E3A8A" stroke-width="1.5"/>
+          <text x="325" y="41" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Sec. Review</text>
+          <text x="325" y="56" text-anchor="middle" font-size="9" fill="#1e40af">Secretary verifies</text>
+          <!-- Arrow 3 -->
+          <line x1="381" y1="45" x2="398" y2="45" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 4: Pres Review -->
+          <rect x="400" y="15" width="110" height="60" rx="8" fill="#dbeafe" stroke="#1E3A8A" stroke-width="1.5"/>
+          <text x="455" y="41" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Pres. Review</text>
+          <text x="455" y="56" text-anchor="middle" font-size="9" fill="#1e40af">President sign-off</text>
+          <!-- Arrow 4 -->
+          <line x1="511" y1="45" x2="528" y2="45" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 5: Approved -->
+          <rect x="530" y="15" width="110" height="60" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
+          <text x="585" y="41" text-anchor="middle" font-size="11" font-weight="600" fill="#065f46">Approved</text>
+          <text x="585" y="56" text-anchor="middle" font-size="9" fill="#065f46">Dual sign-off done</text>
+          <!-- Arrow 5 -->
+          <line x1="641" y1="45" x2="658" y2="45" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 6: Closed -->
+          <rect x="660" y="15" width="110" height="60" rx="8" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.5"/>
+          <text x="715" y="41" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Closed</text>
+          <text x="715" y="56" text-anchor="middle" font-size="9" fill="#6b7280">Handover complete</text>
+        </svg>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Both Secretary and President must independently approve before an item closes</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Items can be sent back to 'Docs Pending' if evidence is incomplete</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>RERA-eligible items trigger escalation alerts if the builder SLA is breached</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Critical priority items appear in the Pending Approvals queue immediately</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">HOTO Tracker</h1>

@@ -9,6 +9,77 @@ const isExec = ['executive', 'admin'].includes(user.role);
 ---
 
 <PortalLayout title="Finance & Dues" user={user} activeModule="finance">
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Maintenance billing runs in monthly periods — dues are raised, members pay, and overdue accounts are tracked for follow-up.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <svg viewBox="0 0 680 90" class="w-full" role="img" aria-label="Finance billing flow: Period Created → Dues Raised → Payments Received → Overdue Flagged → Period Closed">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+            </marker>
+          </defs>
+          <!-- Step 1: Period Created -->
+          <rect x="10" y="15" width="120" height="55" rx="8" fill="#dbeafe" stroke="#1E3A8A" stroke-width="1.5"/>
+          <text x="70" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Period Created</text>
+          <text x="70" y="54" text-anchor="middle" font-size="9" fill="#1e40af">Monthly cycle opens</text>
+          <!-- Arrow -->
+          <line x1="131" y1="42" x2="148" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 2: Dues Raised -->
+          <rect x="150" y="15" width="120" height="55" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+          <text x="210" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Dues Raised</text>
+          <text x="210" y="54" text-anchor="middle" font-size="9" fill="#92400e">Bills sent to members</text>
+          <!-- Arrow -->
+          <line x1="271" y1="42" x2="288" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 3: Payments Received -->
+          <rect x="290" y="15" width="120" height="55" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
+          <text x="350" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#065f46">Payments Received</text>
+          <text x="350" y="54" text-anchor="middle" font-size="9" fill="#065f46">Logged against unit</text>
+          <!-- Arrow -->
+          <line x1="411" y1="42" x2="428" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 4: Overdue Flagged -->
+          <rect x="430" y="15" width="120" height="55" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+          <text x="490" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#991b1b">Overdue Flagged</text>
+          <text x="490" y="54" text-anchor="middle" font-size="9" fill="#991b1b">Past due date</text>
+          <!-- Arrow -->
+          <line x1="551" y1="42" x2="568" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 5: Period Closed -->
+          <rect x="570" y="15" width="100" height="55" rx="8" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.5"/>
+          <text x="620" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Period Closed</text>
+          <text x="620" y="54" text-anchor="middle" font-size="9" fill="#6b7280">Accounts reconciled</text>
+        </svg>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Maintenance amounts can differ by flat category (1BHK / 2BHK / 3BHK)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Late payments may attract interest as per society bye-laws</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Finance entries above ₹10,000 require a second-level approval (see HOTO Finance for approval tiers)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>All financial records are available in the Document Repository after period close</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="mb-6 flex items-center justify-between">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">Finance & Dues</h1>

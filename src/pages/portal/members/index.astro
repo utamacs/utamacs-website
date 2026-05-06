@@ -12,6 +12,47 @@ const isAdmin = user.isAdmin;
 ---
 
 <PortalLayout title="Member Directory" user={user} activeModule="members">
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">The member directory lists all registered flat owners and residents — contact details are visible only to authorised executives.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 py-2">
+          <div class="bg-white rounded-lg border border-border-light p-4">
+            <div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center mb-2">
+              <i class="fas fa-user-check text-primary-600 text-sm"></i>
+            </div>
+            <div class="text-sm font-semibold text-text-primary mb-1">Member Status</div>
+            <div class="text-xs text-text-secondary">Active, inactive, and tenant-occupied units are tracked separately. Only active members can vote.</div>
+          </div>
+          <div class="bg-white rounded-lg border border-border-light p-4">
+            <div class="w-8 h-8 rounded-lg bg-secondary-50 flex items-center justify-center mb-2">
+              <i class="fas fa-phone text-secondary-500 text-sm"></i>
+            </div>
+            <div class="text-sm font-semibold text-text-primary mb-1">Contact Privacy</div>
+            <div class="text-xs text-text-secondary">Phone numbers are visible only to Secretary and above. Email is shown to all executives.</div>
+          </div>
+          <div class="bg-white rounded-lg border border-border-light p-4">
+            <div class="w-8 h-8 rounded-lg bg-accent-500/10 flex items-center justify-center mb-2">
+              <i class="fas fa-door-open text-accent-500 text-sm"></i>
+            </div>
+            <div class="text-sm font-semibold text-text-primary mb-1">Inviting Members</div>
+            <div class="text-xs text-text-secondary">New members are invited by email — they set their own password. Executive approval is required.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="mb-6">
     <h1 class="text-2xl font-bold text-text-primary">Member Directory</h1>
     <p class="text-sm text-text-secondary mt-1">Residents of Urban Trilla Apartments.</p>
