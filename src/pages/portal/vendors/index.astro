@@ -13,6 +13,84 @@ if (!isExec && !isVendor) return Astro.redirect('/portal');
 ---
 
 <PortalLayout title="Vendors & Work Orders" user={user} activeModule="vendors">
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Approved vendors are assigned work orders — each order tracks scope, deadlines, and payment for maintenance services.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <svg viewBox="0 0 680 90" class="w-full" role="img" aria-label="Work order flow: Draft → Issued → In Progress → Completed → Closed, with Disputed branch">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+            </marker>
+            <marker id="arr-red" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#dc2626"/>
+            </marker>
+          </defs>
+          <!-- Step 1: Draft -->
+          <rect x="10" y="15" width="110" height="55" rx="8" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+          <text x="65" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Draft</text>
+          <text x="65" y="54" text-anchor="middle" font-size="9" fill="#6b7280">Work order created</text>
+          <!-- Arrow -->
+          <line x1="121" y1="42" x2="138" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 2: Issued -->
+          <rect x="140" y="15" width="110" height="55" rx="8" fill="#dbeafe" stroke="#1E3A8A" stroke-width="1.5"/>
+          <text x="195" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Issued</text>
+          <text x="195" y="54" text-anchor="middle" font-size="9" fill="#1e40af">Sent to vendor</text>
+          <!-- Arrow -->
+          <line x1="251" y1="42" x2="268" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 3: In Progress -->
+          <rect x="270" y="15" width="110" height="55" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+          <text x="325" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">In Progress</text>
+          <text x="325" y="54" text-anchor="middle" font-size="9" fill="#92400e">Work underway</text>
+          <!-- Arrow -->
+          <line x1="381" y1="42" x2="398" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 4: Completed -->
+          <rect x="400" y="15" width="110" height="55" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
+          <text x="455" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#065f46">Completed</text>
+          <text x="455" y="54" text-anchor="middle" font-size="9" fill="#065f46">Work finished</text>
+          <!-- Arrow -->
+          <line x1="511" y1="42" x2="528" y2="42" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Step 5: Closed -->
+          <rect x="530" y="15" width="110" height="55" rx="8" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.5"/>
+          <text x="585" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Closed</text>
+          <text x="585" y="54" text-anchor="middle" font-size="9" fill="#6b7280">Payment settled</text>
+          <!-- Disputed branch from step 4 -->
+          <line x1="455" y1="70" x2="455" y2="82" stroke="#dc2626" stroke-width="1.2" marker-end="url(#arr-red)"/>
+          <rect x="390" y="75" width="130" height="0" rx="0" fill="none"/>
+          <text x="455" y="90" text-anchor="middle" font-size="8" fill="#dc2626">Disputed — Query raised</text>
+        </svg>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Only active vendors in the approved vendor list can be assigned work orders</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Work orders linked to complaints auto-update the complaint status on completion</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Quoted amounts are tracked separately from final invoice amounts</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>All work orders are visible in the HOTO audit trail</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="mb-6 flex items-center justify-between">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">

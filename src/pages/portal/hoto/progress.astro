@@ -7,6 +7,57 @@ if (!user) return Astro.redirect('/portal/login');
 ---
 
 <PortalLayout title="HOTO Completion Progress" user={user} activeModule="hoto_progress">
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">A live dashboard showing handover completion across all infrastructure and system categories.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <svg viewBox="0 0 600 70" class="w-full" role="img" aria-label="HOTO progress category groups: Infrastructure, Safety & Services, Documentation">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+            </marker>
+          </defs>
+          <!-- Infrastructure -->
+          <rect x="10" y="8" width="175" height="54" rx="8" fill="#dbeafe" stroke="#1E3A8A" stroke-width="1.5"/>
+          <text x="97" y="30" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Infrastructure</text>
+          <text x="97" y="47" text-anchor="middle" font-size="9" fill="#1e40af">Electrical, Lifts, DG, Water…</text>
+          <!-- Safety & Services -->
+          <rect x="212" y="8" width="175" height="54" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+          <text x="299" y="30" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Safety &amp; Services</text>
+          <text x="299" y="47" text-anchor="middle" font-size="9" fill="#92400e">Fire, Security, HVAC…</text>
+          <!-- Documentation -->
+          <rect x="414" y="8" width="175" height="54" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
+          <text x="501" y="30" text-anchor="middle" font-size="11" font-weight="600" fill="#065f46">Documentation</text>
+          <text x="501" y="47" text-anchor="middle" font-size="9" fill="#065f46">As-Builts, Assets, AMC…</text>
+        </svg>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Progress is calculated as % of items in Approved or Closed status per category</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>A category is fully handed over only when all its items reach Closed status</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Overdue items (past builder SLA) are flagged regardless of status</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">HOTO Completion Progress</h1>
