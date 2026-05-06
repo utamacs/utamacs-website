@@ -1,12 +1,12 @@
 # UTA MACS — HOTO & Vendor Management Platform Design
-## v3.1 — Risk-Hardened + Full RBAC Management + Feature Permission System
+## v3.2 — Risk-Hardened + Full RBAC Management + Feature Permission System + Validation UX
 
 **Society:** Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited  
 **Registration No:** TG/RRD/MACS/2026-15/FOW & M (registered 10-02-2026)  
 **Location:** SY NO:425/2/1, Kondakal Village, Shankarpally Mandal, Rangareddy District, Telangana  
 **Builder (Promoter):** Ankura Homes | **HOTO Consultant:** Ascenza Global Infra Care Pvt Ltd  
 **HOTO Start Date:** June 1, 2026 | **Maintenance Tracking From:** May 1, 2025  
-**Document Version:** 3.1 — May 2026 (adds user/role management + feature permission system)
+**Document Version:** 3.2 — May 2026 (adds gap resolutions + validation UX specification)
 
 ---
 
@@ -23,7 +23,7 @@
 9. [Module 4 — Financial Tracking](#9-module-4--financial-tracking)
 10. [Module 5 — Formal Notice Generation](#10-module-5--formal-notice-generation)
 11. [Workflow Engine & Approval Delegation](#11-workflow-engine--approval-delegation)
-12. [Non-Tech User Experience Specification](#12-non-tech-user-experience-specification)
+12. [Non-Tech User Experience Specification](#12-non-tech-user-experience-specification) — §12.5 [Validation Messages & Blocked Feature UX](#125-validation-messages--blocked-feature-ux)
 13. [Dashboard & UX Design](#13-dashboard--ux-design)
 14. [Git Storage Strategy](#14-git-storage-strategy)
 15. [Data Model](#15-data-model)
@@ -269,14 +269,16 @@ Upload constraints:
 
 ```
 Every 15 minutes (cron /api/cron/github-health):
-  → Test write to governance-data/_meta/health-check.json
-  → Log to github_api_log
+  → GET governance-data/README.md via GitHub API (read-only — zero commits created)
+  → Log result + latency to github_api_log
   → On 3 consecutive failures: Resend alert to Secretary + admin
 
 Every 6 days (cron /api/cron/supabase-ping):
   → SELECT 1 FROM profiles LIMIT 1
   → Prevents Supabase free-tier 7-day pause
 ```
+
+**Why read-only?** A write-based health check (creating a commit on every 15-minute ping) would generate 96 commits per day — polluting the governance audit trail and counting against GitHub API rate limits. A `GET /contents/README.md` call verifies connectivity and token validity without any side effects.
 
 ### 4.3 Async PDF Generation
 
@@ -371,6 +373,10 @@ No one can self-register. All portal access starts with an admin-sent invite —
 
 5. member_invites.accepted = true; token immediately invalidated
 ```
+
+**Profile creation timing (FK safety):** Supabase Auth creates the `auth.users` record first, which triggers a database trigger that immediately creates the corresponding `profiles` row. Only *after* the `profiles` row exists does the registration API set `member_invites.accepted_user_id`. This is enforced by wrapping both operations in a Postgres function called from the API route — the `profiles` INSERT fires via trigger, then the `member_invites` UPDATE runs in the same transaction. There is no window where `accepted_user_id` is set before the FK target exists.
+
+**Token security:** The token is compared using constant-time string comparison (`crypto.timingSafeEqual` in Node.js) to prevent timing attacks. The raw token value is never written to application logs.
 
 **Invite expiry:** Admin can resend from Pending Invites tab.
 **Invite cancellation:** Admin can cancel; cancelled invites cannot be accepted.
@@ -642,7 +648,10 @@ OPEN → IN_PROGRESS → BUILDER_NOTIFIED → BUILDER_COMMITTED → RESOLVED →
 - **Update**: Any executive or above
 - **Delete**: Soft-delete; president only; mandatory `deletion_reason`; permanently logged
 - **VERIFIED_CLOSED**: President or Secretary only
+- **Reopen**: If a verified-closed snag is reopened, a `reopen_reason` is mandatory — stored in `snag_items.reopen_reason` and audit log
 - **Bulk import**: CSV/XLSX from Ascenza punch-list format; column mapping screen; photo ZIP supported
+
+**Role-based assignment (snags):** Every snag stores both `responsible_role` (e.g., `secretary`) and `responsible_user_id`. If the responsible person's role changes or they are deactivated, the snag auto-reassigns to the current holder of that role using the same auto-reassignment logic as HOTO items (§5.8). All reassignments are logged in `audit_log`.
 
 ---
 
@@ -667,6 +676,28 @@ Each director gets exactly 1 vote. Quorum = 8 of 14 (§7.16(a)). Tie → Preside
 - Proxy: notarized PoA uploaded by admin; linked to vote record
 - Joint ownership: first named owner votes by default; policy committed to governance-data pre-vote
 - `voting_policy_committed` flag on `vendor_requirements` must be `true` before voting opens
+
+**Proxy expiry enforcement:**
+
+`proxy_authorizations.valid_until` is checked server-side on every vote submission — not just when the proxy is set up.
+
+```
+When a director casts a vote via proxy:
+  → API checks proxy_authorizations WHERE id = proxy_authorization_id
+  → If valid_until < NOW(): reject with PROXY_EXPIRED error
+  → UI message: "This proxy authorization expired on [date]. The director [Name]
+    must vote directly, or the admin must upload an updated proxy document."
+
+Proactive warning (cron daily):
+  → For any open vote window: scan proxy_authorizations WHERE valid_until < NOW() + 2 days
+  → Alert admin: "Proxy for [Name] in [requirement] expires in [X] days — verify
+    with the director or upload a renewed PoA before voting closes."
+
+If proxy expires mid-vote-window:
+  → The proxy vote slot is left unfilled (director must vote directly or be absent)
+  → Secretary is notified; proxy is flagged as EXPIRED in the vote tracker
+  → The EXPIRED proxy record is never deleted — retained for audit purposes
+```
 
 ### 8.4 Conflict of Interest (§7.16(b))
 
@@ -705,6 +736,20 @@ if (balance < amount) {
 ```
 
 This check is **never client-side**. The UI shows the balance for convenience; the API enforces it regardless.
+
+### 9.3 Corpus Fund APPROVED_USE Approval Chain
+
+`corpus_fund_records` entries with `transaction_type = 'APPROVED_USE'` (withdrawals) are **never created directly** through the financial UI — they are always the output of a completed approval workflow:
+
+| Amount | Approval mechanism | Who creates the record |
+|---|---|---|
+| ≤ ₹20,000 | President unilaterally approves via Expenses module | Record auto-created by API on President's approval click |
+| ≤ ₹50,000 | Board resolution vote (`category = 'FINANCIAL_APPROVAL'` in `vendor_requirements`) | Record auto-created atomically when majority+quorum vote completes |
+| > ₹50,000 | Not possible via portal | API blocks with: "Amounts above ₹50,000 require General Body approval (Byelaw §9.11b). This cannot be processed through the portal." |
+
+**Board financial vote mechanism:** For amounts between ₹20,001–₹50,000, the secretary opens a Board resolution vote using the same `vendor_requirements` / `votes` table structure with `category = 'FINANCIAL_APPROVAL'` and `vendor_id = null`. The motion text (what the money is for, payee, amount) goes in `description`. When quorum (8/14) is reached with a majority yes, the API atomically: (1) writes the `corpus_fund_records` row; (2) runs the overdraft check; (3) creates the `audit_log` entry citing the board resolution. The `board_resolution_ref` on the corpus record stores the `vendor_requirements.id` of the vote.
+
+**Treasurer cannot create APPROVED_USE directly.** The Treasurer role enters expense records (`expenses` table — running costs) and can enter corpus receipts (`RECEIVED_FROM_BUILDER`, `INTEREST_EARNED`). Corpus withdrawals always require presidential or board sign-off as above.
 
 ### 9.3 Defaulter Tracking
 
@@ -846,6 +891,157 @@ Documents attached (3):
 
 Before go-live (May 30): Secretary walks through with Bal Reddy using a test HOTO item. Bal Reddy performs a real approval and a real vote. Any confusion fixed before May 31 go-live.
 
+### 12.5 Validation Messages & Blocked Feature UX
+
+**Core principle for every blocked action, validation failure, or permission gate:**
+1. **What** was blocked — in plain English, never a raw error code
+2. **Why** it was blocked — the actual reason; include byelaw citation after plain explanation
+3. **What to do next** — specific and actionable; name the person or step
+
+No user should ever see "Error 403", "Forbidden", or "An error occurred. Please try again." These are developer messages, not user messages.
+
+---
+
+#### Display Patterns
+
+| Pattern | When to use | Position |
+|---|---|---|
+| **Inline error** | Form field validation failure | Below the field, red text |
+| **Toast (success)** | Background operation completed | Top-right, auto-dismiss 4s |
+| **Toast (error)** | Background operation failed | Top-right, persists until dismissed |
+| **Contextual info box** | Permission gate within a page | Inline with the blocked action |
+| **Page-level banner** | System-wide issue (GitHub down, approval chain broken) | Sticky top, amber or red |
+| **Blocking modal** | Irreversible action (approve, vote, deactivate, bulk election) | Center screen, must confirm |
+
+---
+
+#### Message Catalog — Byelaw-Driven Blocks
+
+| Scenario | User-Facing Message |
+|---|---|
+| **Vote suspended — maintenance arrears** | "Your voting rights are currently suspended because maintenance for Flat [N] is [X] days overdue (Byelaw §4.6). Please contact the Secretary to arrange payment. Once settled, your voting access is restored automatically." |
+| **Quorum not yet met** | "Voting is open, but [X] more directors need to vote before results can be counted. Required: 8 of 14 · Voted so far: [Y]" |
+| **Financial limit — Secretary** | "Your approval authority is up to ₹10,000 (Byelaw §9.11a). This expense is ₹[amount]. It needs the President's approval. Please forward the details to the President." |
+| **Financial limit — President** | "This expense (₹[amount]) exceeds your authority of ₹20,000 (Byelaw §9.11a). Amounts up to ₹50,000 require a Board resolution. Contact the Secretary to open a Board vote." |
+| **Financial limit — Board** | "This expense (₹[amount]) exceeds the Board's authority of ₹50,000 (Byelaw §9.11b). It requires General Body approval, which cannot be processed through this portal. Raise it at the next Annual General Body Meeting." |
+| **Corpus fund insufficient** | "The corpus fund currently holds ₹[balance]. This withdrawal (₹[amount]) would exceed the available balance. Please reduce the amount or wait until additional funds are received." |
+| **Cash payment attempted** | "Cash payments are not permitted for this society (Byelaw §5.3p and §9.1). Please select an electronic payment mode — bank transfer, UPI, or cheque." |
+| **President and VP both absent** | Page banner: "Approval chain unavailable — the President and Vice President are currently unavailable. No HOTO or vendor approvals can be completed until this is resolved. Contact Admin to activate delegation." |
+| **Approval chain incomplete (dual sign-off)** | "This item needs both President and Secretary approval (Byelaw §8.1 and §8.3). Secretary approved on [date]. Waiting for the President. No action needed from you right now — the President has been notified." |
+| **Required documents missing** | "This item cannot move to review until all required documents are uploaded. Missing: [list]. The Secretary or President can override this gate if there is a valid reason." |
+| **Director conflict of interest** | "You declared a conflict of interest for this evaluation. You cannot cast a vote on this requirement (Byelaw §7.16b). Your recusal has been permanently recorded." |
+
+---
+
+#### Message Catalog — Feature Permission Gates
+
+| Scenario | UX behaviour |
+|---|---|
+| **Feature not in user's role** | The button or section is hidden entirely. No error shown — users see only what they can do. |
+| **Locked feature (byelaw-mandated)** | 🔒 icon shows. Hover tooltip: "This permission is required by the society's byelaws and cannot be changed." |
+| **Admin-only action** | "This action can only be performed by the system admin. Contact [admin name] if you need this done." |
+| **Approval gate — wrong role** | "This approval requires the President's confirmation. You can read the item but cannot approve it. The President has been notified." |
+| **Temporarily restricted feature (custom override)** | "Access to [feature] is currently restricted for your account. Contact the Admin if you believe this is incorrect." |
+
+---
+
+#### Message Catalog — Background Operations
+
+| Scenario | User-Facing Message |
+|---|---|
+| **File upload queued** | Toast: "Your file is being saved securely. You'll receive an email when it's ready. (Usually under 1 minute)" |
+| **File upload processing** | Status badge next to file: "Saving… [spinner]" → auto-updates to "Saved ✓" |
+| **File upload failed (all retries exhausted)** | Toast (persistent): "Your file could not be saved after multiple attempts. Please try uploading again. If the problem continues, contact admin." |
+| **PDF generation started** | Spinner with text: "Generating your letter… This usually takes 30–60 seconds." |
+| **PDF generation complete** | Spinner replaced by: [Download Letter ↓] button — no page refresh needed |
+| **PDF generation failed** | "The letter could not be generated. Please try again. If the issue continues, contact admin." |
+| **GitHub storage unavailable** | Page banner (amber): "Document storage is temporarily unavailable. You can still view and manage items, but file uploads will queue until storage is restored. The admin has been notified automatically." |
+
+---
+
+#### Message Catalog — Auth & Session
+
+| Scenario | User-Facing Message |
+|---|---|
+| **Session expired** | Full page: "Your session has expired for security. [Log In Again]" — auto-redirects in 5 seconds |
+| **Account deactivated** | "Your portal access has been deactivated. If you believe this is an error, contact the Secretary or Admin." |
+| **Privacy consent required (first login)** | Full-screen modal — cannot be dismissed until accepted. Body: "Before you access the portal, we need your consent to store and use your contact information for UTA MACS governance communications. This is required by the Digital Personal Data Protection Act, 2023." |
+| **Invite link expired** | "This invitation has expired (invitations are valid for 7 days). Contact the admin to request a new invitation." |
+| **Invite link already used** | "This invitation has already been used. If you registered, [Log In here]. If you did not register, contact the admin — your invitation may have been used by someone else." |
+
+---
+
+#### UX Rules for Non-Tech Users (My Actions Screen)
+
+For Bal Reddy and the Working President, **no action should ever dead-end** — every blocked state must tell them what happens next without requiring them to take any action themselves:
+
+```
+─────────────────────────────────────────────────────────
+If a blocked item appears on My Actions, show:
+
+  🟠  WAITING — not ready for you yet
+
+  [Item title]
+  [Plain English explanation of what is waiting]
+
+  No action needed from you right now.
+  You'll be notified when this is ready.
+─────────────────────────────────────────────────────────
+```
+
+**Never show:** Technical details, error codes, "Something went wrong", or blank/empty states without explanation.
+
+**For voting specifically (non-tech user):**
+
+```
+┌─────────────────────────────────────────────────┐
+│  🗳️  VOTE NEEDED                                  │
+│  Choose a Property Management Company            │
+│                                                 │
+│  Read about each option below, then tap         │
+│  your choice. Your vote is final.               │
+│                                                 │
+│  [MyGate — ₹45/flat/month]                      │
+│  ⭐ 4.2/5 by committee  Site visit: ✓           │
+│  [Choose MyGate]                                │
+│                                                 │
+│  [NoBroker — ₹38/flat/month]                    │
+│  ⭐ 3.8/5 by committee  Site visit: ✓           │
+│  [Choose NoBroker]                              │
+│                                                 │
+│  [I am not voting on this (explain why)]        │
+│                                                 │
+│  5 of 14 directors have voted.                  │
+│  Voting closes: Friday, 5 June at 6:00 PM       │
+└─────────────────────────────────────────────────┘
+```
+
+After voting, immediately show:
+```
+  ✅  Your vote for [MyGate] has been recorded.
+  Thank you. You'll hear the outcome when voting closes.
+```
+
+**My Actions — overflow/pagination:**
+
+- Maximum 5 items shown on My Actions at once; excess items shown as: "5 more items need your attention → [View All]"
+- Items sorted by urgency: (1) approvals pending >48h, (2) votes closing within 24h, (3) everything else by date
+- Empty state: "Nothing needs your attention today. ✅ Check back tomorrow."
+
+---
+
+#### Implementation Note: No Visible 403 Pages
+
+If a user navigates directly to a URL for a feature their role doesn't include (e.g., `/portal/admin/elections` without `is_admin`):
+
+```
+→ Server-side: redirect to /portal/dashboard with a query param: ?blocked=insufficient_role
+→ Dashboard: shows a dismissable notice:
+   "You don't have access to that page. If you need access, contact the admin."
+
+NOT: a bare "403 Forbidden" or "Access Denied" page.
+```
+
 ---
 
 ## 13. Dashboard & UX Design
@@ -960,6 +1156,31 @@ health-check: OK [latency:234ms]
 
 ```sql
 -- ─────────────────────────────────────────────────────────────────────
+-- Societies (top-level multi-tenancy anchor; all other tables FK here)
+-- UTA MACS has exactly one society. This enables future multi-society
+-- hosting without schema changes to any other table.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS societies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  registration_number TEXT UNIQUE NOT NULL,
+  address TEXT,
+  district TEXT,
+  state TEXT DEFAULT 'Telangana',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Seed: UTA MACS (use fixed UUID so all env vars and seeds reference it consistently)
+INSERT INTO societies (id, name, registration_number, address, district)
+VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  'Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited',
+  'TG/RRD/MACS/2026-15/FOW & M',
+  'SY NO:425/2/1, Kondakal Village, Shankarpally Mandal',
+  'Rangareddy'
+) ON CONFLICT DO NOTHING;
+
+-- ─────────────────────────────────────────────────────────────────────
 -- EXISTING BUG FIX: user_roles table missing unique constraint
 -- This causes role changes via UI to silently fail or create duplicates
 -- Run this migration first (migration 027)
@@ -1021,6 +1242,11 @@ CREATE TABLE member_invites (
 );
 CREATE INDEX idx_member_invites_token ON member_invites(token)
   WHERE NOT accepted AND NOT cancelled;
+-- Token lookup uses constant-time comparison (Node.js crypto.timingSafeEqual) to
+-- prevent timing attacks. The raw token value is never written to application logs.
+-- Token is invalidated (accepted = true) atomically in the same DB transaction
+-- that creates the profiles row — no window exists where a token remains valid
+-- after the account is created.
 
 -- ─────────────────────────────────────────────────────────────────────
 -- Role Change Log (fast role history; complements audit_log)
@@ -1104,6 +1330,10 @@ CREATE TABLE upload_queue (
   file_hash_sha256 TEXT,
   source_description TEXT,
   target_github_path TEXT NOT NULL,
+  -- Server-side validation required before INSERT:
+  --   Must match: ^(hoto|snags|vendors|notices|finances|audit)/[a-zA-Z0-9/_.-]+$
+  --   Must not contain: '..', '//', or null bytes
+  --   Rejection response: { error: 'INVALID_PATH', message: 'File path is not permitted.' }
   status TEXT DEFAULT 'PENDING',
   attempts INTEGER DEFAULT 0,
   last_attempt_at TIMESTAMPTZ,
@@ -1144,8 +1374,13 @@ CREATE TABLE pdf_generation_jobs (
   github_path TEXT,
   error_message TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
+  completed_at TIMESTAMPTZ,
+  purged_at TIMESTAMPTZ  -- set when input_data PII is scrubbed (30 days post-completion)
 );
+-- Retention policy: rows are never deleted (job history = audit record).
+-- 30 days after reaching DONE or FAILED, a daily cron sets input_data = null and
+-- purged_at = NOW(). This removes any PII embedded in the letter template input
+-- while preserving the job existence, type, and outcome for audit purposes.
 
 -- ─────────────────────────────────────────────────────────────────────
 -- HOTO Items
@@ -1220,6 +1455,9 @@ CREATE TABLE snag_items (
   reported_date DATE DEFAULT CURRENT_DATE,
   verified_by UUID REFERENCES profiles,
   verified_at TIMESTAMPTZ,
+  responsible_role TEXT,              -- for auto-reassignment on role change (§5.8)
+  responsible_user_id UUID REFERENCES profiles,
+  reopen_reason TEXT,                  -- required when VERIFIED_CLOSED → REOPENED
   deleted BOOLEAN DEFAULT false,
   deleted_by UUID REFERENCES profiles,
   deleted_at TIMESTAMPTZ,
@@ -1602,11 +1840,12 @@ export const FEATURES = {
   'vendor.final_select':     { label: 'Confirm final vendor selection', locked: true  }, // president+secretary
 
   // Finance
-  'finance.view':            { label: 'View financial records',         locked: false },
-  'finance.enter':           { label: 'Enter maintenance/expense records', locked: false },
-  'finance.approve_10k':     { label: 'Approve expenses ≤₹10K (§9.11a)',  locked: true  }, // secretary+
-  'finance.approve_20k':     { label: 'Approve expenses ≤₹20K (§9.11a)',  locked: true  }, // president only
-  'finance.view_member_phones': { label: 'View member phone numbers',   locked: true  }, // secretary+
+  'finance.view':            { label: 'View financial records',                         locked: false },
+  'finance.enter':           { label: 'Enter maintenance/expense records',              locked: false },
+  'finance.approve_10k':     { label: 'Approve expenses ≤₹10K (§9.11a)',               locked: true  }, // secretary+
+  'finance.approve_20k':     { label: 'Approve expenses ≤₹20K (§9.11a)',               locked: true  }, // president only
+  'finance.open_board_vote': { label: 'Open Board resolution vote ≤₹50K (§9.11b)',     locked: true  }, // secretary only — starts the vote
+  'finance.view_member_phones': { label: 'View member phone numbers',                  locked: true  }, // secretary+
 
   // Notices
   'notice.view':             { label: 'View formal notices',            locked: false },
@@ -1659,9 +1898,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Feature[]> = {
     '...joint_secretary features...',
     'hoto.approve_secretary',
     'snag.verify_close',
-    'finance.approve_10k', 'finance.view_member_phones',
+    'finance.approve_10k', 'finance.open_board_vote', 'finance.view_member_phones',
     'audit.view',
   ],
+  // finance.open_board_vote: Secretary opens a Board resolution vote for amounts
+  // ₹20,001–₹50,000. The vote uses vendor_requirements (category='FINANCIAL_APPROVAL')
+  // and the votes table (vendor_id = null). On majority+quorum completion, the API
+  // auto-creates the corpus_fund_records APPROVED_USE entry. See §9.3 for full chain.
   vice_president: [
     '...secretary features...',
     'hoto.approve_president',   // when delegated per §8.2
@@ -1894,6 +2137,7 @@ Two orthogonal axes: **governance role** (approval/voting/action power) and **ad
 | Enter records | - | - | ✓(treasurer) | ✓ | ✓ | ✓ | — |
 | Approve ≤₹10K | - | - | - | ✓ | - | - | — |
 | Approve ≤₹20K | - | - | - | - | - | ✓ | — |
+| Open Board vote ≤₹50K | - | - | - | ✓(sec only) | - | - | — |
 | View member phones | - | - | - | ✓ | ✓ | ✓ | ✓ (operational) |
 | **Notices** | | | | | | | |
 | View | R | R | R | R | R | R | R |
@@ -2305,7 +2549,8 @@ If only three risks get managed before everything else:
 
 ---
 
-*Document Version 3.1 · Revised May 2026 — Full RBAC Management + Feature Permission System*  
-*Changes from v3: Added Module 0 (User & Role Management); invite-only registration; committee election bulk update; member deactivation; auto-reassignment; feature registry with locked/unlocked features; runtime permission resolution; UI enforcement pattern; admin permissions UI at /portal/admin/permissions; per-user feature overrides; fixed user_roles unique constraint bug; updated implementation plan (Days 1-4 now include RBAC infrastructure); RBAC risk register section added; pre-launch checklist expanded*  
-*Based on: Registered Byelaws TG/RRD/MACS/2026-15/FOW & M · Ascenza HOTO Scope · Committee Q&A · Risk Analysis · RBAC Requirements*  
+*Document Version 3.2 · Revised May 2026 — Gap Resolution + Validation UX Specification*  
+*Changes from v3.1: Added `societies` table (FK anchor for all society_id columns); clarified `member_invites.accepted_user_id` FK creation timing and token timing-attack prevention; added `responsible_role`/`responsible_user_id` to `snag_items`; added `reopen_reason` to `snag_items`; specified proxy authorization expiry enforcement mechanism with proactive cron alert; defined Corpus Fund APPROVED_USE approval chain (presidential vs board vs blocked); changed health-check cron from write-based (96 commits/day) to read-only GET; added path traversal validation spec for `upload_queue.target_github_path`; added `finance.open_board_vote` feature for Board resolution votes ≤₹50K; specified board financial vote mechanism reusing vendor_requirements+votes tables with FINANCIAL_APPROVAL category; added `pdf_generation_jobs.purged_at` with 30-day PII scrub retention policy; added §12.5 Validation Messages & Blocked Feature UX (full message catalog, display patterns, non-tech user vote screen, My Actions overflow/pagination, no-403-pages rule); added corpus fund §9.3 with three-tier approval chain table*  
+*Changes from v3: Added Module 0 (User & Role Management); invite-only registration; committee election bulk update; member deactivation; auto-reassignment; feature registry with locked/unlocked features; runtime permission resolution; UI enforcement pattern; admin permissions UI; per-user feature overrides; fixed user_roles unique constraint bug; RBAC risk register; pre-launch checklist*  
+*Based on: Registered Byelaws TG/RRD/MACS/2026-15/FOW & M · Ascenza HOTO Scope · Committee Q&A · Risk Analysis · RBAC Requirements · Final Design Review (21 findings)*  
 *Next review: Post-Phase 1 go-live (June 2026)*
