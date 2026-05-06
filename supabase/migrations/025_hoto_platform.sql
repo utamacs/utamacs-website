@@ -3,6 +3,7 @@
 -- HOTO & Vendor Management Platform — Phase 1 Schema
 -- Design: design/HOTO-VENDOR-PLATFORM-DESIGN.md v4.1
 --
+
 -- TABLE NAMING NOTES (conflicts with existing migrations avoided):
 --   governance_files    ← was "documents" in design (existing `documents` = community doc library)
 --   vendor_candidates   ← was "vendors"   in design (existing `vendors` = maintenance contractors)
@@ -84,7 +85,7 @@ CREATE TABLE IF NOT EXISTS member_invites (
   flat_number      TEXT,
   intended_role    TEXT NOT NULL DEFAULT 'member',
   invited_by       UUID NOT NULL REFERENCES profiles(id),
-  token            TEXT UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(32), 'hex'),
+  token            TEXT UNIQUE NOT NULL DEFAULT replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''),
   token_expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '7 days',
   accepted         BOOLEAN NOT NULL DEFAULT false,
   accepted_at      TIMESTAMPTZ,
@@ -651,10 +652,10 @@ CREATE INDEX IF NOT EXISTS idx_rules_category
 
 -- Seed all rules for UTA MACS
 -- PARAMETER category (byelaw-mandated values + operational parameters)
-INSERT INTO rules (society_id, rule_category, rule_code, label, description, byelaw_reference, value_type, current_value, default_value, is_locked)
+INSERT INTO rules (society_id, rule_category, rule_code, label, byelaw_reference, value_type, current_value, default_value, is_locked)
 SELECT
   '00000000-0000-0000-0000-000000000001',
-  r.rule_category, r.rule_code, r.label, r.description, r.byelaw_reference,
+  r.rule_category, r.rule_code, r.label, r.byelaw_reference,
   r.value_type, r.current_value::jsonb, r.default_value::jsonb, r.is_locked
 FROM (VALUES
   -- PARAMETER: byelaw-locked values
@@ -709,7 +710,7 @@ FROM (VALUES
   ('VALIDATION','HOTO_EVIDENCE_REQUIRED_BEFORE_UPLOAD','Must select an HOTO item before uploading doc',      null, 'BOOLEAN', 'true',  'true',  false),
   ('VALIDATION','SNAG_SCOPE_REQUIRED_ON_CREATE',       'snag_scope mandatory on snag creation',              null, 'BOOLEAN', 'true',  'true',  false),
   ('VALIDATION','INVITE_EMAIL_DOMAIN_ALLOWLIST',       'Restrict invites to specific email domains (empty = any)', null, 'JSON_ARRAY', '[]', '[]', false)
-) AS r(rule_category, rule_code, label, description, byelaw_reference, value_type, current_value, default_value, is_locked)
+) AS r(rule_category, rule_code, label, byelaw_reference, value_type, current_value, default_value, is_locked)
 ON CONFLICT (society_id, rule_code) DO NOTHING;
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -955,52 +956,62 @@ ALTER TABLE hoto_audit_log          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_config           ENABLE ROW LEVEL SECURITY;
 
 -- HOTO items: all committee can read; executive+ can insert; anon blocked
+DROP POLICY IF EXISTS "hoto_items_read" ON hoto_items;
 CREATE POLICY "hoto_items_read" ON hoto_items
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
+DROP POLICY IF EXISTS "hoto_items_insert" ON hoto_items;
 CREATE POLICY "hoto_items_insert" ON hoto_items
   FOR INSERT WITH CHECK (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
+DROP POLICY IF EXISTS "hoto_items_update" ON hoto_items;
 CREATE POLICY "hoto_items_update" ON hoto_items
   FOR UPDATE USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
 -- Snag items: all committee can read; executive+ can insert
+DROP POLICY IF EXISTS "snag_items_read" ON snag_items;
 CREATE POLICY "snag_items_read" ON snag_items
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
+DROP POLICY IF EXISTS "snag_items_insert" ON snag_items;
 CREATE POLICY "snag_items_insert" ON snag_items
   FOR INSERT WITH CHECK (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
+DROP POLICY IF EXISTS "snag_items_update" ON snag_items;
 CREATE POLICY "snag_items_update" ON snag_items
   FOR UPDATE USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
 -- Vendor requirements + candidates: all committee can read
+DROP POLICY IF EXISTS "vendor_req_read" ON vendor_requirements;
 CREATE POLICY "vendor_req_read" ON vendor_requirements
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
+DROP POLICY IF EXISTS "vendor_candidates_read" ON vendor_candidates;
 CREATE POLICY "vendor_candidates_read" ON vendor_candidates
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
 -- Votes: each user sees only their own vote record (no peeking at others)
+DROP POLICY IF EXISTS "votes_read_own" ON votes;
 CREATE POLICY "votes_read_own" ON votes
   FOR SELECT USING (voter_id = auth.uid());
 
+DROP POLICY IF EXISTS "votes_insert" ON votes;
 CREATE POLICY "votes_insert" ON votes
   FOR INSERT WITH CHECK (
     voter_id = auth.uid()
@@ -1008,24 +1019,29 @@ CREATE POLICY "votes_insert" ON votes
   );
 
 -- Feature permissions: committee can read; only admin can write
+DROP POLICY IF EXISTS "feature_perms_read" ON feature_permissions;
 CREATE POLICY "feature_perms_read" ON feature_permissions
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
+DROP POLICY IF EXISTS "feature_perms_write" ON feature_permissions;
 CREATE POLICY "feature_perms_write" ON feature_permissions
   FOR ALL USING (is_admin_user(auth.uid()));
 
 -- User feature overrides: user sees their own; admin sees all
+DROP POLICY IF EXISTS "user_overrides_read" ON user_feature_overrides;
 CREATE POLICY "user_overrides_read" ON user_feature_overrides
   FOR SELECT USING (
     user_id = auth.uid() OR is_admin_user(auth.uid())
   );
 
+DROP POLICY IF EXISTS "user_overrides_write" ON user_feature_overrides;
 CREATE POLICY "user_overrides_write" ON user_feature_overrides
   FOR ALL USING (is_admin_user(auth.uid()));
 
 -- Maintenance records: finance-enabled users + admin
+DROP POLICY IF EXISTS "maintenance_records_read" ON maintenance_records;
 CREATE POLICY "maintenance_records_read" ON maintenance_records
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('secretary','president')
@@ -1039,6 +1055,7 @@ CREATE POLICY "maintenance_records_read" ON maintenance_records
   );
 
 -- Corpus fund records: same as maintenance
+DROP POLICY IF EXISTS "corpus_fund_read" ON corpus_fund_records;
 CREATE POLICY "corpus_fund_read" ON corpus_fund_records
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('secretary','president')
@@ -1052,20 +1069,24 @@ CREATE POLICY "corpus_fund_read" ON corpus_fund_records
   );
 
 -- Rules: all committee can read (for display); only admin can write
+DROP POLICY IF EXISTS "rules_read" ON rules;
 CREATE POLICY "rules_read" ON rules
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
+DROP POLICY IF EXISTS "rules_write" ON rules;
 CREATE POLICY "rules_write" ON rules
   FOR ALL USING (is_admin_user(auth.uid()));
 
 -- Comments: all committee can read and create
+DROP POLICY IF EXISTS "hoto_comments_read" ON hoto_comments;
 CREATE POLICY "hoto_comments_read" ON hoto_comments
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
+DROP POLICY IF EXISTS "hoto_comments_insert" ON hoto_comments;
 CREATE POLICY "hoto_comments_insert" ON hoto_comments
   FOR INSERT WITH CHECK (
     author_id = auth.uid()
@@ -1073,17 +1094,20 @@ CREATE POLICY "hoto_comments_insert" ON hoto_comments
   );
 
 -- Governance files: all committee can read; executive+ can insert
+DROP POLICY IF EXISTS "governance_files_read" ON governance_files;
 CREATE POLICY "governance_files_read" ON governance_files
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
+DROP POLICY IF EXISTS "governance_files_insert" ON governance_files;
 CREATE POLICY "governance_files_insert" ON governance_files
   FOR INSERT WITH CHECK (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
 -- Role change log: admin + secretary + president can read
+DROP POLICY IF EXISTS "role_change_log_read" ON role_change_log;
 CREATE POLICY "role_change_log_read" ON role_change_log
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('secretary','president')
@@ -1091,6 +1115,7 @@ CREATE POLICY "role_change_log_read" ON role_change_log
   );
 
 -- Email drafts: secretary + president can read/update; system can insert
+DROP POLICY IF EXISTS "email_drafts_read" ON email_drafts;
 CREATE POLICY "email_drafts_read" ON email_drafts
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('secretary','president')
@@ -1098,6 +1123,7 @@ CREATE POLICY "email_drafts_read" ON email_drafts
   );
 
 -- HOTO audit log: secretary + president + admin can read
+DROP POLICY IF EXISTS "hoto_audit_read" ON hoto_audit_log;
 CREATE POLICY "hoto_audit_read" ON hoto_audit_log
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
@@ -1105,33 +1131,40 @@ CREATE POLICY "hoto_audit_read" ON hoto_audit_log
   );
 
 -- Upload queue: committee can see their own uploads; admin sees all
+DROP POLICY IF EXISTS "upload_queue_read" ON upload_queue;
 CREATE POLICY "upload_queue_read" ON upload_queue
   FOR SELECT USING (
     uploaded_by = auth.uid() OR is_admin_user(auth.uid())
   );
 
 -- Approval delegations: all committee can read (affects their approval routing)
+DROP POLICY IF EXISTS "approval_delegations_read" ON approval_delegations;
 CREATE POLICY "approval_delegations_read" ON approval_delegations
   FOR SELECT USING (
     get_portal_role(auth.uid()) IN ('executive','secretary','president')
   );
 
 -- System config: admin only
+DROP POLICY IF EXISTS "system_config_admin" ON system_config;
 CREATE POLICY "system_config_admin" ON system_config
   FOR ALL USING (is_admin_user(auth.uid()));
 
 -- Member invites: admin can manage; invited user can read their own
+DROP POLICY IF EXISTS "member_invites_admin" ON member_invites;
 CREATE POLICY "member_invites_admin" ON member_invites
   FOR ALL USING (is_admin_user(auth.uid()));
 
 -- Cron tables: service role only (no RLS bypass needed — these use service client)
+DROP POLICY IF EXISTS "cron_heartbeats_admin" ON cron_heartbeats;
 CREATE POLICY "cron_heartbeats_admin" ON cron_heartbeats
   FOR ALL USING (is_admin_user(auth.uid()));
 
+DROP POLICY IF EXISTS "cron_locks_admin" ON cron_locks;
 CREATE POLICY "cron_locks_admin" ON cron_locks
   FOR ALL USING (is_admin_user(auth.uid()));
 
 -- Github API log: admin only
+DROP POLICY IF EXISTS "github_api_log_admin" ON github_api_log;
 CREATE POLICY "github_api_log_admin" ON github_api_log
   FOR ALL USING (is_admin_user(auth.uid()));
 
@@ -1146,6 +1179,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS hoto_items_updated ON hoto_items;
 CREATE TRIGGER hoto_items_updated
   BEFORE UPDATE ON hoto_items
   FOR EACH ROW EXECUTE FUNCTION update_hoto_last_updated();

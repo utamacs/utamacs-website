@@ -8,6 +8,12 @@ import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
 const VALID_ROLES = ['member', 'executive', 'secretary', 'president'] as const;
+const VALID_TITLES = [
+  'President', 'Vice President',
+  'General Secretary', 'Joint Secretary',
+  'Treasurer', 'Joint Treasurer',
+  'Executive Member',
+] as const;
 const TREASURER_TITLES = new Set(['Treasurer', 'Joint Treasurer']);
 
 // GET — list election events ordered by created_at DESC with total_role_changes
@@ -110,6 +116,13 @@ export const POST: APIRoute = async ({ request }) => {
       if (!c.reason?.trim()) {
         return Response.json(
           { error: 'VALIDATION_ERROR', message: `changes[${i}].reason is required` },
+          { status: 400 },
+        );
+      }
+      const titleStr = c.new_title?.trim();
+      if (titleStr && !VALID_TITLES.includes(titleStr as typeof VALID_TITLES[number])) {
+        return Response.json(
+          { error: 'VALIDATION_ERROR', message: `changes[${i}].new_title must be one of: ${VALID_TITLES.join(', ')} (or blank)` },
           { status: 400 },
         );
       }

@@ -11,7 +11,7 @@ const isGuard = user.role === 'security_guard';
 const today = new Date().toISOString().split('T')[0];
 ---
 
-<PortalLayout title="Staff Attendance" user={user} activeModule="compliance">
+<PortalLayout title="Staff Attendance" user={user} activeModule="admin_staff">
   <div class="mb-6 flex items-center justify-between">
     <div>
       {!isGuard && (

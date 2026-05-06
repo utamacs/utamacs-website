@@ -32,7 +32,10 @@ export const GET: APIRoute = async ({ request }) => {
         description, severity, status, ascenza_reference,
         builder_committed_date, builder_sla_days_overdue,
         notice_sent, reported_date, created_at,
-        reported_by, responsible_user_id, verified_by
+        reported_by, responsible_user_id, verified_by,
+        snag_source, audit_ref_no, audit_source, audit_date,
+        compliance_requirement, recommendation, equipment_machinery,
+        expected_closure_date, responsible_person_name
       `)
       .eq('society_id', SOCIETY_ID)
       .eq('deleted', false)

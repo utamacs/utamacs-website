@@ -7,7 +7,7 @@ if (!user) return Astro.redirect('/portal/login');
 if (!user.isAdmin) return Astro.redirect('/portal');
 ---
 
-<PortalLayout title="Election Wizard" user={user} activeModule="hoto">
+<PortalLayout title="Election Wizard" user={user} activeModule="hoto_elections">
   <div class="mb-6">
     <nav class="text-sm text-text-secondary mb-2">
       <a href="/portal/hoto/admin/users" class="hover:text-primary-600">Manage Roles</a>
@@ -176,8 +176,16 @@ if (!user.isAdmin) return Astro.redirect('/portal');
           </select>
         </td>
         <td class="py-2 px-2 min-w-[160px]">
-          <input type="text" data-field="new_title" placeholder="e.g. Vice President"
-            class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <select data-field="new_title" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">— None —</option>
+            <option value="President">President</option>
+            <option value="Vice President">Vice President</option>
+            <option value="General Secretary">General Secretary</option>
+            <option value="Joint Secretary">Joint Secretary</option>
+            <option value="Treasurer">Treasurer</option>
+            <option value="Joint Treasurer">Joint Treasurer</option>
+            <option value="Executive Member">Executive Member</option>
+          </select>
         </td>
         <td class="py-2 px-2 min-w-[160px]">
           <input type="text" data-field="reason" placeholder="e.g. AGM 2025 election"

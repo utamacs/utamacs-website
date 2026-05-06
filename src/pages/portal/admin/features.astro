@@ -6,7 +6,7 @@ const user = Astro.locals.user;
 if (!user || user.role !== 'admin') return Astro.redirect('/portal');
 ---
 
-<PortalLayout title="Feature Configuration" user={user} activeModule="compliance">
+<PortalLayout title="Feature Configuration" user={user} activeModule="admin_features">
   <div class="mb-6">
     <h1 class="text-2xl font-bold text-text-primary">Feature Configuration</h1>
     <p class="text-sm text-text-secondary mt-1">Enable or disable modules and features for UTA MACS portal.</p>
