@@ -2,7 +2,7 @@
 -- Enables enterprise-grade letter generation with configurable templates stored in GitHub
 
 -- ─── Letterhead Templates ─────────────────────────────────────────────────────
-CREATE TABLE letterhead_templates (
+CREATE TABLE IF NOT EXISTS letterhead_templates (
   id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   society_id              uuid NOT NULL REFERENCES societies(id) ON DELETE CASCADE,
   name                    text NOT NULL,
@@ -31,17 +31,17 @@ CREATE TABLE letterhead_templates (
   updated_at              timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_letterhead_templates_society ON letterhead_templates(society_id);
+CREATE INDEX IF NOT EXISTS idx_letterhead_templates_society ON letterhead_templates(society_id);
 ALTER TABLE letterhead_templates ENABLE ROW LEVEL SECURITY;
 
 -- Only one default template per society
-CREATE UNIQUE INDEX idx_letterhead_templates_default
+CREATE UNIQUE INDEX IF NOT EXISTS idx_letterhead_templates_default
   ON letterhead_templates(society_id)
   WHERE is_default = true;
 
 -- ─── Committee Members (per template) ─────────────────────────────────────────
 -- These appear in the header right-column AND are selectable as signatories
-CREATE TABLE letterhead_committee_members (
+CREATE TABLE IF NOT EXISTS letterhead_committee_members (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   template_id     uuid NOT NULL REFERENCES letterhead_templates(id) ON DELETE CASCADE,
   name            text NOT NULL,
@@ -52,12 +52,12 @@ CREATE TABLE letterhead_committee_members (
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_letterhead_committee_template ON letterhead_committee_members(template_id);
+CREATE INDEX IF NOT EXISTS idx_letterhead_committee_template ON letterhead_committee_members(template_id);
 ALTER TABLE letterhead_committee_members ENABLE ROW LEVEL SECURITY;
 
 -- ─── Dynamic Fields (per template) ────────────────────────────────────────────
 -- Configurable input fields shown on the letter generation form
-CREATE TABLE letterhead_dynamic_fields (
+CREATE TABLE IF NOT EXISTS letterhead_dynamic_fields (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   template_id     uuid NOT NULL REFERENCES letterhead_templates(id) ON DELETE CASCADE,
   field_key       text NOT NULL,     -- machine key, e.g. 'date', 'to', 'subject'
@@ -71,11 +71,11 @@ CREATE TABLE letterhead_dynamic_fields (
   UNIQUE (template_id, field_key)
 );
 
-CREATE INDEX idx_letterhead_fields_template ON letterhead_dynamic_fields(template_id);
+CREATE INDEX IF NOT EXISTS idx_letterhead_fields_template ON letterhead_dynamic_fields(template_id);
 ALTER TABLE letterhead_dynamic_fields ENABLE ROW LEVEL SECURITY;
 
 -- ─── Generated Letters (metadata; actual files live in GitHub) ────────────────
-CREATE TABLE generated_letters (
+CREATE TABLE IF NOT EXISTS generated_letters (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   society_id       uuid NOT NULL REFERENCES societies(id) ON DELETE CASCADE,
   template_id      uuid REFERENCES letterhead_templates(id) ON DELETE SET NULL,
@@ -96,15 +96,17 @@ CREATE TABLE generated_letters (
   created_at       timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_generated_letters_society ON generated_letters(society_id, created_at DESC);
-CREATE INDEX idx_generated_letters_created_by ON generated_letters(created_by);
+CREATE INDEX IF NOT EXISTS idx_generated_letters_society ON generated_letters(society_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_generated_letters_created_by ON generated_letters(created_by);
 ALTER TABLE generated_letters ENABLE ROW LEVEL SECURITY;
 
 -- ─── RLS Policies ─────────────────────────────────────────────────────────────
 -- Templates: admin/executive can manage; all authenticated users can read
+DROP POLICY IF EXISTS "letterhead_templates_read" ON letterhead_templates;
 CREATE POLICY "letterhead_templates_read" ON letterhead_templates
   FOR SELECT USING (auth.uid() IS NOT NULL);
 
+DROP POLICY IF EXISTS "letterhead_templates_write" ON letterhead_templates;
 CREATE POLICY "letterhead_templates_write" ON letterhead_templates
   FOR ALL USING (
     EXISTS (
@@ -115,9 +117,11 @@ CREATE POLICY "letterhead_templates_write" ON letterhead_templates
     )
   );
 
+DROP POLICY IF EXISTS "letterhead_committee_read" ON letterhead_committee_members;
 CREATE POLICY "letterhead_committee_read" ON letterhead_committee_members
   FOR SELECT USING (auth.uid() IS NOT NULL);
 
+DROP POLICY IF EXISTS "letterhead_committee_write" ON letterhead_committee_members;
 CREATE POLICY "letterhead_committee_write" ON letterhead_committee_members
   FOR ALL USING (
     EXISTS (
@@ -129,9 +133,11 @@ CREATE POLICY "letterhead_committee_write" ON letterhead_committee_members
     )
   );
 
+DROP POLICY IF EXISTS "letterhead_fields_read" ON letterhead_dynamic_fields;
 CREATE POLICY "letterhead_fields_read" ON letterhead_dynamic_fields
   FOR SELECT USING (auth.uid() IS NOT NULL);
 
+DROP POLICY IF EXISTS "letterhead_fields_write" ON letterhead_dynamic_fields;
 CREATE POLICY "letterhead_fields_write" ON letterhead_dynamic_fields
   FOR ALL USING (
     EXISTS (
@@ -144,6 +150,7 @@ CREATE POLICY "letterhead_fields_write" ON letterhead_dynamic_fields
   );
 
 -- Generated letters: only admin/executive can see; creators see their own
+DROP POLICY IF EXISTS "generated_letters_read" ON generated_letters;
 CREATE POLICY "generated_letters_read" ON generated_letters
   FOR SELECT USING (
     created_by = auth.uid()
@@ -155,6 +162,7 @@ CREATE POLICY "generated_letters_read" ON generated_letters
     )
   );
 
+DROP POLICY IF EXISTS "generated_letters_write" ON generated_letters;
 CREATE POLICY "generated_letters_write" ON generated_letters
   FOR ALL USING (
     EXISTS (
@@ -171,6 +179,7 @@ RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_letterhead_templates_updated_at ON letterhead_templates;
 CREATE TRIGGER trg_letterhead_templates_updated_at
   BEFORE UPDATE ON letterhead_templates
   FOR EACH ROW EXECUTE FUNCTION update_letterhead_updated_at();
