@@ -1,0 +1,117 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const canView = ['secretary','president'].includes(user.portalRole) || user.isAdmin;
+if (!canView) return Astro.redirect('/portal/hoto/finance');
+---
+
+<PortalLayout title="Board Resolution Register" user={user} activeModule="hoto">
+  <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Board Resolution Register</h1>
+      <p class="text-sm text-text-secondary mt-1">All expenses approved by board vote (≥ ₹20,001). Governance audit record per §9.11b.</p>
+    </div>
+    <a href="/portal/hoto/finance" class="text-sm text-text-secondary hover:text-primary-600 flex items-center gap-1.5">
+      <i class="fas fa-arrow-left text-xs"></i> Finance
+    </a>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white rounded-xl border border-border-light p-4 mb-5 flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="block text-xs font-medium text-text-secondary mb-1">Year</label>
+      <select id="filter-year" class="px-3 py-2 border border-border-light rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+        <option value="">All years</option>
+        {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(y => (
+          <option value={y}>{y}</option>
+        ))}
+      </select>
+    </div>
+    <button id="export-btn" class="btn-outline text-xs px-4 py-2 flex items-center gap-1.5 ml-auto">
+      <i class="fas fa-download"></i> Export CSV
+    </button>
+  </div>
+
+  <!-- Summary stats -->
+  <div id="stats" class="grid grid-cols-3 gap-4 mb-5"></div>
+
+  <!-- Resolution table -->
+  <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-border-light bg-gray-50">
+          <th class="text-left p-4 text-xs font-medium text-text-secondary">Resolution Ref</th>
+          <th class="text-left p-4 text-xs font-medium text-text-secondary">Date</th>
+          <th class="text-left p-4 text-xs font-medium text-text-secondary">Payee / Purpose</th>
+          <th class="text-right p-4 text-xs font-medium text-text-secondary">Amount</th>
+          <th class="text-left p-4 text-xs font-medium text-text-secondary">Payment Mode</th>
+        </tr>
+      </thead>
+      <tbody id="resolutions-body">
+        <tr><td colspan="5" class="p-8 text-center text-text-secondary text-sm animate-pulse">Loading…</td></tr>
+      </tbody>
+    </table>
+    <div id="pagination" class="p-4 border-t border-border-light flex justify-between items-center text-xs text-text-secondary"></div>
+  </div>
+
+  <script>
+    let yearFilter = '';
+
+    async function load() {
+      const params = new URLSearchParams({ limit: '50' });
+      if (yearFilter) params.set('year', yearFilter);
+
+      const res = await fetch(`/api/v1/hoto/finance/expenses?${params}&has_resolution=true`, { credentials: 'include' });
+      if (!res.ok) { document.getElementById('resolutions-body')!.innerHTML = '<tr><td colspan="5" class="p-4 text-red-600 text-sm text-center">Failed to load.</td></tr>'; return; }
+
+      const data = await res.json();
+      const items: any[] = (data.expenses ?? data.items ?? data ?? []).filter((e: any) => e.board_resolution_ref);
+      items.sort((a, b) => a.board_resolution_ref?.localeCompare(b.board_resolution_ref));
+
+      // Stats
+      const total = items.reduce((s, e) => s + Number(e.amount), 0);
+      document.getElementById('stats')!.innerHTML = [
+        { label: 'Total Resolutions', val: items.length, color: 'bg-gray-50' },
+        { label: 'Total Amount', val: `₹${total.toLocaleString('en-IN')}`, color: 'bg-amber-50' },
+        { label: 'Avg Resolution', val: items.length ? `₹${Math.round(total / items.length).toLocaleString('en-IN')}` : '—', color: 'bg-blue-50' },
+      ].map(s => `<div class="${s.color} rounded-xl border border-border-light p-4 text-center"><div class="text-xl font-bold text-text-primary">${s.val}</div><div class="text-xs text-text-secondary mt-1">${s.label}</div></div>`).join('');
+
+      if (!items.length) {
+        document.getElementById('resolutions-body')!.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-text-secondary text-sm">No board resolutions recorded.</td></tr>';
+        document.getElementById('pagination')!.textContent = '';
+        return;
+      }
+
+      document.getElementById('resolutions-body')!.innerHTML = items.map(e => `
+        <tr class="border-b border-border-light last:border-0 hover:bg-gray-50">
+          <td class="p-4 font-mono text-xs text-primary-700">${e.board_resolution_ref}</td>
+          <td class="p-4 text-text-secondary text-xs">${e.expense_date}</td>
+          <td class="p-4">
+            <div class="font-medium text-text-primary">${e.payee}</div>
+            <div class="text-xs text-text-secondary mt-0.5 line-clamp-1">${e.purpose}</div>
+          </td>
+          <td class="p-4 text-right font-semibold text-text-primary">₹${Number(e.amount).toLocaleString('en-IN')}</td>
+          <td class="p-4 text-xs text-text-secondary">${e.payment_mode ?? '—'}${e.reference_number ? `<br><span class="font-mono">${e.reference_number}</span>` : ''}</td>
+        </tr>`).join('');
+
+      document.getElementById('pagination')!.textContent = `${items.length} resolutions`;
+    }
+
+    document.getElementById('filter-year')!.addEventListener('change', (e) => {
+      yearFilter = (e.target as HTMLSelectElement).value;
+      load();
+    });
+
+    document.getElementById('export-btn')!.addEventListener('click', () => {
+      const params = new URLSearchParams({ format: 'csv', has_resolution: 'true' });
+      if (yearFilter) params.set('year', yearFilter);
+      window.open(`/api/v1/hoto/finance/expenses?${params}`, '_blank');
+    });
+
+    load();
+  </script>
+</PortalLayout>

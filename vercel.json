@@ -5,13 +5,6 @@
   "installCommand": "npm install",
   "framework": "astro",
   "crons": [
-    { "path": "/api/v1/automation/payment-reminders",           "schedule": "0 9 * * *"   },
-    { "path": "/api/v1/automation/expire-listings",             "schedule": "0 2 * * *"   },
-    { "path": "/api/v1/automation/expire-preapprovals",         "schedule": "0 1 * * *"   },
-    { "path": "/api/v1/hoto/cron/process-uploads",              "schedule": "* * * * *"   },
-    { "path": "/api/v1/hoto/cron/github-health",                "schedule": "*/15 * * * *"},
-    { "path": "/api/v1/hoto/cron/supabase-ping",                "schedule": "0 3 */6 * *" },
-    { "path": "/api/v1/hoto/cron/builder-sla-escalation",       "schedule": "0 6 * * *"   },
-    { "path": "/api/v1/hoto/cron/generate-weekly-digest",       "schedule": "0 7 * * 1"   }
+    { "path": "/api/v1/cron/master", "schedule": "30 1 * * *" }
   ]
 }
