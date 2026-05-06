@@ -1,0 +1,251 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!user.isAdmin) return Astro.redirect('/portal');
+---
+
+<PortalLayout title="Election Wizard" user={user} activeModule="hoto">
+  <div class="mb-6">
+    <nav class="text-sm text-text-secondary mb-2">
+      <a href="/portal/hoto/admin/users" class="hover:text-primary-600">Manage Roles</a>
+      <span class="mx-2">›</span><span class="text-text-primary">Election Wizard</span>
+    </nav>
+    <h1 class="text-2xl font-bold text-text-primary">Committee Election Wizard</h1>
+    <p class="text-sm text-text-secondary mt-1">Record an AGM/EGM election outcome and apply all role changes atomically.</p>
+  </div>
+
+  <!-- Past Elections -->
+  <div class="mb-8">
+    <h2 class="font-semibold text-text-primary mb-3 flex items-center gap-2">
+      <i class="fas fa-history text-text-secondary" aria-hidden="true"></i> Past Elections
+    </h2>
+    <div id="elections-list" class="space-y-3">
+      <div class="text-sm text-text-secondary">Loading…</div>
+    </div>
+  </div>
+
+  <!-- New Election Form -->
+  <div class="bg-white rounded-xl border border-border-light p-6">
+    <h2 class="font-semibold text-text-primary mb-5 flex items-center gap-2">
+      <i class="fas fa-vote-yea text-primary-600" aria-hidden="true"></i> Record New Election
+    </h2>
+
+    <div id="election-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+    <div id="election-success" class="hidden mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"></div>
+
+    <div class="space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Election Date <span class="text-red-500">*</span></label>
+          <input type="date" id="election-date"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Description <span class="text-red-500">*</span></label>
+          <input type="text" id="election-desc" placeholder="e.g. AGM 2025 — Committee Election"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+      </div>
+
+      <!-- Role changes table -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <label class="text-sm font-medium text-text-primary">Role Changes</label>
+          <button id="add-change-btn" class="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1.5">
+            <i class="fas fa-plus-circle" aria-hidden="true"></i> Add Member
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-border-light">
+                <th class="pb-2 text-left text-xs font-medium text-text-secondary">Member</th>
+                <th class="pb-2 text-left text-xs font-medium text-text-secondary pl-3">New Role</th>
+                <th class="pb-2 text-left text-xs font-medium text-text-secondary pl-3">Committee Title</th>
+                <th class="pb-2 text-left text-xs font-medium text-text-secondary pl-3">Reason</th>
+                <th class="pb-2"></th>
+              </tr>
+            </thead>
+            <tbody id="changes-table">
+              <!-- rows added dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <div id="changes-empty" class="text-sm text-text-secondary py-4 text-center">
+          Click "Add Member" to add a role change.
+        </div>
+      </div>
+
+      <button id="submit-election-btn" class="btn-primary w-full flex items-center justify-center gap-2">
+        <i class="fas fa-check-circle" aria-hidden="true"></i> Record Election
+      </button>
+    </div>
+  </div>
+
+  <!-- Member picker data (loaded once) -->
+  <div id="member-data" class="hidden"></div>
+
+  <script>
+    let members: Array<{ id: string; full_name: string; portal_role: string }> = [];
+    let changeRows: number[] = [];
+    let rowCounter = 0;
+
+    async function loadPastElections() {
+      const res = await fetch('/api/v1/hoto/elections', { credentials: 'include' });
+      const elections = res.ok ? await res.json() : [];
+      const container = document.getElementById('elections-list')!;
+
+      if (!elections.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary">No elections recorded yet.</div>';
+        return;
+      }
+
+      container.innerHTML = elections.slice(0, 5).map((e: any) => `
+        <div class="bg-white rounded-xl border border-border-light p-4">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="font-medium text-text-primary text-sm">${e.description}</div>
+              <div class="text-xs text-text-secondary mt-0.5">
+                ${new Date(e.election_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                · ${e.total_role_changes ?? 0} role change${(e.total_role_changes ?? 0) !== 1 ? 's' : ''}
+              </div>
+            </div>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium flex-shrink-0">Recorded</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadMembers() {
+      const res = await fetch('/api/v1/hoto/users?limit=200', { credentials: 'include' });
+      members = res.ok ? await res.json() : [];
+    }
+
+    function memberOptions(selectedId = '') {
+      return members.map((m) =>
+        `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>${m.full_name} (${m.portal_role})</option>`
+      ).join('');
+    }
+
+    function addChangeRow() {
+      const id = rowCounter++;
+      changeRows.push(id);
+      const tbody = document.getElementById('changes-table')!;
+      document.getElementById('changes-empty')!.classList.add('hidden');
+
+      const tr = document.createElement('tr');
+      tr.id = `change-row-${id}`;
+      tr.className = 'border-b border-border-light';
+      tr.innerHTML = `
+        <td class="py-2 pr-2 min-w-[180px]">
+          <select data-field="user_id" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">Select member…</option>
+            ${memberOptions()}
+          </select>
+        </td>
+        <td class="py-2 px-2 min-w-[130px]">
+          <select data-field="new_role" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="member">Member</option>
+            <option value="executive">Executive</option>
+            <option value="secretary">Secretary</option>
+            <option value="president">President</option>
+          </select>
+        </td>
+        <td class="py-2 px-2 min-w-[160px]">
+          <input type="text" data-field="new_title" placeholder="e.g. Vice President"
+            class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </td>
+        <td class="py-2 px-2 min-w-[160px]">
+          <input type="text" data-field="reason" placeholder="e.g. AGM 2025 election"
+            class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </td>
+        <td class="py-2 pl-2">
+          <button onclick="removeRow(${id})" class="text-red-500 hover:text-red-700 p-1" aria-label="Remove row">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    (window as any).removeRow = (id: number) => {
+      document.getElementById(`change-row-${id}`)?.remove();
+      changeRows = changeRows.filter((r) => r !== id);
+      if (!changeRows.length) {
+        document.getElementById('changes-empty')!.classList.remove('hidden');
+      }
+    };
+
+    function getRowData(id: number) {
+      const row = document.getElementById(`change-row-${id}`);
+      if (!row) return null;
+      return {
+        user_id: (row.querySelector('[data-field="user_id"]') as HTMLSelectElement)?.value,
+        new_role: (row.querySelector('[data-field="new_role"]') as HTMLSelectElement)?.value,
+        new_title: (row.querySelector('[data-field="new_title"]') as HTMLInputElement)?.value.trim() || null,
+        reason: (row.querySelector('[data-field="reason"]') as HTMLInputElement)?.value.trim(),
+      };
+    }
+
+    document.getElementById('add-change-btn')!.addEventListener('click', addChangeRow);
+
+    document.getElementById('submit-election-btn')!.addEventListener('click', async () => {
+      const date = (document.getElementById('election-date') as HTMLInputElement).value;
+      const desc = (document.getElementById('election-desc') as HTMLInputElement).value.trim();
+      const errEl = document.getElementById('election-error')!;
+      const successEl = document.getElementById('election-success')!;
+
+      errEl.classList.add('hidden');
+      successEl.classList.add('hidden');
+
+      if (!date) { errEl.textContent = 'Election date is required.'; errEl.classList.remove('hidden'); return; }
+      if (!desc) { errEl.textContent = 'Description is required.'; errEl.classList.remove('hidden'); return; }
+      if (!changeRows.length) { errEl.textContent = 'Add at least one role change.'; errEl.classList.remove('hidden'); return; }
+
+      const changes = changeRows.map(getRowData).filter(Boolean);
+      for (const c of changes) {
+        if (!c!.user_id) { errEl.textContent = 'Select a member for each row.'; errEl.classList.remove('hidden'); return; }
+        if (!c!.reason) { errEl.textContent = 'Reason is required for each row.'; errEl.classList.remove('hidden'); return; }
+      }
+
+      const btn = document.getElementById('submit-election-btn') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Recording…';
+
+      const res = await fetch('/api/v1/hoto/elections', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ election_date: date, description: desc, changes }),
+      });
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check-circle" aria-hidden="true"></i> Record Election';
+
+      if (res.ok) {
+        const d = await res.json();
+        successEl.textContent = `Election recorded. ${d.changes_count} role change${d.changes_count !== 1 ? 's' : ''} applied.`;
+        successEl.classList.remove('hidden');
+        document.getElementById('changes-table')!.innerHTML = '';
+        changeRows = [];
+        document.getElementById('changes-empty')!.classList.remove('hidden');
+        (document.getElementById('election-date') as HTMLInputElement).value = '';
+        (document.getElementById('election-desc') as HTMLInputElement).value = '';
+        loadPastElections();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to record election.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // Set default election date to today
+    const today = new Date().toISOString().split('T')[0];
+    (document.getElementById('election-date') as HTMLInputElement).value = today;
+
+    Promise.all([loadPastElections(), loadMembers()]);
+  </script>
+</PortalLayout>
