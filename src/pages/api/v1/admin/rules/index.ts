@@ -31,12 +31,23 @@ export const GET: APIRoute = async ({ request }) => {
     const { data, error } = await query;
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
+    // Batch-fetch names for all users who changed rules
+    const changerIds = [...new Set((data ?? []).map((r: any) => r.changed_by).filter(Boolean))];
+    let nameMap: Record<string, string> = {};
+    if (changerIds.length) {
+      const { data: profiles } = await sb.from('profiles').select('id, full_name').in('id', changerIds);
+      for (const p of profiles ?? []) nameMap[(p as any).id] = (p as any).full_name;
+    }
+
     // Group by category for convenient UI consumption
     const grouped: Record<string, unknown[]> = {};
     for (const rule of data ?? []) {
       const cat = (rule as any).rule_category;
       if (!grouped[cat]) grouped[cat] = [];
-      grouped[cat].push(rule);
+      grouped[cat].push({
+        ...(rule as any),
+        changed_by_name: nameMap[(rule as any).changed_by] ?? null,
+      });
     }
 
     return Response.json({ rules: data ?? [], grouped });

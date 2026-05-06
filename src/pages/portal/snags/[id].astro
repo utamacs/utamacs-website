@@ -10,6 +10,7 @@ const snagId = Astro.params.id!;
 const canEdit   = ['executive','secretary','president'].includes(user.portalRole) || user.isAdmin;
 const canVerify = ['secretary','president'].includes(user.portalRole) || user.isAdmin;
 const canDelete = user.portalRole === 'president' || user.isAdmin;
+const canUpload = canEdit;
 ---
 
 <PortalLayout title="Snag Detail" user={user} activeModule="snags">
@@ -17,6 +18,12 @@ const canDelete = user.portalRole === 'president' || user.isAdmin;
     <a href="/portal/snags" class="text-sm text-text-secondary hover:text-primary-600 flex items-center gap-1.5">
       <i class="fas fa-arrow-left text-xs" aria-hidden="true"></i> Back to Snag List
     </a>
+  </div>
+
+  <!-- SLA overdue banner (injected by JS when applicable) -->
+  <div id="sla-banner" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800 flex items-center gap-2">
+    <i class="fas fa-exclamation-triangle text-red-500"></i>
+    <span id="sla-banner-text"></span>
   </div>
 
   <div id="snag-header" class="mb-6 animate-pulse">
@@ -29,18 +36,52 @@ const canDelete = user.portalRole === 'president' || user.isAdmin;
     <div class="lg:col-span-2 space-y-6">
       <!-- Description card -->
       <div class="bg-white rounded-2xl border border-border-light p-5">
-        <h2 class="font-semibold text-text-primary mb-3">Description</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold text-text-primary">Description</h2>
+          {canEdit && (
+            <button id="edit-btn" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
+              <i class="fas fa-pen mr-1"></i> Edit
+            </button>
+          )}
+        </div>
         <div id="snag-description" class="text-sm text-text-primary whitespace-pre-wrap animate-pulse bg-gray-100 h-12 rounded"></div>
       </div>
 
       <!-- Files -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
-        <div class="px-5 py-4 border-b border-border-light">
+        <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
           <h2 class="font-semibold text-text-primary">Documents</h2>
+          {canUpload && (
+            <button id="upload-btn" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
+              + Upload file
+            </button>
+          )}
         </div>
-        <div id="files-list" class="p-5">
-          <div class="text-sm text-text-secondary">Loading…</div>
+        <div id="files-list" class="divide-y divide-border-light">
+          <div class="px-5 py-3 text-sm text-text-secondary">Loading…</div>
         </div>
+        {canUpload && (
+          <div id="upload-form-wrapper" class="hidden px-5 py-4 bg-gray-50 border-t border-border-light">
+            <div id="upload-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+            <div id="upload-success" class="hidden mb-3 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"></div>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-text-primary mb-1">File <span class="text-red-500">*</span></label>
+                <input type="file" id="upload-file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.csv,.docx"
+                  class="w-full text-sm text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-600 file:text-white hover:file:bg-primary-700" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-text-primary mb-1">Source Description</label>
+                <input type="text" id="upload-desc" placeholder="e.g. Received from builder on 15 Jan 2025"
+                  class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+              </div>
+              <div class="flex gap-2">
+                <button id="upload-submit-btn" class="btn-primary text-xs py-2 px-4">Upload</button>
+                <button id="upload-cancel-btn" class="btn-outline text-xs py-2 px-4">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <!-- Comments -->
@@ -88,6 +129,60 @@ const canDelete = user.portalRole === 'president' || user.isAdmin;
     </div>
   </div>
 
+  <!-- Edit modal -->
+  {canEdit && (
+    <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large max-h-[90vh] overflow-y-auto">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">Edit Snag</h2>
+        <div id="edit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Category <span class="text-red-500">*</span></label>
+              <input type="text" id="e-category" class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Subcategory</label>
+              <input type="text" id="e-subcategory" class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Location <span class="text-red-500">*</span></label>
+            <input type="text" id="e-location" class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Description <span class="text-red-500">*</span></label>
+            <textarea id="e-description" rows="3" class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Severity</label>
+              <select id="e-severity" class="w-full px-3 py-2 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Builder Committed Date</label>
+              <input type="date" id="e-builder-committed-date" class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Ascenza Reference</label>
+            <input type="text" id="e-ascenza-reference" placeholder="e.g. ASC-DEFECT-2024-001"
+              class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button id="edit-save-btn" class="btn-primary flex-1">Save Changes</button>
+            <button id="edit-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
   <!-- Reopen modal -->
   <div id="reopen-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
@@ -129,7 +224,7 @@ const canDelete = user.portalRole === 'president' || user.isAdmin;
     </div>
   )}
 
-  <script define:vars={{ snagId, canEdit, canVerify, canDelete }}>
+  <script define:vars={{ snagId, canEdit, canVerify, canDelete, canUpload }}>
     const STATUS_LABEL = {
       OPEN: 'Open', IN_PROGRESS: 'In Progress', RESOLVED: 'Resolved',
       VERIFIED_CLOSED: 'Verified Closed', REOPENED: 'Reopened',
@@ -164,6 +259,16 @@ const canDelete = user.portalRole === 'president' || user.isAdmin;
       const { snag, files, comments } = state;
       if (!snag) return;
 
+      // SLA overdue banner
+      const today = new Date().toISOString().slice(0, 10);
+      if (snag.builder_committed_date && snag.builder_committed_date < today && !['VERIFIED_CLOSED'].includes(snag.status)) {
+        const days = Math.floor((Date.now() - new Date(snag.builder_committed_date).getTime()) / 86_400_000);
+        document.getElementById('sla-banner-text').textContent = `Builder committed date passed ${days} day${days !== 1 ? 's' : ''} ago (${new Date(snag.builder_committed_date).toLocaleDateString('en-IN')}). Follow up with builder.`;
+        document.getElementById('sla-banner').classList.remove('hidden');
+      } else {
+        document.getElementById('sla-banner').classList.add('hidden');
+      }
+
       document.getElementById('snag-header').innerHTML = `
         <div class="flex items-start gap-3 flex-wrap">
           <div class="flex-1 min-w-0">
@@ -182,15 +287,16 @@ const canDelete = user.portalRole === 'president' || user.isAdmin;
 
       // Files
       const filesEl = document.getElementById('files-list');
+      const fmt = b => b < 1024 ? b + 'B' : b < 1048576 ? (b/1024).toFixed(0)+'KB' : (b/1048576).toFixed(1)+'MB';
       if (!files.length) {
-        filesEl.innerHTML = '<div class="text-sm text-text-secondary">No documents uploaded yet.</div>';
+        filesEl.innerHTML = '<div class="px-5 py-4 text-sm text-text-secondary">No documents uploaded yet.</div>';
       } else {
         filesEl.innerHTML = files.map(f => `
-          <div class="flex items-center gap-3 py-2 border-b border-border-light last:border-0">
-            <i class="fas fa-file text-text-secondary" aria-hidden="true"></i>
+          <div class="px-5 py-3 flex items-center gap-3">
+            <i class="fas fa-file-alt text-text-secondary flex-shrink-0" aria-hidden="true"></i>
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium text-text-primary truncate">${f.name}</div>
-              <div class="text-xs text-text-secondary">${(f.file_size_bytes / 1024).toFixed(0)} KB · ${new Date(f.created_at).toLocaleDateString('en-IN')}</div>
+              <div class="text-xs text-text-secondary mt-0.5">${fmt(f.file_size_bytes ?? 0)} · ${new Date(f.created_at).toLocaleDateString('en-IN')}</div>
             </div>
           </div>
         `).join('');
@@ -224,7 +330,7 @@ const canDelete = user.portalRole === 'president' || user.isAdmin;
           <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Category</dt><dd class="text-text-primary">${snag.category}${snag.subcategory ? ` / ${snag.subcategory}` : ''}</dd></div>
           <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Location</dt><dd class="text-text-primary">${snag.location}</dd></div>
           ${snag.ascenza_reference ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Ascenza Ref</dt><dd class="text-text-primary">${snag.ascenza_reference}</dd></div>` : ''}
-          ${snag.builder_committed_date ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Builder Committed</dt><dd class="text-text-primary">${new Date(snag.builder_committed_date).toLocaleDateString('en-IN')}</dd></div>` : ''}
+          ${snag.builder_committed_date ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Builder Committed</dt><dd class="${snag.builder_committed_date < new Date().toISOString().slice(0,10) ? 'text-red-600 font-medium' : 'text-text-primary'}">${new Date(snag.builder_committed_date).toLocaleDateString('en-IN')}</dd></div>` : ''}
           <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Reported</dt><dd class="text-text-primary">${new Date(snag.reported_date).toLocaleDateString('en-IN')}</dd></div>
           ${snag.verified_at ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Verified</dt><dd class="text-green-600">${new Date(snag.verified_at).toLocaleString('en-IN')}</dd></div>` : ''}
           ${snag.reopen_reason ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Reopen Reason</dt><dd class="text-orange-600">${snag.reopen_reason}</dd></div>` : ''}
@@ -301,12 +407,114 @@ const canDelete = user.portalRole === 'president' || user.isAdmin;
       }
     }
 
+    // Edit modal
+    if (canEdit) {
+      document.getElementById('edit-btn')?.addEventListener('click', () => {
+        const s = state.snag;
+        if (!s) return;
+        (document.getElementById('e-category')).value = s.category ?? '';
+        (document.getElementById('e-subcategory')).value = s.subcategory ?? '';
+        (document.getElementById('e-location')).value = s.location ?? '';
+        (document.getElementById('e-description')).value = s.description ?? '';
+        (document.getElementById('e-severity')).value = s.severity ?? 'MEDIUM';
+        (document.getElementById('e-builder-committed-date')).value = s.builder_committed_date ?? '';
+        (document.getElementById('e-ascenza-reference')).value = s.ascenza_reference ?? '';
+        document.getElementById('edit-error').classList.add('hidden');
+        document.getElementById('edit-modal').classList.remove('hidden');
+      });
+
+      document.getElementById('edit-cancel-btn')?.addEventListener('click', () => {
+        document.getElementById('edit-modal').classList.add('hidden');
+      });
+
+      document.getElementById('edit-save-btn')?.addEventListener('click', async () => {
+        const category = (document.getElementById('e-category')).value.trim();
+        const location = (document.getElementById('e-location')).value.trim();
+        const description = (document.getElementById('e-description')).value.trim();
+        const errEl = document.getElementById('edit-error');
+        errEl.classList.add('hidden');
+        if (!category) { errEl.textContent = 'Category is required.'; errEl.classList.remove('hidden'); return; }
+        if (!location) { errEl.textContent = 'Location is required.'; errEl.classList.remove('hidden'); return; }
+        if (!description) { errEl.textContent = 'Description is required.'; errEl.classList.remove('hidden'); return; }
+
+        const btn = document.getElementById('edit-save-btn');
+        btn.disabled = true; btn.textContent = 'Saving…';
+
+        const res = await fetch(`/api/v1/hoto/snags/${snagId}`, {
+          method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category,
+            subcategory: (document.getElementById('e-subcategory')).value.trim() || null,
+            location,
+            description,
+            severity: (document.getElementById('e-severity')).value,
+            builder_committed_date: (document.getElementById('e-builder-committed-date')).value || null,
+            ascenza_reference: (document.getElementById('e-ascenza-reference')).value.trim() || null,
+          }),
+        });
+        btn.disabled = false; btn.textContent = 'Save Changes';
+        if (res.ok) {
+          document.getElementById('edit-modal').classList.add('hidden');
+          await loadData();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          errEl.textContent = d.message ?? d.error ?? 'Failed to save changes.';
+          errEl.classList.remove('hidden');
+        }
+      });
+    }
+
+    // Upload file
+    if (canUpload) {
+      document.getElementById('upload-btn')?.addEventListener('click', () => {
+        document.getElementById('upload-form-wrapper').classList.toggle('hidden');
+      });
+      document.getElementById('upload-cancel-btn')?.addEventListener('click', () => {
+        document.getElementById('upload-form-wrapper').classList.add('hidden');
+      });
+      document.getElementById('upload-submit-btn')?.addEventListener('click', async () => {
+        const fileInput = document.getElementById('upload-file');
+        const file = fileInput.files?.[0];
+        const errEl = document.getElementById('upload-error');
+        const successEl = document.getElementById('upload-success');
+        errEl.classList.add('hidden'); successEl.classList.add('hidden');
+        if (!file) { errEl.textContent = 'Please select a file.'; errEl.classList.remove('hidden'); return; }
+
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const targetPath = `snags/${snagId}/${Date.now()}_${safeName}`;
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('item_id', snagId);
+        fd.append('item_type', 'snag_item');
+        fd.append('target_path', targetPath);
+        fd.append('source_description', (document.getElementById('upload-desc')).value.trim());
+
+        const btn = document.getElementById('upload-submit-btn');
+        btn.disabled = true; btn.textContent = 'Uploading…';
+        const res = await fetch('/api/v1/hoto/upload', {
+          method: 'POST', credentials: 'include', body: fd,
+        });
+        btn.disabled = false; btn.textContent = 'Upload';
+        if (res.ok) {
+          successEl.textContent = 'File uploaded successfully.';
+          successEl.classList.remove('hidden');
+          fileInput.value = '';
+          (document.getElementById('upload-desc')).value = '';
+          await loadData();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          errEl.textContent = d.message ?? d.error ?? 'Upload failed.';
+          errEl.classList.remove('hidden');
+        }
+      });
+    }
+
     // Reopen modal
     document.getElementById('reopen-cancel-btn')?.addEventListener('click', () => {
       document.getElementById('reopen-modal').classList.add('hidden');
     });
     document.getElementById('reopen-submit-btn')?.addEventListener('click', async () => {
-      const reason = document.getElementById('reopen-reason').value.trim();
+      const reason = (document.getElementById('reopen-reason')).value.trim();
       const errEl = document.getElementById('reopen-error');
       if (!reason) { errEl.textContent = 'Reopen reason is required.'; errEl.classList.remove('hidden'); return; }
       const btn = document.getElementById('reopen-submit-btn');
@@ -331,7 +539,7 @@ const canDelete = user.portalRole === 'president' || user.isAdmin;
       document.getElementById('delete-modal').classList.add('hidden');
     });
     document.getElementById('delete-submit-btn')?.addEventListener('click', async () => {
-      const reason = document.getElementById('delete-reason').value.trim();
+      const reason = (document.getElementById('delete-reason')).value.trim();
       const errEl = document.getElementById('delete-error');
       if (!reason) { errEl.textContent = 'Deletion reason is required.'; errEl.classList.remove('hidden'); return; }
       const btn = document.getElementById('delete-submit-btn');

@@ -78,3 +78,48 @@ export const PATCH: APIRoute = async ({ request, params }) => {
     return normalizeError(err, request.url);
   }
 };
+
+// DELETE — remove a candidate (auth: vendor.create, only allowed in DRAFT or OPEN_FOR_QUOTES)
+export const DELETE: APIRoute = async ({ request, params }) => {
+  try {
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED', message: 'Authentication required' }, { status: 401 });
+    requireFeature(user, 'vendor.create');
+
+    const reqId       = params.id!;
+    const candidateId = params.candidateId!;
+    const sb = getSupabaseServiceClient();
+
+    const { data: req } = await sb
+      .from('vendor_requirements')
+      .select('id, status')
+      .eq('id', reqId)
+      .eq('society_id', SOCIETY_ID)
+      .single();
+
+    if (!req) return Response.json({ error: 'NOT_FOUND', message: 'Vendor requirement not found' }, { status: 404 });
+
+    if (!['DRAFT', 'OPEN_FOR_QUOTES'].includes((req as any).status)) {
+      return Response.json({ error: 'CONFLICT', message: 'Cannot remove candidates after voting has started' }, { status: 409 });
+    }
+
+    const { error } = await sb
+      .from('vendor_candidates')
+      .delete()
+      .eq('id', candidateId)
+      .eq('requirement_id', reqId);
+
+    if (error) throw Object.assign(new Error(error.message), { status: 500 });
+
+    await writeAuditLog({
+      societyId: SOCIETY_ID, userId: user.id,
+      action: 'DELETE', resourceType: 'vendor_candidates', resourceId: candidateId,
+      ip: extractClientIP(request),
+      newValues: { removed: true },
+    });
+
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    return normalizeError(err, request.url);
+  }
+};

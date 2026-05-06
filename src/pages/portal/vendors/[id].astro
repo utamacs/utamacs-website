@@ -126,6 +126,12 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
             <input type="checkbox" id="c-site-visited" class="rounded" />
             Site visited
           </label>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Quote Document (PDF/image)</label>
+            <input type="file" id="c-quote-file" accept=".pdf,.jpg,.jpeg,.png"
+              class="w-full text-sm text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary-600 file:text-white hover:file:bg-primary-700" />
+            <div id="c-upload-status" class="hidden mt-1 text-xs"></div>
+          </div>
           <div class="flex gap-3 pt-1">
             <button id="candidate-save-btn" class="btn-primary flex-1">Add Candidate</button>
             <button id="candidate-cancel-btn" class="btn-outline flex-1">Cancel</button>
@@ -246,38 +252,82 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
         </div>
       `;
 
+      // Voting deadline countdown
+      if (req.voting_closes_at && req.status === 'VOTING_OPEN') {
+        const closesAt = new Date(req.voting_closes_at);
+        const msLeft = closesAt.getTime() - Date.now();
+        if (msLeft > 0) {
+          const days = Math.floor(msLeft / 86_400_000);
+          const hrs  = Math.floor((msLeft % 86_400_000) / 3_600_000);
+          const mins = Math.floor((msLeft % 3_600_000) / 60_000);
+          const countdownText = days > 0 ? `${days}d ${hrs}h remaining` : hrs > 0 ? `${hrs}h ${mins}m remaining` : `${mins}m remaining`;
+          const urgency = msLeft < 86_400_000 ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800';
+          const existingBanner = document.getElementById('deadline-banner');
+          if (!existingBanner) {
+            const banner = document.createElement('div');
+            banner.id = 'deadline-banner';
+            banner.className = `mb-4 p-3 ${urgency} border rounded-xl text-sm flex items-center gap-2`;
+            banner.innerHTML = `<i class="fas fa-clock"></i> Voting closes ${closesAt.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} — <strong>${countdownText}</strong>`;
+            document.getElementById('req-header').after(banner);
+          }
+        }
+      }
+
       // Candidates
       const candEl = document.getElementById('candidates-list');
       if (!candidates.length) {
         candEl.innerHTML = '<div class="p-5 text-sm text-text-secondary text-center">No candidates added yet.</div>';
       } else {
+        const canRemove = canCreate && ['DRAFT','OPEN_FOR_QUOTES'].includes(req.status);
         candEl.innerHTML = candidates.map(c => {
           const isSelected = req.selected_vendor_id === c.id;
           const tallyCount = vote_summary?.tally?.[c.id] ?? 0;
+          const quoteLink = c.github_path
+            ? `<a href="${c.github_path}" target="_blank" rel="noopener" class="text-xs text-primary-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i>Quote doc</a>`
+            : '';
           return `
             <div class="p-4 ${isSelected ? 'bg-green-50' : ''}">
               <div class="flex items-start justify-between gap-3">
                 <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 flex-wrap">
                     <span class="font-medium text-sm text-text-primary">${c.vendor_name}</span>
                     ${isSelected ? '<span class="text-xs px-1.5 py-0.5 bg-green-600 text-white rounded">Selected</span>' : ''}
                     ${c.site_visited ? '<span class="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Site Visited</span>' : ''}
+                    ${quoteLink}
                   </div>
-                  <div class="flex gap-4 mt-1 text-xs text-text-secondary">
+                  <div class="flex gap-4 mt-1 text-xs text-text-secondary flex-wrap">
                     ${c.contact_person ? `<span><i class="fas fa-user mr-1"></i>${c.contact_person}</span>` : ''}
                     ${c.contact_phone ? `<span><i class="fas fa-phone mr-1"></i>${c.contact_phone}</span>` : ''}
                     ${c.quote_monthly ? `<span><i class="fas fa-rupee-sign mr-1"></i>${fmt(c.quote_monthly)}/mo</span>` : ''}
                     ${c.quote_setup ? `<span>Setup: ${fmt(c.quote_setup)}</span>` : ''}
                   </div>
                 </div>
-                <div class="text-right flex-shrink-0">
-                  <div class="text-lg font-bold text-text-primary">${tallyCount}</div>
-                  <div class="text-xs text-text-secondary">vote${tallyCount !== 1 ? 's' : ''}</div>
+                <div class="flex items-center gap-3 flex-shrink-0">
+                  <div class="text-right">
+                    <div class="text-lg font-bold text-text-primary">${tallyCount}</div>
+                    <div class="text-xs text-text-secondary">vote${tallyCount !== 1 ? 's' : ''}</div>
+                  </div>
+                  ${canRemove ? `<button class="remove-candidate text-xs text-red-500 hover:text-red-700" data-id="${c.id}" title="Remove candidate"><i class="fas fa-times"></i></button>` : ''}
                 </div>
               </div>
             </div>
           `;
         }).join('');
+
+        if (canRemove) {
+          candEl.querySelectorAll('.remove-candidate').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const candidateId = btn.dataset.id;
+              const name = btn.closest('.p-4').querySelector('.font-medium.text-sm').textContent.trim();
+              if (!confirm(`Remove ${name} from this evaluation?`)) return;
+              const res = await fetch(`/api/v1/vendors/requirements/${reqId}/candidates/${candidateId}`, {
+                method: 'DELETE', credentials: 'include',
+              });
+              if (res.ok || res.status === 204) { await loadData(); }
+              else { const d = await res.json().catch(() => ({})); alert(d.message ?? 'Failed to remove candidate.'); }
+            });
+          });
+        }
       }
 
       // Voting section
@@ -347,6 +397,18 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
           </div>
         `;
       } else if (req.status === 'VOTING_OPEN' && canVote) {
+        // Show candidate quote docs for reference
+        const withDocs = candidates.filter(c => c.github_path);
+        if (withDocs.length) {
+          voteHtml += `
+            <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+              <div class="font-medium text-blue-800 mb-1.5"><i class="fas fa-file-pdf mr-1"></i> Quote Documents</div>
+              <div class="space-y-1">
+                ${withDocs.map(c => `<div><a href="${c.github_path}" target="_blank" rel="noopener" class="text-primary-600 hover:underline text-xs">${c.vendor_name}</a></div>`).join('')}
+              </div>
+            </div>
+          `;
+        }
         // Populate vote modal candidates
         const sel = document.getElementById('vote-vendor-id');
         if (sel) {
@@ -530,7 +592,9 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
     document.getElementById('candidate-save-btn')?.addEventListener('click', async () => {
       const vendorName = document.getElementById('c-vendor-name').value.trim();
       const errEl = document.getElementById('candidate-error');
+      const uploadStatus = document.getElementById('c-upload-status');
       errEl.classList.add('hidden');
+      uploadStatus.classList.add('hidden');
 
       if (!vendorName) { errEl.textContent = 'Vendor name is required.'; errEl.classList.remove('hidden'); return; }
 
@@ -550,21 +614,50 @@ const canVote       = true; // vendor.vote — all active members; eligibility c
         }),
       });
 
-      btn.disabled = false; btn.textContent = 'Add Candidate';
-
-      if (res.ok) {
-        document.getElementById('add-candidate-modal').classList.add('hidden');
-        // Reset form
-        ['c-vendor-name','c-contact-person','c-contact-phone','c-contact-email','c-quote-monthly','c-quote-setup'].forEach(id => {
-          document.getElementById(id).value = '';
-        });
-        document.getElementById('c-site-visited').checked = false;
-        await loadData();
-      } else {
+      if (!res.ok) {
+        btn.disabled = false; btn.textContent = 'Add Candidate';
         const d = await res.json().catch(() => ({}));
         errEl.textContent = d.message ?? d.error ?? 'Failed to add candidate.';
         errEl.classList.remove('hidden');
+        return;
       }
+
+      const newCandidate = await res.json();
+
+      // Optionally upload quote document
+      const quoteFile = document.getElementById('c-quote-file').files?.[0];
+      if (quoteFile && newCandidate.id) {
+        btn.textContent = 'Uploading quote…';
+        uploadStatus.textContent = 'Uploading quote document…';
+        uploadStatus.className = 'mt-1 text-xs text-text-secondary';
+        uploadStatus.classList.remove('hidden');
+        const safeName = quoteFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const fd = new FormData();
+        fd.append('file', quoteFile);
+        fd.append('item_id', newCandidate.id);
+        fd.append('item_type', 'vendor_candidate');
+        fd.append('target_path', `vendors/${reqId}/${newCandidate.id}/${Date.now()}_${safeName}`);
+        fd.append('source_description', `Quote from ${vendorName}`);
+        const upRes = await fetch('/api/v1/hoto/upload', { method: 'POST', credentials: 'include', body: fd });
+        if (upRes.ok) {
+          uploadStatus.textContent = 'Quote document queued for upload.';
+          uploadStatus.className = 'mt-1 text-xs text-green-600';
+        } else {
+          uploadStatus.textContent = 'Candidate added but quote upload failed.';
+          uploadStatus.className = 'mt-1 text-xs text-amber-600';
+        }
+      }
+
+      btn.disabled = false; btn.textContent = 'Add Candidate';
+      document.getElementById('add-candidate-modal').classList.add('hidden');
+      // Reset form
+      ['c-vendor-name','c-contact-person','c-contact-phone','c-contact-email','c-quote-monthly','c-quote-setup'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('c-site-visited').checked = false;
+      document.getElementById('c-quote-file').value = '';
+      uploadStatus.classList.add('hidden');
+      await loadData();
     });
 
     loadData();

@@ -31,6 +31,15 @@ if (!user.isAdmin) return Astro.redirect('/portal/admin');
     ))}
   </div>
 
+  <!-- Search within category -->
+  <div class="mb-5">
+    <div class="relative max-w-sm">
+      <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
+      <input type="search" id="rules-search" placeholder="Search rules…"
+        class="w-full pl-10 pr-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+    </div>
+  </div>
+
   <div id="rules-container">
     <div class="text-sm text-text-secondary animate-pulse">Loading rules…</div>
   </div>
@@ -86,6 +95,7 @@ if (!user.isAdmin) return Astro.redirect('/portal/admin');
     let activeCategory = 'PARAMETER';
     let editingRuleCode = '';
     let resetRuleCode = '';
+    let searchQuery = '';
 
     function displayValue(rule: any): string {
       const v = rule.current_value;
@@ -107,7 +117,11 @@ if (!user.isAdmin) return Astro.redirect('/portal/admin');
 
     function renderCategory(cat: string) {
       activeCategory = cat;
-      const rules: any[] = (allRules[cat] ?? []) as any[];
+      let rules: any[] = (allRules[cat] ?? []) as any[];
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        rules = rules.filter((r: any) => r.rule_code?.toLowerCase().includes(q) || r.label?.toLowerCase().includes(q) || r.description?.toLowerCase().includes(q));
+      }
       const container = document.getElementById('rules-container');
 
       if (!rules.length) {
@@ -140,6 +154,11 @@ if (!user.isAdmin) return Astro.redirect('/portal/admin');
                 <td class="p-4">
                   <code class="text-xs bg-gray-100 px-2 py-1 rounded ${isChanged(rule) ? 'text-amber-700 bg-amber-50' : ''}">${displayValue(rule)}</code>
                   ${isChanged(rule) ? '<span class="ml-1 text-xs text-amber-600">modified</span>' : ''}
+                  ${isChanged(rule) && rule.changed_at ? `
+                    <div class="text-xs text-text-secondary mt-1">
+                      ${rule.changed_by_name ? `<span class="font-medium">${rule.changed_by_name}</span> · ` : ''}${new Date(rule.changed_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}
+                      ${rule.change_reason ? `<span class="block italic mt-0.5 text-text-secondary">"${rule.change_reason}"</span>` : ''}
+                    </div>` : ''}
                 </td>
                 <td class="p-4 text-xs text-text-secondary">
                   <code class="bg-gray-50 px-1.5 py-0.5 rounded">${JSON.stringify(rule.default_value)}</code>
@@ -194,6 +213,16 @@ if (!user.isAdmin) return Astro.redirect('/portal/admin');
         btn.classList.remove('border-transparent','text-text-secondary');
         renderCategory((btn as HTMLElement).dataset.cat!);
       });
+    });
+
+    // Search
+    let searchTimer: ReturnType<typeof setTimeout>;
+    document.getElementById('rules-search')!.addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        searchQuery = (e.target as HTMLInputElement).value.trim();
+        renderCategory(activeCategory);
+      }, 250);
     });
 
     // Edit modal

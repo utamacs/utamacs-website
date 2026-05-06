@@ -63,6 +63,10 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
       <option value="COMMON_AREA">Common Area</option>
       <option value="APARTMENT">Apartment</option>
     </select>
+    <select id="category-filter" class="px-4 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+      <option value="">All categories</option>
+      {['Civil & Structural','Seepage / Water','Electrical','Plumbing','Flooring','Painting','Exterior & Facade','Common Area','Lift & Elevator','Other'].map(c => <option value={c}>{c}</option>)}
+    </select>
   </div>
 
   <!-- Create modal -->
@@ -168,12 +172,13 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
 
     let debounceTimer;
 
-    async function loadItems(q = '', status = '', severity = '', scope = '') {
+    async function loadItems(q = '', status = '', severity = '', scope = '', category = '') {
       const params = new URLSearchParams({ limit: '200' });
       if (q) params.set('q', q);
       if (status) params.set('status', status);
       if (severity) params.set('severity', severity);
       if (scope) params.set('snag_scope', scope);
+      if (category) params.set('category', category);
 
       const res = await fetch(`/api/v1/hoto/snags?${params}`, { credentials: 'include' });
       const items = res.ok ? await res.json() : [];
@@ -208,22 +213,28 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
       `).join('');
     }
 
+    function getFilters() {
+      return {
+        q: document.getElementById('search-input').value.trim(),
+        status: document.getElementById('status-filter').value,
+        severity: document.getElementById('severity-filter').value,
+        scope: document.getElementById('scope-filter').value,
+        category: document.getElementById('category-filter').value,
+      };
+    }
+
     document.getElementById('search-input')?.addEventListener('input', e => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        loadItems(e.target.value.trim(),
-          document.getElementById('status-filter').value,
-          document.getElementById('severity-filter').value,
-          document.getElementById('scope-filter').value);
+        const f = getFilters();
+        loadItems(f.q, f.status, f.severity, f.scope, f.category);
       }, 350);
     });
 
-    ['status-filter','severity-filter','scope-filter'].forEach(id => {
+    ['status-filter','severity-filter','scope-filter','category-filter'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', () => {
-        loadItems(document.getElementById('search-input').value.trim(),
-          document.getElementById('status-filter').value,
-          document.getElementById('severity-filter').value,
-          document.getElementById('scope-filter').value);
+        const f = getFilters();
+        loadItems(f.q, f.status, f.severity, f.scope, f.category);
       });
     });
 

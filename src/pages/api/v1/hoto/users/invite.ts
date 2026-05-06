@@ -122,7 +122,7 @@ export const POST: APIRoute = async ({ request }) => {
         invited_by: user.id,
         token_expires_at: tokenExpiresAt,
       })
-      .select('id, email, token_expires_at')
+      .select('id, email, token, token_expires_at')
       .single();
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });

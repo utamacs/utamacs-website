@@ -54,35 +54,28 @@ const myPendingStatuses = isAdmin
     let currentFilter = isAdmin ? 'all' : null;
 
     async function loadPending(statusFilter) {
-      const params = new URLSearchParams({ limit: '50' });
-      if (statusFilter && statusFilter !== 'all') {
-        params.set('status', statusFilter);
-      } else if (!isAdmin) {
-        // Non-admin: only their statuses
-        myPendingStatuses.forEach(s => params.append('status', s));
-      }
-      // Always filter to pending approval statuses
-      if (!statusFilter || statusFilter === 'all') {
-        if (isAdmin) {
-          params.set('status', 'PENDING_SECRETARY');
-          params.append('status', 'PENDING_PRESIDENT');
-        }
-      }
-
-      const res = await fetch(`/api/v1/hoto/items?status=${myPendingStatuses.join('&status=')}&limit=50`, { credentials: 'include' });
-      if (!res.ok) {
-        document.getElementById('pending-container').innerHTML = '<p class="text-red-600 text-sm">Failed to load items.</p>';
-        return;
-      }
-      const { items } = await res.json();
-
-      const filtered = statusFilter && statusFilter !== 'all'
-        ? items.filter(i => i.status === statusFilter)
+      // Fetch all relevant pending statuses in two requests (API only takes one status at a time)
+      const statusesToFetch = statusFilter && statusFilter !== 'all'
+        ? [statusFilter]
         : isAdmin
-          ? items.filter(i => ['PENDING_SECRETARY','PENDING_PRESIDENT'].includes(i.status))
-          : items.filter(i => myPendingStatuses.includes(i.status));
+          ? ['PENDING_SECRETARY', 'PENDING_PRESIDENT']
+          : myPendingStatuses;
 
-      renderItems(filtered);
+      const container = document.getElementById('pending-container');
+
+      try {
+        const results = await Promise.all(
+          statusesToFetch.map(s =>
+            fetch(`/api/v1/hoto/items?status=${s}&limit=100`, { credentials: 'include' })
+              .then(r => r.ok ? r.json() : { items: [] })
+              .then(d => d.items ?? d)
+          )
+        );
+        const items = results.flat().sort((a, b) => new Date(a.last_updated_at).getTime() - new Date(b.last_updated_at).getTime());
+        renderItems(items);
+      } catch {
+        container.innerHTML = '<p class="text-red-600 text-sm">Failed to load items.</p>';
+      }
     }
 
     function renderItems(items) {

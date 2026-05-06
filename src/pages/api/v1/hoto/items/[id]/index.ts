@@ -51,8 +51,22 @@ export const GET: APIRoute = async ({ request, params }) => {
       return Response.json({ error: 'NOT_FOUND', message: 'HOTO item not found' }, { status: 404 });
     }
 
+    const itemRow = itemResult.data as any;
+
+    // Resolve approver names from profiles
+    const approverIds = [itemRow.president_approved_by, itemRow.secretary_approved_by].filter(Boolean);
+    let approverNames: Record<string, string> = {};
+    if (approverIds.length) {
+      const { data: approverProfiles } = await sb.from('profiles').select('id, full_name').in('id', approverIds);
+      for (const p of approverProfiles ?? []) approverNames[(p as any).id] = (p as any).full_name;
+    }
+
     return Response.json({
-      item: itemResult.data,
+      item: {
+        ...itemRow,
+        president_approved_by_name: itemRow.president_approved_by ? (approverNames[itemRow.president_approved_by] ?? null) : null,
+        secretary_approved_by_name: itemRow.secretary_approved_by ? (approverNames[itemRow.secretary_approved_by] ?? null) : null,
+      },
       required_docs: docsResult.data ?? [],
       files: filesResult.data ?? [],
       comments: (commentsResult.data ?? []).reverse(),

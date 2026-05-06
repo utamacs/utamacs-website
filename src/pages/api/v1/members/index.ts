@@ -14,9 +14,12 @@ export const GET: APIRoute = async ({ request, url }) => {
     const q = url.searchParams.get('q')?.trim() ?? '';
     const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '50'), 100);
 
+    const isPrivileged = ['executive', 'secretary', 'president', 'admin'].includes(user.portalRole ?? user.role);
+    const isAdmin = user.isAdmin ?? user.role === 'admin';
+
     let query = sb
       .from('profiles')
-      .select('id, full_name, residency_type, move_in_date, is_active, units(unit_number, block)')
+      .select(`id, full_name, residency_type, move_in_date, is_active, units(unit_number, block)${isPrivileged ? ', phone_encrypted' : ''}`)
       .eq('society_id', SOCIETY_ID)
       .eq('is_active', true)
       .order('full_name')
@@ -35,7 +38,20 @@ export const GET: APIRoute = async ({ request, url }) => {
     const roleMap: Record<string, { role: string; expires_at: string | null }> = {};
     for (const r of roles ?? []) roleMap[r.user_id] = { role: r.role, expires_at: r.expires_at };
 
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
+    // Fetch auth emails for privileged viewers (single admin API call)
+    let emailMap: Record<string, string> = {};
+    if (isPrivileged && memberIds.length) {
+      try {
+        const { data: authData } = await sb.auth.admin.listUsers({ perPage: 1000 });
+        const memberIdSet = new Set(memberIds);
+        for (const u of authData?.users ?? []) {
+          if (memberIdSet.has(u.id) && u.email) emailMap[u.id] = u.email;
+        }
+      } catch {
+        // Non-fatal — contact info just won't include email
+      }
+    }
+
     const members = (data ?? []).map((m: any) => ({
       id: m.id,
       full_name: m.full_name,
@@ -46,6 +62,8 @@ export const GET: APIRoute = async ({ request, url }) => {
       ...(isPrivileged ? {
         move_in_date: m.move_in_date,
         role_expires_at: roleMap[m.id]?.expires_at ?? null,
+        phone: m.phone_encrypted ?? null,
+        email: emailMap[m.id] ?? null,
       } : {}),
     }));
 

@@ -190,18 +190,13 @@ for (const [key, meta] of Object.entries(FEATURES)) {
           const role = (btn as HTMLElement).dataset.role!;
           const feat = (btn as HTMLElement).dataset.feature!;
           const cur  = (btn as HTMLElement).dataset.enabled === 'true';
+          const newVal = !cur;
           const idx = pendingChanges.findIndex(c => c.role === role && c.feature === feat);
           if (idx >= 0) pendingChanges.splice(idx, 1);
           const orig = matrix[feat]?.[role]?.enabled ?? false;
-          if ((!cur) !== orig) {
-            pendingChanges.push({ role, feature: feat, enabled: !cur });
-          } else if ((!cur) === orig && idx >= 0) {
-            // removed — do nothing (already spliced)
-          } else if ((!cur) !== orig) {
-            pendingChanges.push({ role, feature: feat, enabled: !cur });
+          if (newVal !== orig) {
+            pendingChanges.push({ role, feature: feat, enabled: newVal });
           }
-          // Ensure we track the toggle
-          if (idx < 0) pendingChanges.push({ role, feature: feat, enabled: !cur });
           updateSaveBanner();
           renderMatrix();
         });

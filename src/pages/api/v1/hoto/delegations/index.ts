@@ -15,9 +15,10 @@ const DELEGATION_FEATURE_MAP: Record<string, string> = {
   SECRETARY_TO_JOINT_SEC: 'hoto.approve_secretary',
 };
 
-// GET — list active approval delegations with delegate profile info
+// GET — list approval delegations with delegate profile info
 // Auth: executive or above (portal_role in executive/secretary/president) or admin
-export const GET: APIRoute = async ({ request }) => {
+// Query: ?active=true (default) | false | all
+export const GET: APIRoute = async ({ request, url }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
     if (!user) {
@@ -36,18 +37,22 @@ export const GET: APIRoute = async ({ request }) => {
       );
     }
 
+    const activeParam = url.searchParams.get('active') ?? 'true';
     const sb = getSupabaseServiceClient();
 
-    const { data, error } = await sb
+    let q = sb
       .from('approval_delegations')
       .select(`
-        id, from_role, to_user_id, delegation_type, reason,
-        created_at, active,
+        id, from_role, to_user_id, delegation_type, reason, end_date,
+        created_at, deactivated_at, active,
         delegate:profiles!approval_delegations_to_user_id_fkey(full_name, portal_role, committee_title)
       `)
       .eq('society_id', SOCIETY_ID)
-      .eq('active', true)
       .order('created_at', { ascending: false });
+
+    if (activeParam !== 'all') q = q.eq('active', activeParam === 'true');
+
+    const { data, error } = await q;
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
@@ -83,6 +88,7 @@ export const POST: APIRoute = async ({ request }) => {
       to_user_id?: string;
       reason?: string;
       delegation_type?: string;
+      end_date?: string;
     };
 
     if (!body.from_role || !VALID_FROM_ROLES.includes(body.from_role as typeof VALID_FROM_ROLES[number])) {
@@ -175,6 +181,7 @@ export const POST: APIRoute = async ({ request }) => {
         delegation_type: delegationType,
         active: true,
         activated_by: user.id,
+        ...(body.end_date?.trim() ? { end_date: body.end_date.trim() } : {}),
       })
       .select()
       .single();

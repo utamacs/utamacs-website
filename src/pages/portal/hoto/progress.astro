@@ -44,26 +44,24 @@ if (!user) return Astro.redirect('/portal/login');
   </div>
 
   <script>
-    const STATUS_WEIGHT: Record<string, number> = {
-      CLOSED: 1, APPROVED: 0.9, PENDING_PRESIDENT: 0.7, PENDING_SECRETARY: 0.6,
-      UNDER_REVIEW: 0.5, IN_PROGRESS: 0.3, NOT_STARTED: 0,
-    };
-    const CLOSED_STATUSES = ['CLOSED', 'REJECTED'];
+    // APPROVED counts toward completion; REJECTED does not (it means builder refused, not done)
+    const DONE_STATUSES = ['CLOSED', 'APPROVED'];
 
     async function load() {
       const res = await fetch('/api/v1/hoto/items?limit=200&include_closed=true', { credentials: 'include' });
       if (!res.ok) { document.getElementById('overall-card')!.innerHTML = '<p class="text-red-600 text-sm">Failed to load.</p>'; return; }
-      const { items } = await res.json();
+      const data = await res.json();
+      const items: any[] = data.items ?? data;
 
       const today = new Date().toISOString().slice(0, 10);
       const total = items.length;
-      const closed = items.filter((i: any) => CLOSED_STATUSES.includes(i.status)).length;
-      const pct = total > 0 ? Math.round((closed / total) * 100) : 0;
-      const overdue = items.filter((i: any) => i.builder_sla_date && i.builder_sla_date < today && !CLOSED_STATUSES.includes(i.status));
+      const done = items.filter((i: any) => DONE_STATUSES.includes(i.status)).length;
+      const rejected = items.filter((i: any) => i.status === 'REJECTED').length;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      const overdue = items.filter((i: any) => i.builder_sla_date && i.builder_sla_date < today && !DONE_STATUSES.includes(i.status) && i.status !== 'REJECTED');
       const pendingApproval = items.filter((i: any) => ['PENDING_SECRETARY','PENDING_PRESIDENT'].includes(i.status));
 
       // Overall card
-      const color = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400';
       document.getElementById('overall-card')!.innerHTML = `
         <div class="flex flex-col sm:flex-row sm:items-center gap-6">
           <div class="relative size-28 sm:size-36 mx-auto sm:mx-0 shrink-0">
@@ -83,8 +81,8 @@ if (!user) return Astro.redirect('/portal/login');
               <div class="text-xs text-text-secondary mt-0.5">Total Items</div>
             </div>
             <div class="p-3 rounded-xl bg-green-50">
-              <div class="text-2xl font-bold text-green-700">${closed}</div>
-              <div class="text-xs text-text-secondary mt-0.5">Closed</div>
+              <div class="text-2xl font-bold text-green-700">${done}</div>
+              <div class="text-xs text-text-secondary mt-0.5">Closed / Approved</div>
             </div>
             <div class="p-3 rounded-xl bg-purple-50">
               <div class="text-2xl font-bold text-purple-700">${pendingApproval.length}</div>
@@ -95,34 +93,38 @@ if (!user) return Astro.redirect('/portal/login');
               <div class="text-xs text-text-secondary mt-0.5">SLA Overdue</div>
             </div>
           </div>
-        </div>`;
+        </div>
+        ${rejected > 0 ? `<div class="mt-4 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"><i class="fas fa-exclamation-circle"></i> ${rejected} item${rejected !== 1 ? 's' : ''} rejected by builder — excluded from completion %.</div>` : ''}`;
 
       // Category breakdown
-      const cats: Record<string, { total: number; closed: number }> = {};
+      const cats: Record<string, { total: number; done: number; rejected: number }> = {};
       for (const it of items) {
         const cat = (it as any).ascenza_category ?? 'Uncategorised';
-        if (!cats[cat]) cats[cat] = { total: 0, closed: 0 };
+        if (!cats[cat]) cats[cat] = { total: 0, done: 0, rejected: 0 };
         cats[cat].total++;
-        if (CLOSED_STATUSES.includes((it as any).status)) cats[cat].closed++;
+        if (DONE_STATUSES.includes((it as any).status)) cats[cat].done++;
+        if ((it as any).status === 'REJECTED') cats[cat].rejected++;
       }
       const sortedCats = Object.entries(cats).sort(([, a], [, b]) => b.total - a.total);
 
-      document.getElementById('category-rows')!.innerHTML = sortedCats.map(([cat, { total, closed }]) => {
-        const pct = total > 0 ? Math.round((closed / total) * 100) : 0;
+      document.getElementById('category-rows')!.innerHTML = sortedCats.map(([cat, { total, done, rejected }]) => {
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
         const barColor = pct === 100 ? 'bg-green-500' : pct >= 50 ? 'bg-primary-600' : 'bg-amber-400';
+        const encodedCat = encodeURIComponent(cat);
         return `
-          <div class="flex items-center gap-4 p-4">
+          <a href="/portal/hoto?category=${encodedCat}" class="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors group">
             <div class="flex-1 min-w-0">
               <div class="flex justify-between mb-1">
-                <span class="text-sm text-text-primary font-medium truncate">${cat}</span>
-                <span class="text-xs text-text-secondary ml-2 shrink-0">${closed}/${total}</span>
+                <span class="text-sm text-text-primary font-medium truncate group-hover:text-primary-600 transition-colors">${cat}</span>
+                <span class="text-xs text-text-secondary ml-2 shrink-0">${done}/${total}${rejected > 0 ? ` <span class="text-amber-600">(${rejected} rejected)</span>` : ''}</span>
               </div>
               <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div class="h-full ${barColor} rounded-full transition-all" style="width:${pct}%"></div>
               </div>
             </div>
             <span class="text-sm font-semibold ${pct === 100 ? 'text-green-600' : 'text-text-secondary'} w-10 text-right">${pct}%</span>
-          </div>`;
+            <i class="fas fa-chevron-right text-xs text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity"></i>
+          </a>`;
       }).join('') || '<div class="p-4 text-center text-sm text-text-secondary">No items.</div>';
 
       // Overdue SLA

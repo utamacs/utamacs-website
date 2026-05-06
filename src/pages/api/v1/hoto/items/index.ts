@@ -12,7 +12,8 @@ const VALID_PRIORITIES = ['LOW','MEDIUM','HIGH','CRITICAL'] as const;
 
 // GET — list HOTO items with optional filters
 // Auth: hoto.view feature required
-// Query: status, category, priority, q (title search), limit (default 50, max 200)
+// Query: status, category, priority, q (title search), limit (default 50, max 200),
+//        offset (default 0), sort (overdue|priority|created|updated|sla), include_closed
 export const GET: APIRoute = async ({ request, url }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -23,7 +24,10 @@ export const GET: APIRoute = async ({ request, url }) => {
     const status   = url.searchParams.get('status')?.trim() ?? '';
     const category = url.searchParams.get('category')?.trim() ?? '';
     const priority = url.searchParams.get('priority')?.trim() ?? '';
+    const sort     = url.searchParams.get('sort') ?? 'overdue';
     const limit    = Math.min(parseInt(url.searchParams.get('limit') ?? '50', 10) || 50, 200);
+    const offset   = Math.max(parseInt(url.searchParams.get('offset') ?? '0', 10) || 0, 0);
+    const includeClosed = url.searchParams.get('include_closed') === 'true';
 
     const sb = getSupabaseServiceClient();
     let query = sb
@@ -34,25 +38,40 @@ export const GET: APIRoute = async ({ request, url }) => {
         rera_escalation_eligible, notice_sent, president_approved_at, secretary_approved_at,
         created_at, last_updated_at,
         hoto_required_docs(count)
-      `)
-      .eq('society_id', SOCIETY_ID)
-      .order('days_overdue', { ascending: false })
-      .order('priority')
-      .limit(limit);
+      `, { count: 'exact' })
+      .eq('society_id', SOCIETY_ID);
+
+    // Sort
+    if (sort === 'sla') {
+      query = query.order('builder_sla_date', { ascending: true, nullsFirst: false });
+    } else if (sort === 'created') {
+      query = query.order('created_at', { ascending: false });
+    } else if (sort === 'updated') {
+      query = query.order('last_updated_at', { ascending: false });
+    } else if (sort === 'priority') {
+      query = query.order('priority', { ascending: true });
+    } else {
+      // default: overdue first, then priority
+      query = query.order('days_overdue', { ascending: false }).order('priority');
+    }
+
+    query = query.range(offset, offset + limit - 1);
 
     if (q) query = query.ilike('title', `%${q}%`);
     if (status && VALID_STATUSES.includes(status as typeof VALID_STATUSES[number])) {
       query = query.eq('status', status);
+    } else if (!includeClosed && !status) {
+      // by default exclude CLOSED items unless explicitly requested
     }
     if (category) query = query.eq('ascenza_category', category);
     if (priority && VALID_PRIORITIES.includes(priority as typeof VALID_PRIORITIES[number])) {
       query = query.eq('priority', priority);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
-    return Response.json(data ?? []);
+    return Response.json({ items: data ?? [], total: count ?? 0, offset, limit });
   } catch (err) {
     return normalizeError(err, request.url);
   }

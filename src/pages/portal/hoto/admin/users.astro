@@ -45,10 +45,18 @@ if (!user.isAdmin) return Astro.redirect('/portal');
           <p class="text-xs text-text-secondary mt-1">The role determines permissions. Treasurer finance access is granted automatically via committee title.</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-text-primary mb-1.5">Committee Title <span class="text-text-secondary font-normal">(optional display label)</span></label>
-          <input type="text" id="title-input" placeholder="e.g. Vice President, Joint Treasurer"
-            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-          <p class="text-xs text-text-secondary mt-1">Setting "Treasurer" or "Joint Treasurer" automatically grants finance access.</p>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Committee Title <span class="text-text-secondary font-normal">(optional)</span></label>
+          <select id="title-input" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">— None —</option>
+            <option value="President">President</option>
+            <option value="Vice President">Vice President</option>
+            <option value="Secretary">Secretary</option>
+            <option value="Joint Secretary">Joint Secretary</option>
+            <option value="Treasurer">Treasurer</option>
+            <option value="Joint Treasurer">Joint Treasurer</option>
+            <option value="Executive Member">Executive Member</option>
+          </select>
+          <p class="text-xs text-text-secondary mt-1">Treasurer / Joint Treasurer automatically grants finance access.</p>
         </div>
         <div>
           <label class="block text-sm font-medium text-text-primary mb-1.5">Reason <span class="text-red-500">*</span></label>
@@ -115,8 +123,16 @@ if (!user.isAdmin) return Astro.redirect('/portal');
         </div>
         <div>
           <label class="block text-sm font-medium text-text-primary mb-1.5">Committee Title <span class="text-text-secondary font-normal">(optional)</span></label>
-          <input type="text" id="invite-title" placeholder="e.g. Treasurer"
-            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <select id="invite-title" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">— None —</option>
+            <option value="President">President</option>
+            <option value="Vice President">Vice President</option>
+            <option value="Secretary">Secretary</option>
+            <option value="Joint Secretary">Joint Secretary</option>
+            <option value="Treasurer">Treasurer</option>
+            <option value="Joint Treasurer">Joint Treasurer</option>
+            <option value="Executive Member">Executive Member</option>
+          </select>
         </div>
         <div class="flex gap-3 pt-1">
           <button id="invite-save-btn" class="btn-primary flex-1">Send Invite</button>
@@ -144,6 +160,14 @@ if (!user.isAdmin) return Astro.redirect('/portal');
 
   <div id="member-count" class="text-xs text-text-secondary mb-4">Loading…</div>
 
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-4 border-b border-border-light">
+    <button id="tab-members" class="tab-btn px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px">Members</button>
+    <button id="tab-invites" class="tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary border-b-2 border-transparent -mb-px">Pending Invites</button>
+  </div>
+
+  <!-- Members tab -->
+  <div id="panel-members">
   <div class="bg-white rounded-xl border border-border-light overflow-hidden">
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b border-border-light">
@@ -169,6 +193,27 @@ if (!user.isAdmin) return Astro.redirect('/portal');
         ))}
       </tbody>
     </table>
+  </div>
+
+  </div> <!-- end panel-members -->
+
+  <!-- Invites tab -->
+  <div id="panel-invites" class="hidden">
+    <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+      <div class="px-4 py-3 border-b border-border-light flex items-center justify-between">
+        <h2 class="font-semibold text-text-primary text-sm">Pending Invites</h2>
+        <select id="invite-status-filter" class="text-xs px-2 py-1.5 border border-border-light rounded-lg bg-white focus:outline-none">
+          <option value="pending">Pending</option>
+          <option value="accepted">Accepted</option>
+          <option value="expired">Expired</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="">All</option>
+        </select>
+      </div>
+      <div id="invites-list" class="divide-y divide-border-light">
+        <div class="px-4 py-6 text-center text-sm text-text-secondary animate-pulse">Loading…</div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -391,8 +436,28 @@ if (!user.isAdmin) return Astro.redirect('/portal');
 
       if (res.ok) {
         const d = await res.json();
-        successEl.textContent = `Invite created for ${d.email}. Share the login link with them.`;
+        const origin = window.location.origin;
+        const inviteUrl = d.token ? `${origin}/portal/join?token=${d.token}` : null;
+        if (inviteUrl) {
+          successEl.innerHTML = `
+            Invite created for <strong>${d.email}</strong>. Share this registration link:<br>
+            <div class="mt-2 flex items-center gap-2">
+              <code class="text-xs bg-gray-100 px-2 py-1 rounded break-all flex-1">${inviteUrl}</code>
+              <button id="copy-invite-url" class="text-xs text-primary-600 hover:text-primary-700 font-medium shrink-0">Copy</button>
+            </div>
+            <div class="text-xs text-text-secondary mt-1">Expires: ${new Date(d.token_expires_at).toLocaleDateString('en-IN')}</div>
+          `;
+          document.getElementById('copy-invite-url')?.addEventListener('click', () => {
+            navigator.clipboard.writeText(inviteUrl).then(() => {
+              const btn = document.getElementById('copy-invite-url');
+              if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); }
+            });
+          });
+        } else {
+          successEl.textContent = `Invite created for ${d.email}. Expires: ${new Date(d.token_expires_at).toLocaleDateString('en-IN')}`;
+        }
         successEl.classList.remove('hidden');
+        loadInvites();
       } else {
         const d = await res.json().catch(() => ({}));
         errEl.textContent = d.message ?? d.error ?? 'Failed to send invite.';
@@ -416,6 +481,79 @@ if (!user.isAdmin) return Astro.redirect('/portal');
       const q = (document.getElementById('search-input') as HTMLInputElement).value.trim();
       loadMembers(q, (e.target as HTMLSelectElement).value);
     });
+
+    // Tab switching
+    document.getElementById('tab-members')?.addEventListener('click', () => {
+      document.getElementById('tab-members')!.className = 'tab-btn px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+      document.getElementById('tab-invites')!.className = 'tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary border-b-2 border-transparent -mb-px';
+      document.getElementById('panel-members')!.classList.remove('hidden');
+      document.getElementById('panel-invites')!.classList.add('hidden');
+    });
+    document.getElementById('tab-invites')?.addEventListener('click', () => {
+      document.getElementById('tab-invites')!.className = 'tab-btn px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+      document.getElementById('tab-members')!.className = 'tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary border-b-2 border-transparent -mb-px';
+      document.getElementById('panel-members')!.classList.add('hidden');
+      document.getElementById('panel-invites')!.classList.remove('hidden');
+      loadInvites();
+    });
+
+    // Pending invites
+    async function loadInvites() {
+      const statusF = (document.getElementById('invite-status-filter') as HTMLSelectElement).value;
+      const params = new URLSearchParams({ limit: '50' });
+      if (statusF) params.set('status', statusF);
+      const res = await fetch(`/api/v1/hoto/users/invites?${params}`, { credentials: 'include' });
+      const el = document.getElementById('invites-list')!;
+      if (!res.ok) { el.innerHTML = '<div class="px-4 py-4 text-sm text-red-600">Failed to load invites.</div>'; return; }
+      const { invites } = await res.json();
+      if (!invites.length) {
+        el.innerHTML = '<div class="px-4 py-6 text-center text-sm text-text-secondary">No invites found.</div>';
+        return;
+      }
+      const STATUS_CLS: Record<string,string> = {
+        PENDING: 'bg-amber-100 text-amber-700', ACCEPTED: 'bg-green-100 text-green-700',
+        EXPIRED: 'bg-gray-100 text-gray-500', CANCELLED: 'bg-red-100 text-red-600',
+      };
+      el.innerHTML = invites.map((inv: any) => `
+        <div class="px-4 py-3 flex items-center gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-text-primary">${inv.email}</div>
+            <div class="text-xs text-text-secondary">${inv.flat_number} · ${inv.intended_role} · Created ${new Date(inv.created_at).toLocaleDateString('en-IN')}</div>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[inv.status] ?? 'bg-gray-100 text-gray-600'}">${inv.status}</span>
+          ${inv.status === 'PENDING' ? `
+            <button class="resend-invite text-xs text-primary-600 hover:text-primary-700 font-medium" data-id="${inv.id}">Resend</button>
+            <button class="cancel-invite text-xs text-red-600 hover:text-red-700 font-medium" data-id="${inv.id}">Cancel</button>
+          ` : ''}
+        </div>
+      `).join('');
+
+      el.querySelectorAll('.resend-invite').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const inviteId = (btn as HTMLElement).dataset.id!;
+          const res = await fetch('/api/v1/hoto/users/invites', {
+            method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invite_id: inviteId }),
+          });
+          if (res.ok) { showToast('Invite resent.'); loadInvites(); }
+          else { const d = await res.json().catch(() => ({})); showToast(d.message ?? 'Failed to resend invite.', false); }
+        });
+      });
+
+      el.querySelectorAll('.cancel-invite').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const inviteId = (btn as HTMLElement).dataset.id!;
+          if (!confirm('Cancel this invite?')) return;
+          const res = await fetch(`/api/v1/hoto/users/invites?invite_id=${inviteId}`, {
+            method: 'DELETE', credentials: 'include',
+          });
+          if (res.ok || res.status === 204) { showToast('Invite cancelled.'); loadInvites(); }
+          else { const d = await res.json().catch(() => ({})); showToast(d.message ?? 'Failed to cancel.', false); }
+        });
+      });
+    }
+
+    document.getElementById('invite-status-filter')?.addEventListener('change', loadInvites);
 
     (window as any).openRoleModal = openRoleModal;
     (window as any).openDeactivateModal = openDeactivateModal;

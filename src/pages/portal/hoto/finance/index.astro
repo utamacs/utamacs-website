@@ -46,20 +46,63 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
   <div id="tab-corpus" class="tab-panel">
     <div class="flex items-center justify-between mb-4">
       <h2 class="font-semibold text-text-primary">Corpus Fund Transactions</h2>
-      {canEnter && (
-        <button id="add-corpus-btn" class="btn-primary text-sm">
-          <i class="fas fa-plus mr-1"></i> Add Entry
+      <div class="flex gap-2">
+        <button id="export-corpus-btn" class="btn-outline text-sm flex items-center gap-1.5">
+          <i class="fas fa-download text-xs" aria-hidden="true"></i> CSV
         </button>
-      )}
+        {canEnter && (
+          <button id="add-corpus-btn" class="btn-primary text-sm">
+            <i class="fas fa-plus mr-1"></i> Add Entry
+          </button>
+        )}
+      </div>
     </div>
     <div id="corpus-list" class="bg-white rounded-2xl border border-border-light overflow-hidden">
       <div class="p-5 text-sm text-text-secondary">Loading…</div>
     </div>
   </div>
 
+  <!-- Edit Maintenance Modal -->
+  {canEnter && (
+    <div id="maintenance-edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">Edit Maintenance Record</h2>
+        <div id="maintenance-edit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Amount (₹)</label>
+              <input type="number" id="me-amount" min="0"
+                class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Paid Date</label>
+              <input type="date" id="me-paid-date"
+                class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Payment Mode</label>
+            <input type="text" id="me-mode" placeholder="UPI / NEFT"
+              class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Reference No.</label>
+            <input type="text" id="me-ref"
+              class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button id="me-save-btn" class="btn-primary flex-1">Save Changes</button>
+            <button id="me-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
   <!-- Maintenance Records Tab -->
   <div id="tab-maintenance" class="tab-panel hidden">
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
       <div class="flex gap-3">
         <select id="maintenance-year" class="px-3 py-2 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
           {Array.from({length: 5}).map((_, i) => {
@@ -69,11 +112,16 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
         </select>
         <input type="text" id="maintenance-flat" placeholder="Flat no." class="px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 w-28" />
       </div>
-      {canEnter && (
-        <button id="add-maintenance-btn" class="btn-primary text-sm">
-          <i class="fas fa-plus mr-1"></i> Record Payment
+      <div class="flex gap-2">
+        <button id="export-maintenance-btn" class="btn-outline text-sm flex items-center gap-1.5">
+          <i class="fas fa-download text-xs" aria-hidden="true"></i> CSV
         </button>
-      )}
+        {canEnter && (
+          <button id="add-maintenance-btn" class="btn-primary text-sm">
+            <i class="fas fa-plus mr-1"></i> Record Payment
+          </button>
+        )}
+      </div>
     </div>
     <div id="maintenance-list" class="bg-white rounded-2xl border border-border-light overflow-hidden">
       <div class="p-5 text-sm text-text-secondary">Loading…</div>
@@ -84,11 +132,16 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
   <div id="tab-expenses" class="tab-panel hidden">
     <div class="flex items-center justify-between mb-4">
       <h2 class="font-semibold text-text-primary">Governance Expenses</h2>
-      {canApprove10k && (
-        <button id="add-expense-btn" class="btn-primary text-sm">
-          <i class="fas fa-plus mr-1"></i> Record Expense
+      <div class="flex gap-2">
+        <button id="export-expenses-btn" class="btn-outline text-sm flex items-center gap-1.5">
+          <i class="fas fa-download text-xs" aria-hidden="true"></i> CSV
         </button>
-      )}
+        {canApprove10k && (
+          <button id="add-expense-btn" class="btn-primary text-sm">
+            <i class="fas fa-plus mr-1"></i> Record Expense
+          </button>
+        )}
+      </div>
     </div>
     <div id="expenses-list" class="bg-white rounded-2xl border border-border-light overflow-hidden">
       <div class="p-5 text-sm text-text-secondary">Loading…</div>
@@ -266,9 +319,28 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
             Recurring expense
           </label>
           <div class="flex gap-3 pt-1">
-            <button id="expense-save-btn" class="btn-primary flex-1">Record Expense</button>
+            <button id="expense-preview-btn" class="btn-primary flex-1">Preview & Confirm</button>
             <button id="expense-cancel-btn" class="btn-outline flex-1">Cancel</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expense confirm modal -->
+    <div id="expense-confirm-modal" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-large">
+        <h2 class="font-semibold text-text-primary text-lg mb-1">Confirm Expense</h2>
+        <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+          <i class="fas fa-exclamation-triangle mr-1"></i>
+          By confirming, you are acting as both the recorder and approving authority for this expense. Ensure this complies with society byelaws.
+        </p>
+        <div id="expense-confirm-summary" class="mb-4 space-y-2 text-sm"></div>
+        <div id="expense-confirm-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="flex gap-3">
+          <button id="expense-confirm-btn" class="btn-primary flex-1 flex items-center justify-center gap-2">
+            <i class="fas fa-check-circle"></i> Confirm & Record
+          </button>
+          <button id="expense-confirm-back-btn" class="btn-outline flex-1">Go Back</button>
         </div>
       </div>
     </div>
@@ -277,8 +349,26 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
   <script define:vars={{ canEnter, canApprove10k, canApprove20k, canBoardVote }}>
     const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+    let corpusRecords = [];
+    let maintenanceRecords = [];
+    let expenseRecords = [];
+
     function fmt(n) {
       return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function downloadCSV(rows, headers, filename) {
+      const escape = v => {
+        const s = String(v ?? '');
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const lines = [headers.join(','), ...rows.map(r => r.map(escape).join(','))];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
     }
 
     // Tab switching
@@ -300,6 +390,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
       const res = await fetch('/api/v1/hoto/finance/corpus', { credentials: 'include' });
       if (!res.ok) return;
       const { balance, records } = await res.json();
+      corpusRecords = records;
       document.getElementById('corpus-balance').textContent = fmt(balance);
       const list = document.getElementById('corpus-list');
       if (!records.length) {
@@ -332,6 +423,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
       const res = await fetch(`/api/v1/hoto/finance/maintenance?${params}`, { credentials: 'include' });
       if (!res.ok) return;
       const records = await res.json();
+      maintenanceRecords = records;
       const yearTotal = records.reduce((s, r) => s + Number(r.amount), 0);
       document.getElementById('maintenance-total').textContent = fmt(yearTotal);
       const list = document.getElementById('maintenance-list');
@@ -345,6 +437,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
         <th class="text-left p-4 text-xs text-text-secondary font-medium">Paid Date</th>
         <th class="text-left p-4 text-xs text-text-secondary font-medium">Mode</th>
         <th class="text-right p-4 text-xs text-text-secondary font-medium">Amount</th>
+        ${canEnter ? '<th class="p-4"></th>' : ''}
       </tr></thead><tbody>` +
       records.map(r => `<tr class="border-b border-border-light last:border-0 hover:bg-gray-50">
         <td class="p-4 font-medium text-text-primary">${r.flat_number}</td>
@@ -352,6 +445,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
         <td class="p-4 text-text-secondary">${r.paid_date ? new Date(r.paid_date).toLocaleDateString('en-IN') : '—'}</td>
         <td class="p-4 text-text-secondary">${r.payment_mode ?? '—'}</td>
         <td class="p-4 text-right font-medium text-green-600">${fmt(r.amount)}</td>
+        ${canEnter ? `<td class="p-4"><button onclick="openMaintenanceEdit('${r.id}', ${r.amount}, '${r.paid_date ?? ''}', '${r.payment_mode ?? ''}', '${r.reference_number ?? ''}')" class="text-xs text-primary-600 hover:underline">Edit</button></td>` : ''}
       </tr>`).join('') + '</tbody></table>';
     }
 
@@ -360,6 +454,7 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
       const res = await fetch('/api/v1/hoto/finance/expenses?limit=100', { credentials: 'include' });
       if (!res.ok) return;
       const records = await res.json();
+      expenseRecords = records;
       const year = new Date().getFullYear();
       const ytd = records.filter(r => r.expense_date?.startsWith(String(year))).reduce((s, r) => s + Number(r.amount), 0);
       document.getElementById('expenses-total').textContent = fmt(ytd);
@@ -383,6 +478,34 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
         <td class="p-4 text-right font-medium text-text-primary">${fmt(r.amount)}</td>
       </tr>`).join('') + '</tbody></table>';
     }
+
+    // CSV exports
+    document.getElementById('export-corpus-btn')?.addEventListener('click', () => {
+      if (!corpusRecords.length) return;
+      downloadCSV(
+        corpusRecords.map(r => [r.date, r.transaction_type, r.description ?? '', r.amount, r.payment_mode ?? '', r.reference_number ?? '']),
+        ['Date','Type','Description','Amount','Payment Mode','Reference'],
+        'corpus_fund.csv'
+      );
+    });
+
+    document.getElementById('export-maintenance-btn')?.addEventListener('click', () => {
+      if (!maintenanceRecords.length) return;
+      downloadCSV(
+        maintenanceRecords.map(r => [r.flat_number, MONTHS[r.period_month - 1] + ' ' + r.period_year, r.paid_date ?? '', r.payment_mode ?? '', r.reference_number ?? '', r.amount]),
+        ['Flat','Period','Paid Date','Payment Mode','Reference','Amount'],
+        'maintenance_records.csv'
+      );
+    });
+
+    document.getElementById('export-expenses-btn')?.addEventListener('click', () => {
+      if (!expenseRecords.length) return;
+      downloadCSV(
+        expenseRecords.map(r => [r.expense_date, r.payee, r.purpose, r.amount, r.payment_mode ?? '', r.reference_number ?? '', r.sanctioned_by_role ?? '']),
+        ['Date','Payee','Purpose','Amount','Payment Mode','Reference','Approved By'],
+        'governance_expenses.csv'
+      );
+    });
 
     // Show board resolution field when amount > 20000
     document.getElementById('e-amount')?.addEventListener('input', e => {
@@ -470,6 +593,14 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
     });
 
     // Expense modal
+    let pendingExpensePayload = null;
+
+    function getExpenseTier(amount) {
+      if (amount > 20_000) return 'Board Resolution Required';
+      if (amount > 10_000) return 'President Approval';
+      return 'Secretary Approval';
+    }
+
     document.getElementById('add-expense-btn')?.addEventListener('click', () => {
       document.getElementById('expense-error').classList.add('hidden');
       document.getElementById('expense-modal').classList.remove('hidden');
@@ -477,7 +608,8 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
     document.getElementById('expense-cancel-btn')?.addEventListener('click', () => {
       document.getElementById('expense-modal').classList.add('hidden');
     });
-    document.getElementById('expense-save-btn')?.addEventListener('click', async () => {
+
+    document.getElementById('expense-preview-btn')?.addEventListener('click', () => {
       const payee = document.getElementById('e-payee').value.trim();
       const purpose = document.getElementById('e-purpose').value.trim();
       const amount = Number(document.getElementById('e-amount').value);
@@ -490,25 +622,104 @@ const canBoardVote   = ['secretary','president'].includes(user.portalRole) || us
       if (!amount || amount <= 0) { errEl.textContent = 'Amount is required.'; errEl.classList.remove('hidden'); return; }
       if (!date) { errEl.textContent = 'Date is required.'; errEl.classList.remove('hidden'); return; }
       if (!mode) { errEl.textContent = 'Payment mode is required.'; errEl.classList.remove('hidden'); return; }
-      const btn = document.getElementById('expense-save-btn');
-      btn.disabled = true; btn.textContent = 'Recording…';
+      if (amount > 20_000 && !document.getElementById('e-board-ref')?.value.trim()) {
+        errEl.textContent = 'Board resolution reference is required for amounts above ₹20,000.'; errEl.classList.remove('hidden'); return;
+      }
+
+      pendingExpensePayload = {
+        payee, purpose, amount, expense_date: date, payment_mode: mode,
+        reference_number: document.getElementById('e-ref').value.trim() || undefined,
+        board_resolution_ref: document.getElementById('e-board-ref')?.value.trim() || undefined,
+        byelaw_authority: document.getElementById('e-byelaw').value.trim() || undefined,
+        is_recurring: document.getElementById('e-recurring').checked,
+      };
+
+      const tier = getExpenseTier(amount);
+      document.getElementById('expense-confirm-summary').innerHTML = `
+        <div class="flex justify-between"><span class="text-text-secondary">Payee</span><span class="font-medium">${payee}</span></div>
+        <div class="flex justify-between"><span class="text-text-secondary">Amount</span><span class="font-bold text-text-primary">${fmt(amount)}</span></div>
+        <div class="flex justify-between"><span class="text-text-secondary">Date</span><span>${date}</span></div>
+        <div class="flex justify-between"><span class="text-text-secondary">Approval tier</span><span class="font-medium text-amber-700">${tier}</span></div>
+        <div class="mt-2 text-xs text-text-secondary truncate" title="${purpose}"><em>Purpose: ${purpose}</em></div>
+      `;
+      document.getElementById('expense-confirm-error').classList.add('hidden');
+      document.getElementById('expense-confirm-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('expense-confirm-back-btn')?.addEventListener('click', () => {
+      document.getElementById('expense-confirm-modal').classList.add('hidden');
+    });
+
+    document.getElementById('expense-confirm-btn')?.addEventListener('click', async () => {
+      if (!pendingExpensePayload) return;
+      const btn = document.getElementById('expense-confirm-btn');
+      const errEl = document.getElementById('expense-confirm-error');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Recording…';
+
       const res = await fetch('/api/v1/hoto/finance/expenses', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          payee, purpose, amount, expense_date: date, payment_mode: mode,
-          reference_number: document.getElementById('e-ref').value.trim() || undefined,
-          board_resolution_ref: document.getElementById('e-board-ref')?.value.trim() || undefined,
-          byelaw_authority: document.getElementById('e-byelaw').value.trim() || undefined,
-          is_recurring: document.getElementById('e-recurring').checked,
-        }),
+        body: JSON.stringify(pendingExpensePayload),
       });
-      btn.disabled = false; btn.textContent = 'Record Expense';
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Record';
+
       if (res.ok) {
+        document.getElementById('expense-confirm-modal').classList.add('hidden');
         document.getElementById('expense-modal').classList.add('hidden');
+        pendingExpensePayload = null;
         loadExpenses();
       } else {
         const d = await res.json().catch(() => ({}));
-        errEl.textContent = d.message ?? 'Failed to record expense.'; errEl.classList.remove('hidden');
+        errEl.textContent = d.message ?? 'Failed to record expense.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // Maintenance edit modal
+    let editingMaintenanceId = null;
+
+    window.openMaintenanceEdit = (id, amount, paidDate, mode, ref) => {
+      editingMaintenanceId = id;
+      document.getElementById('me-amount').value = amount;
+      document.getElementById('me-paid-date').value = paidDate;
+      document.getElementById('me-mode').value = mode;
+      document.getElementById('me-ref').value = ref;
+      document.getElementById('maintenance-edit-error').classList.add('hidden');
+      document.getElementById('maintenance-edit-modal').classList.remove('hidden');
+    };
+
+    document.getElementById('me-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('maintenance-edit-modal').classList.add('hidden');
+    });
+
+    document.getElementById('me-save-btn')?.addEventListener('click', async () => {
+      if (!editingMaintenanceId) return;
+      const btn = document.getElementById('me-save-btn');
+      const errEl = document.getElementById('maintenance-edit-error');
+      const amount = Number(document.getElementById('me-amount').value);
+      errEl.classList.add('hidden');
+      if (amount <= 0) { errEl.textContent = 'Amount must be positive.'; errEl.classList.remove('hidden'); return; }
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      const res = await fetch(`/api/v1/hoto/finance/maintenance/${editingMaintenanceId}`, {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount,
+          paid_date: document.getElementById('me-paid-date').value || null,
+          payment_mode: document.getElementById('me-mode').value.trim() || null,
+          reference_number: document.getElementById('me-ref').value.trim() || null,
+        }),
+      });
+
+      btn.disabled = false; btn.textContent = 'Save Changes';
+      if (res.ok) {
+        document.getElementById('maintenance-edit-modal').classList.add('hidden');
+        loadMaintenance();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? 'Failed to save.'; errEl.classList.remove('hidden');
       }
     });
 
