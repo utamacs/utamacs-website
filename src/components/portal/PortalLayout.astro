@@ -462,12 +462,17 @@ if (isGuard) {
           container.appendChild(rowEl);
 
           if (rowIdx < rows.length - 1) {
+            // Outer div aligns to the end of this row (right for LTR, left for RTL).
+            // Inner w-52 div matches the card width so the arrow is centred over the card below.
             const turnEl = document.createElement('div');
-            turnEl.className = `flex items-center py-0.5 ${isRTL ? 'justify-start' : 'justify-end'}`;
+            turnEl.className = `flex ${isRTL ? 'justify-start' : 'justify-end'}`;
+            const centreEl = document.createElement('div');
+            centreEl.className = 'w-52 flex justify-center py-1';
             const turnArr = document.createElement('i');
-            turnArr.className = `fas fa-arrow-down text-gray-400 text-sm`;
+            turnArr.className = 'fas fa-arrow-down text-gray-400 text-sm';
             turnArr.setAttribute('aria-hidden', 'true');
-            turnEl.appendChild(turnArr);
+            centreEl.appendChild(turnArr);
+            turnEl.appendChild(centreEl);
             container.appendChild(turnEl);
           }
         });
