@@ -1,0 +1,380 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const snagId = Astro.params.id!;
+
+const canEdit   = ['executive','secretary','president'].includes(user.portalRole) || user.isAdmin;
+const canVerify = ['secretary','president'].includes(user.portalRole) || user.isAdmin;
+const canDelete = user.portalRole === 'president' || user.isAdmin;
+---
+
+<PortalLayout title="Snag Detail" user={user} activeModule="snags">
+  <div class="mb-5">
+    <a href="/portal/snags" class="text-sm text-text-secondary hover:text-primary-600 flex items-center gap-1.5">
+      <i class="fas fa-arrow-left text-xs" aria-hidden="true"></i> Back to Snag List
+    </a>
+  </div>
+
+  <div id="snag-header" class="mb-6 animate-pulse">
+    <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+    <div class="h-6 bg-gray-300 rounded w-3/4"></div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main -->
+    <div class="lg:col-span-2 space-y-6">
+      <!-- Description card -->
+      <div class="bg-white rounded-2xl border border-border-light p-5">
+        <h2 class="font-semibold text-text-primary mb-3">Description</h2>
+        <div id="snag-description" class="text-sm text-text-primary whitespace-pre-wrap animate-pulse bg-gray-100 h-12 rounded"></div>
+      </div>
+
+      <!-- Files -->
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light">
+          <h2 class="font-semibold text-text-primary">Documents</h2>
+        </div>
+        <div id="files-list" class="p-5">
+          <div class="text-sm text-text-secondary">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Comments -->
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light">
+          <h2 class="font-semibold text-text-primary">Comments</h2>
+        </div>
+        <div id="comments-list" class="p-5 space-y-3">
+          <div class="text-sm text-text-secondary">Loading…</div>
+        </div>
+        {canEdit && (
+          <div class="px-5 pb-5">
+            <textarea id="comment-input" rows="2" placeholder="Add a comment… (Enter to post, Shift+Enter for newline)"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+            <div id="comment-error" class="hidden mt-1 text-xs text-red-600"></div>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+      <!-- Status & Actions -->
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light">
+          <h2 class="font-semibold text-text-primary">Status &amp; Actions</h2>
+        </div>
+        <div id="actions-content" class="p-5 space-y-3 animate-pulse">
+          <div class="h-8 bg-gray-100 rounded"></div>
+        </div>
+      </div>
+
+      <!-- Metadata -->
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light">
+          <h2 class="font-semibold text-text-primary">Details</h2>
+        </div>
+        <div id="metadata-content" class="p-5 animate-pulse">
+          <div class="space-y-2">
+            <div class="h-3 bg-gray-100 rounded w-32"></div>
+            <div class="h-3 bg-gray-100 rounded w-24"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reopen modal -->
+  <div id="reopen-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+      <h2 class="font-semibold text-text-primary text-lg mb-4">Reopen Snag</h2>
+      <div id="reopen-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Reopen Reason <span class="text-red-500">*</span></label>
+          <textarea id="reopen-reason" rows="3" placeholder="Why is this snag being reopened?"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+        </div>
+        <div class="flex gap-3">
+          <button id="reopen-submit-btn" class="btn-primary flex-1">Confirm Reopen</button>
+          <button id="reopen-cancel-btn" class="btn-outline flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete modal -->
+  {canDelete && (
+    <div id="delete-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-large">
+        <h2 class="font-semibold text-text-primary text-lg mb-4">Delete Snag</h2>
+        <p class="text-sm text-text-secondary mb-4">This is a permanent soft-delete. The record will be hidden but retained in the audit log.</p>
+        <div id="delete-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Deletion Reason <span class="text-red-500">*</span></label>
+            <textarea id="delete-reason" rows="2" placeholder="Why is this snag being deleted?"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+          </div>
+          <div class="flex gap-3">
+            <button id="delete-submit-btn" class="btn-primary flex-1 bg-red-600 hover:bg-red-700 border-red-600">Delete</button>
+            <button id="delete-cancel-btn" class="btn-outline flex-1">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ snagId, canEdit, canVerify, canDelete }}>
+    const STATUS_LABEL = {
+      OPEN: 'Open', IN_PROGRESS: 'In Progress', RESOLVED: 'Resolved',
+      VERIFIED_CLOSED: 'Verified Closed', REOPENED: 'Reopened',
+    };
+    const STATUS_CLS = {
+      OPEN: 'bg-red-100 text-red-700',
+      IN_PROGRESS: 'bg-blue-100 text-blue-700',
+      RESOLVED: 'bg-indigo-100 text-indigo-700',
+      VERIFIED_CLOSED: 'bg-green-100 text-green-700',
+      REOPENED: 'bg-orange-100 text-orange-700',
+    };
+    const SEVERITY_CLS = {
+      CRITICAL: 'bg-red-600 text-white',
+      HIGH: 'bg-orange-100 text-orange-700',
+      MEDIUM: 'bg-amber-100 text-amber-700',
+      LOW: 'bg-gray-100 text-gray-500',
+    };
+
+    let state = { snag: null, files: [], comments: [] };
+
+    async function loadData() {
+      const res = await fetch(`/api/v1/hoto/snags/${snagId}`, { credentials: 'include' });
+      if (!res.ok) {
+        document.getElementById('snag-header').innerHTML = '<p class="text-red-600 text-sm">Snag not found or you do not have access.</p>';
+        return;
+      }
+      state = await res.json();
+      render();
+    }
+
+    function render() {
+      const { snag, files, comments } = state;
+      if (!snag) return;
+
+      document.getElementById('snag-header').innerHTML = `
+        <div class="flex items-start gap-3 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium ${SEVERITY_CLS[snag.severity] ?? 'bg-gray-100 text-gray-500'}">${snag.severity}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[snag.status] ?? 'bg-gray-100 text-gray-600'}">${STATUS_LABEL[snag.status] ?? snag.status}</span>
+              <span class="text-xs text-text-secondary">${snag.snag_scope === 'APARTMENT' ? (snag.flat_number ? `Apt ${snag.flat_number}` : 'Apartment') : 'Common Area'}</span>
+            </div>
+            <h1 class="text-xl font-bold text-text-primary">${snag.category}${snag.location ? ` — ${snag.location}` : ''}</h1>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('snag-description').textContent = snag.description;
+      document.getElementById('snag-description').classList.remove('animate-pulse', 'bg-gray-100', 'h-12', 'rounded');
+
+      // Files
+      const filesEl = document.getElementById('files-list');
+      if (!files.length) {
+        filesEl.innerHTML = '<div class="text-sm text-text-secondary">No documents uploaded yet.</div>';
+      } else {
+        filesEl.innerHTML = files.map(f => `
+          <div class="flex items-center gap-3 py-2 border-b border-border-light last:border-0">
+            <i class="fas fa-file text-text-secondary" aria-hidden="true"></i>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-text-primary truncate">${f.name}</div>
+              <div class="text-xs text-text-secondary">${(f.file_size_bytes / 1024).toFixed(0)} KB · ${new Date(f.created_at).toLocaleDateString('en-IN')}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Comments
+      const commentsEl = document.getElementById('comments-list');
+      if (!comments.length) {
+        commentsEl.innerHTML = '<div class="text-sm text-text-secondary">No comments yet.</div>';
+      } else {
+        commentsEl.innerHTML = comments.map(c => `
+          <div class="flex gap-3">
+            <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
+              ${(c.profiles?.full_name ?? 'U').charAt(0).toUpperCase()}
+            </div>
+            <div class="flex-1">
+              <div class="text-xs font-medium text-text-primary">${c.profiles?.full_name ?? 'Unknown'}</div>
+              <div class="text-sm text-text-primary mt-0.5 whitespace-pre-wrap">${c.body}</div>
+              <div class="text-xs text-text-secondary mt-1">${new Date(c.created_at).toLocaleString('en-IN', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Actions
+      renderActions(snag);
+
+      // Metadata
+      document.getElementById('metadata-content').innerHTML = `
+        <dl class="space-y-3 text-sm">
+          <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Category</dt><dd class="text-text-primary">${snag.category}${snag.subcategory ? ` / ${snag.subcategory}` : ''}</dd></div>
+          <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Location</dt><dd class="text-text-primary">${snag.location}</dd></div>
+          ${snag.ascenza_reference ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Ascenza Ref</dt><dd class="text-text-primary">${snag.ascenza_reference}</dd></div>` : ''}
+          ${snag.builder_committed_date ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Builder Committed</dt><dd class="text-text-primary">${new Date(snag.builder_committed_date).toLocaleDateString('en-IN')}</dd></div>` : ''}
+          <div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Reported</dt><dd class="text-text-primary">${new Date(snag.reported_date).toLocaleDateString('en-IN')}</dd></div>
+          ${snag.verified_at ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Verified</dt><dd class="text-green-600">${new Date(snag.verified_at).toLocaleString('en-IN')}</dd></div>` : ''}
+          ${snag.reopen_reason ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Reopen Reason</dt><dd class="text-orange-600">${snag.reopen_reason}</dd></div>` : ''}
+        </dl>
+      `;
+    }
+
+    function renderActions(snag) {
+      const el = document.getElementById('actions-content');
+      const status = snag.status;
+
+      let html = `
+        <div class="text-sm font-medium text-text-secondary mb-2">Current Status</div>
+        <span class="text-sm px-2.5 py-1 rounded-full font-medium ${STATUS_CLS[status] ?? 'bg-gray-100 text-gray-600'}">${STATUS_LABEL[status] ?? status}</span>
+      `;
+
+      const actionErr = '<div id="action-error" class="hidden mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>';
+
+      if (canEdit) {
+        if (status === 'OPEN' || status === 'REOPENED') {
+          html += `<button id="btn-in-progress" class="w-full btn-primary text-sm mt-3" data-to="IN_PROGRESS"><i class="fas fa-play mr-1"></i> Mark In Progress</button>`;
+        }
+        if (status === 'IN_PROGRESS') {
+          html += `<button id="btn-resolved" class="w-full btn-primary text-sm mt-3" data-to="RESOLVED"><i class="fas fa-check mr-1"></i> Mark Resolved</button>`;
+        }
+      }
+
+      if (canVerify && status === 'RESOLVED') {
+        html += `<button id="btn-verify" class="w-full btn-primary text-sm mt-3" data-to="VERIFIED_CLOSED"><i class="fas fa-check-double mr-1"></i> Verify &amp; Close</button>`;
+      }
+
+      if (canEdit && status === 'VERIFIED_CLOSED') {
+        html += `<button id="btn-reopen" class="w-full btn-outline text-sm mt-3 text-orange-600 border-orange-300"><i class="fas fa-undo mr-1"></i> Reopen</button>`;
+      }
+
+      if (canDelete && !['VERIFIED_CLOSED'].includes(status)) {
+        html += `<button id="btn-delete" class="w-full btn-outline text-sm text-red-600 border-red-200 hover:bg-red-50 mt-2"><i class="fas fa-trash mr-1"></i> Delete</button>`;
+      }
+
+      html += actionErr;
+      el.innerHTML = html;
+
+      // Wire up simple advance buttons
+      ['btn-in-progress','btn-resolved','btn-verify'].forEach(id => {
+        document.getElementById(id)?.addEventListener('click', e => {
+          advanceStatus(e.currentTarget.dataset.to);
+        });
+      });
+
+      // Reopen via modal
+      document.getElementById('btn-reopen')?.addEventListener('click', () => {
+        document.getElementById('reopen-error').classList.add('hidden');
+        document.getElementById('reopen-modal').classList.remove('hidden');
+      });
+
+      // Delete via modal
+      document.getElementById('btn-delete')?.addEventListener('click', () => {
+        document.getElementById('delete-error').classList.add('hidden');
+        document.getElementById('delete-modal').classList.remove('hidden');
+      });
+    }
+
+    async function advanceStatus(toStatus, extra = {}) {
+      const res = await fetch(`/api/v1/hoto/snags/${snagId}/status`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_status: toStatus, ...extra }),
+      });
+      if (res.ok) {
+        await loadData();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        const errEl = document.getElementById('action-error');
+        if (errEl) { errEl.textContent = d.message ?? d.error ?? 'Action failed.'; errEl.classList.remove('hidden'); }
+      }
+    }
+
+    // Reopen modal
+    document.getElementById('reopen-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('reopen-modal').classList.add('hidden');
+    });
+    document.getElementById('reopen-submit-btn')?.addEventListener('click', async () => {
+      const reason = document.getElementById('reopen-reason').value.trim();
+      const errEl = document.getElementById('reopen-error');
+      if (!reason) { errEl.textContent = 'Reopen reason is required.'; errEl.classList.remove('hidden'); return; }
+      const btn = document.getElementById('reopen-submit-btn');
+      btn.disabled = true; btn.textContent = 'Reopening…';
+      const res = await fetch(`/api/v1/hoto/snags/${snagId}/status`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_status: 'REOPENED', reopen_reason: reason }),
+      });
+      btn.disabled = false; btn.textContent = 'Confirm Reopen';
+      if (res.ok) {
+        document.getElementById('reopen-modal').classList.add('hidden');
+        await loadData();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to reopen.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // Delete modal
+    document.getElementById('delete-cancel-btn')?.addEventListener('click', () => {
+      document.getElementById('delete-modal').classList.add('hidden');
+    });
+    document.getElementById('delete-submit-btn')?.addEventListener('click', async () => {
+      const reason = document.getElementById('delete-reason').value.trim();
+      const errEl = document.getElementById('delete-error');
+      if (!reason) { errEl.textContent = 'Deletion reason is required.'; errEl.classList.remove('hidden'); return; }
+      const btn = document.getElementById('delete-submit-btn');
+      btn.disabled = true; btn.textContent = 'Deleting…';
+      const res = await fetch(`/api/v1/hoto/snags/${snagId}`, {
+        method: 'DELETE', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deletion_reason: reason }),
+      });
+      btn.disabled = false; btn.textContent = 'Delete';
+      if (res.ok || res.status === 204) {
+        window.location.href = '/portal/snags';
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? d.error ?? 'Failed to delete.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // Comment input
+    document.getElementById('comment-input')?.addEventListener('keydown', async e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const body = e.target.value.trim();
+        const errEl = document.getElementById('comment-error');
+        if (!body) return;
+        e.target.disabled = true;
+        const res = await fetch(`/api/v1/hoto/items/${snagId}/comments`, {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_type: 'snag_item', body }),
+        });
+        e.target.disabled = false;
+        if (res.ok) {
+          e.target.value = '';
+          errEl.classList.add('hidden');
+          await loadData();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          errEl.textContent = d.message ?? 'Failed to post comment.';
+          errEl.classList.remove('hidden');
+        }
+      }
+    });
+
+    loadData();
+  </script>
+</PortalLayout>
