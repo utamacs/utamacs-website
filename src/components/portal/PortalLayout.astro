@@ -359,8 +359,7 @@ if (isGuard) {
     // ── Group collapse / expand ───────────────────────────────────────────────
     document.querySelectorAll<HTMLButtonElement>('.nav-group-btn').forEach((btn) => {
       const groupKey = btn.getAttribute('data-group-key') ?? '';
-      const wrapper  = btn.closest<HTMLElement>('[data-group-key]');
-      const itemsEl  = wrapper?.querySelector<HTMLElement>('.nav-group-items');
+      const itemsEl  = btn.nextElementSibling as HTMLElement | null;
       const chevron  = btn.querySelector<HTMLElement>('.nav-chevron');
       if (!itemsEl) return;
 
