@@ -170,8 +170,8 @@ const canUpload = canEdit;
             </div>
           </div>
           <div>
-            <label class="block text-sm font-medium text-text-primary mb-1.5">Ascenza Reference</label>
-            <input type="text" id="e-ascenza-reference" placeholder="e.g. ASC-DEFECT-2024-001"
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Builder Reference</label>
+            <input type="text" id="e-builder-ref" placeholder="e.g. BLD-DEFECT-2024-001"
               class="w-full px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
           </div>
           <div class="flex gap-3 pt-1">
@@ -338,7 +338,7 @@ const canUpload = canEdit;
               ${snag.audit_ref_no ? `<dd class="text-text-secondary text-xs">Sr No: ${snag.audit_ref_no}</dd>` : ''}
             </div>` : ''}
           ${snag.compliance_requirement ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Compliance Ref</dt><dd class="text-text-primary text-xs leading-relaxed">${snag.compliance_requirement}</dd></div>` : ''}
-          ${snag.ascenza_reference ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Ascenza Ref</dt><dd class="text-text-primary">${snag.ascenza_reference}</dd></div>` : ''}
+          ${snag.builder_ref ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Builder Ref</dt><dd class="text-text-primary">${snag.builder_ref}</dd></div>` : ''}
           ${snag.expected_closure_date ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Expected Closure</dt><dd class="${snag.expected_closure_date < new Date().toISOString().slice(0,10) ? 'text-red-600 font-medium' : 'text-text-primary'}">${new Date(snag.expected_closure_date).toLocaleDateString('en-IN')}</dd></div>` : ''}
           ${snag.builder_committed_date ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Builder Committed</dt><dd class="${snag.builder_committed_date < new Date().toISOString().slice(0,10) ? 'text-red-600 font-medium' : 'text-text-primary'}">${new Date(snag.builder_committed_date).toLocaleDateString('en-IN')}</dd></div>` : ''}
           ${snag.responsible_person_name ? `<div><dt class="text-xs text-text-secondary uppercase tracking-wide mb-0.5">Responsible Person</dt><dd class="text-text-primary">${snag.responsible_person_name}</dd></div>` : ''}
@@ -442,7 +442,7 @@ const canUpload = canEdit;
         (document.getElementById('e-description')).value = s.description ?? '';
         (document.getElementById('e-severity')).value = s.severity ?? 'MEDIUM';
         (document.getElementById('e-builder-committed-date')).value = s.builder_committed_date ?? '';
-        (document.getElementById('e-ascenza-reference')).value = s.ascenza_reference ?? '';
+        (document.getElementById('e-builder-ref')).value = s.builder_ref ?? '';
         document.getElementById('edit-error').classList.add('hidden');
         document.getElementById('edit-modal').classList.remove('hidden');
       });
@@ -473,7 +473,7 @@ const canUpload = canEdit;
             description,
             severity: (document.getElementById('e-severity')).value,
             builder_committed_date: (document.getElementById('e-builder-committed-date')).value || null,
-            ascenza_reference: (document.getElementById('e-ascenza-reference')).value.trim() || null,
+            builder_ref: (document.getElementById('e-builder-ref')).value.trim() || null,
           }),
         });
         btn.disabled = false; btn.textContent = 'Save Changes';

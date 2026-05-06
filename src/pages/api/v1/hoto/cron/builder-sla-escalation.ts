@@ -33,7 +33,7 @@ export const GET: APIRoute = async ({ request }) => {
     // Items that are overdue (sla_date set, not yet closed/rejected)
     const { data: items } = await sb
       .from('hoto_items')
-      .select('id, title, ascenza_category, builder_sla_date, priority, status')
+      .select('id, title, hoto_category, builder_sla_date, priority, status')
       .eq('society_id', SOCIETY_ID)
       .not('builder_sla_date', 'is', null)
       .not('status', 'in', '("CLOSED","REJECTED")')
@@ -102,7 +102,7 @@ export const GET: APIRoute = async ({ request }) => {
 <p>The following HOTO item has an overdue builder SLA commitment:</p>
 <table border="0" cellpadding="4">
   <tr><td><strong>Item:</strong></td><td>${it.title}</td></tr>
-  <tr><td><strong>Category:</strong></td><td>${it.ascenza_category}</td></tr>
+  <tr><td><strong>Category:</strong></td><td>${it.hoto_category}</td></tr>
   <tr><td><strong>Priority:</strong></td><td>${it.priority}</td></tr>
   <tr><td><strong>SLA Date:</strong></td><td>${it.builder_sla_date}</td></tr>
   <tr><td><strong>Days Overdue:</strong></td><td>${daysOverdue}</td></tr>
@@ -110,7 +110,7 @@ export const GET: APIRoute = async ({ request }) => {
 </table>
 <p>Please follow up with the builder immediately. Update the item status in the portal once resolved.</p>`;
 
-      const bodyText = `${subject}\n\nItem: ${it.title}\nCategory: ${it.ascenza_category}\nPriority: ${it.priority}\nSLA Date: ${it.builder_sla_date}\nDays Overdue: ${daysOverdue}\nStatus: ${it.status}\n\nPlease follow up with the builder immediately.`;
+      const bodyText = `${subject}\n\nItem: ${it.title}\nCategory: ${it.hoto_category}\nPriority: ${it.priority}\nSLA Date: ${it.builder_sla_date}\nDays Overdue: ${daysOverdue}\nStatus: ${it.status}\n\nPlease follow up with the builder immediately.`;
 
       // Create draft for each committee member
       for (const person of committee) {

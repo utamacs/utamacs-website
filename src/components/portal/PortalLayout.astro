@@ -135,10 +135,11 @@ if (isGuard) {
   const snagsMod = modItem('snags'); if (snagsMod) hotoItems.push(snagsMod);
   const vendorsMod = modItem('vendors'); if (vendorsMod) hotoItems.push(vendorsMod);
   if (isPrivileged) {
-    hotoItems.push(link('HOTO Progress',     '/portal/hoto/progress',              'fa-chart-pie',   'hoto_progress'));
-    hotoItems.push(link('Pending Approvals', '/portal/hoto/pending',               'fa-clock',        'hoto_pending'));
-    hotoItems.push(link('HOTO Finance',      '/portal/hoto/finance',               'fa-coins',        'hoto_finance'));
-    hotoItems.push(link('Board Resolutions', '/portal/hoto/finance/resolutions',   'fa-scroll',       'hoto_resolutions'));
+    hotoItems.push(link('Vendor Procurement', '/portal/vendors/procurement',        'fa-clipboard-list', 'vendors_procurement'));
+    hotoItems.push(link('HOTO Progress',      '/portal/hoto/progress',              'fa-chart-pie',   'hoto_progress'));
+    hotoItems.push(link('Pending Approvals',  '/portal/hoto/pending',               'fa-clock',        'hoto_pending'));
+    hotoItems.push(link('HOTO Finance',       '/portal/hoto/finance',               'fa-coins',        'hoto_finance'));
+    hotoItems.push(link('Board Resolutions',  '/portal/hoto/finance/resolutions',   'fa-scroll',       'hoto_resolutions'));
   }
   if (hotoItems.length) navGroups.push({ label: 'HOTO Platform', items: hotoItems });
 
@@ -237,6 +238,20 @@ if (isGuard) {
             <div class="text-sm font-medium text-text-primary truncate">{user.email}</div>
             <div class="text-xs text-text-secondary capitalize">{user.committeeTitle ?? user.role.replace('_', ' ')}</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Navigation controls -->
+      <div class="flex items-center justify-end px-4 py-1.5 border-b border-border-light bg-gray-50/60">
+        <div class="flex gap-0.5">
+          <button id="collapse-all-btn" title="Collapse all groups" aria-label="Collapse all navigation groups"
+            class="w-6 h-6 flex items-center justify-center rounded text-text-secondary hover:text-primary-600 hover:bg-primary-50 transition-colors">
+            <i class="fas fa-angle-double-up text-[10px]" aria-hidden="true"></i>
+          </button>
+          <button id="expand-all-btn" title="Expand all groups" aria-label="Expand all navigation groups"
+            class="w-6 h-6 flex items-center justify-center rounded text-text-secondary hover:text-primary-600 hover:bg-primary-50 transition-colors">
+            <i class="fas fa-angle-double-down text-[10px]" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
 
@@ -364,7 +379,9 @@ if (isGuard) {
       if (!itemsEl) return;
 
       const hasActive = !!itemsEl.querySelector('.bg-primary-50');
-      const isCollapsed = !hasActive && sessionStorage.getItem(`${COLLAPSE_PFX}${groupKey}`) === '1';
+      // Default: collapsed unless this group contains the active page or user explicitly expanded it
+      const stored = sessionStorage.getItem(`${COLLAPSE_PFX}${groupKey}`);
+      const isCollapsed = !hasActive && stored !== '0';
 
       function applyCollapse(collapsed: boolean) {
         itemsEl!.classList.toggle('hidden', collapsed);
@@ -380,6 +397,23 @@ if (isGuard) {
         sessionStorage.setItem(`${COLLAPSE_PFX}${groupKey}`, nowCollapsed ? '1' : '0');
       });
     });
+
+    // ── Collapse all / Expand all ─────────────────────────────────────────────
+    function setAllGroups(collapsed: boolean) {
+      document.querySelectorAll<HTMLButtonElement>('.nav-group-btn').forEach((btn) => {
+        const groupKey  = btn.getAttribute('data-group-key') ?? '';
+        const itemsEl   = btn.nextElementSibling as HTMLElement | null;
+        const chevron   = btn.querySelector<HTMLElement>('.nav-chevron');
+        if (!itemsEl) return;
+        itemsEl.classList.toggle('hidden', collapsed);
+        if (chevron) chevron.style.transform = collapsed ? 'rotate(-90deg)' : '';
+        btn.setAttribute('aria-expanded', String(!collapsed));
+        sessionStorage.setItem(`${COLLAPSE_PFX}${groupKey}`, collapsed ? '1' : '0');
+      });
+    }
+
+    document.getElementById('collapse-all-btn')?.addEventListener('click', () => setAllGroups(true));
+    document.getElementById('expand-all-btn')?.addEventListener('click', () => setAllGroups(false));
   </script>
 </body>
 </html>

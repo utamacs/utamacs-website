@@ -14,7 +14,7 @@ const isAdmin = user.isAdmin;
   <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">HOTO Tracker</h1>
-      <p class="text-sm text-text-secondary mt-1">Handover of Assets tracking — Ascenza-aligned categories.</p>
+      <p class="text-sm text-text-secondary mt-1">Handover of Assets tracking — infrastructure &amp; system categories.</p>
     </div>
     {canCreate && (
       <button id="create-btn" class="btn-primary text-sm flex items-center gap-2">
@@ -267,7 +267,7 @@ const isAdmin = user.isAdmin;
                   ${overdueNote}${deadline}
                 </div>
                 <div class="font-medium text-text-primary text-sm">${item.title}</div>
-                <div class="text-xs text-text-secondary mt-0.5">${item.ascenza_category}</div>
+                <div class="text-xs text-text-secondary mt-0.5">${item.hoto_category}</div>
               </div>
               <i class="fas fa-chevron-right text-text-secondary text-xs flex-shrink-0 mt-1" aria-hidden="true"></i>
             </div>
@@ -325,7 +325,7 @@ const isAdmin = user.isAdmin;
         const res = await fetch('/api/v1/hoto/items', {
           method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ascenza_category: category,
+            hoto_category: category,
             title,
             description: document.getElementById('new-description').value.trim() || undefined,
             priority: document.getElementById('new-priority').value,

@@ -182,7 +182,7 @@ async function runSlaEscalation(sb: ReturnType<typeof getSupabaseServiceClient>,
   const [d7, d14, d30] = [escalationDays[0] ?? 7, escalationDays[1] ?? 14, escalationDays[2] ?? 30];
 
   const { data: items } = await sb
-    .from('hoto_items').select('id, title, ascenza_category, builder_sla_date, priority, status')
+    .from('hoto_items').select('id, title, hoto_category, builder_sla_date, priority, status')
     .eq('society_id', SOCIETY_ID).not('builder_sla_date', 'is', null)
     .not('status', 'in', '("CLOSED","REJECTED")').lt('builder_sla_date', todayStr).limit(5);
 
@@ -215,7 +215,7 @@ async function runSlaEscalation(sb: ReturnType<typeof getSupabaseServiceClient>,
           trigger_resource_type: 'hoto_item', trigger_resource_id: it.id,
           recipient_type: 'COMMITTEE', recipient_email: person.email, recipient_name: person.name,
           subject,
-          body_html: `<p>HOTO item <strong>${it.title}</strong> (${it.ascenza_category}) has an overdue builder SLA commitment.</p><ul><li>SLA Date: ${it.builder_sla_date}</li><li>Days Overdue: ${daysOverdue}</li><li>Priority: ${it.priority}</li><li>Status: ${it.status}</li></ul>${tier === 3 ? '<p style="color:red"><strong>Consider formal legal notice to the builder.</strong></p>' : ''}`,
+          body_html: `<p>HOTO item <strong>${it.title}</strong> (${it.hoto_category}) has an overdue builder SLA commitment.</p><ul><li>SLA Date: ${it.builder_sla_date}</li><li>Days Overdue: ${daysOverdue}</li><li>Priority: ${it.priority}</li><li>Status: ${it.status}</li></ul>${tier === 3 ? '<p style="color:red"><strong>Consider formal legal notice to the builder.</strong></p>' : ''}`,
           body_text: `${subject}\n\nSLA Date: ${it.builder_sla_date}\nDays Overdue: ${daysOverdue}\nPriority: ${it.priority}\nStatus: ${it.status}`,
           suggested_sender_name: SENDER_NAME, suggested_sender_email: SENDER_EMAIL, status: 'DRAFT',
         });
