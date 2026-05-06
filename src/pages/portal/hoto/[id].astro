@@ -293,7 +293,7 @@ const canBypass  = user.isAdmin || ['secretary','president'].includes(user.porta
             <div class="flex items-center gap-2 flex-wrap text-xs">
               <span class="px-2 py-0.5 rounded-full font-medium ${PRIORITY_CLS[item.priority] ?? ''}">${item.priority}</span>
               <span class="px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[item.status] ?? ''}">${STATUS_LABEL[item.status] ?? item.status}</span>
-              <span class="text-text-secondary">${item.ascenza_category}</span>
+              <span class="text-text-secondary">${item.hoto_category}</span>
               ${item.days_overdue > 0 ? `<span class="text-red-600 font-medium"><i class="fas fa-clock"></i> ${item.days_overdue}d overdue</span>` : ''}
             </div>
             ${item.description ? `<p class="text-sm text-text-secondary mt-2">${item.description}</p>` : ''}
@@ -314,7 +314,7 @@ const canBypass  = user.isAdmin || ['secretary','president'].includes(user.porta
         <h3 class="font-semibold text-text-primary mb-4 text-sm">Details</h3>
         <dl class="space-y-3 text-sm">
           ${[
-            ['Category', item.ascenza_category],
+            ['Category', item.hoto_category],
             ['Priority', item.priority],
             ['Status', STATUS_LABEL[item.status] ?? item.status],
             ['Deadline', fmtDate(item.deadline)],

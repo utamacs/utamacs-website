@@ -120,8 +120,8 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-text-primary mb-1.5">Ascenza Ref</label>
-              <input type="text" id="new-ascenza" placeholder="Optional reference"
+              <label class="block text-sm font-medium text-text-primary mb-1.5">Builder Ref</label>
+              <input type="text" id="new-builder-ref" placeholder="Optional reference"
                 class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
             </div>
             <div>
@@ -282,7 +282,7 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
             description,
             flat_number: scope === 'APARTMENT' ? document.getElementById('new-flat').value.trim() : undefined,
             severity: document.getElementById('new-severity').value,
-            ascenza_reference: document.getElementById('new-ascenza').value.trim() || undefined,
+            builder_ref: document.getElementById('new-builder-ref').value.trim() || undefined,
             builder_committed_date: document.getElementById('new-committed-date').value || undefined,
           }),
         });

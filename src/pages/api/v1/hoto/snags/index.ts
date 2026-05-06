@@ -29,7 +29,7 @@ export const GET: APIRoute = async ({ request }) => {
       .from('snag_items')
       .select(`
         id, snag_scope, category, subcategory, location, flat_number,
-        description, severity, status, ascenza_reference,
+        description, severity, status, builder_ref,
         builder_committed_date, builder_sla_days_overdue,
         notice_sent, reported_date, created_at,
         reported_by, responsible_user_id, verified_by,
@@ -58,7 +58,7 @@ export const GET: APIRoute = async ({ request }) => {
 };
 
 // POST — create a snag item (auth: snag.create)
-// Body: { snag_scope, category, subcategory?, location, flat_number?, description, severity?, ascenza_reference?, builder_committed_date? }
+// Body: { snag_scope, category, subcategory?, location, flat_number?, description, severity?, builder_ref?, builder_committed_date? }
 export const POST: APIRoute = async ({ request }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -73,7 +73,7 @@ export const POST: APIRoute = async ({ request }) => {
       flat_number?: string;
       description?: string;
       severity?: string;
-      ascenza_reference?: string;
+      builder_ref?: string;
       builder_committed_date?: string;
     };
 
@@ -116,7 +116,7 @@ export const POST: APIRoute = async ({ request }) => {
       description: body.description.trim(),
       severity,
       status: 'OPEN',
-      ascenza_reference: body.ascenza_reference?.trim() ?? null,
+      builder_ref: body.builder_ref?.trim() ?? null,
       builder_committed_date: body.builder_committed_date ?? null,
       reported_by: user.id,
       reported_date: new Date().toISOString().slice(0, 10),

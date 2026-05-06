@@ -33,7 +33,7 @@ export const GET: APIRoute = async ({ request, url }) => {
     let query = sb
       .from('hoto_items')
       .select(`
-        id, ascenza_category, title, priority, status, deadline,
+        id, hoto_category, title, priority, status, deadline,
         builder_sla_date, days_overdue, responsible_role, responsible_user_id,
         rera_escalation_eligible, notice_sent, president_approved_at, secretary_approved_at,
         created_at, last_updated_at, status_changed_at,
@@ -63,7 +63,7 @@ export const GET: APIRoute = async ({ request, url }) => {
     } else if (!includeClosed && !status) {
       // by default exclude CLOSED items unless explicitly requested
     }
-    if (category) query = query.eq('ascenza_category', category);
+    if (category) query = query.eq('hoto_category', category);
     if (priority && VALID_PRIORITIES.includes(priority as typeof VALID_PRIORITIES[number])) {
       query = query.eq('priority', priority);
     }
@@ -79,7 +79,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
 // POST — create a new HOTO item
 // Auth: hoto.create feature required
-// Body: { ascenza_category, title, description?, builder_commitment?, builder_contact?,
+// Body: { hoto_category, title, description?, builder_commitment?, builder_contact?,
 //         priority?, deadline?, builder_sla_date?, responsible_role?, responsible_user_id?,
 //         rera_escalation_eligible? }
 export const POST: APIRoute = async ({ request }) => {
@@ -89,7 +89,7 @@ export const POST: APIRoute = async ({ request }) => {
     requireFeature(user, 'hoto.create');
 
     const body = await request.json() as {
-      ascenza_category?: string;
+      hoto_category?: string;
       title?: string;
       description?: string;
       builder_commitment?: string;
@@ -102,8 +102,8 @@ export const POST: APIRoute = async ({ request }) => {
       rera_escalation_eligible?: boolean;
     };
 
-    if (!body.ascenza_category?.trim()) {
-      return Response.json({ error: 'VALIDATION_ERROR', message: 'ascenza_category is required' }, { status: 400 });
+    if (!body.hoto_category?.trim()) {
+      return Response.json({ error: 'VALIDATION_ERROR', message: 'hoto_category is required' }, { status: 400 });
     }
     if (!body.title?.trim()) {
       return Response.json({ error: 'VALIDATION_ERROR', message: 'title is required' }, { status: 400 });
@@ -126,7 +126,7 @@ export const POST: APIRoute = async ({ request }) => {
       .insert({
         id,
         society_id: SOCIETY_ID,
-        ascenza_category: body.ascenza_category.trim(),
+        hoto_category: body.hoto_category.trim(),
         title: body.title.trim(),
         description: body.description?.trim() ?? null,
         builder_commitment: body.builder_commitment?.trim() ?? null,
@@ -149,7 +149,7 @@ export const POST: APIRoute = async ({ request }) => {
       societyId: SOCIETY_ID, userId: user.id,
       action: 'CREATE', resourceType: 'hoto_items', resourceId: id,
       ip: extractClientIP(request),
-      newValues: { ascenza_category: body.ascenza_category, title: body.title, priority },
+      newValues: { hoto_category: body.hoto_category, title: body.title, priority },
     });
 
     return Response.json(data, { status: 201 });

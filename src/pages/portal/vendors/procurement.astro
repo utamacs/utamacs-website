@@ -1,0 +1,426 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const canCreate = ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+const canVote   = ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+const canSelect = ['secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+const canOpenVoting = ['secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+
+if (!canVote) return Astro.redirect('/portal');
+---
+
+<PortalLayout title="Vendor Procurement" user={user} activeModule="vendors_procurement">
+  <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-text-primary">Vendor Procurement</h1>
+      <p class="text-sm text-text-secondary mt-1">Manage vendor requirements, candidate quotes, and committee selection.</p>
+    </div>
+    {canCreate && (
+      <button id="new-req-btn" class="btn-primary text-sm flex items-center gap-2">
+        <i class="fas fa-plus" aria-hidden="true"></i>New Requirement
+      </button>
+    )}
+  </div>
+
+  <!-- Status filter tabs -->
+  <div class="flex gap-2 mb-5 flex-wrap">
+    {['All','DRAFT','OPEN','VOTING','SELECTED','CLOSED'].map(s => (
+      <button
+        class="status-tab text-xs px-3 py-1.5 rounded-full border transition-colors font-medium"
+        data-status={s === 'All' ? '' : s}
+      >{s}</button>
+    ))}
+  </div>
+
+  <!-- Requirements list -->
+  <div id="req-list" class="space-y-4">
+    <div class="text-sm text-text-secondary text-center py-8">Loading…</div>
+  </div>
+
+  <!-- Requirement detail panel (slide-in) -->
+  <div id="detail-panel" class="hidden fixed inset-y-0 right-0 w-full max-w-2xl bg-white shadow-2xl z-50 flex flex-col">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-border-light">
+      <h2 id="detail-title" class="text-lg font-semibold text-text-primary">Requirement Detail</h2>
+      <button id="detail-close" class="p-2 rounded-lg text-text-secondary hover:bg-gray-100" aria-label="Close panel">
+        <i class="fas fa-times" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div id="detail-body" class="flex-1 overflow-y-auto p-6 space-y-6">
+      <div class="text-sm text-text-secondary text-center py-8">Loading…</div>
+    </div>
+  </div>
+  <div id="detail-overlay" class="hidden fixed inset-0 bg-black/40 z-40" aria-hidden="true"></div>
+
+  <!-- New Requirement Modal -->
+  {canCreate && (
+    <div id="new-req-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+        <h3 class="font-semibold text-text-primary mb-4 flex justify-between">
+          New Vendor Requirement
+          <button id="new-req-modal-close" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+            <i class="fas fa-times"></i>
+          </button>
+        </h3>
+        <div id="new-req-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+        <form id="new-req-form" class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Category <span class="text-red-500">*</span></label>
+            <select name="category" required class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+              <option value="">Select</option>
+              {['Electrical','Plumbing','Civil','Landscaping','Lift Maintenance','Generator AMC',
+                'Security Services','Housekeeping','Pest Control','IT & Networking','Fire Safety AMC',
+                'HVAC','STP Operations','Painting','Other'].map(c => (
+                <option value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Title <span class="text-red-500">*</span></label>
+            <input name="title" required maxlength="200" placeholder="e.g. Annual Lift Maintenance Contract" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Scope / Description</label>
+            <textarea name="description" rows="3" maxlength="1000" placeholder="Scope of work, expected deliverables…" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">Quorum (votes needed)</label>
+            <input name="quorum_required" type="number" min="1" max="20" value="8" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="btn-primary flex-1 text-sm">Create</button>
+            <button type="button" id="new-req-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ canCreate, canVote, canSelect, canOpenVoting, userId: user.id }}>
+    const STATUS_STYLES = {
+      DRAFT:    'bg-gray-100 text-gray-600',
+      OPEN:     'bg-blue-100 text-blue-700',
+      VOTING:   'bg-amber-100 text-amber-700',
+      SELECTED: 'bg-green-100 text-green-700',
+      CLOSED:   'bg-gray-100 text-gray-500',
+    };
+
+    let activeStatus = '';
+    let currentReqId = null;
+
+    // ── Tab filtering ─────────────────────────────────────────────────────────
+    document.querySelectorAll('.status-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeStatus = btn.dataset.status ?? '';
+        document.querySelectorAll('.status-tab').forEach(b => b.classList.remove('bg-primary-600','text-white','border-primary-600'));
+        btn.classList.add('bg-primary-600','text-white','border-primary-600');
+        loadRequirements();
+      });
+    });
+    document.querySelector('.status-tab').classList.add('bg-primary-600','text-white','border-primary-600');
+
+    // ── Load requirement list ─────────────────────────────────────────────────
+    async function loadRequirements() {
+      const list = document.getElementById('req-list');
+      list.innerHTML = '<div class="text-sm text-text-secondary text-center py-8">Loading…</div>';
+      const url = '/api/v1/vendors/requirements' + (activeStatus ? `?status=${activeStatus}` : '');
+      const res = await fetch(url, { credentials: 'include' });
+      const reqs = res.ok ? await res.json() : [];
+
+      if (!reqs.length) {
+        list.innerHTML = '<div class="text-sm text-text-secondary text-center py-8">No vendor requirements found.</div>';
+        return;
+      }
+
+      list.innerHTML = reqs.map(r => `
+        <div class="bg-white rounded-xl border border-border-light p-5 hover:shadow-soft cursor-pointer transition-shadow" data-req-id="${r.id}">
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <div class="font-semibold text-text-primary">${r.title}</div>
+              <div class="text-xs text-text-secondary mt-0.5">${r.category} · ${new Date(r.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${STATUS_STYLES[r.status] ?? 'bg-gray-100 text-gray-600'}">${r.status}</span>
+          </div>
+          ${r.description ? `<p class="text-sm text-text-secondary mb-3 line-clamp-2">${r.description}</p>` : ''}
+          <div class="flex gap-4 text-xs text-text-secondary">
+            <span><i class="fas fa-building mr-1"></i>${(r.vendor_candidates?.[0]?.count ?? 0)} candidate${r.vendor_candidates?.[0]?.count !== 1 ? 's' : ''}</span>
+            <span><i class="fas fa-vote-yea mr-1"></i>${(r.votes?.[0]?.count ?? 0)} vote${r.votes?.[0]?.count !== 1 ? 's' : ''} · quorum ${r.quorum_required}</span>
+            ${r.voting_opens_at ? `<span><i class="fas fa-clock mr-1"></i>Voting ${new Date(r.voting_opens_at) > new Date() ? 'opens' : 'opened'} ${new Date(r.voting_opens_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      list.querySelectorAll('[data-req-id]').forEach(card => {
+        card.addEventListener('click', () => openDetail(card.dataset.reqId));
+      });
+    }
+
+    // ── Detail panel ──────────────────────────────────────────────────────────
+    const panel   = document.getElementById('detail-panel');
+    const overlay = document.getElementById('detail-overlay');
+
+    function openDetail(reqId) {
+      currentReqId = reqId;
+      panel.classList.remove('hidden');
+      overlay.classList.remove('hidden');
+      loadDetail(reqId);
+    }
+
+    function closeDetail() {
+      panel.classList.add('hidden');
+      overlay.classList.add('hidden');
+      currentReqId = null;
+    }
+
+    document.getElementById('detail-close')?.addEventListener('click', closeDetail);
+    overlay?.addEventListener('click', closeDetail);
+
+    async function loadDetail(reqId) {
+      const body = document.getElementById('detail-body');
+      body.innerHTML = '<div class="text-sm text-text-secondary text-center py-8">Loading…</div>';
+      document.getElementById('detail-title').textContent = 'Loading…';
+
+      const res = await fetch(`/api/v1/vendors/requirements/${reqId}`, { credentials: 'include' });
+      if (!res.ok) { body.innerHTML = '<div class="text-sm text-red-600 text-center py-8">Failed to load.</div>'; return; }
+      const { requirement: r, candidates, vote_summary } = await res.json();
+
+      document.getElementById('detail-title').textContent = r.title;
+
+      const myVote = vote_summary.user_vote;
+      const tally  = vote_summary.tally ?? {};
+      const totalVotes = vote_summary.total_votes ?? 0;
+
+      body.innerHTML = `
+        <!-- Meta -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_STYLES[r.status] ?? 'bg-gray-100 text-gray-600'}">${r.status}</span>
+          <span class="text-xs text-text-secondary">${r.category}</span>
+          <span class="text-xs text-text-secondary">Quorum: ${r.quorum_required} votes</span>
+        </div>
+        ${r.description ? `<p class="text-sm text-text-secondary">${r.description}</p>` : ''}
+
+        <!-- Actions bar -->
+        <div id="action-bar" class="flex gap-2 flex-wrap"></div>
+
+        <!-- Candidates -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-text-primary text-sm">Candidate Vendors</h3>
+            ${(canCreate && ['DRAFT','OPEN'].includes(r.status)) ? `
+              <button id="add-candidate-btn" class="text-xs text-primary-600 hover:underline flex items-center gap-1">
+                <i class="fas fa-plus text-[10px]"></i>Add Candidate
+              </button>` : ''}
+          </div>
+          ${candidates.length === 0
+            ? '<p class="text-sm text-text-secondary">No candidates added yet.</p>'
+            : candidates.map(c => {
+                const votes = tally[c.id] ?? 0;
+                const pct   = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+                const isSelected = r.selected_vendor_id === c.id;
+                return `
+                  <div class="border border-border-light rounded-xl p-4 mb-3 ${isSelected ? 'border-green-400 bg-green-50' : ''}">
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <div class="font-medium text-sm text-text-primary flex items-center gap-2">
+                          ${c.name}
+                          ${isSelected ? '<span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">Selected</span>' : ''}
+                        </div>
+                        ${c.contact_person ? `<div class="text-xs text-text-secondary mt-0.5">${c.contact_person}${c.phone ? ` · ${c.phone}` : ''}${c.email ? ` · ${c.email}` : ''}</div>` : ''}
+                      </div>
+                      ${c.quoted_amount ? `<div class="text-right flex-shrink-0"><div class="font-semibold text-text-primary text-sm">₹${Number(c.quoted_amount).toLocaleString('en-IN')}</div><div class="text-xs text-text-secondary">${c.gst_inclusive ? 'incl. GST' : 'excl. GST'}</div></div>` : ''}
+                    </div>
+                    ${c.scope_summary ? `<p class="text-xs text-text-secondary mb-2">${c.scope_summary}</p>` : ''}
+                    ${r.status === 'VOTING' || r.status === 'SELECTED' ? `
+                      <div class="flex items-center gap-2 mt-2">
+                        <div class="flex-1 bg-gray-200 rounded-full h-1.5">
+                          <div class="bg-primary-600 h-1.5 rounded-full" style="width:${pct}%"></div>
+                        </div>
+                        <span class="text-xs text-text-secondary w-12 text-right">${votes} vote${votes !== 1 ? 's' : ''} (${pct}%)</span>
+                        ${(canVote && r.status === 'VOTING' && !myVote) ? `
+                          <button class="vote-btn text-xs px-3 py-1 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors" data-candidate-id="${c.id}">Vote</button>
+                        ` : (myVote?.vendor_id === c.id ? '<span class="text-xs text-primary-600 font-medium">Your vote</span>' : '')}
+                        ${(canSelect && r.status === 'VOTING' && !isSelected && totalVotes >= r.quorum_required) ? `
+                          <button class="select-btn text-xs px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors" data-candidate-id="${c.id}">Select</button>
+                        ` : ''}
+                      </div>` : ''}
+                  </div>`;
+              }).join('')
+          }
+        </div>
+
+        <!-- Vote summary -->
+        ${(r.status === 'VOTING' || r.status === 'SELECTED') ? `
+          <div class="bg-gray-50 rounded-xl p-4 text-sm">
+            <div class="font-medium text-text-primary mb-1">Vote Summary</div>
+            <div class="text-text-secondary text-xs">${totalVotes} of ${r.quorum_required} required votes cast${myVote ? ' · You have voted' : (canVote ? ' · You have not voted yet' : '')}</div>
+          </div>` : ''}
+      `;
+
+      // Action bar
+      const actionBar = body.querySelector('#action-bar');
+      if (actionBar) {
+        if (canOpenVoting && r.status === 'DRAFT') {
+          actionBar.innerHTML += `<button id="open-btn" class="btn-outline text-xs flex items-center gap-1.5"><i class="fas fa-door-open"></i>Open for Candidates</button>`;
+        }
+        if (canOpenVoting && r.status === 'OPEN') {
+          actionBar.innerHTML += `<button id="vote-open-btn" class="btn-primary text-xs flex items-center gap-1.5"><i class="fas fa-vote-yea"></i>Open Voting</button>`;
+        }
+        if (canSelect && r.status === 'SELECTED') {
+          actionBar.innerHTML += `<button id="close-btn" class="btn-outline text-xs flex items-center gap-1.5"><i class="fas fa-check-circle"></i>Close Requirement</button>`;
+        }
+
+        actionBar.querySelector('#open-btn')?.addEventListener('click', () => advanceStatus(reqId, 'OPEN'));
+        actionBar.querySelector('#vote-open-btn')?.addEventListener('click', () => advanceStatus(reqId, 'VOTING'));
+        actionBar.querySelector('#close-btn')?.addEventListener('click', () => advanceStatus(reqId, 'CLOSED'));
+      }
+
+      // Vote buttons
+      body.querySelectorAll('.vote-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const candidateId = btn.dataset.candidateId;
+          const res = await fetch(`/api/v1/vendors/requirements/${reqId}/vote`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vendor_id: candidateId }),
+          });
+          if (res.ok) { loadDetail(reqId); loadRequirements(); }
+          else { const d = await res.json(); alert(d.message ?? 'Vote failed.'); }
+        });
+      });
+
+      // Select vendor buttons
+      body.querySelectorAll('.select-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Confirm vendor selection? This advances the requirement to SELECTED status.')) return;
+          const candidateId = btn.dataset.candidateId;
+          const res = await fetch(`/api/v1/vendors/requirements/${reqId}/select`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vendor_id: candidateId }),
+          });
+          if (res.ok) { loadDetail(reqId); loadRequirements(); }
+          else { const d = await res.json(); alert(d.message ?? 'Selection failed.'); }
+        });
+      });
+
+      // Add candidate button
+      body.querySelector('#add-candidate-btn')?.addEventListener('click', () => openAddCandidate(reqId));
+    }
+
+    async function advanceStatus(reqId, status) {
+      const res = await fetch(`/api/v1/vendors/requirements/${reqId}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) { loadDetail(reqId); loadRequirements(); }
+      else { const d = await res.json(); alert(d.message ?? `Failed to advance to ${status}.`); }
+    }
+
+    // ── Add candidate modal (inline) ──────────────────────────────────────────
+    function openAddCandidate(reqId) {
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4';
+      overlay.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+          <h3 class="font-semibold text-text-primary mb-4">Add Candidate Vendor</h3>
+          <div id="cand-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+          <form id="cand-form" class="space-y-3">
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Vendor Name <span class="text-red-500">*</span></label>
+              <input name="name" required maxlength="200" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-text-primary mb-1">Contact Person</label>
+                <input name="contact_person" maxlength="100" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-text-primary mb-1">Phone</label>
+                <input name="phone" type="tel" maxlength="15" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Email</label>
+              <input name="email" type="email" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-text-primary mb-1">Quoted Amount (₹)</label>
+                <input name="quoted_amount" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-text-primary mb-1 flex items-center gap-1">
+                  <input type="checkbox" name="gst_inclusive" class="rounded" /> GST inclusive
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-primary mb-1">Scope / Notes</label>
+              <textarea name="scope_summary" rows="2" maxlength="500" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button type="submit" class="btn-primary flex-1 text-sm">Add Candidate</button>
+              <button type="button" id="cand-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+            </div>
+          </form>
+        </div>`;
+
+      document.body.appendChild(overlay);
+      overlay.querySelector('#cand-cancel')?.addEventListener('click', () => overlay.remove());
+      overlay.querySelector('#cand-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd   = new FormData(e.target);
+        const errEl = overlay.querySelector('#cand-error');
+        errEl.classList.add('hidden');
+        const res = await fetch(`/api/v1/vendors/requirements/${reqId}/candidates`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name:            fd.get('name'),
+            contact_person:  fd.get('contact_person') || null,
+            phone:           fd.get('phone') || null,
+            email:           fd.get('email') || null,
+            quoted_amount:   fd.get('quoted_amount') ? parseFloat(fd.get('quoted_amount')) : null,
+            gst_inclusive:   !!fd.get('gst_inclusive'),
+            scope_summary:   fd.get('scope_summary') || null,
+          }),
+        });
+        if (res.ok) { overlay.remove(); loadDetail(reqId); loadRequirements(); }
+        else { const d = await res.json(); errEl.textContent = d.message ?? 'Failed.'; errEl.classList.remove('hidden'); }
+      });
+    }
+
+    // ── New requirement modal ─────────────────────────────────────────────────
+    if (canCreate) {
+      const modal = document.getElementById('new-req-modal');
+      document.getElementById('new-req-btn')?.addEventListener('click', () => modal?.classList.remove('hidden'));
+      document.getElementById('new-req-modal-close')?.addEventListener('click', () => modal?.classList.add('hidden'));
+      document.getElementById('new-req-cancel')?.addEventListener('click', () => modal?.classList.add('hidden'));
+
+      document.getElementById('new-req-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd  = new FormData(e.target);
+        const errEl = document.getElementById('new-req-error');
+        errEl.classList.add('hidden');
+        const res = await fetch('/api/v1/vendors/requirements', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category:         fd.get('category'),
+            title:            fd.get('title'),
+            description:      fd.get('description') || null,
+            quorum_required:  parseInt(fd.get('quorum_required')) || 8,
+          }),
+        });
+        if (res.ok) { modal?.classList.add('hidden'); e.target.reset(); loadRequirements(); }
+        else { const d = await res.json(); errEl.textContent = d.message ?? d.error ?? 'Failed.'; errEl.classList.remove('hidden'); }
+      });
+    }
+
+    loadRequirements();
+  </script>
+</PortalLayout>

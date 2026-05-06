@@ -50,7 +50,7 @@ export const GET: APIRoute = async ({ request, params }) => {
 
 // PATCH — update snag metadata (auth: snag.create)
 // Editable: category, subcategory, location, flat_number, description, severity,
-//           ascenza_reference, builder_committed_date, notice_sent, responsible_user_id, video_url
+//           builder_ref, builder_committed_date, notice_sent, responsible_user_id, video_url
 export const PATCH: APIRoute = async ({ request, params }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -78,7 +78,7 @@ export const PATCH: APIRoute = async ({ request, params }) => {
     const body = await request.json() as Record<string, unknown>;
     const allowed = [
       'category', 'subcategory', 'location', 'flat_number', 'description',
-      'severity', 'ascenza_reference', 'builder_committed_date',
+      'severity', 'builder_ref', 'builder_committed_date',
       'notice_sent', 'responsible_user_id', 'video_url',
     ];
     const updates: Record<string, unknown> = {};
