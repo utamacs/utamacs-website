@@ -1,12 +1,12 @@
 # UTA MACS — HOTO & Vendor Management Platform Design
-## v3.2 — Risk-Hardened + Full RBAC Management + Feature Permission System + Validation UX
+## v4.0 — Rules Engine + Async Resilience + Email Draft System + Full RBAC UI + RUNBOOK
 
 **Society:** Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited  
 **Registration No:** TG/RRD/MACS/2026-15/FOW & M (registered 10-02-2026)  
 **Location:** SY NO:425/2/1, Kondakal Village, Shankarpally Mandal, Rangareddy District, Telangana  
 **Builder (Promoter):** Ankura Homes | **HOTO Consultant:** Ascenza Global Infra Care Pvt Ltd  
 **HOTO Start Date:** June 1, 2026 | **Maintenance Tracking From:** May 1, 2025  
-**Document Version:** 3.2 — May 2026 (adds gap resolutions + validation UX specification)
+**Document Version:** 4.0 — May 2026 (major redesign: rules engine, async resilience, email drafts, full RBAC UI)
 
 ---
 
@@ -34,6 +34,12 @@
 20. [Scope Boundary](#20-scope-boundary)
 21. [Phase-wise Implementation Plan](#21-phase-wise-implementation-plan) — §21.0 [Non-Regression Principles](#210-non-regression-principles) applies to every sprint task
 22. [Comprehensive Risk Register](#22-comprehensive-risk-register)
+23. [Rules Engine](#23-rules-engine)
+24. [Email Management & Draft System](#24-email-management--draft-system)
+25. [RBAC Administration UI — Complete Specification](#25-rbac-administration-ui--complete-specification)
+26. [Post-Redesign Regression Analysis](#26-post-redesign-regression-analysis-v40-self-check)
+
+**Operations:** See [design/RUNBOOK.md](./RUNBOOK.md) for step-by-step operations procedures.
 
 ---
 
@@ -280,6 +286,8 @@ Every 6 days (cron /api/cron/supabase-ping):
 
 **Why read-only?** A write-based health check (creating a commit on every 15-minute ping) would generate 96 commits per day — polluting the governance audit trail and counting against GitHub API rate limits. A `GET /contents/README.md` call verifies connectivity and token validity without any side effects.
 
+**Circuit breaker integration:** On 3 consecutive failures, the circuit breaker opens (see §4.5) — all upload processing stops until the check starts passing again. Recovery is automatic; no admin intervention required.
+
 ### 4.3 Async PDF Generation
 
 ```
@@ -293,9 +301,115 @@ User clicks "Generate PDF"
 
 Vercel Pro upgrade (14-minute timeout) is the backup safety net.
 
+### 4.5 Async Resilience Patterns
+
+Every async operation can fail. The system handles failures in layers: retry → circuit break → dead letter queue → human intervention. No failure silently disappears.
+
+#### Retry Policy (Exponential Backoff)
+
+| Attempt | When | On failure |
+|---|---|---|
+| 1 | Immediate (first try) | Set `backoff_until = NOW() + 5 min` |
+| 2 | 5 minutes later | Set `backoff_until = NOW() + 30 min` |
+| 3 | 30 minutes later | `status = PERMANENTLY_FAILED` → DLQ alert to admin |
+
+Fixed-interval retries hammer a recovering service. Exponential backoff gives it time to stabilise. Upload queue and PDF generation both use this pattern.
+
+```sql
+-- Cron query selects only items past their backoff window:
+SELECT * FROM upload_queue
+WHERE status = 'PENDING'
+  AND (backoff_until IS NULL OR backoff_until < NOW())
+ORDER BY created_at LIMIT 30;
+```
+
+#### Circuit Breaker
+
+If `github_api_log` has 3 consecutive `success = false` entries, the circuit breaker opens. All upload processing stops to avoid hammering a recovering service.
+
+```
+State: CLOSED (normal)
+  → 3 consecutive health-check failures
+State: OPEN (blocked)
+  → All upload_queue processing skipped
+  → Admin banner: "Document storage unavailable. Uploads paused."
+  → Every 5 min: read-only GET to check recovery
+  → On read success:
+State: CLOSED (recovered)
+  → Trigger immediate on-demand cron run with 3× batch size (90 items)
+  → Admin banner: "Storage restored. Processing queued uploads."
+```
+
+Circuit breaker state is stored in `system_config` table (key: `github_circuit_breaker`, values: `OPEN`/`CLOSED`).
+
+#### Idempotency
+
+Vercel Cron does not guarantee exactly-once delivery. Every cron run is protected by a distributed lock:
+
+```sql
+CREATE TABLE cron_locks (
+  item_type TEXT NOT NULL,
+  item_id TEXT NOT NULL,
+  run_id UUID NOT NULL,
+  acquired_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '10 minutes',
+  PRIMARY KEY (item_type, item_id)
+);
+
+-- Before processing any item:
+INSERT INTO cron_locks (item_type, item_id, run_id)
+VALUES ('upload', $upload_id, $run_id)
+ON CONFLICT DO NOTHING;
+-- 0 rows inserted → item is being processed by another run → skip
+-- Locks auto-expire after 10 min (safeguard for crashed runs)
+```
+
+#### Cron Heartbeat Monitoring
+
+Every cron writes a heartbeat. A daily job compares last-run time to expected interval × 2 and alerts admin if a cron has gone silent (Vercel Cron can fail to fire).
+
+| Cron | Expected interval | Alert threshold |
+|---|---|---|
+| `process-uploads` | 60 s | 5 min silent |
+| `github-health` | 15 min | 45 min silent |
+| `process-pdfs` | 30 s | 5 min silent |
+| `builder-sla` | 24 h | 36 h silent |
+| `supabase-ping` | 6 days | 8 days silent |
+| `pdf-purge` | 24 h | 36 h silent |
+
+#### Dead Letter Queue (DLQ) Dashboard — `/portal/admin/queue`
+
+Admin-only page showing system health and all PERMANENTLY_FAILED items:
+
+```
+QUEUE HEALTH                                Last updated: 2 min ago
+────────────────────────────────────────────────────────────────────
+GitHub Storage: ✅ Connected  |  Circuit Breaker: ✅ Closed
+Upload Queue: 0 pending · 0 in-progress · 2 ⚠️ failed
+────────────────────────────────────────────────────────────────────
+CRON STATUS
+  ✅ process-uploads     last run: 42s ago
+  ✅ github-health       last run: 7m ago
+  ⚠️ builder-sla        last run: 38h ago     [Trigger Manually]
+  ✅ supabase-ping       last run: 4d ago
+
+DEAD LETTER QUEUE (2 items):
+┌──────────────────────────────────────────────────────────────────┐
+│  ⚠️ PERMANENTLY FAILED                                            │
+│  hoto/HOTO-042/documents/kone-amc.pdf                            │
+│  Uploaded by: Treasurer · 3 days ago                             │
+│  Error: GitHub API 422 — blob too large (> 100MB GitHub limit)   │
+│  [↩ Retry]   [✗ Abandon]   [↓ Download Original]                 │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+- **Retry**: Resets `status = 'PENDING'`, `attempts = 0`, `backoff_until = null`
+- **Abandon**: Sets `status = 'ABANDONED'`; sends email to original uploader: "Your file could not be saved. Please re-upload."
+- **Download Original**: Retrieves from Vercel `/tmp` if still cached (best-effort within 24h)
+
 ### 4.4 Non-Developer Operations Runbook
 
-`RUNBOOK.md` committed to governance-data before go-live. Covers: adding members, resetting passwords, activating/deactivating delegation, checking upload queue, rotating GitHub App key, restarting the app. Validated by Secretary following it without assistance.
+`RUNBOOK.md` is a separate document at [design/RUNBOOK.md](./RUNBOOK.md) and committed to `governance-data` before go-live. Covers: adding members, resetting passwords, activating/deactivating delegation, checking upload queue, rotating GitHub App key, recovering from storage and database failures, managing the email draft queue, updating rules, monitoring cron jobs, and portal-down procedures. Validated by Secretary following it without assistance before go-live.
 
 ---
 
@@ -676,6 +790,8 @@ Each director gets exactly 1 vote. Quorum = 8 of 14 (§7.16(a)). Tie → Preside
 - Proxy: notarized PoA uploaded by admin; linked to vote record
 - Joint ownership: first named owner votes by default; policy committed to governance-data pre-vote
 - `voting_policy_committed` flag on `vendor_requirements` must be `true` before voting opens
+
+**Proxy voting is DISABLED by default.** The `PROXY_VOTING_ENABLED` rule (see §23) defaults to `false`. When disabled: the proxy upload option is hidden in the voting UI, and the API rejects any proxy vote submission with: "Proxy voting is not currently enabled for this society. Contact the Admin to enable it if required." Admin can enable it from the Rules Engine UI without a code change.
 
 **Proxy expiry enforcement:**
 
@@ -1680,6 +1796,114 @@ CREATE TABLE approval_delegations (
 );
 
 -- ─────────────────────────────────────────────────────────────────────
+-- System Config (key-value store for runtime flags like circuit_breaker)
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE system_config (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by UUID REFERENCES profiles
+);
+INSERT INTO system_config (key, value) VALUES
+  ('github_circuit_breaker', '"CLOSED"'),
+  ('github_consecutive_failures', '0')
+ON CONFLICT DO NOTHING;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- Byelaw / Business Rules Engine (see §23)
+-- All configurable parameters — byelaw-locked or operational
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  society_id UUID REFERENCES societies NOT NULL,
+  rule_category TEXT NOT NULL,  -- 'PARAMETER', 'APPROVAL', 'ESCALATION', 'NOTIFICATION', 'VALIDATION'
+  rule_code TEXT NOT NULL,
+  label TEXT NOT NULL,
+  description TEXT,
+  byelaw_reference TEXT,
+  value_type TEXT NOT NULL,
+  current_value JSONB NOT NULL,
+  default_value JSONB NOT NULL,
+  is_locked BOOLEAN DEFAULT true,
+  effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
+  changed_by UUID REFERENCES profiles,
+  changed_at TIMESTAMPTZ DEFAULT NOW(),
+  change_reason TEXT,
+  UNIQUE (society_id, rule_code)
+);
+CREATE INDEX idx_rules_society_category ON rules(society_id, rule_category, rule_code);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- Cron Heartbeats (§4.5 — silence detection)
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE cron_heartbeats (
+  id BIGSERIAL PRIMARY KEY,
+  cron_name TEXT NOT NULL,
+  run_at TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT NOT NULL,             -- 'OK', 'PARTIAL', 'FAILED', 'CIRCUIT_OPEN'
+  items_processed INTEGER DEFAULT 0,
+  items_failed INTEGER DEFAULT 0,
+  duration_ms INTEGER,
+  error_message TEXT
+);
+CREATE INDEX idx_cron_heartbeats_name ON cron_heartbeats(cron_name, run_at DESC);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- Cron Locks (§4.5 — idempotency for Vercel Cron duplicates)
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE cron_locks (
+  item_type TEXT NOT NULL,
+  item_id TEXT NOT NULL,
+  run_id UUID NOT NULL,
+  acquired_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '10 minutes',
+  PRIMARY KEY (item_type, item_id)
+);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- Email Drafts (§24 — pre-generated formal communications)
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE email_drafts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  society_id UUID REFERENCES societies NOT NULL,
+  tier INTEGER NOT NULL CHECK (tier IN (1, 2, 3)),
+  triggered_by TEXT NOT NULL,
+  trigger_resource_type TEXT,
+  trigger_resource_id TEXT,
+  recipient_type TEXT NOT NULL,
+  recipient_email TEXT,
+  recipient_name TEXT,
+  subject TEXT NOT NULL,
+  body_html TEXT NOT NULL,
+  body_text TEXT NOT NULL,
+  suggested_sender_name TEXT NOT NULL,
+  suggested_sender_email TEXT NOT NULL,
+  status TEXT DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','REVIEWED','SENT','DISCARDED')),
+  reviewed_by UUID REFERENCES profiles,
+  reviewed_at TIMESTAMPTZ,
+  sent_by UUID REFERENCES profiles,
+  sent_at TIMESTAMPTZ,
+  resend_message_id TEXT,
+  discarded_by UUID REFERENCES profiles,
+  discarded_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_email_drafts_status ON email_drafts(society_id, status, created_at DESC);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- upload_queue: add backoff support (§4.5)
+-- ─────────────────────────────────────────────────────────────────────
+ALTER TABLE upload_queue
+  ADD COLUMN IF NOT EXISTS backoff_until TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS idempotency_key TEXT UNIQUE;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- profiles: email digest opt-out (§26.6 gap #4)
+-- ─────────────────────────────────────────────────────────────────────
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS email_digest_enabled BOOLEAN DEFAULT true;
+
+-- ─────────────────────────────────────────────────────────────────────
 -- Audit Log
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE audit_log (
@@ -2549,7 +2773,708 @@ If only three risks get managed before everything else:
 
 ---
 
-*Document Version 3.2 · Revised May 2026 — Gap Resolution + Validation UX Specification*  
+---
+
+## 23. Rules Engine
+
+### 23.1 Design Philosophy
+
+v3.x hardcoded all business logic — approval limits, escalation timelines, notification recipients, validation constraints — directly in API routes. When requirements change (byelaw amendments, operational adjustments, new committee practices), every change requires a code deployment.
+
+The v4.0 Rules Engine moves all configurable logic into the database, fully managed through the admin UI. The engine covers five rule categories:
+
+| Category | What it controls | Who can change |
+|---|---|---|
+| **PARAMETER** | Numeric thresholds, durations, feature flags | Admin (locked rules need byelaw amendment) |
+| **APPROVAL** | Who approves what, chain ordering, delegation | Admin only |
+| **ESCALATION** | Item type × days overdue → action | Admin only |
+| **NOTIFICATION** | Event → recipients → channel | Admin only |
+| **VALIDATION** | Field constraints, state transition guards | Admin only |
+
+**Important distinction:**
+- **Structural rules** (the *existence* of dual sign-off, one-apartment-one-vote, quorum requirement) are byelaw text. They stay in code. Changing them requires a formal byelaw amendment, a society resolution, and a code deployment.
+- **Parametric rules** (the *values* — ₹10,000, 90 days, 8 directors) are data. They live in the `rules` table and are managed through the UI.
+
+The engine does not replace code judgment — it provides values that code uses to make decisions.
+
+### 23.2 Rules Table
+
+```sql
+CREATE TABLE rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  society_id UUID REFERENCES societies NOT NULL,
+  rule_category TEXT NOT NULL,  -- 'PARAMETER', 'APPROVAL', 'ESCALATION', 'NOTIFICATION', 'VALIDATION'
+  rule_code TEXT NOT NULL,
+  label TEXT NOT NULL,
+  description TEXT,
+  byelaw_reference TEXT,
+  value_type TEXT NOT NULL,  -- 'integer', 'decimal', 'boolean', 'integer_array', 'date_string', 'json'
+  current_value JSONB NOT NULL,
+  default_value JSONB NOT NULL,
+  is_locked BOOLEAN DEFAULT true,  -- locked = needs formal byelaw amendment to change
+  effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
+  changed_by UUID REFERENCES profiles,
+  changed_at TIMESTAMPTZ DEFAULT NOW(),
+  change_reason TEXT,
+  UNIQUE (society_id, rule_code)
+);
+CREATE INDEX idx_rules_society ON rules(society_id, rule_category, rule_code);
+```
+
+### 23.3 Complete Rules Registry (Seed Values)
+
+#### Category: PARAMETER — numeric and boolean configuration values
+
+| `rule_code` | Label | Byelaw | Default | Locked |
+|---|---|---|---|---|
+| `QUORUM_REQUIRED` | Board quorum (directors required to vote) | §7.16(a) | `8` | ✓ |
+| `TOTAL_DIRECTORS` | Total number of directors | §7.16(a) | `14` | ✓ |
+| `VOTE_SUSPENSION_DAYS` | Maintenance arrears days before vote suspended | §4.6 | `90` | ✓ |
+| `DEFAULTER_FLAG_DAYS` | Days before "Defaulting Member" flag | §6.36 | `60` | ✓ |
+| `DEFAULTER_NOTICE_DAYS` | Days before services denial warning | §6.37 | `90` | ✓ |
+| `MAINTENANCE_INTEREST_RATE` | Annual interest on arrears (% p.a.) | §19(e) | `18` | ✓ |
+| `SECRETARY_APPROVAL_LIMIT` | Max expense Secretary can approve unilaterally (₹) | §9.11(a) | `10000` | ✓ |
+| `PRESIDENT_APPROVAL_LIMIT` | Max expense President can approve unilaterally (₹) | §9.11(a) | `20000` | ✓ |
+| `BOARD_APPROVAL_LIMIT` | Max expense requiring Board vote (₹) | §9.11(b) | `50000` | ✓ |
+| `MINUTES_SUBMISSION_DAYS` | Days to submit meeting minutes | §7.16(e) | `7` | ✓ |
+| `ANNUAL_STATEMENT_DEADLINE` | Annual financial statement deadline (MM-DD) | §9.3 | `"09-30"` | ✓ |
+| `INVITE_EXPIRY_DAYS` | Invite link validity (days) | — | `7` | ✗ |
+| `PROXY_VOTING_ENABLED` | Allow proxy authorization for vendor votes | — | `false` | ✗ |
+| `UPLOAD_MAX_SIZE_MB` | Maximum file upload size (MB) | — | `5` | ✗ |
+| `PDF_PURGE_DAYS` | Days after which PDF job input_data is PII-scrubbed | — | `30` | ✗ |
+| `PROXY_EXPIRY_ALERT_DAYS` | Days before proxy expiry to alert admin | — | `2` | ✗ |
+| `EMAIL_DRAFT_RETENTION_DAYS` | Days to retain SENT/DISCARDED email drafts | — | `365` | ✗ |
+
+#### Category: APPROVAL — who approves what and in what order
+
+| `rule_code` | Label | Default value | Locked |
+|---|---|---|---|
+| `HOTO_APPROVAL_CHAIN` | Roles required to approve HOTO items (in order) | `["secretary","president"]` | ✓ |
+| `HOTO_APPROVAL_ALTERNATE_VP` | VP substitutes for President if delegated | `true` | ✓ |
+| `HOTO_APPROVAL_ALTERNATE_JOINT_SEC` | Joint Secretary substitutes for Secretary if delegated | `true` | ✓ |
+| `VENDOR_DECISION_REQUIRES_BOTH` | Vendor final selection requires President + Secretary | `true` | ✓ |
+| `EXPENSE_APPROVAL_CHAIN_10K` | Role(s) who can approve expenses ≤ limit | `["secretary"]` | ✓ |
+| `EXPENSE_APPROVAL_CHAIN_20K` | Role(s) who can approve expenses ≤ limit | `["president"]` | ✓ |
+| `EXPENSE_APPROVAL_CHAIN_50K` | Board vote required for expenses ≤ limit | `"BOARD_VOTE"` | ✓ |
+
+#### Category: ESCALATION — overdue triggers and actions
+
+| `rule_code` | Label | Default value | Locked |
+|---|---|---|---|
+| `HOTO_SLA_ESCALATION_DAYS` | Days overdue before escalation actions | `[7,14,30]` | ✗ |
+| `HOTO_SLA_DAY7_ACTION` | Action at 7 days overdue | `"EMAIL_COMMITTEE"` | ✗ |
+| `HOTO_SLA_DAY14_ACTION` | Action at 14 days overdue | `"EMAIL_URGENT_FLAG"` | ✗ |
+| `HOTO_SLA_DAY30_ACTION` | Action at 30 days overdue | `"AUTO_DRAFT_NOTICE"` | ✗ |
+| `SNAG_SLA_WARNING_DAYS` | Days before snag builder-committed date to warn | `7` | ✗ |
+| `DEFAULTER_REMINDER_DAYS` | Days arrears before reminder email to member | `30` | ✗ |
+| `PENDING_APPROVAL_REMINDER_HOURS` | Hours before re-notifying approver of pending item | `48` | ✗ |
+| `PROXY_EXPIRY_ALERT_DAYS` | Days before proxy expiry to alert admin | `2` | ✗ |
+
+#### Category: NOTIFICATION — who gets notified of what
+
+| `rule_code` | Label | Default value | Locked |
+|---|---|---|---|
+| `NOTIFY_HOTO_APPROVAL_NEEDED` | Recipients when HOTO needs approval | `["approver"]` | ✗ |
+| `NOTIFY_VOTE_OPENED` | Recipients when vendor vote opens | `["all_committee"]` | ✗ |
+| `NOTIFY_BUILDER_SLA_OVERDUE` | Recipients when builder SLA overdue | `["committee"]` | ✗ |
+| `NOTIFY_GITHUB_HEALTH_FAIL` | Recipients for storage outage alert | `["admin","secretary"]` | ✗ |
+| `NOTIFY_ELECTION_COMPLETE` | Recipients after election bulk update | `["all_affected","president","secretary"]` | ✗ |
+| `WEEKLY_DIGEST_ENABLED` | Send weekly HOTO digest to committee | `true` | ✗ |
+| `WEEKLY_DIGEST_DAY` | Day of week for weekly digest (0=Sun) | `1` | ✗ |
+| `WEEKLY_DIGEST_HOUR` | Hour (24h) to send weekly digest | `7` | ✗ |
+
+#### Category: VALIDATION — state transition guards and field constraints
+
+| `rule_code` | Label | Default value | Locked |
+|---|---|---|---|
+| `HOTO_REQUIRE_DOCS_BEFORE_REVIEW` | Block UNDER_REVIEW if required docs missing | `true` | ✗ |
+| `VOTE_REQUIRE_CONFLICT_DECLARATION` | Force conflict-of-interest declaration before vote | `true` | ✓ |
+| `PAYMENT_REQUIRE_ELECTRONIC_ABOVE` | Min amount (₹) requiring electronic payment mode | `10000` | ✓ |
+| `HOTO_EVIDENCE_REQUIRED_BEFORE_UPLOAD` | Must select an HOTO item before uploading doc | `true` | ✗ |
+| `SNAG_SCOPE_REQUIRED_ON_CREATE` | snag_scope mandatory on snag creation | `true` | ✗ |
+| `INVITE_EMAIL_DOMAIN_ALLOWLIST` | Restrict invites to specific email domains (empty = any) | `[]` | ✗ |
+
+### 23.4 Runtime Access Pattern
+
+```typescript
+// src/lib/rules.ts
+
+// Single-rule fetch with typed fallback
+export async function getRule<T>(
+  societyId: string,
+  ruleCode: string,
+  fallback: T
+): Promise<T> {
+  const { data } = await supabase
+    .from('rules')
+    .select('current_value')
+    .eq('society_id', societyId)
+    .eq('rule_code', ruleCode)
+    .single();
+  return (data?.current_value as T) ?? fallback;
+}
+
+// Batch-load all rules for a society (cached per request)
+export async function loadRules(societyId: string): Promise<Map<string, unknown>> {
+  const { data } = await supabase
+    .from('rules')
+    .select('rule_code, current_value')
+    .eq('society_id', societyId);
+  return new Map((data ?? []).map(r => [r.rule_code, r.current_value]));
+}
+
+// Helper: get rule from pre-loaded map (zero DB calls after initial load)
+export function r<T>(rules: Map<string, unknown>, code: string, fallback: T): T {
+  return (rules.get(code) as T) ?? fallback;
+}
+
+// Usage — batch load once per API route, use throughout:
+const rules = await loadRules(societyId);
+
+// Financial limit check:
+const limit = r(rules, 'SECRETARY_APPROVAL_LIMIT', 10000);
+if (amount > limit) {
+  return Response.json({
+    error: 'APPROVAL_LIMIT_EXCEEDED',
+    message: `Your approval authority is up to ₹${limit.toLocaleString('en-IN')} (Byelaw §9.11a). This expense needs the President's approval.`,
+    limit, amount
+  }, { status: 422 });
+}
+
+// Quorum check:
+const quorum = r(rules, 'QUORUM_REQUIRED', 8);
+if (voteCount < quorum) {
+  return { quorumMet: false, required: quorum, current: voteCount };
+}
+
+// Approval chain resolution:
+const chain = r(rules, 'HOTO_APPROVAL_CHAIN', ['secretary','president']);
+const nextApprover = chain[currentApprovalStep];
+
+// Escalation check:
+const escalationDays = r(rules, 'HOTO_SLA_ESCALATION_DAYS', [7, 14, 30]);
+const actions = escalationDays.map((days, i) => ({ days, action: r(rules, `HOTO_SLA_DAY${days}_ACTION`, '') }));
+
+// Notification recipients:
+const recipients = r(rules, 'NOTIFY_BUILDER_SLA_OVERDUE', ['committee']);
+// Expand 'committee' → fetch all committee members from profiles
+```
+
+**Caching strategy:** `loadRules()` is called once per API route invocation and the result is passed as a parameter — no request-scoped cache needed. The batch SELECT fetches all society rules in one query. Rules change infrequently; stale reads by seconds are acceptable (noted in UI tooltip: "Changes take effect on the next action").
+
+### 23.5 Rules Engine Admin UI — `/portal/admin/rules`
+
+Admin-only management. Non-admin committee can view (read-only) to understand what rules are in force.
+
+The UI has five tabs — one per rule category.
+
+```
+RULES ENGINE                      Admin access  [View Change History]
+────────────────────────────────────────────────────────────────────
+Tabs: [Parameters] [Approval] [Escalation] [Notification] [Validation]
+────────────────────────────────────────────────────────────────────
+```
+
+#### Tab 1 — Parameters
+
+```
+PARAMETERS
+
+BYELAW-MANDATED (🔒 Locked — require formal amendment to change)
+────────────────────────────────────────────────────────────────────
+🔒 Board quorum required      8 of 14 directors         §7.16(a)
+🔒 Vote suspension threshold  90 days arrears           §4.6
+🔒 Secretary approval limit   ₹10,000                  §9.11(a)
+🔒 President approval limit   ₹20,000                  §9.11(a)
+🔒 Board approval limit       ₹50,000                  §9.11(b)
+🔒 Maintenance interest rate  18% per annum             §19(e)
+🔒 Minutes deadline           7 days after meeting      §7.16(e)
+
+OPERATIONAL (Admin-configurable)
+────────────────────────────────────────────────────────────────────
+  Invite link validity         7 days           [Edit]
+  Proxy voting                 ❌ Disabled       [Enable]
+  Max upload file size         5 MB             [Edit]
+  Builder SLA warnings         7, 14, 30 days   [Edit]
+  PDF data scrub after         30 days          [Edit]
+  Proxy expiry alert           2 days before    [Edit]
+  Email draft retention        1 year           [Edit]
+```
+
+#### Tab 2 — Approval Chains
+
+```
+APPROVAL CHAINS
+
+HOTO ITEMS
+  Who approves (in order):  Secretary → President    [Edit Order]
+  If Secretary absent:      Joint Secretary steps in  [Toggle]  ✅
+  If President absent:      Vice President (when delegated)  [Toggle]  ✅
+
+VENDOR DECISIONS
+  Final selection requires:  President AND Secretary (both)  [Locked 🔒]
+
+EXPENSES
+  ≤ Secretary limit (₹10,000):   Secretary alone          [Locked 🔒]
+  ≤ President limit (₹20,000):   President alone          [Locked 🔒]
+  ≤ Board limit (₹50,000):       Board vote (quorum 8/14) [Locked 🔒]
+  > Board limit:                  API blocks — not possible [Locked 🔒]
+```
+
+Editing an approval chain shows a drag-to-reorder interface for the chain order (unlocked chains only). A preview shows: "HOTO items will require approval from: Secretary (Step 1) → President (Step 2)."
+
+#### Tab 3 — Escalation Rules
+
+```
+ESCALATION RULES
+
+HOTO ITEMS — Builder SLA Overdue
+  7 days overdue  →  Email all committee (urgent flag)      [Edit]
+  14 days overdue →  Email with URGENT banner               [Edit]
+  30 days overdue →  Auto-draft formal notice + RERA flag   [Edit]
+
+  Each trigger:  action [EMAIL_COMMITTEE ▼]   [+ Add Trigger]   [✗ Remove]
+
+SNAG ITEMS — Builder Committed Date
+  7 days before   →  Remind Secretary                      [Edit]
+  Past date       →  Email Secretary + flag in dashboard   [Edit]
+
+MAINTENANCE DEFAULTERS
+  30 days arrears →  Email reminder to member              [Edit]
+  60 days arrears →  Flag committee dashboard              [Edit]
+  90 days arrears →  Suspend vote rights; 7-day notice     [Locked 🔒]
+
+PENDING APPROVALS
+  Re-notify approver after:  48 hours of no action        [Edit]
+```
+
+Each escalation trigger is editable (threshold days + action type). Action types available: `EMAIL_COMMITTEE`, `EMAIL_URGENT_FLAG`, `AUTO_DRAFT_NOTICE`, `DASHBOARD_FLAG`, `EMAIL_MEMBER`, `SUSPEND_VOTE_RIGHTS`. Locked triggers (byelaw-mandated) cannot be removed or have their action changed.
+
+#### Tab 4 — Notification Recipients
+
+```
+NOTIFICATION RECIPIENTS
+
+Event                          Recipients              Channel
+──────────────────────────────────────────────────────────────
+HOTO needs President approval  President only          Email  [Edit]
+HOTO needs Secretary approval  Secretary only          Email  [Edit]
+Vendor vote opened             All committee           Email  [Edit]
+Builder SLA overdue            Committee               Email  [Edit]
+GitHub storage down            Admin + Secretary       Email  [Edit]
+Election completed             All affected members    Email  [Edit]
+Weekly HOTO digest             All committee           Email
+  Enabled: ✅   Day: Monday   Hour: 7:00 AM            [Edit]
+
+Recipient options: approver / all_committee / committee / secretary /
+  president / admin / all_affected / uploader / member
+```
+
+Each row is editable. Adding recipients beyond the default widens notification scope; reducing them narrows it. Locked rows (e.g., "GitHub down → admin") cannot be narrowed below the minimum required for the system to function.
+
+#### Tab 5 — Validation Rules
+
+```
+VALIDATION RULES
+
+HOTO
+  ✅ Block status advance to UNDER_REVIEW if required docs missing   [Toggle]
+  ✅ Evidence document required before status advance                 [Toggle]
+
+SNAGS
+  ✅ snag_scope (common/individual) required on creation             [Toggle]
+
+VENDORS
+  🔒 Conflict-of-interest declaration required before voting         [Locked]
+  🔒 voting_policy_committed must be true before votes open          [Locked]
+
+FINANCE
+  🔒 Electronic payment required for amounts > ₹10,000              [Locked]
+  🔒 Cash payments blocked                                           [Locked]
+
+USERS
+  Invite email domain allowlist (empty = any domain):  [           ]  [Save]
+```
+
+Toggle-type validations can be turned on/off. Locked validations are byelaw requirements.
+
+#### Interaction Rules (All Tabs)
+
+1. **Editing:** Click [Edit] → inline field with current value. Enter new value + mandatory reason text.
+2. **Confirmation:** "You are changing [rule] from [old] to [new]. Reason: '[text]'. This takes effect on the next action — in-flight operations use the previous value."
+3. **On save:** `rules.current_value` updated; `changed_by`, `changed_at`, `change_reason` recorded; audit_log entry created.
+4. **Change History:** Global log showing: who changed what, old value → new value, reason, timestamp. Cannot be deleted.
+5. **Reset to Default:** Each unlocked rule has a [Reset] button. Requires a reason ("Reverting to byelaw default after temporary change").
+6. **Locked rule hover:** "This rule is set by the society's registered byelaws (TG/RRD/MACS/2026-15/FOW & M). It can only be changed if the byelaws are formally amended at a General Body Meeting and a new registration is obtained."
+
+---
+
+## 24. Email Management & Draft System
+
+### 24.1 Three-Tier Email Model
+
+Not all system emails should send automatically. Formal communications to external parties or members require human review before sending. The three tiers:
+
+| Tier | Examples | Behaviour |
+|---|---|---|
+| **1 — Operational** | File upload complete, PDF ready, session expired, invite accepted | Auto-send immediately via Resend |
+| **2 — Action Required** | Approval needed, vote opened, delegation changed, health alert | Auto-send with action button; tracked in dashboard |
+| **3 — Formal Draft** | Builder notices, defaulter notices, RERA packages, formal letters | Created as DRAFT; Secretary or President must review and send |
+
+Tier 1 and 2 send immediately. Tier 3 never sends automatically — it creates a draft that waits for human review.
+
+### 24.2 Email Drafts Table
+
+```sql
+CREATE TABLE email_drafts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  society_id UUID REFERENCES societies NOT NULL,
+  tier INTEGER NOT NULL CHECK (tier IN (1, 2, 3)),
+  triggered_by TEXT NOT NULL,        -- event type: 'SLA_30_DAY', 'DEFAULTER_90D', 'VOTE_CLOSED'
+  trigger_resource_type TEXT,        -- 'hoto_item', 'snag_item', 'vendor_requirement', 'member'
+  trigger_resource_id TEXT,
+  recipient_type TEXT NOT NULL,      -- 'BUILDER', 'MEMBER', 'COMMITTEE', 'ADMIN'
+  recipient_email TEXT,
+  recipient_name TEXT,
+  subject TEXT NOT NULL,
+  body_html TEXT NOT NULL,
+  body_text TEXT NOT NULL,
+  suggested_sender_name TEXT NOT NULL,
+  suggested_sender_email TEXT NOT NULL,
+  status TEXT DEFAULT 'DRAFT',       -- 'DRAFT', 'REVIEWED', 'SENT', 'DISCARDED'
+  reviewed_by UUID REFERENCES profiles,
+  reviewed_at TIMESTAMPTZ,
+  sent_by UUID REFERENCES profiles,
+  sent_at TIMESTAMPTZ,
+  resend_message_id TEXT,
+  discarded_by UUID REFERENCES profiles,
+  discarded_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_email_drafts_status ON email_drafts(society_id, status, created_at DESC);
+```
+
+### 24.3 Trigger → Draft Mapping
+
+| Trigger | Tier | Recipient | Subject Template |
+|---|---|---|---|
+| Builder SLA 7 days overdue | 2 | Committee | "OVERDUE: [item] builder deadline was [date]" |
+| Builder SLA 14 days overdue | 2 | Committee | "URGENT: [item] now 14 days overdue" |
+| Builder SLA 30 days overdue | 3 | Builder | "Legal Notice — [item] — Urban Trilla MACS" |
+| HOTO item needs President approval | 2 | President | "ACTION REQUIRED: [item] needs your approval" |
+| HOTO item needs Secretary approval | 2 | Secretary | "ACTION REQUIRED: [item] needs your approval" |
+| Vendor vote opened | 2 | All committee | "VOTE OPEN: [vendor category] — closes [date]" |
+| Vendor vote result | 2 | All committee | "VOTE RESULT: [vendor selected/failed quorum]" |
+| Defaulter 90+ days | 3 | Member | "Maintenance Default Notice — Urban Trilla MACS" |
+| GitHub health 3 failures | 1 | Admin + Secretary | "URGENT: Governance storage unavailable" |
+| Upload PERMANENTLY_FAILED | 1 | Uploader + Admin | "File upload failed — action needed" |
+| Invite accepted | 1 | Admin | "[Name] (Flat [N]) has accepted their invitation" |
+| Weekly HOTO digest | 2 | All committee | "HOTO Week [N] Summary — [X] items pending" |
+
+### 24.4 Draft Review UI — `/portal/admin/email-drafts`
+
+Secretary and President can access. Nav badge shows pending count: `📧 2`.
+
+```
+PENDING EMAIL DRAFTS (2)
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📧  READY TO SEND                           Generated today, 3:45 PM │
+│                                                                        │
+│  Legal Notice — HOTO-042 Lift AMC (30 days overdue)                   │
+│  To: Ankura Homes <legal@ankurahomes.com>                              │
+│  Subject: Legal Notice — HOTO Item Overdue — Urban Trilla MACS        │
+│                                                                        │
+│  [Preview Full Email]   [✏ Edit Subject / Body]                        │
+│  [✉ Send Now]           [✗ Discard]                                    │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📧  READY TO SEND                           Generated yesterday       │
+│                                                                        │
+│  Maintenance Default Notice — Flat 312 (92 days overdue)              │
+│  To: [Member Name] <email@example.com>                                 │
+│  Subject: Maintenance Default Notice — UTA MACS (Byelaw §6.37)        │
+│                                                                        │
+│  [Preview Full Email]   [✏ Edit Subject / Body]                        │
+│  [✉ Send Now]           [✗ Discard]                                    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Preview:** Renders the HTML email exactly as it appears in an inbox — sender name, subject, body, footer. The reviewer sees what the recipient will see.
+
+**Edit:** Inline editor for subject and body only. The system fills in recipient email and sender credentials automatically from the society profile — reviewers cannot redirect emails or spoof senders.
+
+**Send:** Calls Resend API with the stored `body_html`; records `sent_by`, `sent_at`, `resend_message_id`. Status → `SENT`. Cannot be unsent — the audit trail records the send.
+
+**Discard:** Requires a reason. Status → `DISCARDED`. Item stays in history for audit purposes.
+
+### 24.5 Weekly Digest Email
+
+Generated every Monday at 7:00 AM by cron `generate-weekly-digest`. Content:
+
+```
+Subject: UTA MACS — HOTO Week [N] Summary (May 26–June 1, 2026)
+
+Greetings Committee Members,
+
+HOTO PROGRESS THIS WEEK
+  Items completed: 4
+  Items advanced: 12
+  Currently overdue: 3 (builder-dependent)
+
+PENDING ACTIONS
+  ● Lift AMC Transfer — Waiting for President approval (3 days)
+  ● KONE Service Contract — Documents missing
+  ● Water Tank OC — Builder notified; awaiting response
+
+VENDOR DECISIONS
+  ● Property Management: Voting open until June 5
+  ● Accounting Tool: Selection pending Board vote
+
+UPCOMING DEADLINES
+  ● Terrace Waterproofing SLA: 8 days remaining
+  ● Backup DG Commissioning: 14 days remaining
+
+[Open Portal →]
+
+Urban Trilla MACS | portal.utamacs.org
+```
+
+Sent as Tier 2 (auto-send to all committee). The draft is created, sent immediately, and recorded in `email_drafts` with `status = 'SENT'` for audit purposes.
+
+---
+
+## 25. RBAC Administration UI — Complete Specification
+
+### 25.1 Three-Area Structure
+
+The RBAC admin UI has three distinct areas, each with its own URL and purpose:
+
+| Area | URL | Purpose | Who accesses |
+|---|---|---|---|
+| Role-Feature Matrix | `/portal/admin/permissions` | Which features each role has | Admin only |
+| User Role Assignment | `/portal/admin/users` | Which role each user holds | Admin only |
+| Per-User Overrides | `/portal/admin/users/[id]/permissions` | Exceptions for individual users | Admin only |
+
+### 25.2 Role-Feature Matrix (`/portal/admin/permissions`)
+
+The primary RBAC configuration interface. Shows a full matrix of roles × features, with visual toggle cells.
+
+```
+FEATURE PERMISSIONS MATRIX
+────────────────────────────────────────────────────────────────────────────
+View mode: [Matrix ▼]        [Preview as User…]   [Export CSV]
+
+            member  exec  jt_sec  sec   vp    pres   LEGEND
+────────────────────────────────────────────────────────────────────────────
+USER MANAGEMENT (admin controls these via the admin flag — not shown here)
+────────────────────────────────────────────────────────────────────────────
+HOTO MODULE
+  View items   🔒✅   🔒✅   🔒✅   🔒✅  🔒✅  🔒✅   🔒 = locked
+  Create/edit   —     ✅    ✅    ✅    ✅   ✅   ✅ = enabled
+  Upload docs   —     ✅    ✅    ✅    ✅   ✅   — = disabled (role default)
+  Add comments  —     ✅    ✅    ✅    ✅   ✅
+  Advance status—     ✅    ✅    ✅    ✅   ✅
+  Pres. gate  🔒—   🔒—   🔒—   🔒—  🔒✅ 🔒✅
+  Sec. gate   🔒—   🔒—   🔒✅  🔒✅  🔒—  🔒—
+────────────────────────────────────────────────────────────────────────────
+SNAG MODULE
+  View         🔒✅   🔒✅   🔒✅   🔒✅  🔒✅  🔒✅
+  Create/edit   —     ✅    ✅    ✅    ✅   ✅
+  Delete       🔒—   🔒—   🔒—   🔒—  🔒—  🔒✅
+  Verify-close 🔒—   🔒—   🔒—   🔒✅  🔒—  🔒✅
+────────────────────────────────────────────────────────────────────────────
+VENDOR MODULE
+  View         🔒✅   🔒✅   🔒✅   🔒✅  🔒✅  🔒✅
+  View quotes   —     ✅    ✅    ✅    ✅   ✅
+  Cast vote     —     ✅    ✅    ✅    ✅   ✅
+  Open voting   —     —     ✅    ✅    ✅   ✅
+  Final select 🔒—   🔒—   🔒—   🔒✅  🔒✅  🔒✅
+────────────────────────────────────────────────────────────────────────────
+FINANCE MODULE
+  View records  —     —     ✅    ✅    ✅   ✅
+  Enter records —     —     ✅    ✅    ✅   ✅
+  Approve ≤10K 🔒—   🔒—   🔒—   🔒✅  🔒—  🔒—
+  Approve ≤20K 🔒—   🔒—   🔒—   🔒—  🔒—  🔒✅
+  Board vote   🔒—   🔒—   🔒—   🔒✅  🔒—  🔒—
+  Member phones🔒—   🔒—   🔒—   🔒✅  🔒✅  🔒✅
+────────────────────────────────────────────────────────────────────────────
+[Save All Changes]    [Reset to Defaults]    [View Change Log]
+```
+
+**Interaction rules:**
+- Click an unlocked cell (✅/—) to toggle it; it turns amber to indicate an unsaved change
+- Clicking a locked (🔒) cell shows tooltip: "This is required by the society's byelaws. Contact Admin if a byelaw amendment is needed."
+- "Save All Changes" shows a diff summary modal before committing: "You are enabling 'Finance → View records' for Executive and disabling 'Vendor → View quotes' for Executive. These changes take effect immediately."
+- "Preview as User" → select any user → screen shows exactly what buttons and sections that user would see on the HOTO, Snag, Vendor, and Finance pages
+
+### 25.3 Role Assignment with Visual Hierarchy (`/portal/admin/users`)
+
+Beyond the list view in §5.9, the admin has a **Roles View** tab showing who holds each governance role:
+
+```
+COMMITTEE ROLES                          [+ Invite Member]  [Run Election]
+─────────────────────────────────────────────────────────────────────────
+
+  🔵 PRESIDENT                 Bal Reddy (Flat 101)       [Change]
+  🔵 VICE PRESIDENT            [Vacant — no one assigned] [Assign]  ⚠️
+  🔵 WORKING PRESIDENT         [Name] (Flat 204)          [Change]
+  🟢 GENERAL SECRETARY         [Name] (Flat 312)          [Change]
+  🟢 JOINT SECRETARY           [Name] (Flat 108)          [Change]
+  🟡 TREASURER                 [Name] (Flat 207)          [Change]
+  🟡 JOINT TREASURER           [Name] (Flat 415)          [Change]
+  ⚪ EXECUTIVE MEMBER (7)      [Name], [Name], [Name]...  [Manage]
+
+─────────────────────────────────────────────────────────────────────────
+  ADMIN FLAG (orthogonal to governance roles)
+  🔴 System Admin              [Your name] (Flat —)       [Manage Admins]
+─────────────────────────────────────────────────────────────────────────
+
+⚠️ Vice President is vacant. If the President is unavailable and delegation
+   is activated, no one can act. Assign a VP before go-live.
+```
+
+**[Change] role flow (single user):**
+1. Click [Change] → drawer slides in showing: current role, dropdown for new role, reason field, preview of permission changes
+2. Permission diff shown: "Removing: finance.view, finance.enter / Adding: hoto.approve_secretary"
+3. Confirmation modal: "Change [Name] from Executive to Joint Secretary? This affects their feature access immediately."
+4. On confirm: role updated, role_change_log created, email sent to user
+
+### 25.4 Per-User Permission Overrides (`/portal/admin/users/[id]/permissions`)
+
+Two-panel layout showing inherited + overrides:
+
+```
+[Name] (Flat 207) — Joint Treasurer
+─────────────────────────────────────────────────────────────────────────
+INHERITED FROM JOINT TREASURER ROLE          │ USER-SPECIFIC OVERRIDES
+                                             │
+✅ hoto.view                                 │  finance.view   ENABLED
+✅ hoto.create                               │  Reason: Acting financial
+✅ hoto.upload                               │  coordinator (Treasurer absent)
+✅ hoto.comment                              │  Granted: Admin, Jun 15
+✅ hoto.advance_status                       │  Expires: Aug 31, 2026 (78 days)
+✅ snag.view                                 │  [✗ Revoke Now]
+✅ snag.create                               │
+✅ vendor.view                               │  [+ Add Override]
+✅ vendor.vote                               │
+✅ finance.view  ← overridden (role: ❌)     │
+✅ finance.enter                             │
+❌ finance.approve_10k  (not in role)        │
+❌ finance.approve_20k  (not in role)        │
+─────────────────────────────────────────────────────────────────────────
+Note: The effective permission for 'finance.view' is ENABLED (override wins).
+Override expiry is checked server-side on every API call — not just on login.
+```
+
+**[+ Add Override] form:**
+- Feature: dropdown of all FEATURES
+- Enable or Disable: radio (enable grants access above role; disable restricts below role)
+- Reason: required text (for audit trail)
+- Expires: optional date picker (blank = no expiry)
+- On save: `user_feature_overrides` record created; user receives email notification
+
+### 25.5 Admin Flag Management (`/portal/admin/users/admins`)
+
+Separate sub-page for managing who holds `is_admin = true`:
+
+```
+SYSTEM ADMINISTRATORS
+──────────────────────────────────────────────────────────────────
+  [Name]  Flat —  Admin since: Jun 1, 2026   [Revoke Admin]
+
+  No one else has admin access.
+
+  [+ Grant Admin Access]
+  Enter email of existing member → confirm → is_admin = true
+
+──────────────────────────────────────────────────────────────────
+⚠️  Only grant admin access to people you fully trust.
+    Admins can change any role, enable any feature, and
+    deactivate any member. This cannot be undone without
+    another admin.
+```
+
+- Only another admin can grant or revoke the admin flag
+- Cannot revoke your own admin flag (prevents lock-out)
+- Must have at least one admin at all times (API enforces)
+
+---
+
+## 26. Post-Redesign Regression Analysis (v4.0 Self-Check)
+
+This section verifies that the six new design areas introduced in v4.0 do not create new gaps, contradict existing sections, or break existing functionality.
+
+### 26.1 Byelaw Rules Engine — Regression Checks
+
+| Check | Status | Note |
+|---|---|---|
+| Existing hardcoded values match seed defaults | ✅ | ₹10K/₹20K/₹50K/quorum=8/90-day all match |
+| `getRuleValue` is a read-only DB call — no side effects | ✅ | SELECT only; safe in API middleware |
+| Locked rules cannot be changed via the admin UI | ✅ | `is_locked = true` → edit disabled; API enforces |
+| Rules engine UI is admin-only | ✅ | `is_admin = true` gate; non-admin sees read-only view |
+| Rule change is logged in `audit_log` | ✅ | Change recorded with `changed_by`, `change_reason` |
+| Fallback values in `getRuleValue` match byelaw defaults | ✅ | Hardcoded fallbacks = seed defaults = byelaw text |
+| Non-regression: §2 tables unchanged | ✅ | §2 references rules engine parameters by name |
+
+### 26.2 Async Resilience — Regression Checks
+
+| Check | Status | Note |
+|---|---|---|
+| Existing `upload_queue` behaviour preserved | ✅ | Backoff fields are additive; `null backoff_until` = no backoff (old behaviour) |
+| Circuit breaker does not affect read operations | ✅ | Only blocks `process-uploads` cron; views/downloads unaffected |
+| `cron_locks` UNIQUE constraint cannot deadlock normal operation | ✅ | 10-min expiry auto-releases stale locks |
+| DLQ dashboard does not expose PII | ✅ | Shows file path and error only; no member data |
+| Retry does not re-process already-committed uploads | ✅ | Only `status = 'PENDING'` items are picked up; COMPLETED items excluded |
+| `system_config` table is a new addition — no existing FK dependencies | ✅ | New table; no existing migrations affected |
+
+### 26.3 Email Draft System — Regression Checks
+
+| Check | Status | Note |
+|---|---|---|
+| Tier 1 and 2 emails continue to auto-send | ✅ | Only Tier 3 creates a DRAFT; existing auto-send behaviour unchanged |
+| Existing Resend integration unchanged | ✅ | Email drafts use same Resend client; new `sent_by` + `sent_at` tracking added |
+| No email sent to builder without human review | ✅ | All builder communications are Tier 3 DRAFT |
+| Weekly digest does not send if no committee members are active | ✅ | Cron checks `profiles.is_active = true` before generating recipient list |
+| `email_drafts` table does not store raw passwords or tokens | ✅ | Stores only rendered subject+body + recipient email |
+| Secretary/President see email drafts; admin also sees | ✅ | Role check in draft review UI |
+
+### 26.4 Proxy Disabled by Default — Regression Checks
+
+| Check | Status | Note |
+|---|---|---|
+| `proxy_authorizations` table not dropped or altered | ✅ | Table retained; feature is gated, not removed |
+| When `PROXY_VOTING_ENABLED = false`, proxy upload UI hidden | ✅ | UI conditional on `getRuleValue('PROXY_VOTING_ENABLED')` |
+| When `false`, API rejects proxy vote submissions with clear message | ✅ | Server-side check before processing vote |
+| Admin can enable at any time — takes effect immediately | ✅ | Rules engine update → next page load shows proxy option |
+| Existing proxy votes (if any) are not retroactively invalidated when disabled | ✅ | Disable affects new votes only; existing records unchanged |
+
+### 26.5 RBAC UI Expansion — Regression Checks
+
+| Check | Status | Note |
+|---|---|---|
+| Matrix UI is display-only until "Save All Changes" clicked | ✅ | No partial saves; atomic update of all changed cells |
+| Preview-as-User uses same `resolveUserPermissions` function as production | ✅ | Same code path — no separate preview logic that could diverge |
+| Role assignment change emails to affected user | ✅ | Existing §5.5 flow preserved |
+| Vacant role warnings are advisory, not blocking | ✅ | Admin can proceed without filling VP; warning only |
+| Admin cannot revoke own admin flag | ✅ | API enforces minimum-1-admin rule |
+| Non-regression: §18 RBAC text and §25 new spec are consistent | ✅ | §25 is the UI spec; §18 is the logic spec; no contradictions |
+
+### 26.6 New Gaps Identified During Regression
+
+These gaps surfaced during the v4.0 self-check and are documented for resolution in implementation:
+
+1. **`system_config` table needs definition** — circuit breaker state is stored there but the table schema is not defined. Add to §15 schema.
+2. **Email draft retention** — `email_drafts` rows are never deleted. Define a retention policy (e.g., purge `SENT`/`DISCARDED` rows older than 1 year via a cron).
+3. **`getRuleValue` caching strategy** — "30s TTL per request context" needs a concrete implementation path (Vercel edge cache or a module-level Map with timestamp).
+4. **Weekly digest opt-out** — if a committee member does not want weekly emails, there is no unsubscribe mechanism. Add `email_digest_enabled BOOLEAN DEFAULT true` to `profiles`.
+5. **Rules engine change propagation** — if `SECRETARY_APPROVAL_LIMIT` is changed while an expense approval is in-flight, the in-flight approval uses the old value (cached at approval-start time). This is acceptable behaviour but should be documented in the UI tooltip: "Changes take effect on the next submission."
+
+*These 5 items are low-priority (no blockers) and can be addressed in Phase 2.*
+
+*Document Version 4.0 · Revised May 2026 — Rules Engine + Async Resilience + Email Draft System + Full RBAC UI + RUNBOOK*  
+*Changes from v3.2: §23 general-purpose Rules Engine (5 categories: PARAMETER, APPROVAL, ESCALATION, NOTIFICATION, VALIDATION) with 35+ configurable rules and full tab-based admin UI; §24 Email Draft System (3-tier model, email_drafts table, review UI, weekly digest spec, 13-event trigger mapping); §25 full RBAC Administration UI spec (role-feature matrix with visual toggles, role assignment with hierarchy view, per-user overrides with two-panel layout, admin flag management); §26 post-redesign regression analysis (6 categories, 5 new gaps identified and documented); §4.5 Async Resilience Patterns (exponential backoff, circuit breaker, idempotency locks, cron heartbeat monitoring, DLQ dashboard); §4.4 updated to reference new RUNBOOK.md; proxy voting disabled by default via rules engine; new DB tables: rules, email_drafts, cron_heartbeats, cron_locks, system_config; upload_queue backoff fields; profiles.email_digest_enabled; design/RUNBOOK.md created (20 sections, 600+ lines)*  
 *Changes from v3.1: Added `societies` table (FK anchor for all society_id columns); clarified `member_invites.accepted_user_id` FK creation timing and token timing-attack prevention; added `responsible_role`/`responsible_user_id` to `snag_items`; added `reopen_reason` to `snag_items`; specified proxy authorization expiry enforcement mechanism with proactive cron alert; defined Corpus Fund APPROVED_USE approval chain (presidential vs board vs blocked); changed health-check cron from write-based (96 commits/day) to read-only GET; added path traversal validation spec for `upload_queue.target_github_path`; added `finance.open_board_vote` feature for Board resolution votes ≤₹50K; specified board financial vote mechanism reusing vendor_requirements+votes tables with FINANCIAL_APPROVAL category; added `pdf_generation_jobs.purged_at` with 30-day PII scrub retention policy; added §12.5 Validation Messages & Blocked Feature UX (full message catalog, display patterns, non-tech user vote screen, My Actions overflow/pagination, no-403-pages rule); added corpus fund §9.3 with three-tier approval chain table*  
 *Changes from v3: Added Module 0 (User & Role Management); invite-only registration; committee election bulk update; member deactivation; auto-reassignment; feature registry with locked/unlocked features; runtime permission resolution; UI enforcement pattern; admin permissions UI; per-user feature overrides; fixed user_roles unique constraint bug; RBAC risk register; pre-launch checklist*  
 *Based on: Registered Byelaws TG/RRD/MACS/2026-15/FOW & M · Ascenza HOTO Scope · Committee Q&A · Risk Analysis · RBAC Requirements · Final Design Review (21 findings)*  
