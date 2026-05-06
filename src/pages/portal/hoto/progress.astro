@@ -6,7 +6,7 @@ const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
 ---
 
-<PortalLayout title="HOTO Completion Progress" user={user} activeModule="hoto">
+<PortalLayout title="HOTO Completion Progress" user={user} activeModule="hoto_progress">
   <div class="mb-6 flex items-center justify-between flex-wrap gap-3">
     <div>
       <h1 class="text-2xl font-bold text-text-primary">HOTO Completion Progress</h1>
@@ -24,8 +24,9 @@ if (!user) return Astro.redirect('/portal/login');
 
   <!-- Per-category breakdown -->
   <div id="category-breakdown" class="bg-white rounded-2xl border border-border-light overflow-hidden mb-6">
-    <div class="p-4 border-b border-border-light">
+    <div class="p-4 border-b border-border-light flex items-center justify-between">
       <h2 class="font-semibold text-text-primary text-sm">By Ascenza Category</h2>
+      <span class="text-xs text-text-secondary">Click a category to expand items</span>
     </div>
     <div id="category-rows" class="divide-y divide-border-light">
       <div class="p-4 text-center text-sm text-text-secondary animate-pulse">Loading…</div>
@@ -44,22 +45,26 @@ if (!user) return Astro.redirect('/portal/login');
   </div>
 
   <script>
-    // APPROVED counts toward completion; REJECTED does not (it means builder refused, not done)
+    // APPROVED/CLOSED = done; REJECTED = builder-blocked (excluded from denominator);
+    // all other statuses = in-progress
     const DONE_STATUSES = ['CLOSED', 'APPROVED'];
+    let allItems: any[] = [];
 
     async function load() {
       const res = await fetch('/api/v1/hoto/items?limit=200&include_closed=true', { credentials: 'include' });
       if (!res.ok) { document.getElementById('overall-card')!.innerHTML = '<p class="text-red-600 text-sm">Failed to load.</p>'; return; }
       const data = await res.json();
-      const items: any[] = data.items ?? data;
+      allItems = data.items ?? data;
 
       const today = new Date().toISOString().slice(0, 10);
-      const total = items.length;
-      const done = items.filter((i: any) => DONE_STATUSES.includes(i.status)).length;
-      const rejected = items.filter((i: any) => i.status === 'REJECTED').length;
-      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-      const overdue = items.filter((i: any) => i.builder_sla_date && i.builder_sla_date < today && !DONE_STATUSES.includes(i.status) && i.status !== 'REJECTED');
-      const pendingApproval = items.filter((i: any) => ['PENDING_SECRETARY','PENDING_PRESIDENT'].includes(i.status));
+      const total = allItems.length;
+      const done = allItems.filter((i: any) => DONE_STATUSES.includes(i.status)).length;
+      const rejected = allItems.filter((i: any) => i.status === 'REJECTED').length;
+      // Denominator excludes REJECTED (builder-blocked items aren't "pending" work)
+      const activeDenominator = total - rejected;
+      const pct = activeDenominator > 0 ? Math.round((done / activeDenominator) * 100) : 0;
+      const overdue = allItems.filter((i: any) => i.builder_sla_date && i.builder_sla_date < today && !DONE_STATUSES.includes(i.status) && i.status !== 'REJECTED');
+      const pendingApproval = allItems.filter((i: any) => ['PENDING_SECRETARY','PENDING_PRESIDENT'].includes(i.status));
 
       // Overall card
       document.getElementById('overall-card')!.innerHTML = `
@@ -94,37 +99,68 @@ if (!user) return Astro.redirect('/portal/login');
             </div>
           </div>
         </div>
-        ${rejected > 0 ? `<div class="mt-4 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"><i class="fas fa-exclamation-circle"></i> ${rejected} item${rejected !== 1 ? 's' : ''} rejected by builder — excluded from completion %.</div>` : ''}`;
+        ${rejected > 0 ? `<div class="mt-4 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"><i class="fas fa-exclamation-circle"></i> ${rejected} item${rejected !== 1 ? 's' : ''} rejected by builder — excluded from completion % (${done}/${activeDenominator} active items).</div>` : ''}`;
 
       // Category breakdown
-      const cats: Record<string, { total: number; done: number; rejected: number }> = {};
-      for (const it of items) {
-        const cat = (it as any).ascenza_category ?? 'Uncategorised';
-        if (!cats[cat]) cats[cat] = { total: 0, done: 0, rejected: 0 };
+      const cats: Record<string, { total: number; done: number; rejected: number; items: any[] }> = {};
+      for (const it of allItems) {
+        const cat = it.ascenza_category ?? 'Uncategorised';
+        if (!cats[cat]) cats[cat] = { total: 0, done: 0, rejected: 0, items: [] };
         cats[cat].total++;
-        if (DONE_STATUSES.includes((it as any).status)) cats[cat].done++;
-        if ((it as any).status === 'REJECTED') cats[cat].rejected++;
+        cats[cat].items.push(it);
+        if (DONE_STATUSES.includes(it.status)) cats[cat].done++;
+        if (it.status === 'REJECTED') cats[cat].rejected++;
       }
       const sortedCats = Object.entries(cats).sort(([, a], [, b]) => b.total - a.total);
 
-      document.getElementById('category-rows')!.innerHTML = sortedCats.map(([cat, { total, done, rejected }]) => {
-        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-        const barColor = pct === 100 ? 'bg-green-500' : pct >= 50 ? 'bg-primary-600' : 'bg-amber-400';
+      const PRIORITY_COLOR: Record<string, string> = { CRITICAL: 'text-red-600 bg-red-50', HIGH: 'text-orange-600 bg-orange-50', MEDIUM: 'text-amber-600 bg-amber-50', LOW: 'text-blue-600 bg-blue-50' };
+      const STATUS_SHORT: Record<string, string> = { NOT_STARTED: 'Not started', IN_PROGRESS: 'In progress', UNDER_REVIEW: 'Under review', PENDING_SECRETARY: 'Awaiting Sec', PENDING_PRESIDENT: 'Awaiting Pres', APPROVED: 'Approved', REJECTED: 'Rejected', CLOSED: 'Closed' };
+
+      document.getElementById('category-rows')!.innerHTML = sortedCats.map(([cat, { total: catTotal, done: catDone, rejected: catRej, items: catItems }]) => {
+        const activeDen = catTotal - catRej;
+        const catPct = activeDen > 0 ? Math.round((catDone / activeDen) * 100) : (catDone > 0 ? 100 : 0);
+        const barColor = catPct === 100 ? 'bg-green-500' : catPct >= 50 ? 'bg-primary-600' : 'bg-amber-400';
         const encodedCat = encodeURIComponent(cat);
+        const rowId = `cat-${encodedCat}`;
+
+        const itemsHtml = catItems
+          .sort((a: any, b: any) => {
+            const order: Record<string,number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+            return (order[a.priority] ?? 9) - (order[b.priority] ?? 9);
+          })
+          .map((it: any) => {
+            const prioStyle = PRIORITY_COLOR[it.priority] ?? 'text-gray-600 bg-gray-50';
+            const statusLabel = STATUS_SHORT[it.status] ?? it.status;
+            return `<a href="/portal/hoto/${it.id}" class="flex items-center gap-3 px-5 py-2.5 hover:bg-blue-50 transition-colors border-t border-border-light first:border-t-0">
+              <span class="text-xs px-1.5 py-0.5 rounded font-medium ${prioStyle}">${it.priority}</span>
+              <span class="flex-1 text-xs text-text-primary truncate">${it.title}</span>
+              <span class="text-xs text-text-secondary shrink-0">${statusLabel}</span>
+              <i class="fas fa-chevron-right text-[10px] text-text-secondary"></i>
+            </a>`;
+          }).join('');
+
         return `
-          <a href="/portal/hoto?category=${encodedCat}" class="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors group">
-            <div class="flex-1 min-w-0">
-              <div class="flex justify-between mb-1">
-                <span class="text-sm text-text-primary font-medium truncate group-hover:text-primary-600 transition-colors">${cat}</span>
-                <span class="text-xs text-text-secondary ml-2 shrink-0">${done}/${total}${rejected > 0 ? ` <span class="text-amber-600">(${rejected} rejected)</span>` : ''}</span>
+          <div>
+            <button onclick="toggleCat('${rowId}')" class="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors group text-left">
+              <div class="flex-1 min-w-0">
+                <div class="flex justify-between mb-1">
+                  <span class="text-sm text-text-primary font-medium truncate group-hover:text-primary-600 transition-colors">${cat}</span>
+                  <span class="text-xs text-text-secondary ml-2 shrink-0">${catDone}/${activeDen}${catRej > 0 ? ` · <span class="text-amber-600">${catRej} rejected</span>` : ''}</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full ${barColor} rounded-full transition-all" style="width:${catPct}%"></div>
+                </div>
               </div>
-              <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div class="h-full ${barColor} rounded-full transition-all" style="width:${pct}%"></div>
+              <span class="text-sm font-semibold ${catPct === 100 ? 'text-green-600' : 'text-text-secondary'} w-10 text-right">${catPct}%</span>
+              <i id="${rowId}-chevron" class="fas fa-chevron-down text-xs text-text-secondary transition-transform"></i>
+            </button>
+            <div id="${rowId}" class="hidden bg-gray-50">
+              ${itemsHtml}
+              <div class="px-5 py-2 border-t border-border-light">
+                <a href="/portal/hoto?category=${encodedCat}" class="text-xs text-primary-600 hover:underline">View all in HOTO tracker →</a>
               </div>
             </div>
-            <span class="text-sm font-semibold ${pct === 100 ? 'text-green-600' : 'text-text-secondary'} w-10 text-right">${pct}%</span>
-            <i class="fas fa-chevron-right text-xs text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity"></i>
-          </a>`;
+          </div>`;
       }).join('') || '<div class="p-4 text-center text-sm text-text-secondary">No items.</div>';
 
       // Overdue SLA
@@ -137,7 +173,7 @@ if (!user) return Astro.redirect('/portal/login');
             <a href="/portal/hoto/${it.id}" class="flex items-center gap-4 p-4 hover:bg-red-50 transition-colors">
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-medium text-text-primary truncate">${it.title}</div>
-                <div class="text-xs text-text-secondary mt-0.5">${it.ascenza_category} · ${it.status.replace('_', ' ')}</div>
+                <div class="text-xs text-text-secondary mt-0.5">${it.ascenza_category} · ${it.status.replace(/_/g, ' ')}</div>
               </div>
               <div class="text-right shrink-0">
                 <div class="text-sm font-semibold text-red-600">${daysOverdue}d overdue</div>
@@ -147,6 +183,16 @@ if (!user) return Astro.redirect('/portal/login');
         }).join('');
       }
     }
+
+    function toggleCat(id: string) {
+      const el = document.getElementById(id);
+      const chevron = document.getElementById(`${id}-chevron`);
+      if (!el || !chevron) return;
+      const isHidden = el.classList.contains('hidden');
+      el.classList.toggle('hidden', !isHidden);
+      chevron.classList.toggle('rotate-180', isHidden);
+    }
+    (window as any).toggleCat = toggleCat;
 
     load();
   </script>

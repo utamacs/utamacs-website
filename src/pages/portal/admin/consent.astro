@@ -9,7 +9,7 @@ if (user.role !== 'admin') return Astro.redirect('/portal');
 const CURRENT_VERSION = parseInt(import.meta.env.PRIVACY_POLICY_VERSION ?? '1');
 ---
 
-<PortalLayout title="Consent Management" user={user} activeModule="compliance">
+<PortalLayout title="Consent Management" user={user} activeModule="admin_consent">
   <div class="mb-6">
     <h1 class="text-2xl font-bold text-text-primary">Consent Version Management</h1>
     <p class="text-sm text-text-secondary mt-1">

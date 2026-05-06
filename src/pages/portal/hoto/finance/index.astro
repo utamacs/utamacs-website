@@ -11,7 +11,7 @@ const canApprove20k  = user.portalRole === 'president' || user.isAdmin;
 const canBoardVote   = ['secretary','president'].includes(user.portalRole) || user.isAdmin;
 ---
 
-<PortalLayout title="HOTO Finance" user={user} activeModule="hoto">
+<PortalLayout title="HOTO Finance" user={user} activeModule="hoto_finance">
   <div class="mb-6">
     <h1 class="text-2xl font-bold text-text-primary">Finance</h1>
     <p class="text-sm text-text-secondary mt-1">Corpus fund, maintenance records, and governance expenses.</p>

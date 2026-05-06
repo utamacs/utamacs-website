@@ -36,7 +36,7 @@ export const GET: APIRoute = async ({ request, url }) => {
         id, ascenza_category, title, priority, status, deadline,
         builder_sla_date, days_overdue, responsible_role, responsible_user_id,
         rera_escalation_eligible, notice_sent, president_approved_at, secretary_approved_at,
-        created_at, last_updated_at,
+        created_at, last_updated_at, status_changed_at,
         hoto_required_docs(count)
       `, { count: 'exact' })
       .eq('society_id', SOCIETY_ID);

@@ -21,6 +21,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     const action       = url.searchParams.get('action');
     const resourceType = url.searchParams.get('resource_type');
+    const resourceId   = url.searchParams.get('resource_id');
     const userId       = url.searchParams.get('user_id');
     const from         = url.searchParams.get('from');
     const to           = url.searchParams.get('to');
@@ -41,6 +42,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
       if (action)       q = q.eq('action', action);
       if (resourceType) q = q.eq('resource_type', resourceType);
+      if (resourceId)   q = q.eq('resource_id', resourceId);
       if (userId)       q = q.eq('user_id', userId);
       if (from)         q = q.gte('created_at', from);
       if (to)           q = q.lte('created_at', to);
@@ -69,6 +71,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
       if (action)       q = q.eq('action', action);
       if (resourceType) q = q.eq('resource_type', resourceType);
+      if (resourceId)   q = q.eq('resource_id', resourceId);
       if (userId)       q = q.eq('actor_id', userId);
       if (from)         q = q.gte('created_at', from);
       if (to)           q = q.lte('created_at', to);
