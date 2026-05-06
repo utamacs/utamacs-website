@@ -332,57 +332,20 @@ This module is the foundation for everything else. Every action in the platform 
 - Approve HOTO items (unless they also hold president/secretary governance role)
 - Act on behalf of President or Secretary in governance decisions
 
-### 5.2 Authorization Documentation (Required for All Significant Admin Actions)
+### 5.2 Admin Acts Unilaterally — No In-Portal Approval Required
 
-Every admin action that affects a user's access or system-wide permissions must include authorization metadata before it can be confirmed:
+The admin has full authority to manage users and permissions without needing to wait for or collect a digital approval from the President or Secretary inside the portal. The expectation is that the President/Secretary communicate decisions to the admin via their normal channels (WhatsApp, phone, meeting) — the admin then acts.
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  CHANGE ROLE: [Name] from executive → secretary                  │
-│                                                                   │
-│  This action requires documented authorization from the          │
-│  President or Secretary. (§8.3 — Secretary implements decisions) │
-│                                                                   │
-│  Authorized by:   [President Bal Reddy ▼]                        │
-│  How:             [WhatsApp message ▼]                           │
-│                    WhatsApp message                               │
-│                    Email                                          │
-│                    Verbal instruction in meeting                  │
-│                    Board resolution                               │
-│  Date authorized: [2026-06-15]                                   │
-│  Details (what was communicated):                                 │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │ President messaged on Jun 15: "Please make [Name] the new  │  │
-│  │ General Secretary effective from today's AGM result"       │  │
-│  └────────────────────────────────────────────────────────────┘  │
-│                                                                   │
-│  [Cancel]                          [Confirm Role Change]         │
-└──────────────────────────────────────────────────────────────────┘
-```
+**Why no in-portal authorization workflow?**
+- The President and Working President are non-technical. Requiring them to log into an admin panel and click "Approve" on every user change adds friction that defeats the purpose.
+- The admin is a trusted, designated role. Assigning `is_admin = true` to someone is itself the act of trust — it should be done carefully once, not verified on every subsequent action.
+- The audit log records everything the admin does. If a decision is ever questioned, the audit trail shows what changed, when, and by whom.
 
-This authorization metadata is stored in `role_change_log.authorized_by`, `authorization_method`, `authorization_date`, and `authorization_details`. It is shown in the audit trail and on the user's role history page.
-
-**Which actions require authorization documentation:**
-
-| Admin Action | Authorization Required From |
-|---|---|
-| Invite new member (member role) | Secretary or President |
-| Invite new committee member | President |
-| Change role (any direction) | President |
-| Run committee election bulk update | President |
-| Toggle feature permission per role | President |
-| Grant per-user feature override | President |
-| Deactivate a member | Secretary or President |
-| Reactivate a member | Secretary or President |
-| Grant admin flag to another person | President |
-| Activate/deactivate delegation chain | President (for their own delegation) or Secretary (for Secretary delegation) |
-
-**Actions that do NOT need authorization documentation:**
-- Resending an expired invite (no new access is being granted)
-- Cancelling a pending invite
-- Viewing the user directory
-- Checking system health
-- Running bulk data imports
+**What keeps the admin accountable:**
+- Every admin action is permanently logged in `audit_log` (who, what, when)
+- The user's role history timeline is visible to the President, Secretary, and Vice President — they can review changes at any time
+- The admin cannot change their own role or grant themselves extra governance powers
+- Only another admin (or the initial setup) can grant the `is_admin` flag to someone
 
 ### 5.3 Registration Model: Invite-Only
 
@@ -391,30 +354,26 @@ No one can self-register. All portal access starts with an admin-sent invite —
 **Registration Flow:**
 
 ```
-1. Admin receives authorization (e.g., President says "add [Name] from Flat 207")
+1. Admin: /portal/admin/users → [Invite Member]
+   Enter: email, flat number, intended role (default: member)
 
-2. Admin: /portal/admin/users → [Invite Member]
-   Enter: email, flat number, intended role
-   Enter authorization metadata: who approved, how, when, what was said
-
-3. System:
+2. System:
    → Creates member_invites record with one-time token (expires 7 days)
    → Sends Resend email with invite link + flat number + portal introduction
 
-4. New user clicks link:
+3. New user clicks link:
    → Registration form: name + password (email pre-filled, non-editable)
    → Privacy consent checkbox (DPDP Act — must accept to proceed)
    → On submit: account created, privacy_consents record saved
 
-5. Admin notified: "[Name] (Flat 207) has accepted their invitation"
-   Secretary also notified (so leadership knows the access was activated)
+4. Admin notified: "[Name] (Flat 207) has accepted their invitation"
+   Secretary also notified via email (FYI — not for approval)
 
-6. member_invites.accepted = true; token immediately invalidated
+5. member_invites.accepted = true; token immediately invalidated
 ```
 
 **Invite expiry:** Admin can resend from Pending Invites tab.
 **Invite cancellation:** Admin can cancel; cancelled invites cannot be accepted.
-**When authorization is questioned later:** The invite record stores who authorized the invite, how, and when — admin can point to this record.
 
 ### 5.4 Role Hierarchy (Governance Roles)
 
@@ -437,33 +396,29 @@ The `is_admin` flag is orthogonal — it is not in this hierarchy. An admin with
 ### 5.5 Role Change Workflow
 
 ```
-1. Admin receives instruction from President or Secretary (WhatsApp/email/meeting)
+1. Admin: /portal/admin/users → Click user → [Change Role]
 
-2. Admin: /portal/admin/users → Click user → [Change Role]
+2. Select new role from dropdown
 
-3. Select new role from dropdown
+3. Enter reason (free text — for the audit trail):
+   "Committee election — June 2026 AGM"
+   "Treasurer resigned — Joint Treasurer stepping up"
+   "New apartment owner onboarded"
 
-4. Complete authorization form (required — cannot skip):
-   - Authorized by: [President / Secretary / Board ▼]
-   - How: [WhatsApp / Email / Verbal / Board resolution ▼]
-   - Date: [date of authorization]
-   - Details: [verbatim or summary of what was communicated]
-
-5. Confirmation dialog shows all changes + authorization summary:
+4. Confirmation dialog:
    "You are changing [Name]'s role from [executive] to [secretary].
-   Authorized by President on 2026-06-15 via WhatsApp.
    This is permanent and will be logged. Continue?"
 
-6. On confirm (API /api/admin/users/[id]/role PATCH):
+5. On confirm (API /api/admin/users/[id]/role PATCH):
    → profiles.portal_role updated
-   → role_change_log record created (includes full authorization metadata)
+   → role_change_log record created
    → audit_log record created
    → All assigned items reviewed for auto-reassignment
    → User receives email: "Your UTA MACS access has been updated to [new role]"
-   → Secretary notified (if admin ≠ Secretary): "[Admin] changed [Name]'s role to secretary"
+   → Secretary notified (FYI): "Admin changed [Name]'s role to secretary"
 ```
 
-Role changes are **immediate**. The authorization documentation is recorded before the change, not after.
+Role changes are **immediate**. The reason field provides enough context for the audit trail without requiring a separate approval workflow.
 
 ### 5.6 Committee Election Bulk Update
 
@@ -474,9 +429,7 @@ The admin runs this workflow after the General Body election concludes. The Pres
 ```
 Step 1: [New Election]
   Enter: Election date, Description ("Annual General Body Meeting 2026")
-  Enter authorization: "President Bal Reddy provided the outcome via WhatsApp
-                        on 2026-06-15 with the list of elected members"
-  Attach: election outcome document (optional — uploaded via document upload)
+  Attach: AGM minutes or outcome document (optional)
 
 Step 2: System shows current committee lineup
   ┌─────────────────────────────────────────────────────────────┐
@@ -494,48 +447,42 @@ Step 2: System shows current committee lineup
   │  Executive 1-7     │  [Name] → [Select member ▼] (×7)       │
   └────────────────────┴────────────────────────────────────────┘
 
-Step 3: Preview screen — shows all changes + the authorization summary
+Step 3: Preview screen
   CHANGES (5 members affected):
   [Name] executive → secretary
   [Name] secretary → member (outgoing)
   [Name] member    → executive
-  Authorized by: President Bal Reddy · WhatsApp · 2026-06-15
 
   [Cancel]   [Confirm Election]
 
 Step 4: On confirm (single database transaction):
   → All role changes atomically (all succeed or all fail)
   → All changes linked to election_event_id
-  → Authorization metadata stored on the event (not repeated per person)
   → Old role holders not re-elected revert to 'member'
   → Each affected person receives email with their new role
-  → Secretary receives summary: "Admin has applied the June 2026 election results"
+  → Secretary and President notified (FYI): "Admin applied the June 2026 election results"
 ```
 
 **Why atomic?** A partial failure leaves the system inconsistent. Either the full election applies or nothing does.
 
 ### 5.7 Member Deactivation
 
-When an apartment owner sells their flat (NOC process complete), the admin deactivates them — after Secretary or President has authorized it:
+When an apartment owner sells their flat (NOC process complete), the admin deactivates them:
 
 ```
-1. Admin receives authorization from Secretary or President ("Flat 204 sold — remove access")
+1. Admin: /portal/admin/users → Find member → [Deactivate]
 
-2. Admin: /portal/admin/users → Find member → [Deactivate]
+2. Enter reason: "Flat 204 sold — NOC issued 2026-06-15"
 
-3. Complete authorization form: who authorized, how, when
-
-4. Mandatory reason: "Flat sold — NOC issued 2026-06-15 — authorized by Secretary"
-
-5. On confirm:
+3. On confirm:
    → profiles.is_active = false
    → All active sessions immediately invalidated
    → Email sent to deactivated member: "Your UTA MACS portal access has been deactivated"
    → All their assigned HOTO/snag items auto-reassigned
-   → Secretary notified of deactivation (unless Secretary is the admin)
+   → Secretary and President notified (FYI)
    → Data retained for 10-year audit requirement
 
-Reactivation: Admin only; with Secretary or President authorization; mandatory reason.
+Reactivation: Admin only; mandatory reason.
 ```
 
 **Account deletion:** Never. Data retention is a byelaw requirement (10 years).
@@ -1077,8 +1024,6 @@ CREATE INDEX idx_member_invites_token ON member_invites(token)
 
 -- ─────────────────────────────────────────────────────────────────────
 -- Role Change Log (fast role history; complements audit_log)
--- Includes authorization metadata: admin always documents who in leadership
--- authorized the change, how, and when — creates a defensible audit trail
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE role_change_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1087,12 +1032,7 @@ CREATE TABLE role_change_log (
   old_role TEXT NOT NULL,
   new_role TEXT NOT NULL,
   changed_by UUID REFERENCES profiles NOT NULL,   -- always the admin
-  reason TEXT NOT NULL,
-  -- Authorization metadata (required for every role change)
-  authorized_by UUID REFERENCES profiles,          -- the President or Secretary who consented
-  authorization_method TEXT,                       -- 'whatsapp' | 'email' | 'verbal' | 'board_resolution'
-  authorization_date DATE,
-  authorization_details TEXT,                      -- verbatim or summary of what was communicated
+  reason TEXT NOT NULL,                           -- free-text reason for audit trail
   election_event_id UUID,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1100,7 +1040,6 @@ CREATE INDEX idx_role_change_user ON role_change_log(user_id, created_at DESC);
 
 -- ─────────────────────────────────────────────────────────────────────
 -- Election Events (groups bulk role changes)
--- Authorization metadata stored once on the event, not repeated per person
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE election_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1108,19 +1047,14 @@ CREATE TABLE election_events (
   election_date DATE NOT NULL,
   description TEXT NOT NULL,
   total_role_changes INTEGER DEFAULT 0,
-  -- Authorization metadata (required — admin must document presidential/secretarial consent)
-  authorized_by UUID REFERENCES profiles,          -- President who communicated the results
-  authorization_method TEXT,                       -- 'whatsapp' | 'email' | 'verbal' | 'board_resolution'
-  authorization_date DATE,
-  authorization_details TEXT,                      -- e.g. "AGM minutes shared on 2026-06-15"
-  outcome_document_id TEXT REFERENCES documents,  -- optional: uploaded AGM minutes/resolution
+  outcome_document_id TEXT REFERENCES documents,  -- optional: uploaded AGM minutes
   created_by UUID REFERENCES profiles,             -- the admin who executed this
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ─────────────────────────────────────────────────────────────────────
 -- Feature Permissions (which features each role can access)
--- Only admin can change these; every change requires President authorization documented
+-- Only admin (is_admin=true) can change these
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE feature_permissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1131,17 +1065,12 @@ CREATE TABLE feature_permissions (
   is_locked BOOLEAN NOT NULL DEFAULT false,  -- locked = byelaw-mandated; cannot be toggled
   last_changed_by UUID REFERENCES profiles,  -- always the admin
   last_changed_at TIMESTAMPTZ DEFAULT NOW(),
-  -- Authorization metadata (required for every non-locked feature change)
-  authorized_by UUID REFERENCES profiles,    -- President who approved this change
-  authorization_method TEXT,
-  authorization_date DATE,
-  authorization_details TEXT,
   UNIQUE (society_id, role, feature)
 );
 
 -- ─────────────────────────────────────────────────────────────────────
 -- User Feature Overrides (per-user exceptions to role defaults)
--- Only admin can grant these; every grant requires President authorization documented
+-- Only admin (is_admin=true) can grant these
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE user_feature_overrides (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1149,17 +1078,12 @@ CREATE TABLE user_feature_overrides (
   user_id UUID REFERENCES profiles NOT NULL,
   feature TEXT NOT NULL,
   enabled BOOLEAN NOT NULL,
-  reason TEXT NOT NULL,                        -- why this override is needed
+  reason TEXT NOT NULL,                        -- why this override is needed (audit trail)
   granted_by UUID REFERENCES profiles NOT NULL, -- always the admin
   granted_at TIMESTAMPTZ DEFAULT NOW(),
   expires_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ,
   revoked_by UUID REFERENCES profiles,
-  -- Authorization metadata (required — admin must document who approved this exception)
-  authorized_by UUID REFERENCES profiles,      -- President who approved the override
-  authorization_method TEXT,
-  authorization_date DATE,
-  authorization_details TEXT,
   UNIQUE (society_id, user_id, feature)
 );
 CREATE INDEX idx_user_feature_overrides_user ON user_feature_overrides(user_id)
@@ -1885,14 +1809,6 @@ Finance Module
   [Save Changes for Executive Role]    [Reset to Defaults]
 ```
 
-After clicking Save, the authorization form appears:
-```
-  Before saving, document the President's authorization for this change:
-  Authorized by: [President Bal Reddy ▼]   How: [WhatsApp ▼]   Date: [____]
-  Details: ___________________________________
-  [Cancel]   [Save with Authorization]
-```
-
 Locked features display a tooltip: "This permission is mandated by the society's byelaws and cannot be changed."
 
 **Non-locked features** can be toggled per role by the admin with documented President authorization. Examples of legitimate changes:
@@ -1917,26 +1833,21 @@ USER-SPECIFIC OVERRIDES:
   ┌──────────────────────────────────────────────────────────────────┐
   │  finance.view   ENABLED   Expires: 2026-08-31                    │
   │  Reason: Acting financial coordinator during Treasurer's absence │
-  │  Granted by: Admin on 2026-06-15                                 │
-  │  Authorized by: President (WhatsApp, Jun 15)    [Revoke]         │
+  │  Granted by: Admin on 2026-06-15                    [Revoke]     │
   └──────────────────────────────────────────────────────────────────┘
 
 [+ Add Override]  ← Admin only
   Feature: [finance.view ▼]   Enable/Disable: [Enable ▼]
   Reason: _________________________   Expires: ____/____/____  (optional)
-
-  Authorization (required):
-  Authorized by: [President ▼]   How: [WhatsApp ▼]   Date: [____]
-  Details: ___________________________________
   [Grant Override]
 ```
 
 Overrides:
-- Require a mandatory reason AND authorization metadata
+- Require a mandatory reason (for audit trail)
 - Optional expiry date (auto-revoked when expired)
-- Shown in the user's audit trail with full authorization details
-- Can be revoked at any time by the admin (with authorization from President/Secretary)
-- Only the admin can grant overrides — President/Secretary communicate the decision but the admin executes it
+- Shown in the user's audit trail
+- Can be revoked at any time by the admin
+- Only the admin can grant or revoke overrides
 
 **Guiding principle:** Overrides are for genuine edge cases (temporary acting role, specific investigation). They are not a substitute for proper role management via the election workflow.
 
@@ -1946,19 +1857,19 @@ Two orthogonal axes: **governance role** (approval/voting/action power) and **ad
 
 | Feature | member | executive | treasurer / joint_sec | secretary | vice_president | president | **admin** (`is_admin=true`) |
 |---|---|---|---|---|---|---|---|
-| **User Management** — admin executes with documented Pres/Sec authorization | | | | | | | |
+| **User Management** — admin only; no in-portal approval from leaders required | | | | | | | |
 | View member directory (read-only) | - | - | - | ✓ | ✓ | ✓ | ✓ |
-| Invite new member | - | - | - | - | - | - | ✓ + auth from Sec/Pres |
-| Invite committee member | - | - | - | - | - | - | ✓ + auth from Pres |
-| Change any governance role | - | - | - | - | - | - | ✓ + auth from Pres |
-| Deactivate member | - | - | - | - | - | - | ✓ + auth from Sec/Pres |
-| Reactivate member | - | - | - | - | - | - | ✓ + auth from Sec/Pres |
-| Run election bulk update | - | - | - | - | - | - | ✓ + auth from Pres |
-| Manage feature permissions | - | - | - | - | - | - | ✓ + auth from Pres |
-| Grant per-user feature override | - | - | - | - | - | - | ✓ + auth from Pres |
-| Revoke per-user feature override | - | - | - | - | - | - | ✓ + auth from Pres |
-| Grant / revoke admin flag | - | - | - | - | - | - | ✓ + auth from Pres |
-| Manage delegation settings | - | - | - | - | - | - | ✓ + auth from Pres/Sec |
+| Invite new member | - | - | - | - | - | - | ✓ |
+| Invite committee member | - | - | - | - | - | - | ✓ |
+| Change any governance role | - | - | - | - | - | - | ✓ |
+| Deactivate member | - | - | - | - | - | - | ✓ |
+| Reactivate member | - | - | - | - | - | - | ✓ |
+| Run election bulk update | - | - | - | - | - | - | ✓ |
+| Manage feature permissions per role | - | - | - | - | - | - | ✓ |
+| Grant per-user feature override | - | - | - | - | - | - | ✓ |
+| Revoke per-user feature override | - | - | - | - | - | - | ✓ |
+| Grant / revoke admin flag | - | - | - | - | - | - | ✓ |
+| Manage delegation settings | - | - | - | - | - | - | ✓ |
 | **HOTO** — governance role controls these | | | | | | | |
 | View items | R | R | R | R | R | R | R |
 | Create/edit items | - | ✓ | ✓ | ✓ | ✓ | ✓ | via governance role only |
@@ -1989,9 +1900,12 @@ Two orthogonal axes: **governance role** (approval/voting/action power) and **ad
 | Send | - | - | ✓(joint_sec) | ✓ | ✓ | ✓ | — |
 | **Audit** | | | | | | | |
 | View audit log | - | - | ✓(sec/joint_sec) | ✓ | ✓ | ✓ | ✓ |
-| View authorization records | - | - | - | ✓ | ✓ | ✓ | ✓ |
+| View role change history (all users) | - | - | - | ✓ | ✓ | ✓ | ✓ |
 
-**Reading the matrix:** The `president` column has no user-management ✓ marks — the President authorizes decisions verbally/via WhatsApp; the admin records that authorization and executes the change. If the admin also holds a governance role (e.g., `executive`), they get both sets of capabilities.
+**Reading the matrix:**
+- `president` column has no user-management ✓ marks — the President governs, not administers. The admin has full system management authority.
+- Admin accountability comes from the audit log (every action permanently recorded) and from the President/Secretary being able to see the role history in the portal, not from an in-portal approval workflow.
+- If the admin also holds a governance role (e.g., `executive`), they get both sets of capabilities for their governance role actions.
 
 ---
 
