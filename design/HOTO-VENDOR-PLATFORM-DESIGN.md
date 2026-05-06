@@ -32,7 +32,7 @@
 18. [Role-Based Access Control & Feature Permissions](#18-role-based-access-control--feature-permissions)
 19. [Document Management](#19-document-management)
 20. [Scope Boundary](#20-scope-boundary)
-21. [Phase-wise Implementation Plan](#21-phase-wise-implementation-plan)
+21. [Phase-wise Implementation Plan](#21-phase-wise-implementation-plan) — §21.0 [Non-Regression Principles](#210-non-regression-principles) applies to every sprint task
 22. [Comprehensive Risk Register](#22-comprehensive-risk-register)
 
 ---
@@ -1968,6 +1968,148 @@ Committed to `governance-data/_meta/scope-v1.md` before launch. When scope-creep
 ---
 
 ## 21. Phase-wise Implementation Plan
+
+### 21.0 Non-Regression Principles
+
+These rules govern the entire implementation. Every sprint task is subject to them. They are not optional and are not overridden by timeline pressure.
+
+---
+
+#### Rule 1: No existing feature is touched unless the design explicitly requires a functional change to it.
+
+The new HOTO, Snag, Vendor, Finance, Notice, and RBAC modules are **additions** to the existing portal. They live alongside what already exists. No existing page, component, API route, or database table is deleted, renamed, or restructured as part of this work unless it is explicitly called out in the design with a stated reason.
+
+**What "explicitly required" means:**
+- The design document names the specific file or table and explains why the change is needed
+- The change is a bug fix for an existing defect (e.g., `user_roles` unique constraint)
+- The change is a necessary extension to an existing system to support new functionality (e.g., adding columns to `profiles`)
+- The change is an additive navigation addition (new items added to the portal menu, not replacing existing ones)
+
+**What does NOT qualify:**
+- "While I'm in this file, I'll clean up X" — stop; leave X as-is
+- "This component could be refactored to be cleaner" — not in scope
+- "This old pattern conflicts with the new approach" — maintain both; document the conflict; resolve it only if it causes an actual breakage
+
+---
+
+#### Rule 2: Database migrations are additive only.
+
+| Allowed | Not Allowed Without Explicit Review |
+|---|---|
+| `CREATE TABLE IF NOT EXISTS` | `DROP TABLE` |
+| `ALTER TABLE ADD COLUMN IF NOT EXISTS` | `DROP COLUMN` |
+| `CREATE INDEX IF NOT EXISTS` | `ALTER COLUMN TYPE` |
+| `ADD CONSTRAINT IF NOT EXISTS` (with pre-check) | `TRUNCATE` |
+| `CREATE OR REPLACE FUNCTION` | Renaming any existing table or column |
+
+**For the `user_roles` unique constraint specifically:** Before applying the constraint, run this query to confirm there are no duplicates in production:
+
+```sql
+SELECT user_id, society_id, COUNT(*)
+FROM user_roles
+GROUP BY user_id, society_id
+HAVING COUNT(*) > 1;
+```
+
+If duplicates exist, resolve them manually first, then apply the constraint. A failed constraint migration can lock the table and break login for all users.
+
+---
+
+#### Rule 3: Existing features are tested before and after every sprint that touches shared code.
+
+**Critical paths to test before closing any sprint:**
+
+| Feature | Test | File(s) |
+|---|---|---|
+| Letter generation (new) | Create a multi-page letter; verify first page layout, subsequent pages have no offset | `src/pages/portal/letters/new.astro` |
+| Letter generation (edit) | Open existing letter, edit, download PDF | `src/pages/portal/letters/[id].astro` |
+| Portal login | Log in with an existing committee member account | Supabase auth |
+| Admin password reset | Trigger and complete a password reset | `/portal/admin/` |
+| Public website navigation | Nav and footer load on all public pages | `src/components/nav.html`, `footer.html` |
+| Existing portal layout | Portal layout renders correctly with any new nav items added | `src/layouts/PortalLayout.astro` |
+
+These tests are done manually before a sprint is considered complete. If any existing feature is broken by a change, the sprint is not done until it is fixed.
+
+---
+
+#### Rule 4: New navigation items are additions, not replacements.
+
+When adding new portal modules to the navigation (HOTO, Snags, Vendors, Finance, Notices, Admin), the new items are appended to the existing navigation structure. No existing nav item is removed, reordered, or renamed unless the design explicitly requires it.
+
+**Known existing navigation items to preserve:**
+- Dashboard (existing)
+- Letters (`/portal/letters/`)
+- Admin (`/portal/admin/`)
+- Any other items currently in `PortalLayout.astro`
+
+**Known fix pending (not a new addition — pre-existing bug):**
+- The `compliance` module nav item currently maps to `/portal/admin/audit` instead of `/portal/admin`; this should be corrected but is not this project's concern unless it is explicitly in the sprint scope.
+
+---
+
+#### Rule 5: New columns on `profiles` use defaults that don't break existing rows.
+
+Every new column added to the `profiles` table must have a default value that is valid for existing rows:
+
+| Column | Default | Why it's safe |
+|---|---|---|
+| `is_admin` | `false` | Existing users do not become admins unexpectedly |
+| `portal_role` | `'executive'` | Existing committee member accounts keep their current effective access |
+| `payment_status` | `'current'` | Existing rows not flagged as defaulters |
+| `is_active` | `true` | Existing accounts remain active |
+| `privacy_consent_given` | `false` | Existing users prompted to consent on next login |
+
+**The privacy consent prompt for existing users:** On first login after the consent feature goes live, existing users see the consent screen. They cannot access the portal until they accept. This is intentional (DPDP Act requirement) but the impact on existing users must be communicated to them before deployment — not just discovered when they try to log in.
+
+---
+
+#### Rule 6: The feature permission system defaults to "everything already working continues to work."
+
+When the `feature_permissions` table is seeded, every feature that existing roles could already access must be set to `enabled = true` for those roles. No existing capability is silently revoked by seeding default permissions.
+
+Verification query after seeding:
+
+```sql
+-- Check: no existing committee member has lost access to a feature they had before
+-- Expected: all committee-level features enabled for executive and above
+SELECT role, feature, enabled
+FROM feature_permissions
+WHERE enabled = false
+ORDER BY role, feature;
+-- Review this list carefully before go-live: every disabled entry is a deliberate choice
+```
+
+---
+
+#### Rule 7: The letter generation system is extended, not replaced.
+
+The formal notice auto-generation (Module 5) reuses the existing PDF generation infrastructure. The approach:
+- The existing `/portal/letters/new.astro` and `/portal/letters/[id].astro` pages remain fully functional and unchanged for manual letter creation
+- The notice auto-draft feature calls the existing letter generation logic programmatically, passing the item data as the template context
+- The result is stored in GitHub at `notices/drafts/` — distinct from manually created letters stored elsewhere
+- If the existing letter generation logic needs to be extracted into a shared utility for reuse, that refactor is done as a standalone commit with the existing letter feature tested before and after
+
+---
+
+#### Rule 8: The `is_admin` flag does not interfere with existing auth checks.
+
+Existing auth checks in the portal use `portal_role` (or the existing `user_roles` table). The new `is_admin` flag is an additional check only — it is never a replacement for existing role checks. Pattern:
+
+```typescript
+// Existing check (unchanged):
+if (user.portal_role !== 'president' && user.portal_role !== 'secretary') {
+  return redirect('/portal');
+}
+
+// New admin check (additive — in new pages only):
+if (!user.is_admin) {
+  return redirect('/portal');
+}
+```
+
+Existing pages that check `portal_role` are not modified to also check `is_admin`. New admin-only pages check `is_admin`. The two systems are independent.
+
+---
 
 ### Urgency Context
 
