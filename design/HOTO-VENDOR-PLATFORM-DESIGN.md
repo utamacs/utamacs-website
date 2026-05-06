@@ -1,916 +1,1008 @@
 # UTA MACS — HOTO & Vendor Management Platform Design
-## Complete System Architecture, Data Model, UX & Implementation Plan
+## Revised Complete System Architecture, Data Model, UX & Implementation Plan
 
 **Society:** Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited  
-**Location:** Kondakal, Shankarpalle, Rangareddy District, Telangana  
-**Phase:** Builder-to-Association Handover (HOTO) + Vendor Selection  
-**Version:** 1.0 — May 2026
+**Registration No:** TG/RRD/MACS/2026-15/FOW & M (registered 10-02-2026)  
+**Location:** SY NO:425/2/1, Kondakal Village, Shankarpally Mandal, Rangareddy District, Telangana  
+**Builder (Promoter):** Ankura Homes | **HOTO Consultant:** Ascenza Global Infra Care Pvt Ltd  
+**HOTO Start Date:** June 1, 2026 | **Maintenance Tracking From:** May 1, 2025  
+**Document Version:** 2.0 — May 2026 (post requirements clarification)
 
 ---
 
 ## Table of Contents
 
-1. [Executive Summary](#1-executive-summary)
-2. [System Architecture](#2-system-architecture)
-3. [Part 1 — Vendor Management System](#3-part-1--vendor-management-system)
-4. [Part 2 — HOTO Management System](#4-part-2--hoto-management-system)
-5. [Part 3 — Workflow Engine](#5-part-3--workflow-engine)
-6. [Part 4 — Dashboard & Tracking](#6-part-4--dashboard--tracking)
-7. [Part 5 — Git as Storage Backend](#7-part-5--git-as-storage-backend)
-8. [Part 6 — Data Models](#8-part-6--data-models)
-9. [Part 7 — UX Design](#9-part-7--ux-design)
-10. [Part 8 — Industry Best Practices](#10-part-8--industry-best-practices)
-11. [Part 9 — Implementation Plan](#11-part-9--implementation-plan)
-12. [Trade-offs & Risks](#12-trade-offs--risks)
+1. [What We Are Building and Why](#1-what-we-are-building-and-why)
+2. [Byelaw Governance Rules Hardcoded into the System](#2-byelaw-governance-rules-hardcoded-into-the-system)
+3. [System Architecture](#3-system-architecture)
+4. [Module 1 — HOTO Management](#4-module-1--hoto-management)
+5. [Module 2 — Snag List Management](#5-module-2--snag-list-management)
+6. [Module 3 — Vendor Evaluation & Selection](#6-module-3--vendor-evaluation--selection)
+7. [Module 4 — Financial Tracking (HOTO Support)](#7-module-4--financial-tracking-hoto-support)
+8. [Module 5 — Formal Notice Generation](#8-module-5--formal-notice-generation)
+9. [Workflow Engine & Approval Delegation](#9-workflow-engine--approval-delegation)
+10. [Dashboard & UX Design](#10-dashboard--ux-design)
+11. [Git Storage Strategy](#11-git-storage-strategy)
+12. [Data Model](#12-data-model)
+13. [Role-Based Access Control](#13-role-based-access-control)
+14. [Document Management & Missing Document Alerts](#14-document-management--missing-document-alerts)
+15. [Phase-wise Implementation Plan](#15-phase-wise-implementation-plan)
+16. [Risks & Trade-offs](#16-risks--trade-offs)
 
 ---
 
-## 1. Executive Summary
+## 1. What We Are Building and Why
 
-Urban Trilla MACS is entering the most critical governance phase of a residential society: **HOTO (Handover/Takeover) from builder to association**. This document designs a production-ready digital governance platform to manage:
+Urban Trilla MACS has 136 units (40-50 currently occupied), 14 committee members, and is entering the most consequential phase of a cooperative society — the Handover/Takeover from builder Ankura Homes. The HOTO process starts June 1, 2026, has a 45-day Ascenza-led audit timeline, and is expected to span 2-3 months depending on builder responsiveness.
 
-- **Vendor evaluation and selection** with full transparency and auditability
-- **HOTO checklist tracking** with item-level governance (documents, discussions, approvals)
-- **A generic workflow engine** applicable to any future association decision
-- **Git-backed document storage** — no paid backend required; GitHub is the database
-- **A portal-integrated dashboard** for all stakeholders
+**The problem today:** All evidence, decisions, communications, and tracking live in WhatsApp messages, personal emails, Google Drive folders, and physical files. The two most senior decision-makers (President Bal Reddy and Working President) are non-technical users who are comfortable with WhatsApp. For the system to succeed, it must be simpler than a WhatsApp group in terms of mental load.
 
-### Design Principles
+**Success definition (your own words):** *"If we were able to build this system that helps all the members go through the HOTO and Vendor selection process seamlessly and effectively with the best possible user experience and context that we can bring to the board, then that is success."*
 
-| Principle | How it manifests |
-|---|---|
-| **Radical transparency** | Every action, comment, vote, and approval is permanently logged |
-| **Non-technical usability** | UI abstracts all Git operations; members never touch a terminal |
-| **Dual-approval governance** | President + Secretary must both sign off on completions |
-| **Audit-first** | Nothing is deleted; statuses transition forward only |
-| **Mobile-first** | All screens usable on Android/iOS without app install |
+**The three core pillars:**
+1. **Radical simplicity** — President and Working President can use it without training
+2. **Complete auditability** — every action permanently recorded; nothing disappears
+3. **Byelaw compliance** — governance rules hardcoded, not configurable
 
 ---
 
-## 2. System Architecture
+## 2. Byelaw Governance Rules Hardcoded into the System
 
-### 2.1 High-Level Architecture
+These are not design choices — they are legal requirements under your registered Byelaws (Reg No: TG/RRD/MACS/2026-15/FOW & M). Each rule is cited with the exact Byelaw section.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    MEMBER BROWSER                           │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  portal.utamacs.org  (Astro SSR on Vercel)           │   │
-│  │                                                       │   │
-│  │  /portal/hoto/          HOTO checklist portal        │   │
-│  │  /portal/vendors/       Vendor evaluation portal     │   │
-│  │  /portal/decisions/     Generic workflow portal      │   │
-│  │  /portal/dashboard      Governance dashboard         │   │
-│  └────────────────┬─────────────────────────────────────┘   │
-└───────────────────┼─────────────────────────────────────────┘
-                    │ HTTPS API calls
-          ┌─────────▼──────────┐
-          │  Vercel Serverless  │
-          │  /api/v1/hoto/      │
-          │  /api/v1/vendors/   │
-          │  /api/v1/decisions/ │
-          └────┬──────────┬────┘
-               │          │
-    ┌──────────▼──┐   ┌───▼──────────────────────┐
-    │  Supabase   │   │  GitHub REST API          │
-    │  PostgreSQL │   │  (octokit)                │
-    │             │   │                           │
-    │  - Users    │   │  utamacs/governance-data  │
-    │  - Roles    │   │  (private repo)           │
-    │  - Sessions │   │                           │
-    │  - Audit    │   │  Documents, JSON records, │
-    │    logs     │   │  comments, votes, files   │
-    └─────────────┘   └───────────────────────────┘
-```
+### 2.1 Voting Rules
 
-### 2.2 Two-Repo Strategy
-
-```
-utamacs/utamacs-website      ← Code (this repo, GitHub Pages + Vercel)
-utamacs/governance-data      ← Data (private, Git = database + audit trail)
-```
-
-The **governance-data** repo is a structured data store. Every write through the portal creates a Git commit — which is the audit log. The UI never exposes Git to users; they interact through forms.
-
-### 2.3 Component Map
-
-```
-Portal (Astro SSR)
-├── Auth (Supabase JWT)
-├── HOTO Module
-│   ├── Item List (filterable, sortable)
-│   ├── Item Detail (full governance view)
-│   ├── Admin: Create/Edit Item
-│   └── Approval Panel (President/Secretary)
-├── Vendor Module
-│   ├── Requirements Board
-│   ├── Vendor Profile
-│   ├── Comparison Dashboard
-│   ├── Voting Screen
-│   └── Decision Record
-├── Workflow Engine (shared)
-│   ├── State machine (status transitions)
-│   ├── Comments/Discussion
-│   ├── Document upload → GitHub
-│   ├── Vote casting
-│   └── Approval gates
-└── Dashboard
-    ├── HOTO Progress
-    ├── Vendor Decisions
-    └── Pending Approvals
-```
-
----
-
-## 3. Part 1 — Vendor Management System
-
-### 3.1 Vendor Lifecycle States
-
-```
-DRAFT → OPEN → SUBMITTED → EVALUATION → VOTING → APPROVED → ONBOARDING → CONTRACTED
-                                                      └─── REJECTED ─────────────────┘
-```
-
-| State | Meaning | Who can advance |
+| Rule | Byelaw Reference | System Implementation |
 |---|---|---|
-| DRAFT | Requirement being written | Admin, Executive |
-| OPEN | Vendors invited, can submit | Admin |
-| SUBMITTED | All quotes received | Admin |
-| EVALUATION | Committee reviewing | All committee |
-| VOTING | Active vote in progress | Admin triggers |
-| APPROVED | Majority vote passed | System (auto) |
-| REJECTED | Vote failed or overridden | President |
-| ONBOARDING | Contracts being signed | Admin |
-| CONTRACTED | Active vendor | Admin |
+| One apartment = one vote | **§4.16** "one Apartment one vote basis" | Each member gets exactly 1 vote per vote; no weighting |
+| Cannot vote if >90 days maintenance arrears | **§4.6** | System checks payment status before showing vote button |
+| Board decisions by majority vote | **§7.16(c)** | Simple majority of votes cast |
+| President has casting vote on tie | **§7.16(c) & §8.1** | If tied, President gets deciding vote; logged permanently |
+| Voting method = show of hands / poll | **§7.9(a)** | Portal voting = digital equivalent of formal poll |
+| Board quorum = simple majority of directors | **§7.16(a)** | With 14 directors, minimum 8 must vote for quorum |
+| Member can authorize family via registered PoA | **§4.16** | PoA field in member profile; admin must verify and record |
 
-### 3.2 Vendor Requirement Card
+### 2.2 Decision Approval Chain
 
-Each **Requirement** (e.g. "Property Management Platform") is the parent entity:
-
-```
-Requirement
-├── ID: REQ-2026-001
-├── Category: Property Management Platform
-├── Description: Full-text description of what we need
-├── Budget Range: ₹X – ₹Y per month
-├── Timeline: Decision needed by YYYY-MM-DD
-├── Evaluation Criteria (weighted):
-│   ├── Cost (25%)
-│   ├── Features & Fit (30%)
-│   ├── Experience / References (20%)
-│   ├── Support & SLA (15%)
-│   └── Risk / Compliance (10%)
-├── Invited Vendors: [MyGate, NoBroker, ...]
-├── Status: EVALUATION
-└── Documents: [RFP.pdf, Criteria-Matrix.xlsx]
-```
-
-### 3.3 Vendor Profile Schema (per vendor, per requirement)
-
-```json
-{
-  "id": "VND-2026-001-A",
-  "requirement_id": "REQ-2026-001",
-  "vendor_name": "MyGate",
-  "contact_person": "Rajesh Kumar",
-  "contact_email": "rajesh@mygate.com",
-  "contact_phone": "+91-9876543210",
-  "company_website": "https://mygate.com",
-  "years_in_business": 8,
-  "associations_served": 15000,
-  "local_references": [
-    { "society": "Brigade Meadows", "contact": "+91-XXXXXXXX" }
-  ],
-  "proposed_solution": "Full text of their pitch",
-  "quote_monthly": 45000,
-  "quote_setup": 25000,
-  "quote_breakdown": "github://governance-data/vendors/REQ-001/mygate/quote.pdf",
-  "features": {
-    "visitor_management": true,
-    "maintenance_requests": true,
-    "accounting": false,
-    "community_app": true,
-    "vehicle_tracking": true,
-    "daily_help_management": false
-  },
-  "submitted_at": "2026-05-10T10:00:00Z",
-  "submitted_by": "committee@utamacs.org",
-  "documents": [
-    { "name": "Quotation.pdf", "github_path": "vendors/REQ-001/mygate/quotation.pdf", "uploaded_at": "..." }
-  ],
-  "evaluation_scores": {
-    "cost": null,
-    "features": null,
-    "experience": null,
-    "support": null,
-    "risk": null
-  }
-}
-```
-
-### 3.4 Side-by-Side Comparison View
-
-The comparison dashboard renders a matrix:
-
-```
-┌─────────────────────┬──────────────┬──────────────┬──────────────┐
-│ Criterion (Weight)  │  MyGate      │  NoBroker    │  ApartmentAdda│
-├─────────────────────┼──────────────┼──────────────┼──────────────┤
-│ Monthly Cost (25%)  │ ₹45,000      │ ₹38,000      │ ₹52,000      │
-│ Setup Cost          │ ₹25,000      │ ₹0           │ ₹30,000      │
-│ Features (30%)      │ ████████ 8/10│ ██████ 6/10  │ █████████9/10│
-│ Experience (20%)    │ 8yr, 15K soc │ 5yr, 8K soc  │ 10yr, 20K   │
-│ Support SLA (15%)   │ 4hr response │ 8hr response │ 2hr response │
-│ Risk Score (10%)    │ Low          │ Medium       │ Low          │
-├─────────────────────┼──────────────┼──────────────┼──────────────┤
-│ WEIGHTED SCORE      │ 7.4 / 10     │ 6.1 / 10     │ 8.2 / 10     │
-│ COMMITTEE VOTES     │ 3            │ 1            │ 5            │
-│ STATUS              │ ─            │ ─            │ LEADING      │
-└─────────────────────┴──────────────┴──────────────┴──────────────┘
-```
-
-### 3.5 Voting Model
-
-**Recommended: Role-Weighted Voting**
-
-| Role | Vote Weight | Rationale |
+| Scenario | Byelaw Reference | System Rule |
 |---|---|---|
-| President | 3× | Final governance authority |
-| Secretary | 2× | Operational accountability |
-| Treasurer | 2× | Financial oversight |
-| Committee Member | 1× | Peer input |
-| General Member | 0.5× | Voice but not decision-making |
+| All HOTO approvals require dual sign-off | **§8.1** (President has general control) + **§8.3** (Secretary implements decisions) | Both President AND Secretary/General Secretary must approve |
+| President absent (planned, >7 working days) | **§8.2** | System auto-delegates approvals to Vice President after admin sets delegation |
+| President absent (unplanned/urgent) | **§8.2** | Vice President may act immediately; logged for President's review on return |
+| Secretary absent (prolonged planned) | **§8.4** | Joint Secretary takes all Secretary functions |
 
-Rules:
-- Voting window: 5 days (configurable)
-- Quorum: Minimum 5 committee-weight votes required
-- Result: Vendor with highest weighted votes wins
-- Tie-breaking: President casts deciding vote
-- All votes are permanently recorded (who voted for whom, when, why)
+### 2.3 Financial Authority Limits
 
-**Vote Record:**
-```json
-{
-  "vote_id": "VOTE-2026-001-0003",
-  "requirement_id": "REQ-2026-001",
-  "voter_id": "user-uuid",
-  "voter_role": "secretary",
-  "vote_weight": 2,
-  "vendor_voted_for": "VND-2026-001-C",
-  "reason": "Best feature coverage for our size; references checked",
-  "cast_at": "2026-05-12T14:30:00Z",
-  "ip_hash": "sha256-of-ip"
-}
-```
+| Authority | Limit | Byelaw Reference | System Rule |
+|---|---|---|---|
+| Secretary (urgent remedial) | Up to ₹10,000/- per transaction | **§9.11(a)** | System allows Secretary to approve expenditure ≤₹10K |
+| President (urgent remedial) | Up to ₹20,000/- per transaction | **§9.11(a)** | System allows President to approve ≤₹20K |
+| Board of Directors | Up to ₹50,000/- per transaction | **§9.11(b)** | Requires Board vote with quorum |
+| Beyond ₹50,000/- | General Body Meeting required | **§9.11(b)** | System blocks and flags: "Requires General Body approval" |
+| All payments >₹10,000/- | Must be electronic | **§9.11(c)** | System records payment mode; warns if cash indicated |
+| No cash payments ever | Absolute prohibition | **§5.3(p) & §9.1** | Cash payment option removed from all screens |
 
-### 3.6 Decision Record (Permanent)
+### 2.4 Conflict of Interest
 
-When selection is finalized, a **Decision Record** is written to Git and cannot be modified:
+| Rule | Byelaw Reference | System Implementation |
+|---|---|---|
+| Director must not participate in matter where personally interested | **§7.16(b)** | Conflict of interest flag on any vote/decision; recuse button; recusal permanently logged |
+| Office bearers receive no remuneration from society funds | **§3.4(b)** | Any vendor where committee member has interest is flagged |
 
-```json
-{
-  "decision_id": "DEC-2026-001",
-  "requirement_id": "REQ-2026-001",
-  "decided_at": "2026-05-15T16:00:00Z",
-  "selected_vendor": "VND-2026-001-C",
-  "selected_vendor_name": "ApartmentAdda",
-  "selection_reason": "Highest weighted score (8.2/10). Strong local references. Best feature match for 200-unit society. Competitive pricing with zero setup cost.",
-  "rejected_vendors": [
-    {
-      "vendor_id": "VND-2026-001-A",
-      "vendor_name": "MyGate",
-      "rejection_reason": "Higher monthly cost. Visitor management strong but accounting absent."
-    },
-    {
-      "vendor_id": "VND-2026-001-B",
-      "vendor_name": "NoBroker",
-      "rejection_reason": "Limited committee management features. Support SLA inadequate."
-    }
-  ],
-  "vote_summary": {
-    "total_weighted_votes": 18.5,
-    "ApartmentAdda": 10.5,
-    "MyGate": 5.5,
-    "NoBroker": 2.5
-  },
-  "approved_by_president": { "user_id": "...", "at": "2026-05-15T15:45:00Z", "signature": "OTP-verified" },
-  "approved_by_secretary": { "user_id": "...", "at": "2026-05-15T15:50:00Z", "signature": "OTP-verified" },
-  "github_commit": "abc123def456"
-}
-```
+### 2.5 Transparency & Records
 
-### 3.7 Vendor Onboarding Checklist
+| Rule | Byelaw Reference | System Implementation |
+|---|---|---|
+| Minutes communicated within 7 days of Board meeting | **§7.16(e)** | System tracks when minutes were uploaded; flags if >7 days |
+| Members can inspect records with 10 days notice | **§5.4** | Portal document access; document request feature |
+| Financial statements published by 30th September each year | **§9.3** | Dashboard reminder; upload prompt in September |
+| Defaulter list published monthly | **§9.6** | Maintenance tracking module; monthly list generation |
+| Data retention: 10 years | Your requirement | All records retained minimum 10 years; Git = permanent |
 
-Once approved, a structured onboarding checklist activates:
+### 2.6 Expulsion & Defaulter Rules
 
-```
-□ Agreement/contract signed (PDF uploaded)
-□ Bank details verified
-□ Service start date confirmed
-□ Integration/training session scheduled
-□ Pilot period defined (30 days recommended)
-□ Escalation contact registered
-□ Exit clause documented
-□ Member communication sent
-```
+| Rule | Byelaw Reference | System Flag |
+|---|---|---|
+| Default = failure to pay within time fixed | **§2(e)** | System marks member as defaulter; blocks vote access |
+| 2 months arrears = Defaulting Member | **§6.36** | Yellow flag at 60 days |
+| 3 months arrears = services can be denied | **§6.37** | Red flag at 90 days; 7-day notice countdown |
+| 18% per annum interest on late payments | **§19(e)** | Interest auto-calculated from due date |
 
 ---
 
-## 4. Part 2 — HOTO Management System
+## 3. System Architecture
 
-### 4.1 HOTO Categories
+### 3.1 Revised Architecture (Reflecting Reality)
 
-Based on standard builder-to-association handover practices:
+```
+┌──────────────────────────────────────────────────────────────────┐
+│               COMMITTEE MEMBER (any device, browser)            │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  portal.utamacs.org  (Astro SSR on Vercel)                 │  │
+│  │                                                             │  │
+│  │  Designed for two audiences:                               │  │
+│  │  [A] Non-tech (President, Working President): WhatsApp-    │  │
+│  │      like simplicity. Big buttons. Clear status. English.  │  │
+│  │  [B] Tech-comfortable (12 others): Full feature access     │  │
+│  │                                                             │  │
+│  │  Modules:                                                   │  │
+│  │  /portal/hoto/          HOTO Checklist                     │  │
+│  │  /portal/snags/         Snag List (Ascenza punch list)     │  │
+│  │  /portal/vendors/       Vendor Evaluation                  │  │
+│  │  /portal/finances/      Maintenance & Fund Tracking        │  │
+│  │  /portal/notices/       Formal Notice Generator            │  │
+│  │  /portal/dashboard      Governance Dashboard               │  │
+│  └──────────────────────┬─────────────────────────────────────┘  │
+└─────────────────────────┼────────────────────────────────────────┘
+                          │ HTTPS
+             ┌────────────▼────────────┐
+             │  Vercel Serverless       │
+             │  API Routes (/api/v1/)   │
+             └────┬───────────────┬────┘
+                  │               │
+     ┌────────────▼──┐   ┌────────▼──────────────────┐
+     │  Supabase      │   │  GitHub (governance-data)  │
+     │  PostgreSQL    │   │  Private repo              │
+     │                │   │                            │
+     │  - Auth        │   │  Every write = audit trail │
+     │  - Fast queries│   │  Documents + JSON records  │
+     │  - Roles       │   │  Permanent history         │
+     │  - Maintenance │   │  10-year retention         │
+     └────────────────┘   └────────────────────────────┘
+```
 
-| # | Category | Typical Items |
+### 3.2 Two Repos
+
+```
+utamacs/utamacs-website      ← Code (this repo, portal.utamacs.org)
+utamacs/governance-data      ← Private data repo (Git = database + audit)
+```
+
+### 3.3 Committee Structure Mapped to Roles
+
+| Actual Title | System Role | Approval Power |
 |---|---|---|
-| 1 | Legal & Statutory | Registration docs, bye-laws, RERA |
-| 2 | Financial | Maintenance corpus, sinking fund, builder dues |
-| 3 | Infrastructure | Building plans, approvals, completion certificate |
-| 4 | Common Areas | Club house, gym, pool, landscaping |
-| 5 | MEP Systems | Electrical, plumbing, HVAC, lifts |
-| 6 | Fire & Safety | NOC, suppression system, extinguishers |
-| 7 | IT & Security | CCTV, intercom, access control |
-| 8 | Service Contracts | AMC agreements from builder |
-| 9 | Inventory | Keys, spares, equipment list |
-| 10 | Pending Works | Snagging, defects, commitments |
+| President | `president` | Final approver; casting vote; delegation to VP |
+| Vice President | `vice_president` | Acts as president when delegated |
+| Working President | `working_president` | Executive committee member; same as executive |
+| General Secretary | `secretary` | Co-approver with President |
+| Joint Secretary | `joint_secretary` | Acts as secretary when delegated |
+| Treasurer | `treasurer` | Approves financial tracking entries |
+| Joint Treasurer | `joint_treasurer` | Acts as treasurer when delegated |
+| Executive Member (×7) | `executive` | Comment, vote, upload, advance status |
+| General Member | `member` | Read-only portal access |
+| Security Guard | `security_guard` | Gate access only (separate features) |
 
-### 4.2 HOTO Item Status Model
+---
+
+## 4. Module 1 — HOTO Management
+
+### 4.1 HOTO Scope (Ascenza-Aligned Categories)
+
+The HOTO checklist is structured to exactly mirror Ascenza Global Infra Care's scope of work:
+
+| Category | Items | Ascenza Scope Section |
+|---|---|---|
+| Statutory Compliance | Land docs, GHMC approval, Occupancy Certificate, NOCs, Fire NOC, regularisation | Statutory Compliance Due Diligence |
+| Technical - Electrical | LT/HT systems, DG sets, earthing, lightning arrestors, UPS, common lighting | Technical Due Diligence |
+| Technical - Lifts | 4 elevators (3 blocks), commissioning reports, technical audit, AMC transfer | Technical Due Diligence |
+| Technical - Fire & Safety | Hydrant system, sprinkler system (incl. sample flat check), fire extinguishers, hoses, fire doors | Security & Fire Safety Due Diligence |
+| Technical - HVAC & Ventilation | Mechanical ventilation, pressurization, exhaust, fresh air systems | Technical Due Diligence |
+| Technical - Water & Plumbing | DWS/SWS/FWS, STP, WTP, boreholes, hydro-pneumatic, dewatering | Technical Due Diligence |
+| Technical - Security & IT | CCTV, access control, boom barriers, intercom, internet/OFC/TV cabling | Technical Due Diligence |
+| MEP - Miscellaneous | Solar panels, gas bank, BMS, Elmeasure, PA system, fountains | Technical Due Diligence |
+| AMC Due Diligence | All existing AMC contracts — status, scope, transfer to association | AMC Due Diligence |
+| Snagging | Civil, seepage, exterior, common areas, basements, terrace, club house | Snagging of Common Areas |
+| Asset/Inventory | Asset register validation vs actuals, parking allocations, spare keys | Asset/Inventory Verification |
+| Financial Handover | Corpus fund transfer (CA certified), maintenance corpus, builder dues | (Custom — see Module 4) |
+| Pending Works | Snagging items committed by builder, timelines, completion | (Tracked in Snag Module) |
+
+### 4.2 HOTO Item State Machine
 
 ```
 NOT_STARTED
     │
     ▼
-IN_PROGRESS ──────────────────────┐
-    │                             │ (builder delays/issues)
-    ▼                             │
-UNDER_REVIEW ◄────────────────────┘
+IN_PROGRESS ────────────── (builder delays/issues noted in comments)
     │
     ▼
-PENDING_PRESIDENT ──► PENDING_SECRETARY
-    │                             │
-    └─────────────────────────────┘
-                  │
-                  ▼
-              APPROVED
-                  │
-                  ▼
-            COMPLETED ──────────► DISPUTED (if issue found later)
+EVIDENCE_UPLOADED ──────── (photos, certificates, reports uploaded)
+    │
+    ▼
+UNDER_REVIEW ──────────── (committee reviewing evidence)
+    │
+    ▼
+PENDING_PRESIDENT ──────── (Secretary submits for President approval)
+    │
+    ▼
+PENDING_SECRETARY ──────── (President approves, now needs Secretary)
+    │
+    ▼
+APPROVED ────────────────── (both approved — auto by system)
+    │
+    ▼
+COMPLETED ───────────────── (physical handover confirmed)
+    │
+    └── DISPUTED ────────── (reopen path if deficiency found post-completion)
 ```
 
-**Status Definitions:**
-
-| Status | Meaning | Who sets it |
-|---|---|---|
-| NOT_STARTED | Item identified, not yet initiated | System default |
-| IN_PROGRESS | Association/builder working on it | Any committee member |
-| UNDER_REVIEW | Evidence submitted, being checked | Committee member |
-| PENDING_PRESIDENT | Awaiting President's approval | Secretary |
-| PENDING_SECRETARY | Awaiting Secretary's approval | President |
-| APPROVED | Both approvals received | System (auto) |
-| COMPLETED | Physical handover confirmed | Admin |
-| DISPUTED | Approved item found deficient later | President or Secretary |
+**State Transition Rules:**
+- `NOT_STARTED → IN_PROGRESS`: Any executive or above
+- `IN_PROGRESS → EVIDENCE_UPLOADED`: Any executive or above (after uploading ≥1 document)
+- `EVIDENCE_UPLOADED → UNDER_REVIEW`: Any executive or above
+- `UNDER_REVIEW → PENDING_PRESIDENT`: Secretary / Joint Secretary only
+- `PENDING_PRESIDENT → PENDING_SECRETARY`: President (or VP if delegated)
+- `PENDING_SECRETARY → APPROVED`: Secretary (or Joint Secretary if delegated) — cannot be same person who set PENDING_PRESIDENT
+- `APPROVED → COMPLETED`: Admin only (President/Secretary)
+- `COMPLETED → DISPUTED`: President or Secretary — requires written reason
+- `DISPUTED → UNDER_REVIEW`: System auto-transition; new approval cycle begins
 
 ### 4.3 HOTO Item Schema
 
 ```json
 {
   "item_id": "HOTO-2026-042",
-  "category": "MEP Systems",
-  "subcategory": "Lifts",
-  "title": "Lift Annual Maintenance Contract Transfer",
-  "description": "Builder's AMC with KONE Elevators must be transferred to association. Includes maintenance logs for past 2 years.",
-  "reference_clause": "Bye-law Clause 12.3 — Common Infrastructure",
+  "ascenza_category": "Technical - Lifts",
+  "title": "Lift No. 2 (Block B) AMC Transfer to Association",
+  "description": "Full description of what needs to happen and current state",
+  "builder_commitment": "Transfer within 30 days of possession",
+  "builder_contact": "Ms. Srilatha / Ms. Saritha — Ankura Homes",
   "priority": "HIGH",
   "status": "IN_PROGRESS",
-  "previous_state": "Builder-owned AMC, paid by builder",
+  "previous_state": "Builder-owned AMC with KONE",
   "current_state": "Association taking over; builder to formally transfer",
-  "expected_outcome": "AMC in association's name, with 1-year prepaid by builder",
-  "builder_commitment": "Transfer within 30 days of possession date",
-  "deadline": "2026-06-15",
-  "responsible_committee_member": "user-uuid-of-treasurer",
-  "builder_contact": "Ramesh Reddy, +91-XXXXXXXXXX",
-  "created_at": "2026-05-01T10:00:00Z",
-  "created_by": "user-uuid",
-  "last_updated_at": "2026-05-06T09:00:00Z",
-  "status_history": [
-    {
-      "from": "NOT_STARTED",
-      "to": "IN_PROGRESS",
-      "changed_by": "user-uuid",
-      "changed_at": "2026-05-03T11:00:00Z",
-      "note": "Contacted builder's PM Ramesh regarding transfer"
-    }
+  "expected_outcome": "AMC in association's name, prepaid 1 year by builder",
+  "deadline": "2026-08-01",
+  "responsible_member": "user-uuid-treasurer",
+  "dependencies": ["HOTO-2026-040"],
+  "required_documents": [
+    { "name": "Original KONE AMC Contract", "required": true, "uploaded": false },
+    { "name": "NOC from Builder for Transfer", "required": true, "uploaded": false },
+    { "name": "New AMC Agreement in Association Name", "required": true, "uploaded": false }
   ],
-  "documents": [
-    {
-      "doc_id": "DOC-042-001",
-      "name": "Original KONE AMC.pdf",
-      "github_path": "hoto/MEP-Systems/Lifts/HOTO-042/original-kone-amc.pdf",
-      "uploaded_by": "user-uuid",
-      "uploaded_at": "2026-05-04T14:00:00Z",
-      "description": "Original contract scanned copy"
-    }
-  ],
-  "approvals": {
-    "president": null,
-    "secretary": null
-  },
-  "tags": ["lift", "AMC", "KONE", "transfer"],
-  "github_path": "hoto/MEP-Systems/Lifts/HOTO-042/item.json"
+  "rera_escalation_eligible": true,
+  "notice_sent": false,
+  "notice_date": null,
+  "status_history": [...],
+  "documents": [...],
+  "comments": [...],
+  "approvals": { "president": null, "secretary": null },
+  "github_path": "hoto/Technical-Lifts/HOTO-042/item.json"
 }
 ```
 
-### 4.4 Approval Gate Rules
+### 4.4 Evidence Types Accepted
+
+From your answer (Question 11) — committee members inspect, invite external vendors, evidence is photos and Excel files. The system accepts:
+- PDFs (statutory documents, certificates, NOCs)
+- Images (JPG, PNG — photos from site inspection)
+- Excel/CSV (snag lists from Ascenza, inventory lists)
+- Word/Work documents
+- CAD files (as-built drawings from builder)
+- Max file size: GitHub's 100MB limit per file — adequate for all above formats
+
+### 4.5 Ascenza Weekly Report Integration
+
+Ascenza provides weekly status updates and weekly stakeholder meetings. The system creates a "Weekly HOTO Status" entry where:
+- Ascenza uploads their weekly status report
+- Committee can view and acknowledge
+- Items flagged by Ascenza as critical are auto-elevated to HIGH priority
+
+---
+
+## 5. Module 2 — Snag List Management
+
+This is a **separate module** from HOTO items, as you clarified (Answer 6). Snag items come from:
+- Ascenza's physical walkthrough punch lists
+- Committee member observations
+- Resident complaints
+- Builder's own punch list
+
+### 5.1 Snag Item States
 
 ```
-Rule 1: Only President (role=president) can set president approval
-Rule 2: Only Secretary (role=secretary) can set secretary approval  
-Rule 3: Both must approve within 7 days of each other (else item returns to UNDER_REVIEW)
-Rule 4: Neither can approve their own submissions
-Rule 5: Approved items can only be DISPUTED, never reverted to earlier states
-Rule 6: Disputed items require a new approval cycle
+OPEN → IN_PROGRESS → BUILDER_NOTIFIED → BUILDER_COMMITTED → RESOLVED → VERIFIED_CLOSED
+                                                                    └── REOPENED
 ```
 
-### 4.5 Discussion & Comment System
+### 5.2 Snag Item Features (Full CRUD per your requirement)
 
-Each HOTO item has a threaded discussion:
+- **Create**: Any committee member can create; must set category, location, severity
+- **Update**: Any committee member can update description, photos, severity
+- **Delete**: Admin only (President/Secretary); deletion is soft-delete with audit log (records who deleted and why)
+- **Mark Complete**: Committee member marks "RESOLVED"; President or Secretary verifies and sets "VERIFIED_CLOSED"
+- **Status tracking**: Full history with timestamps and who made each change
 
-```
-HOTO-042: Lift AMC Transfer
-│
-├── [2026-05-04] Treasurer: "Contacted KONE. They need NOC from builder."
-│   └── [2026-05-04] Secretary: "Builder's PM said NOC will come within a week. Following up."
-│       └── [2026-05-05] President: "Agreed. If not received by 12th, escalate to builder MD."
-│           └── ✓ Acknowledged by: Secretary, Treasurer, 3 others
-│
-├── [2026-05-06] Committee Member Ravi: "I can reach KONE's Hyd office directly if needed."
-│   └── ✓ Acknowledged by: Treasurer
-│
-└── [Pinned] President: "This is a HIGH priority item. All builder AMCs must transfer before monsoon."
-```
+### 5.3 Snag Item Schema
 
-**Comment Schema:**
 ```json
 {
-  "comment_id": "CMT-042-0007",
-  "item_id": "HOTO-2026-042",
-  "parent_comment_id": "CMT-042-0005",
-  "author_id": "user-uuid",
-  "author_name": "T.V.S. Sudheer",
-  "author_role": "president",
-  "content": "Agreed. If not received by 12th, escalate to builder MD.",
-  "is_pinned": false,
-  "attachments": [],
-  "acknowledgedBy": ["user-uuid-2", "user-uuid-3"],
-  "created_at": "2026-05-05T18:30:00Z",
-  "edited_at": null,
-  "github_commit": "def789abc123"
+  "snag_id": "SNAG-2026-0089",
+  "category": "Civil",
+  "subcategory": "Seepage",
+  "location": "Block B, Floor 3, Common Corridor",
+  "description": "Water seepage from roof visible on corridor ceiling, approximately 2 sq ft area",
+  "severity": "MEDIUM",
+  "status": "BUILDER_NOTIFIED",
+  "reported_by": "user-uuid",
+  "reported_date": "2026-06-15",
+  "builder_committed_date": "2026-07-01",
+  "photos": ["snags/civil/SNAG-089/photo1.jpg", "snags/civil/SNAG-089/photo2.jpg"],
+  "ascenza_reference": "Ascenza-Report-Snag-145",
+  "notice_sent": true,
+  "notice_date": "2026-06-20",
+  "formal_notice_doc": "notices/builder/notice-snag-089.pdf",
+  "resolution_notes": null,
+  "verified_by": null,
+  "github_path": "snags/civil/SNAG-089/item.json"
 }
 ```
+
+### 5.4 Bulk Import from Excel
+
+Given that you have photos and Excel files from inspections, the system supports:
+- CSV/Excel upload to bulk-create snag items
+- Photo folder upload (zipped)
+- System parses standard Ascenza Excel format columns automatically
 
 ---
 
-## 5. Part 3 — Workflow Engine
+## 6. Module 3 — Vendor Evaluation & Selection
 
-### 5.1 Generic State Machine
+### 6.1 Active Vendor Evaluations (Confirmed)
 
-Both HOTO items and Vendor Requirements share the same underlying workflow engine. Each workflow type defines its own allowed transitions.
+Based on your answer (Q15: active evaluations currently), all 5 vendor categories are live:
 
-```
-WorkflowItem {
-  id, type (HOTO | VENDOR_REQ | DECISION | GENERAL),
-  status,
-  allowed_transitions: Map<currentStatus, nextStatuses[]>,
-  required_roles: Map<transition, role[]>,
-  hooks: Map<transition, action[]>
-}
-```
-
-### 5.2 Transition Rules Table
-
-| From | To | Allowed By | Hook |
+| # | Category | Known Vendors | Status |
 |---|---|---|---|
-| NOT_STARTED | IN_PROGRESS | committee, executive, admin | notify_responsible |
-| IN_PROGRESS | UNDER_REVIEW | committee, executive, admin | notify_approvers |
-| UNDER_REVIEW | IN_PROGRESS | committee, executive | notify_responsible |
-| UNDER_REVIEW | PENDING_PRESIDENT | secretary, admin | notify_president |
-| PENDING_PRESIDENT | PENDING_SECRETARY | president | notify_secretary |
-| PENDING_SECRETARY | APPROVED | secretary | notify_all, write_approval_to_git |
-| APPROVED | COMPLETED | admin | notify_all |
-| APPROVED | DISPUTED | president, secretary | notify_all, reopen_approval |
-| COMPLETED | DISPUTED | president | notify_all |
+| 1 | Property Management Platform | MyGate, NoBroker | Quotes received |
+| 2 | Accounting/Finance Tool | Mandix, Hari | Quotes received |
+| 3 | Facility Management | Kapston, Kapil | Quotes received |
+| 4 | Legal Counsel | TBD | Evaluation |
+| 5 | Security Vendor | TBD | Evaluation |
 
-### 5.3 Role-Based Permission Matrix
+Vendors have visited the site (Q18: yes). Quotes are already in hand (Q17: yes).
 
-| Action | Member | Committee | Executive | Secretary | President | Admin |
-|---|---|---|---|---|---|---|
-| View all items | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Add comment | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Acknowledge comment | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Upload document | - | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Create HOTO item | - | - | ✓ | ✓ | ✓ | ✓ |
-| Advance status | - | ✓ | ✓ | ✓ | ✓ | ✓ |
-| President approval | - | - | - | - | ✓ | ✓* |
-| Secretary approval | - | - | - | ✓ | - | ✓* |
-| Cast vote | - | ✓ | ✓ | ✓ | ✓ | - |
-| Create vendor req | - | - | ✓ | ✓ | ✓ | ✓ |
-| Trigger voting | - | - | - | ✓ | ✓ | ✓ |
-| Override/dispute | - | - | - | ✓ | ✓ | ✓ |
+### 6.2 Corrected Voting Model (Byelaw Compliant)
 
-*Admin can act as surrogate only with explicit delegation recorded.
+**IMPORTANT CORRECTION from initial design:** The initial design used role-weighted voting. That is WRONG. Your byelaws (§4.16) explicitly state **"one Apartment one vote basis"**. This applies to all society decisions.
 
-### 5.4 Notification Design
+For committee (Board of Directors) decisions:
+- Each director gets exactly 1 vote (§4.16 + §7.16(c))
+- Quorum = simple majority of directors = ≥8 of 14 must vote (§7.16(a))
+- Result = simple majority of votes cast
+- Tie → President has casting vote (§7.16(c))
+- All votes are **visible** (transparent, per byelaw spirit and your preference per Q60: go with byelaw norms)
 
-Notifications are sent via Supabase edge functions + email (Resend):
+### 6.3 Conflict of Interest (Byelaw §7.16(b))
 
-| Trigger | Recipients | Channel |
-|---|---|---|
-| New HOTO item created | All committee | Email + Portal bell |
-| Status changed | Responsible member + approvers | Email |
-| New comment on item | All participants in thread | Portal bell |
-| Item reaches PENDING_PRESIDENT | President | Email (urgent flag) |
-| Vote opened | All eligible voters | Email |
-| Vote closing in 24h | Non-voters | Email reminder |
-| Decision made | All members | Email |
-| Vendor onboarding started | Admin + Secretary | Email |
+System enforces: Before voting opens, each member must declare "I have no personal interest in any of the vendors being evaluated" OR flag a conflict. If flagged, they are excluded from the vote for that requirement (recusal is permanent and logged).
 
-### 5.5 Document Upload Workflow
+### 6.4 Vendor Decision Record (Permanent, Immutable)
 
-```
-1. Member selects file in browser
-2. Portal API receives file as multipart
-3. API authenticates user (JWT)
-4. API uses GitHub App token to:
-   a. Base64 encode file
-   b. Call PUT /repos/utamacs/governance-data/contents/{path}
-   c. Path: {module}/{category}/{item-id}/{filename}
-   d. Commit message: "docs: upload {filename} for {item-id} by {username}"
-5. GitHub returns SHA + URL
-6. API stores reference in Supabase (item_documents table)
-7. API appends document metadata to item's JSON in governance-data
-8. All commits visible in GitHub commit history = audit trail
-```
-
----
-
-## 6. Part 4 — Dashboard & Tracking
-
-### 6.1 Dashboard Layout
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│  GOVERNANCE DASHBOARD          Last updated: 6 May 2026 09:00  │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  HOTO PROGRESS                    VENDOR DECISIONS             │
-│  ┌──────────────────────┐         ┌───────────────────────┐   │
-│  │ ████████████░░ 68%   │         │ 2 of 5 decided        │   │
-│  │                      │         │                       │   │
-│  │ Total:        85      │         │ Property Mgmt: ✓ Done │   │
-│  │ Completed:    22      │         │ Accounting:    ✓ Done │   │
-│  │ Approved:     16      │         │ Facility Mgmt: ⏳ Vote│   │
-│  │ In Progress:  28      │         │ Security:      📋 Eval│   │
-│  │ Not Started:  19      │         │ Legal Counsel: 📋 Eval│   │
-│  └──────────────────────┘         └───────────────────────┘   │
-│                                                                │
-│  PENDING YOUR ACTION              CRITICAL DEADLINES           │
-│  ┌──────────────────────┐         ┌───────────────────────┐   │
-│  │ ⚠️  3 items need     │         │ 🔴 Lift AMC: 9 days   │   │
-│  │    your approval     │         │ 🟡 OC Doc: 15 days    │   │
-│  │ 📋 2 votes awaiting  │         │ 🟡 Corpus: 20 days    │   │
-│  │    your input        │         │ 🟢 CCTV: 45 days      │   │
-│  └──────────────────────┘         └───────────────────────┘   │
-│                                                                │
-│  HOTO BY CATEGORY                                              │
-│  ┌──────────────────────────────────────────────────────────┐ │
-│  │ Legal & Statutory   ████████████████████░░░░░  80%  12/15│ │
-│  │ Financial           ████████░░░░░░░░░░░░░░░░░  33%   4/12│ │
-│  │ Infrastructure      ████████████░░░░░░░░░░░░░  50%   6/12│ │
-│  │ Common Areas        ████████████████░░░░░░░░░  65%   8/12│ │
-│  │ MEP Systems         ████████░░░░░░░░░░░░░░░░░  40%   8/20│ │
-│  │ Fire & Safety       ████████████████████████░  90%   9/10 │ │
-│  │ IT & Security       ████████████░░░░░░░░░░░░░  50%   2/4  │ │
-│  └──────────────────────────────────────────────────────────┘ │
-│                                                                │
-│  RECENT ACTIVITY                                               │
-│  ┌──────────────────────────────────────────────────────────┐ │
-│  │ 09:15 Secretary approved HOTO-042 (Lift AMC)             │ │
-│  │ 08:50 Ravi commented on HOTO-038 (Sinking Fund)          │ │
-│  │ 08:30 Vendor vote closed — ApartmentAdda selected         │ │
-│  │ Yesterday  President approved HOTO-041                    │ │
-│  └──────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────────┘
-```
-
-### 6.2 HOTO Item List View
-
-```
-Filter: [All] [Not Started] [In Progress] [Pending Approval] [Completed]
-Sort:   [Priority] [Deadline] [Category] [Last Updated]
-Search: [                    ]
-
-┌──────┬────────────────────────────────┬──────────────┬─────────────┬──────────────┐
-│  ID  │ Title                          │ Category     │ Status      │ Deadline     │
-├──────┼────────────────────────────────┼──────────────┼─────────────┼──────────────┤
-│ 042  │ Lift AMC Transfer              │ MEP Systems  │ 🟡 In Prog  │ 15 Jun 🔴    │
-│ 038  │ Sinking Fund Transfer          │ Financial    │ 🟠 Pend Pr. │ 30 Jun       │
-│ 012  │ Occupancy Certificate          │ Legal        │ ✅ Completed│ Done         │
-│ 055  │ CCTV System Handover           │ IT/Security  │ ⬜ Not Start│ 20 Jul       │
-└──────┴────────────────────────────────┴──────────────┴─────────────┴──────────────┘
-```
-
-### 6.3 Metrics API
-
-The dashboard pulls from two sources:
-- **Supabase**: item counts, status breakdowns (fast, real-time)
-- **GitHub**: document counts, commit history (batch-refreshed every hour)
-
-```typescript
-// /api/v1/governance/dashboard
+Once both President AND Secretary approve the final selection:
+```json
 {
-  hoto: {
-    total: 85,
-    by_status: { not_started: 19, in_progress: 28, under_review: 12, pending_approval: 8, approved: 16, completed: 22 },
-    by_category: { legal: {...}, financial: {...}, ... },
-    overdue: 3,
-    due_this_week: 7
-  },
-  vendors: {
-    total_requirements: 5,
-    decided: 2,
-    in_voting: 1,
-    in_evaluation: 2
-  },
-  pending_my_action: {
-    approvals_needed: 3,
-    votes_pending: 2,
-    comments_unread: 5
-  }
+  "decision_id": "DEC-2026-001",
+  "decided_at": "2026-06-15T16:00:00Z",
+  "selected_vendor": "VND-001-A",
+  "selection_reason": "Full committee text of why selected",
+  "vote_summary": { "total_votes_cast": 12, "quorum_met": true, "VendorA": 8, "VendorB": 4 },
+  "rejected_vendors": [
+    { "vendor": "VendorB", "rejection_reason": "Detailed reason documented" }
+  ],
+  "president_approval": { "by": "user-uuid", "at": "...", "note": "..." },
+  "secretary_approval": { "by": "user-uuid", "at": "...", "note": "..." },
+  "byelaw_compliance_note": "Decision made per §7.16(c), quorum §7.16(a) satisfied with 12/14 votes",
+  "github_commit": "immutable-sha",
+  "can_be_modified": false
 }
 ```
 
+### 6.5 Post-Selection Tracking (Per Q20: Yes, track all)
+
+After vendor selection and contracting:
+- Contract upload and key terms extracted
+- Renewal date reminder (system alert 90 days before)
+- Monthly performance review (committee can rate: Good/Needs Improvement/Poor)
+- Complaint logging against vendor
+- Contract exit clause tracked
+
 ---
 
-## 7. Part 5 — Git as Storage Backend
+## 7. Module 4 — Financial Tracking (HOTO Support)
 
-### 7.1 Repository Structure (governance-data)
+**Important:** This is NOT a full accounting system. It is a lightweight tracking module to support HOTO — to establish what funds the builder owes, what has been collected, and what has been spent since operations started. Required for:
+- Corpus fund transfer verification (builder must hand over)
+- Maintenance collection tracking (from May 1, 2025)
+- Builder due reconciliation
+- Supporting HOTO financial items
+
+### 7.1 What Gets Tracked
+
+```
+Maintenance Collection (from May 1, 2025)
+├── Per flat: flat number, owner, amount, date paid, payment mode
+├── Month-wise summary
+├── Defaulter tracking (90-day rule per §4.6)
+└── Interest on late payment (18% p.a. per §19(e))
+
+Corpus Fund
+├── Received from builder (₹1,36,000 per §4.11 share capital)
+├── Interest earned (kept as corpus per §4.11)
+└── Transfer status from Ankura Homes
+
+Expenses (tracked against byelaw financial powers)
+├── Each expense: amount, payee, date, approved by, payment mode
+├── Non-recurring sanction authority auto-applied (§9.11)
+└── Alert if expense exceeds delegated authority
+
+Builder Dues Tracker
+├── Pending payments from builder
+├── Corpus fund owed
+├── Maintenance corpus from builder
+└── Any committed pending works cost
+```
+
+### 7.2 Defaulter List (Byelaw §9.6 + §6.36)
+
+System auto-generates monthly defaulter list:
+- 30 days overdue: Reminder email
+- 60 days overdue (§6.36): "Defaulting Member" flag; committee notified
+- 90 days overdue (§4.6): Vote rights suspended; system blocks voting
+- 90+ days overdue (§6.37): Committee prompted to send 7-day notice
+
+---
+
+## 8. Module 5 — Formal Notice Generation
+
+**From your answer (Q12):** When builder doesn't respond, you want formal notices on association letterhead, and if still not resolved, RERA escalation.
+
+This module integrates with the existing letter generation system already built in the portal.
+
+### 8.1 Notice Types
+
+| Notice | Trigger | Template | Next Step |
+|---|---|---|---|
+| HOTO Item Reminder | Item overdue >30 days | Standard builder follow-up | 2nd notice |
+| HOTO Legal Notice | Item overdue >60 days + 1 reminder sent | Formal legal-language notice | RERA escalation |
+| Snag Rectification Notice | Snag open >builder-committed date | Standard snag notice | Legal notice |
+| Maintenance Defaulter Notice | 90+ days arrears + 7 days warning (§6.37) | Member notice (posted on flat door + notice board) | Legal recovery |
+
+### 8.2 RERA Escalation Tracker
+
+For serious HOTO items (marked as `rera_escalation_eligible: true`):
+- System tracks: Notice sent → Response received / No response → RERA filing status
+- Documents: Copies of all correspondence automatically attached
+- Status: Monitoring / Filed / Resolved
+
+---
+
+## 9. Workflow Engine & Approval Delegation
+
+### 9.1 Delegation Chain (Byelaw Compliant)
+
+```
+Default Approval Chain:
+President + Secretary (both required)
+
+If President is absent (planned, >7 working days — §8.2):
+Admin sets: "President delegation active → Vice President"
+Vice President acts as President until delegation is lifted
+
+If President unexpectedly unavailable (urgent matter — §8.2):
+Vice President may act immediately
+All actions flagged: "Acting on behalf of President per §8.2"
+President reviews on return
+
+If Secretary/Gen Secretary absent (planned):
+Joint Secretary takes over (§8.4)
+Admin activates delegation in settings
+
+If both President and VP unavailable:
+System freezes approval gates (shows: "Approval chain unavailable")
+Admin must resolve delegation manually
+```
+
+### 9.2 Delegation Settings (Admin Only)
+
+```
+Admin panel: /portal/admin/delegation
+
+Currently active:
+[President] Bal Reddy          → [Delegate] Vice President when absent
+[Secretary] [Name]              → [Delegate] Joint Secretary when absent
+
+Activate/Deactivate delegation with:
+- Reason (planned absence / unplanned)
+- Start date and expected end date
+- All actions during delegation clearly marked
+```
+
+### 9.3 Notification Design
+
+Given that members check the portal less frequently (Q49), notifications must be email-first:
+
+| Event | Recipients | Channel | Urgency |
+|---|---|---|---|
+| New HOTO item | All committee | Email | Normal |
+| Status changed | Responsible member + approvers | Email | Normal |
+| Pending President approval | President (or VP if delegated) | Email with "ACTION REQUIRED" subject | High |
+| Vote opened | All eligible voters | Email | High |
+| Voting closes in 48 hours | Non-voters | Email reminder | High |
+| Snag overdue by builder | Committee | Email | Normal |
+| Maintenance default (60 days) | Treasurer + Secretary | Email | High |
+| Weekly summary | All committee | Email digest (Sunday evening) | Low |
+
+**WhatsApp fallback (future phase):** For critical approvals, WhatsApp Business API notification. Not in MVP.
+
+---
+
+## 10. Dashboard & UX Design
+
+### 10.1 UX Design Principle: Two Levels
+
+The system must work for **two very different user profiles**:
+
+**Profile A — Non-Tech (President, Working President):**
+- Large text, high contrast
+- "My Actions" front and center — show only what THEY need to do
+- No tables with 10 columns
+- Status shown as color + simple word: "Needs Your Approval" (orange) / "Done" (green)
+- One-click approval with confirmation dialog
+- Mobile-first (they likely use phones)
+
+**Profile B — Tech-Comfortable (other 12 members):**
+- Full filtering, sorting, bulk actions
+- Detailed timelines, audit logs visible
+- Export to Excel/PDF
+
+### 10.2 Dashboard Layout
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  URBAN TRILLA MACS — Governance Dashboard    [Bal Reddy | Log out] │
+├──────────────────────────┬─────────────────────────────────────────┤
+│                          │                                          │
+│  YOUR ACTIONS NEEDED     │  HOTO PROGRESS                          │
+│  ┌────────────────────┐  │  ████████████░░░░░ 62%  (Starts 1 Jun) │
+│  │ 🔴 2 items need    │  │  Total: 87 items tracked                │
+│  │    YOUR APPROVAL   │  │  Approved: 12 · In Progress: 38         │
+│  │                    │  │  Not Started: 37                        │
+│  │ [View & Approve]   │  │                                          │
+│  └────────────────────┘  │  SNAG LIST                              │
+│                          │  ████░░░░░░░░░░░░ 28%  (45/160 closed) │
+│  ┌────────────────────┐  │  Critical open: 12                      │
+│  │ 🟡 3 votes waiting │  │                                          │
+│  │    for your input  │  │  VENDOR DECISIONS                       │
+│  │                    │  │  2 of 5 finalised                       │
+│  │ [Cast Your Vote]   │  │  Property Mgmt: ⏳ Voting open           │
+│  └────────────────────┘  │  Accounting: 📋 Under review            │
+│                          │                                          │
+│  ┌────────────────────┐  │  CRITICAL DEADLINES                     │
+│  │ ✅ Nothing else    │  │  🔴 Snag #89 (Seepage): 5 days          │
+│  │    needs your      │  │  🟡 Lift AMC: 26 days                   │
+│  │    attention today │  │  🟡 Fire NOC: 30 days                   │
+│  └────────────────────┘  │                                          │
+│                          │  FINANCIAL TRACKING                     │
+│  RECENT ACTIVITY         │  Maintenance collected: May 25          │
+│  ─────────────────────   │  Defaulters (60+ days): 3 flats         │
+│  Today  Secretary        │                                          │
+│  approved HOTO-042       │                                          │
+│  Yesterday  New snag     │                                          │
+│  added by Ravi           │                                          │
+└──────────────────────────┴─────────────────────────────────────────┘
+```
+
+### 10.3 Key Screen — HOTO Item Detail (Simplified)
+
+```
+← HOTO Items
+
+Lift No. 2 AMC Transfer (Block B)              🔴 HIGH PRIORITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Status: ⏳ In Progress         Due: 1 Aug 2026 (86 days away)
+
+What needs to happen:
+Transfer the KONE lift AMC from Ankura Homes to association name.
+Builder contact: Ms. Srilatha / Ms. Saritha
+
+━━━━ Documents Required ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❌ Original KONE AMC Contract     [+ Upload]
+❌ NOC from Builder for Transfer   [+ Upload]
+❌ New AMC in Association Name     (not yet available)
+
+━━━━ Discussion ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Treasurer]  Contacted KONE. They need NOC from builder first.
+  [Secretary ↩]  Srilatha said NOC will come within a week.
+    [President ↩]  If not received by 20th, formal notice goes out.
+
+[Write a comment...]                               [Send]
+
+━━━━ Actions ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Mark as Under Review]   [Send Builder Notice]   [View History]
+```
+
+### 10.4 Voting Screen (Clean, Simple)
+
+```
+VOTE: Property Management Platform Selection
+
+Voting closes: 12 Jun 2026 at 11:59 PM (7 days remaining)
+Committee votes cast: 6 of 14 · Quorum needed: 8
+
+─────────────────────────────────────────────────────────
+Your vote is final and will be visible to all members
+(per Byelaw §4.16 and society transparency principles)
+─────────────────────────────────────────────────────────
+
+○ MyGate          ₹45,000/month   Score: 7.4/10
+○ NoBroker        ₹38,000/month   Score: 6.1/10  
+● ApartmentAdda   ₹52,000/month   Score: 8.5/10  ← I select this
+
+Why I'm voting for this vendor (required):
+┌──────────────────────────────────────────────────────┐
+│ Best features for our 136-unit complex. Local        │
+│ references verified. Strong SLA commitment.          │
+└──────────────────────────────────────────────────────┘
+
+⚠️  Conflict of interest declaration:
+☑ I confirm I have no personal interest in any vendor listed
+
+[CONFIRM MY VOTE]
+```
+
+### 10.5 Mobile Design Considerations
+
+- All pages work on any Android/iOS browser (no app install)
+- Dashboard shows only "My Actions" prominently on mobile
+- Swipe to navigate between HOTO items
+- Camera button on document upload (takes photo directly)
+- Large tap targets (min 48px)
+
+---
+
+## 11. Git Storage Strategy
+
+### 11.1 Repository: utamacs/governance-data (Private)
 
 ```
 utamacs/governance-data/
 │
-├── README.md                          # Human-readable index
+├── README.md                     # Human readable index with status summary
 ├── _meta/
-│   └── schema-version.json            # Schema versioning
+│   ├── schema-version.json
+│   └── committee-roster.json     # Current committee + delegation status
 │
 ├── hoto/
-│   ├── _index.json                    # All items, lightweight index
-│   ├── Legal-Statutory/
-│   │   ├── HOTO-001/
-│   │   │   ├── item.json              # Full item record
-│   │   │   ├── comments.json          # All comments, append-only
-│   │   │   ├── approvals.json         # Approval records
-│   │   │   └── documents/
-│   │   │       ├── society-registration.pdf
-│   │   │       └── bye-laws.pdf
-│   │   └── HOTO-002/
-│   │       └── ...
-│   ├── Financial/
-│   ├── Infrastructure/
-│   ├── Common-Areas/
-│   ├── MEP-Systems/
+│   ├── _index.json               # Lightweight index for fast list loading
+│   ├── Statutory-Compliance/
+│   │   └── HOTO-001/ ... HOTO-015/
+│   │       ├── item.json
+│   │       ├── comments.json     # Append-only
+│   │       ├── approvals.json
+│   │       └── documents/
+│   ├── Technical-Lifts/
+│   ├── Technical-Electrical/
+│   ├── Technical-Fire-Safety/
+│   ├── Technical-Water-Plumbing/
+│   ├── Technical-Security-IT/
+│   ├── Technical-HVAC/
+│   ├── MEP-Miscellaneous/
+│   ├── AMC-Due-Diligence/
+│   ├── Asset-Inventory/
+│   └── Financial-Handover/
+│
+├── snags/
+│   ├── _index.json
+│   ├── Civil/
+│   ├── Electrical/
 │   ├── Fire-Safety/
-│   ├── IT-Security/
-│   ├── Service-Contracts/
-│   ├── Inventory/
-│   └── Pending-Works/
+│   ├── Security/
+│   ├── Landscaping/
+│   └── Club-House/
 │
 ├── vendors/
 │   ├── _index.json
 │   ├── REQ-2026-001-Property-Management/
 │   │   ├── requirement.json
-│   │   ├── votes.json
-│   │   ├── decision.json              # Written once, immutable
+│   │   ├── evaluation-criteria.json
+│   │   ├── votes.json            # One record per vote cast
+│   │   ├── decision.json         # Written ONCE; immutable
 │   │   ├── mygate/
-│   │   │   ├── profile.json
-│   │   │   └── documents/
-│   │   │       └── quotation.pdf
 │   │   ├── nobroker/
 │   │   └── apartmentadda/
 │   └── REQ-2026-002-Accounting/
 │
-├── decisions/
-│   └── DEC-2026-001.json              # Permanent decision records
+├── notices/
+│   ├── builder/                  # Formal notices to Ankura Homes
+│   └── members/                  # Defaulter/maintenance notices
+│
+├── finances/
+│   ├── maintenance/
+│   │   ├── 2025-05.json          # May 2025 onwards
+│   │   └── ...
+│   ├── corpus/
+│   └── expenses/
 │
 └── audit/
-    └── 2026-05/
-        ├── 2026-05-06.jsonl           # Append-only audit log (one JSON per line)
-        └── ...
+    └── 2026-06/
+        └── 2026-06-01.jsonl      # Append-only audit log, one JSON per line
 ```
 
-### 7.2 Index File Strategy
-
-`hoto/_index.json` — lightweight, loaded by the portal for list views:
-
-```json
-{
-  "generated_at": "2026-05-06T09:00:00Z",
-  "total": 85,
-  "items": [
-    {
-      "id": "HOTO-2026-042",
-      "category": "MEP Systems",
-      "title": "Lift AMC Transfer",
-      "status": "IN_PROGRESS",
-      "priority": "HIGH",
-      "deadline": "2026-06-15",
-      "responsible": "treasurer-uuid",
-      "last_updated": "2026-05-06T09:00:00Z"
-    }
-  ]
-}
-```
-
-Index is regenerated on every write operation by the API. Full item detail is only fetched when a user opens a specific item.
-
-### 7.3 Commit Message Convention
-
-Every API write to governance-data uses a structured commit message:
+### 11.2 Commit Convention (Human-Readable Audit Trail)
 
 ```
-{action}({item-id}): {description}
-
-action: create | update | comment | upload | approve | vote | close
-Examples:
-  create(HOTO-042): new HOTO item — Lift AMC Transfer
-  update(HOTO-042): status changed IN_PROGRESS → UNDER_REVIEW by treasurer
-  comment(HOTO-042): new comment by president
-  upload(HOTO-042): uploaded original-kone-amc.pdf by treasurer
-  approve(HOTO-042): president approval granted
-  vote(REQ-001): vote cast for ApartmentAdda by secretary
-  close(REQ-001): vendor selected — ApartmentAdda (decision DEC-2026-001)
+create(HOTO-042): Lift No.2 AMC Transfer — created by Treasurer
+upload(HOTO-042): original-kone-amc.pdf uploaded by Treasurer
+comment(HOTO-042): new comment by President
+status(HOTO-042): IN_PROGRESS → EVIDENCE_UPLOADED by Treasurer
+approve(HOTO-042): President approval granted
+approve(HOTO-042): Secretary approval granted → status APPROVED
+vote(REQ-001): vote cast for ApartmentAdda by Secretary [8/14 votes]
+decide(REQ-001): ApartmentAdda selected — quorum met (12/14 voted)
+snag-create(SNAG-089): Block B seepage — reported by Ravi
+snag-close(SNAG-089): verified closed by President
+notice(builder-001): Formal notice sent to Ankura Homes for HOTO-042
 ```
 
-This makes `git log` a human-readable audit trail.
+### 11.3 Immutability Rules
 
-### 7.4 GitHub App Setup
-
-The portal uses a **GitHub App** (not a personal access token) for security:
-
-```
-GitHub App: utamacs-governance-bot
-Permissions:
-  - Contents: Read & Write (for data repo only)
-  - Metadata: Read
-Installation: utamacs/governance-data only
-Secret: Stored in Vercel environment variable GITHUB_APP_PRIVATE_KEY
-```
-
-This means the bot has no access to the website code repo — data repo only.
-
-### 7.5 Non-Technical User Experience
-
-Users never see Git. The abstraction:
-
-```
-User clicks "Submit for Review"
-    ↓
-Portal shows loading spinner
-    ↓
-API authenticates user
-API updates item.json (read → modify → write to GitHub)
-API updates _index.json
-API logs to audit/YYYY-MM/YYYY-MM-DD.jsonl
-API sends email notifications
-    ↓
-Portal shows success toast: "Status updated. President has been notified."
-    ↓
-GitHub has: a new commit, permanent audit trail, diff showing exactly what changed
-```
+- `decision.json` files: written once, never updated. If decision reopened, a new file `decision-v2.json` is created
+- `approvals.json`: append-only, never modified
+- `audit/*.jsonl`: append-only, one line per event
+- `comments.json`: edits create a new entry with `edited_at` field; original preserved
 
 ---
 
-## 8. Part 6 — Data Models
+## 12. Data Model
 
-### 8.1 Supabase Tables (relational metadata, fast queries)
+### 12.1 Supabase Tables
 
 ```sql
--- Users extended profile (links to Supabase auth)
-CREATE TABLE profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users,
-  society_id UUID NOT NULL,
-  full_name TEXT NOT NULL,
-  unit_number TEXT,
-  block TEXT,
-  phone TEXT,
-  role TEXT NOT NULL DEFAULT 'member',
-  -- role: member | committee | executive | secretary | president | admin
-  role_expires_at TIMESTAMPTZ,
-  residency_type TEXT DEFAULT 'owner',
-  move_in_date DATE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Extended profiles (already exists — extend with new fields)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS
+  portal_role TEXT DEFAULT 'executive',
+  -- portal_role values: president | vice_president | working_president |
+  --                     secretary | joint_secretary | treasurer |
+  --                     joint_treasurer | executive | member | security_guard
+  payment_status TEXT DEFAULT 'current',
+  -- current | warned_30d | defaulting_60d | defaulter_90d
+  last_maintenance_paid_date DATE,
+  maintenance_arrears_days INTEGER DEFAULT 0;
 
--- HOTO Items (mirror of governance-data JSON, for fast queries)
+-- HOTO Items
 CREATE TABLE hoto_items (
-  id TEXT PRIMARY KEY,              -- 'HOTO-2026-042'
+  id TEXT PRIMARY KEY,                  -- 'HOTO-2026-042'
   society_id UUID NOT NULL,
-  category TEXT NOT NULL,
-  subcategory TEXT,
+  ascenza_category TEXT NOT NULL,
   title TEXT NOT NULL,
+  description TEXT,
+  builder_commitment TEXT,
+  priority TEXT DEFAULT 'MEDIUM',       -- LOW | MEDIUM | HIGH | CRITICAL
   status TEXT NOT NULL DEFAULT 'NOT_STARTED',
-  priority TEXT DEFAULT 'MEDIUM',
   deadline DATE,
   responsible_user_id UUID REFERENCES profiles,
+  rera_escalation_eligible BOOLEAN DEFAULT false,
+  notice_sent BOOLEAN DEFAULT false,
+  notice_sent_date TIMESTAMPTZ,
+  dependencies TEXT[],                   -- Array of HOTO item IDs
+  president_approved_at TIMESTAMPTZ,
+  president_approved_by UUID REFERENCES profiles,
+  secretary_approved_at TIMESTAMPTZ,
+  secretary_approved_by UUID REFERENCES profiles,
   created_by UUID REFERENCES profiles,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   last_updated_at TIMESTAMPTZ DEFAULT NOW(),
-  github_path TEXT,                 -- path in governance-data repo
-  president_approved_at TIMESTAMPTZ,
-  secretary_approved_at TIMESTAMPTZ
+  github_path TEXT
+);
+
+-- Required documents per HOTO item (prompting system)
+CREATE TABLE hoto_required_docs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  hoto_item_id TEXT REFERENCES hoto_items,
+  doc_name TEXT NOT NULL,
+  required BOOLEAN DEFAULT true,
+  uploaded BOOLEAN DEFAULT false,
+  document_id UUID REFERENCES documents,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Snag Items
+CREATE TABLE snag_items (
+  id TEXT PRIMARY KEY,                  -- 'SNAG-2026-089'
+  society_id UUID NOT NULL,
+  category TEXT NOT NULL,
+  subcategory TEXT,
+  location TEXT NOT NULL,
+  description TEXT NOT NULL,
+  severity TEXT DEFAULT 'MEDIUM',       -- LOW | MEDIUM | HIGH | CRITICAL
+  status TEXT DEFAULT 'OPEN',
+  -- OPEN | IN_PROGRESS | BUILDER_NOTIFIED | BUILDER_COMMITTED |
+  -- RESOLVED | VERIFIED_CLOSED | REOPENED
+  ascenza_reference TEXT,
+  builder_committed_date DATE,
+  notice_sent BOOLEAN DEFAULT false,
+  formal_notice_id TEXT,
+  reported_by UUID REFERENCES profiles,
+  reported_date DATE DEFAULT CURRENT_DATE,
+  verified_by UUID REFERENCES profiles,
+  verified_at TIMESTAMPTZ,
+  deleted BOOLEAN DEFAULT false,        -- soft delete
+  deleted_by UUID REFERENCES profiles,
+  deleted_at TIMESTAMPTZ,
+  deletion_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  github_path TEXT
 );
 
 -- Vendor Requirements
 CREATE TABLE vendor_requirements (
-  id TEXT PRIMARY KEY,              -- 'REQ-2026-001'
+  id TEXT PRIMARY KEY,                  -- 'REQ-2026-001'
   society_id UUID NOT NULL,
   category TEXT NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
-  budget_min INTEGER,
-  budget_max INTEGER,
-  deadline DATE,
-  status TEXT NOT NULL DEFAULT 'DRAFT',
+  status TEXT DEFAULT 'DRAFT',
+  -- DRAFT | EVALUATION | VOTING | DECIDED | CONTRACTED
   voting_opens_at TIMESTAMPTZ,
   voting_closes_at TIMESTAMPTZ,
+  quorum_required INTEGER DEFAULT 8,    -- from §7.16(a)
   selected_vendor_id TEXT,
   created_by UUID REFERENCES profiles,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Vendors (per requirement)
+-- Vendors
 CREATE TABLE vendors (
-  id TEXT PRIMARY KEY,              -- 'VND-2026-001-A'
+  id TEXT PRIMARY KEY,
   requirement_id TEXT REFERENCES vendor_requirements,
   vendor_name TEXT NOT NULL,
   contact_person TEXT,
   contact_email TEXT,
   contact_phone TEXT,
+  site_visited BOOLEAN DEFAULT false,
   quote_monthly INTEGER,
   quote_setup INTEGER,
   submitted_at TIMESTAMPTZ,
   github_path TEXT
 );
 
--- Votes
+-- Votes (one per member per requirement)
 CREATE TABLE votes (
   id TEXT PRIMARY KEY,
   requirement_id TEXT REFERENCES vendor_requirements,
   voter_id UUID REFERENCES profiles,
   vendor_id TEXT REFERENCES vendors,
-  vote_weight NUMERIC NOT NULL,
-  reason TEXT,
+  reason TEXT NOT NULL,
+  conflict_declared BOOLEAN DEFAULT false,
+  recused BOOLEAN DEFAULT false,
   cast_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (requirement_id, voter_id)   -- one vote per requirement per member
+  UNIQUE(requirement_id, voter_id)
 );
 
--- Comments (both HOTO and Vendor items)
+-- Maintenance Collection
+CREATE TABLE maintenance_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  society_id UUID NOT NULL,
+  flat_number TEXT NOT NULL,
+  member_id UUID REFERENCES profiles,
+  amount NUMERIC(10,2) NOT NULL,
+  period_month INTEGER NOT NULL,
+  period_year INTEGER NOT NULL,
+  paid_date DATE,
+  payment_mode TEXT,                    -- NEFT | RTGS | UPI | cheque (NOT cash per §9.1(r))
+  reference_number TEXT,
+  recorded_by UUID REFERENCES profiles,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Corpus Fund Records
+CREATE TABLE corpus_fund_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  society_id UUID NOT NULL,
+  transaction_type TEXT NOT NULL,       -- RECEIVED_FROM_BUILDER | INTEREST_EARNED | APPROVED_USE
+  amount NUMERIC(10,2) NOT NULL,
+  description TEXT,
+  date DATE NOT NULL,
+  approved_by UUID REFERENCES profiles,
+  payment_mode TEXT,
+  reference_number TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Expenses
+CREATE TABLE expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  society_id UUID NOT NULL,
+  amount NUMERIC(10,2) NOT NULL,
+  payee TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  expense_date DATE NOT NULL,
+  payment_mode TEXT NOT NULL,          -- electronic only per §9.11(c)
+  reference_number TEXT,
+  is_recurring BOOLEAN DEFAULT false,
+  sanctioned_by_role TEXT,             -- president | secretary | board | general_body
+  sanctioned_by UUID REFERENCES profiles,
+  byelaw_authority TEXT,               -- e.g. "§9.11(a) - President sanction ≤₹20K"
+  board_resolution_ref TEXT,           -- if board-level sanction
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Comments (shared across HOTO, Snags, Vendor items)
 CREATE TABLE comments (
   id TEXT PRIMARY KEY,
-  item_type TEXT NOT NULL,          -- 'HOTO' | 'VENDOR_REQ'
+  item_type TEXT NOT NULL,             -- HOTO | SNAG | VENDOR_REQ | VENDOR
   item_id TEXT NOT NULL,
   parent_comment_id TEXT REFERENCES comments,
   author_id UUID REFERENCES profiles,
   content TEXT NOT NULL,
-  is_pinned BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
+  is_pinned BOOLEAN DEFAULT false,
   edited_at TIMESTAMPTZ,
+  edited_content TEXT,                 -- stores edit history
+  created_at TIMESTAMPTZ DEFAULT NOW(),
   github_commit TEXT
+  -- NOTE: no deleted column — comments cannot be deleted per byelaw audit requirements
 );
 
--- Comment acknowledgements
-CREATE TABLE comment_acknowledgements (
+-- Comment Acknowledgements
+CREATE TABLE comment_acks (
   comment_id TEXT REFERENCES comments,
   user_id UUID REFERENCES profiles,
-  acknowledged_at TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (comment_id, user_id)
+  acked_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY(comment_id, user_id)
 );
 
--- Document references
+-- Documents
 CREATE TABLE documents (
   id TEXT PRIMARY KEY,
   item_type TEXT NOT NULL,
   item_id TEXT NOT NULL,
   name TEXT NOT NULL,
+  file_type TEXT,
   github_path TEXT NOT NULL,
   github_sha TEXT,
   uploaded_by UUID REFERENCES profiles,
   uploaded_at TIMESTAMPTZ DEFAULT NOW(),
   description TEXT,
-  file_size_bytes INTEGER
+  file_size_bytes INTEGER,
+  is_confidential BOOLEAN DEFAULT false  -- phone numbers, legal docs = committee only
 );
 
--- Audit log (append-only)
+-- Formal Notices
+CREATE TABLE notices (
+  id TEXT PRIMARY KEY,
+  notice_type TEXT NOT NULL,           -- HOTO_REMINDER | HOTO_LEGAL | SNAG | MAINTENANCE_DEFAULT
+  recipient TEXT NOT NULL,             -- Builder name or member name
+  recipient_type TEXT NOT NULL,        -- BUILDER | MEMBER
+  related_item_type TEXT,
+  related_item_id TEXT,
+  sent_date DATE NOT NULL,
+  sent_by UUID REFERENCES profiles,
+  document_path TEXT,                  -- GitHub path to the letter
+  response_received BOOLEAN DEFAULT false,
+  response_date DATE,
+  rera_filed BOOLEAN DEFAULT false,
+  rera_date DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Delegation Status
+CREATE TABLE approval_delegations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  society_id UUID NOT NULL,
+  from_role TEXT NOT NULL,             -- president | secretary
+  to_user_id UUID REFERENCES profiles,
+  reason TEXT NOT NULL,
+  delegation_type TEXT NOT NULL,       -- PLANNED | UNPLANNED
+  active BOOLEAN DEFAULT true,
+  activated_by UUID REFERENCES profiles,
+  activated_at TIMESTAMPTZ DEFAULT NOW(),
+  deactivated_at TIMESTAMPTZ,
+  notes TEXT
+);
+
+-- Audit Log
 CREATE TABLE audit_log (
   id BIGSERIAL PRIMARY KEY,
   society_id UUID NOT NULL,
@@ -925,335 +1017,133 @@ CREATE TABLE audit_log (
 );
 ```
 
-### 8.2 Approval Record Schema
+---
 
-```typescript
-interface ApprovalRecord {
-  item_id: string;
-  approver_id: string;
-  approver_role: 'president' | 'secretary';
-  approved_at: string;        // ISO timestamp
-  note?: string;              // Optional approval note
-  otp_verified: boolean;      // Future: require OTP for approvals
-  github_commit: string;      // Commit that recorded this approval
-}
-```
+## 13. Role-Based Access Control
 
-### 8.3 Evaluation Criteria Schema
+### 13.1 Feature Access Matrix
 
-```typescript
-interface EvaluationCriteria {
-  requirement_id: string;
-  criteria: {
-    key: string;              // 'cost' | 'features' | 'experience' ...
-    label: string;            // Display name
-    weight: number;           // 0–100, all must sum to 100
-    description: string;      // What to look for
-  }[];
-}
+| Feature | member | executive | working_president | treasurer | joint_secretary | secretary | vice_president | president | admin |
+|---|---|---|---|---|---|---|---|---|---|
+| View HOTO items | R | R | R | R | R | R | R | R | R |
+| Create/edit HOTO items | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Upload documents | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Add comments | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Advance HOTO status | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| President approval gate | - | - | - | - | - | - | ✓(delegated) | ✓ | ✓* |
+| Secretary approval gate | - | - | - | - | ✓(delegated) | ✓ | - | - | ✓* |
+| Create/edit snags | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Delete snags | - | - | - | - | - | - | - | - | ✓ |
+| Cast vendor vote | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - |
+| Trigger voting | - | - | - | - | ✓ | ✓ | ✓ | ✓ | ✓ |
+| View vendor quotes | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| View maintenance records | - | - | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Add maintenance entry | - | - | - | ✓ | - | ✓ | ✓ | ✓ | ✓ |
+| Send formal notice | - | - | - | - | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Manage delegation | - | - | - | - | - | - | - | - | ✓ |
+| View audit log | - | - | - | - | - | ✓ | ✓ | ✓ | ✓ |
+| Member phone numbers | - | - | - | - | - | ✓ | ✓ | ✓ | ✓ |
 
-interface VendorScore {
-  vendor_id: string;
-  scored_by: string;          // user_id
-  scores: Record<string, number>; // criteria_key → 0–10
-  notes: Record<string, string>;  // criteria_key → comment
-  scored_at: string;
-}
-```
+*Admin can surrogate only with explicit delegation record.
+
+### 13.2 Member Onboarding / Offboarding
+
+- **New member joins** (Q26: owner sells, NOC received from committee): Admin receives NOC confirmation, creates portal account, assigns `member` role
+- **Committee election**: Admin upgrades role; old committee member reverts to `member`; all past actions remain attributed to them (Q62: remain attributed)
+- **Member death/transfer**: Profile preserved, flagged as `inactive`; NOC workflow handles successor membership
 
 ---
 
-## 9. Part 7 — UX Design
+## 14. Document Management & Missing Document Alerts
 
-### 9.1 Navigation Structure
+### 14.1 Required Document Prompting (Q28: Yes, system should ask)
 
-```
-Portal Navigation
-├── Home (Dashboard)
-├── HOTO Management
-│   ├── Overview (progress by category)
-│   ├── All Items (filterable list)
-│   ├── My Actions (items needing my attention)
-│   └── [Admin] Create Item
-├── Vendor Evaluation
-│   ├── Requirements Board
-│   ├── [Admin] New Requirement
-│   └── Decisions Archive
-├── Documents (cross-item search)
-└── Activity Feed (all recent actions)
-```
+Each HOTO item has a `required_documents` list. The system:
+1. Shows a red "Missing Documents" badge on any item where required docs are not uploaded
+2. On the item detail page, clearly shows: `❌ Original KONE AMC Contract — NOT YET UPLOADED [+ Upload Now]`
+3. Cannot advance status to `UNDER_REVIEW` if any `required: true` document is missing (hard gate)
+4. Can be bypassed by President or Secretary with a written reason (logged in audit)
 
-### 9.2 Key Screens
+### 14.2 Document Confidentiality
 
-#### Screen 1: HOTO Item Detail
+- Member phone numbers: **never visible to general members** (Q58: phone number should not be visible)
+- Vendor quotes: Committee only (Q59: committee member only)
+- Legal notices: Committee only
+- HOTO documents: All committee (for transparency)
+- All financial records: Treasurer + Secretary + President
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│ ← HOTO Items   HOTO-042 · MEP Systems · Lifts                │
-│                                                               │
-│ Lift Annual Maintenance Contract Transfer           🟡 HIGH   │
-│ In Progress · Due 15 Jun 2026 (9 days)                       │
-│                                                               │
-│ ┌─ Status Timeline ──────────────────────────────────────┐   │
-│ │ ✓ Not Started → ✓ In Progress → ○ Under Review →      │   │
-│ │ ○ Pend. President → ○ Pend. Secretary → ○ Approved    │   │
-│ └────────────────────────────────────────────────────────┘   │
-│                                                               │
-│ ┌─ Details ──────────────────────────────────────────────┐   │
-│ │ Previous State: Builder-owned AMC with KONE            │   │
-│ │ Current State:  Association taking over                │   │
-│ │ Expected:       AMC in association name, 1-yr prepaid  │   │
-│ │ Responsible:    Ravi Kumar (Treasurer)                 │   │
-│ │ Builder Contact: Ramesh Reddy · +91-XXXXXXXXXX         │   │
-│ └────────────────────────────────────────────────────────┘   │
-│                                                               │
-│ ┌─ Documents (2) ────────────────────────────────────────┐   │
-│ │ 📄 Original KONE AMC.pdf         4 May  [View] [⬇]   │   │
-│ │ 📄 Transfer Request Letter.pdf   5 May  [View] [⬇]   │   │
-│ │ [+ Upload Document]                                    │   │
-│ └────────────────────────────────────────────────────────┘   │
-│                                                               │
-│ ┌─ Discussion (7 comments) ──────────────────────────────┐   │
-│ │ [President] Pinned: HIGH priority. All AMCs before     │   │
-│ │   monsoon.                                             │   │
-│ │                                                        │   │
-│ │ [Treasurer] Contacted KONE. They need NOC from builder │   │
-│ │   [Secretary ↩] Builder's PM said NOC in a week...    │   │
-│ │     [President ↩] If not by 12th, escalate to MD.     │   │
-│ │       ✓ Acknowledged by Secretary, Treasurer +3        │   │
-│ │                                                        │   │
-│ │ [Add a comment...]                          [Submit]   │   │
-│ └────────────────────────────────────────────────────────┘   │
-│                                                               │
-│ ┌─ Actions ──────────────────────────────────────────────┐   │
-│ │ [Mark as Under Review]  ← visible to committee+       │   │
-│ │ [Approve — President]   ← visible to president only   │   │
-│ └────────────────────────────────────────────────────────┘   │
-└───────────────────────────────────────────────────────────────┘
-```
+### 14.3 Document Update/Replace (Q32: Yes)
 
-#### Screen 2: Vendor Comparison Dashboard
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│ Property Management Platform · EVALUATION PHASE               │
-│                                                               │
-│ Vendors: MyGate | NoBroker | ApartmentAdda                    │
-│                                                               │
-│ ┌── Scores ────────────────────────────────────────────────┐  │
-│ │ Criterion          Weight  MyGate  NoBroker  ApartAdda  │  │
-│ │ Cost               25%     6.5     8.0       7.5        │  │
-│ │ Features & Fit     30%     8.0     6.0       9.0        │  │
-│ │ Experience         20%     8.5     6.5       9.0        │  │
-│ │ Support & SLA      15%     7.0     5.5       8.5        │  │
-│ │ Risk               10%     8.0     6.0       8.0        │  │
-│ │ ─────────────────────────────────────────────────────── │  │
-│ │ WEIGHTED TOTAL     100%    7.70    6.55      8.50       │  │
-│ └──────────────────────────────────────────────────────────┘  │
-│                                                               │
-│ Documents          [Q] [Q] [Q]    (Q = Quotation uploaded)   │
-│                                                               │
-│ Committee Comments: 12 on MyGate · 8 on NoBroker · 15 on AA │
-│                                                               │
-│ [View MyGate Profile] [View NoBroker] [View ApartmentAdda]   │
-│                                                               │
-│ Voting: Opens 10 May at 10:00 · Closes 15 May at 23:59       │
-│ Eligible voters: 8 · Votes cast so far: 0                    │
-│                                                               │
-│ [Open Voting Now]  ← admin/secretary only                    │
-└───────────────────────────────────────────────────────────────┘
-```
-
-#### Screen 3: Voting Screen
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│ Cast Your Vote · Property Management Platform                 │
-│ Voting closes in: 3 days 14 hours                            │
-│                                                               │
-│ Your vote is permanent. You may not change it after submit.  │
-│                                                               │
-│ ○  MyGate          Score: 7.70   ₹45,000/mo                 │
-│ ○  NoBroker        Score: 6.55   ₹38,000/mo                 │
-│ ●  ApartmentAdda   Score: 8.50   ₹52,000/mo  ← selected     │
-│                                                               │
-│ Reason for your vote (required):                             │
-│ ┌─────────────────────────────────────────────────────────┐  │
-│ │ Best feature coverage. Local references verified.       │  │
-│ │ Support SLA is best for our society size.               │  │
-│ └─────────────────────────────────────────────────────────┘  │
-│                                                               │
-│ [Confirm Vote]   ← requires typing "CONFIRM" then submitting │
-└───────────────────────────────────────────────────────────────┘
-```
-
-### 9.3 Mobile Considerations
-
-- All pages use the existing Tailwind responsive grid
-- HOTO item detail collapses to single-column on mobile
-- Comparison table scrolls horizontally on mobile (sticky first column)
-- Voting UI is tap-friendly (large radio buttons)
-- Document upload works from phone camera (accept="image/*,application/pdf")
-- Comment composer is a full-width textarea with submit button below
+- New version of a document can be uploaded; old version is archived, not deleted
+- System shows version history: "Superseded by [new document] on [date]"
 
 ---
 
-## 10. Part 8 — Industry Best Practices
+## 15. Phase-wise Implementation Plan
 
-### 10.1 Governance Models from Real Associations
+### Phase 1: HOTO MVP (6 weeks, before June 1 HOTO start)
 
-| Practice | Source | Applied Here |
-|---|---|---|
-| Dual-signature approvals | RWA governance in India | President + Secretary both required |
-| Immutable decision records | Corporate board minutes | Decision JSON written once, never edited |
-| Quorum requirements | Cooperative Society Act, Telangana | Minimum 5 weighted votes for validity |
-| Conflict of interest disclosure | Listed company governance | Committee member recuses from vendor vote if related |
-| 30-day notice for major decisions | RERA & Cooperative bye-laws | Voting opens 30 days after requirement published |
-| Physical + digital evidence | Legal defensibility | Documents stored in Git, not just DB |
+**Goal: System live before HOTO officially starts**
 
-### 10.2 Lessons from Platforms
-
-| Platform | What they do well | What to avoid/improve |
-|---|---|---|
-| **MyGate** | Visitor management, guard app | Closed ecosystem, high cost at scale |
-| **NoBroker Hood** | Marketplace integration | Finance-heavy, weak governance features |
-| **ApartmentAdda** | Accounting + community | Complex UI, slow mobile |
-| **ADDA.io** | Committee management | Enterprise pricing, overkill for 200 units |
-
-**Key insight from all platforms:** Members disengage when they can't see decisions being made. Radical transparency (every vote, every comment, every approval visible to all) drives participation. This design prioritizes that above all.
-
-### 10.3 Vendor Evaluation Framework (Indian Context)
-
-Standard RFP framework adapted for apartment associations:
-
-1. **Pre-qualification**: Company age ≥ 3 years, serving ≥ 50 societies
-2. **Technical bid**: Feature checklist, integration capabilities, SLA terms
-3. **Financial bid**: Monthly cost per unit, setup cost, contract lock-in period
-4. **Reference check**: Mandatory call to 2 similar societies (similar size, similar city)
-5. **Pilot**: 30-day trial with rollback clause before final commitment
-6. **Exit clause**: Contract must allow 60-day exit without penalty
-
-### 10.4 HOTO Best Practices
-
-From RERA and cooperative society handover standards:
-
-- **Document everything in writing** before accepting handover
-- **Independent structural audit** before accepting building
-- **Pending work register** (snagging list) with builder commitment dates
-- **Corpus fund transfer** must have CA certificate
-- **All AMCs must be transferred** (not just noted) before accepting
-- **NOC from all utility providers** (electricity, water, drainage)
-- **Complete the sinking fund** as per RERA requirement (2.5% of apartment cost)
-
----
-
-## 11. Part 9 — Implementation Plan
-
-### Phase 1: MVP (6–8 weeks)
-
-**Goal: Basic HOTO tracking live for all members**
-
-| Week | Task |
+| Week | Deliverable |
 |---|---|
-| 1–2 | Set up governance-data repo structure; create 85 HOTO items as JSON from master checklist |
-| 2–3 | Build HOTO item list page (`/portal/hoto`) with filter/sort |
-| 3–4 | Build HOTO item detail page with status timeline, document list, comment thread |
-| 4–5 | Build status transition API (`PUT /api/v1/hoto/:id/status`) with role checks |
-| 5–6 | Build document upload API (→ GitHub) and comment API |
-| 6–7 | Build approval gate (President + Secretary endpoints) |
-| 7–8 | Build basic dashboard (counts + category progress bars) |
+| **Week 1** | Set up `utamacs/governance-data` private repo with folder structure. Create Supabase migration 026 with all new tables. Set up GitHub App for governance-data writes. |
+| **Week 2** | HOTO item list page: filterable by category/status, search, priority. Load from governance-data `_index.json`. Seed all HOTO items from Ascenza scope. |
+| **Week 3** | HOTO item detail page: documents section with upload + required doc alerts, comment thread, status timeline. |
+| **Week 4** | Status transition API with role checks, byelaw-enforced approval gates, delegation logic. President/Secretary approval screens (simplified for Bal Reddy). |
+| **Week 5** | Snag list full CRUD module. CSV import for bulk snag upload from Ascenza Excel. Photo upload from mobile camera. |
+| **Week 6** | Basic dashboard (HOTO progress, pending actions, critical deadlines). Weekly email digest. Testing with committee. |
 
-**Deliverable:** Every committee member can see all HOTO items, upload documents, comment, and approve. President/Secretary can sign off. Dashboard shows progress.
+**Target: System is live with all 14 committee members registered and 80+ HOTO items seeded by May 31, 2026.**
 
-### Phase 2: Vendor Management (4–6 weeks)
+### Phase 2: Vendor Module (3 weeks, June)
 
-**Goal: Structured vendor evaluation for all 5 pending decisions**
-
-| Week | Task |
+| Week | Deliverable |
 |---|---|
-| 1–2 | Build vendor requirement board + requirement detail page |
-| 2–3 | Build vendor profile pages + comparison matrix |
-| 3–4 | Build voting system (weighted votes, quorum check, vote recording to Git) |
-| 4–5 | Build decision record writer + vendor decision archive |
-| 5–6 | Build vendor onboarding checklist (reuses HOTO item engine) |
+| **Week 7** | Vendor requirement board. Vendor profiles. Side-by-side comparison matrix with weighted scores. |
+| **Week 8** | Digital voting system: quorum enforcement (§7.16a), conflict of interest declaration (§7.16b), tie-breaking by President (§7.16c), vote transparency. |
+| **Week 9** | Decision record writer (immutable). Vendor onboarding checklist. Post-selection tracking (contract, renewals, complaints). |
 
-### Phase 3: Enhancements (4 weeks)
+### Phase 3: Financial Tracking & Notices (3 weeks, July)
 
-**Goal: Better UX, notifications, mobile polish**
-
-| Week | Task |
+| Week | Deliverable |
 |---|---|
-| 1 | Email notifications via Resend for all workflow transitions |
-| 2 | Comment acknowledgements + threading |
-| 3 | Full-text document search (GitHub API search) |
-| 4 | Mobile UX audit + fixes; accessibility review |
+| **Week 10** | Maintenance collection tracking from May 2025. Defaulter tracking with byelaw-compliant thresholds. Monthly defaulter list generation. |
+| **Week 11** | Corpus fund tracker. Expense tracker with byelaw financial authority enforcement. Builder dues register. |
+| **Week 12** | Formal notice generation module (integrates with existing letter system). RERA escalation tracker. |
 
-### Phase 4: Advanced (Post-HOTO, 8+ weeks)
+### Phase 4: Polish & Onboarding (2 weeks, August)
 
-**Goal: Long-term governance platform**
+| Week | Deliverable |
+|---|---|
+| **Week 13** | Full mobile UX audit. Simplified "My Actions" view for non-tech users. Delegation management UI. |
+| **Week 14** | Committee training session (focus on Bal Reddy and Working President). Go-live support. Feedback collection. |
 
-- General decision workflow (any resolution, not just HOTO/vendors)
-- Meeting management (agenda, minutes as HOTO-style items)
-- Maintenance request lifecycle management
-- Annual general body meeting vote system
+### Future (Post-HOTO)
 
-### 11.1 Technology Stack
-
-```
-Frontend:      Astro SSR (already in use) — no change
-Styling:       Tailwind CSS (already in use) — no change
-Auth:          Supabase (already in use) — extend with new roles
-Database:      Supabase PostgreSQL — new tables per data model above
-File storage:  GitHub (governance-data repo) via GitHub App
-Email:         Resend (when domain verified) — extend existing setup
-GitHub App:    New app for governance-data writes
-Charts:        Chart.js (CDN, no build step) or inline SVG
-```
-
-**Estimated new code:** ~3,000–4,500 lines across API routes, Astro pages, and shared utilities.
-
-### 11.2 GitHub App Setup (one-time)
-
-```
-1. Go to github.com/settings/apps/new
-2. Name: utamacs-governance-bot
-3. Permissions: Contents (R/W) on governance-data repo only
-4. Generate private key
-5. Install on utamacs/governance-data
-6. Set in Vercel:
-   GITHUB_APP_ID=...
-   GITHUB_APP_INSTALLATION_ID=...
-   GITHUB_APP_PRIVATE_KEY=...
-```
-
-### 11.3 New Supabase Tables (migration)
-
-Create `026_governance_schema.sql` with all tables from Part 6 above.
+- Meeting management module (agenda, minutes as structured items)
+- General resolution workflow (any board decision)
+- Annual General Body Meeting support
+- WhatsApp Business API notifications for critical approvals
 
 ---
 
-## 12. Trade-offs & Risks
-
-| Trade-off | Decision | Rationale |
-|---|---|---|
-| GitHub API rate limit (5000 req/hr) | Use Supabase as primary store, GitHub for documents + audit only | At 100 users, well within limits |
-| Git history is public if repo is public | governance-data must be PRIVATE | No member data in a public repo |
-| PDF preview in browser | Use GitHub's raw download link with signed headers | Avoid storing duplicate copies |
-| Weighted votes vs simple majority | Weighted (President 3×) | Aligns with bye-law authority hierarchy |
-| President/Secretary both required for approval | Yes, non-negotiable | Legal defensibility, prevents unilateral decisions |
-| Supabase free tier limits | Current plan should handle Phase 1–2 comfortably | Re-evaluate at Phase 3 if database rows > 500K |
-
-### 12.1 Risk Register
+## 16. Risks & Trade-offs
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Member adoption low | Medium | High | Simple mobile UI; WhatsApp link to items |
-| Builder delays HOTO items | High | Medium | Track separately; escalation workflow built in |
-| GitHub API changes | Low | High | Abstract behind service layer; swap easily |
-| Data loss | Very Low | High | Git + Supabase = two copies; Git is immutable |
-| Vote manipulation | Low | High | One vote per user (DB unique constraint); vote weight by role stored at vote time |
-| President/Secretary unavailable | Medium | Medium | Admin surrogate role with delegation record |
+| Non-tech users don't adopt | **Medium** | **High** | "My Actions" screen is so simple they only need to click "Approve" or "Vote". Onboarding training session. Secretary assists non-tech members. |
+| Builder delays HOTO items (2-3 months) | **High** | **Medium** | Tracker designed for delays; formal notice system built-in; RERA path tracked |
+| Git API rate limit | **Low** | **Medium** | Supabase = primary data store, GitHub = document/audit store. Well within 5000 req/hour for 14 users |
+| governance-data repo security | **Low** | **High** | Private repo; GitHub App with minimal permissions (contents only on governance-data); no access to website code |
+| President/Secretary both unavailable | **Low** | **High** | Delegation chain per §8.2 and §8.4; Joint office bearers exist for exactly this scenario |
+| Votes challenged as invalid | **Low** | **High** | Full audit trail; byelaw §4.16 and §7.16 quoted in every decision record; GitHub commit = immutable evidence |
+| Missing documents delay approval | **Medium** | **Medium** | Required doc prompting; secretary can bypass with written reason; Ascenza provides documents directly to committee |
+| Supabase free tier limits | **Low** | **Medium** | 14 users + 500K rows max; well within free tier for Phase 1-3 |
+| Phase 1 not ready before June 1 | **Medium** | **High** | Start Week 1 immediately. MVP can be item list + detail + upload. Full approval flow can be Week 4-5. |
 
 ---
 
-*Document version 1.0 · Authored May 2026 · Review: July 2026 post-Phase 1*
+*Document Version 2.0 · Revised May 2026 with full requirements clarification*  
+*Based on: Registered Byelaws TG/RRD/MACS/2026-15/FOW & M · Ascenza HOTO Scope · Committee Q&A Session*  
+*Next review: Post-Phase 1 go-live (June 2026)*
