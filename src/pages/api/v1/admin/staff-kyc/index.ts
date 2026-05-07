@@ -67,7 +67,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     if (kycStatus) query = query.eq('kyc_status', kycStatus);
     if (passExpiring === 'true') {
-      const threshold = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const threshold = new Date(Date.now() + warningDays * 24 * 60 * 60 * 1000).toISOString();
       query = query.lte('security_pass_expires_at', threshold).eq('security_pass_issued', true);
     }
 

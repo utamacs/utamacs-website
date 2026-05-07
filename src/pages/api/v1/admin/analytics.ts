@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -16,6 +17,9 @@ export const GET: APIRoute = async ({ request }) => {
     }
 
     const sb = getSupabaseServiceClient();
+
+    const rules = await getRules(sb, SOCIETY_ID, ['ANALYTICS_LOOKBACK_DAYS']);
+    const lookbackDays = ruleInt(rules, 'ANALYTICS_LOOKBACK_DAYS', 30);
 
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -36,7 +40,7 @@ export const GET: APIRoute = async ({ request }) => {
       sb.from('complaints').select('status, priority, created_at').eq('society_id', SOCIETY_ID),
       sb.from('maintenance_dues').select('status, total_amount, base_amount').eq('society_id', SOCIETY_ID),
       sb.from('events').select('id, title, starts_at, is_published').eq('society_id', SOCIETY_ID).eq('is_published', true).order('starts_at', { ascending: false }).limit(10),
-      sb.from('visitor_logs').select('entry_type, entry_time, exit_time').eq('society_id', SOCIETY_ID).gte('entry_time', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+      sb.from('visitor_logs').select('entry_type, entry_time, exit_time').eq('society_id', SOCIETY_ID).gte('entry_time', new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString()),
       sb.from('profiles').select('residency_type, is_active').eq('society_id', SOCIETY_ID).eq('is_active', true),
       sb.from('polls').select('id, status, ends_at').eq('society_id', SOCIETY_ID),
       // Monthly expenses for P&L

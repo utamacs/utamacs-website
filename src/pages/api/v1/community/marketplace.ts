@@ -5,6 +5,7 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -76,10 +77,12 @@ export const POST: APIRoute = async ({ request }) => {
 
     const sb = getSupabaseServiceClient();
 
+    const rules = await getRules(sb, SOCIETY_ID, ['MARKETPLACE_LISTING_EXPIRY_DAYS']);
+    const listingExpiryDays = ruleInt(rules, 'MARKETPLACE_LISTING_EXPIRY_DAYS', 30);
+
     const { data: profile } = await sb.from('profiles').select('unit_id').eq('id', user.id).single();
 
-    // Listings expire after 30 days
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + listingExpiryDays * 24 * 60 * 60 * 1000).toISOString();
 
     const { data, error } = await sb
       .from('marketplace_listings')

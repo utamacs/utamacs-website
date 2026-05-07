@@ -4,9 +4,9 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // GET /api/v1/documents/:id/history — returns all versions of a document (latest first)
 export const GET: APIRoute = async ({ request, params }) => {

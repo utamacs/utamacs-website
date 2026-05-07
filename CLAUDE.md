@@ -438,7 +438,45 @@ ON CONFLICT (society_id, module_key) DO NOTHING;
 
 ---
 
-## 11. What NOT to Do
+## 11. Rules Engine Standard — Mandatory
+
+Every configurable business parameter **must** live in the `rules` table and be read via `getRules()`. **Never hardcode business values in code.**
+
+### When to use the rules engine (always)
+Any value a society admin could reasonably want to change: days, durations, fees, thresholds, rates, percentages, counts.
+
+### When to use `src/lib/constants.ts` (rare, architectural only)
+- `UUID_RE` — regex used everywhere, not a business value
+- `UPLOAD_LIMITS_BYTES` / `getUploadLimitBytes()` — tied to Supabase bucket policies; changing requires infra change
+- `DOCUMENT_MIME_TYPES` / `IMAGE_MIME_TYPES` — security policy, not configurable
+- DPDPA-mandated caps (e.g. `SIGNED_URL_EXPIRY_SECS = 3600`) — compliance floor, cannot be raised
+
+### Code pattern — API route
+```typescript
+import { getRules, ruleInt, ruleStr, ruleBool } from '@lib/utils/getRules';
+import { UUID_RE } from '@lib/constants';   // ← architecture constants only
+
+// Inside handler, after creating sb:
+const rules = await getRules(sb, SOCIETY_ID, ['SOME_RULE_CODE', 'ANOTHER_RULE']);
+const days  = ruleInt(rules, 'SOME_RULE_CODE', 30);   // fallback = migration default
+const mode  = ruleStr(rules, 'ANOTHER_RULE', 'auto');
+```
+
+### Adding a new configurable value
+1. Add a row to `supabase/migrations/{seq}_*.sql` with `rule_code`, `value_type`, `current_value`, `is_locked`
+2. Mark `is_locked = true` only if the value is mandated by byelaw/law
+3. Read it with `getRules()` at call time — **never** as a module-level constant
+4. The admin UI at `/portal/admin/rules` automatically surfaces all rules
+
+### What NOT to do
+- **No `const EXPIRY_DAYS = 30`** at module level for a business value
+- **No `30 * 24 * 60 * 60 * 1000`** literals for durations — read from rules engine
+- **No local `const UUID_RE = /…/`** — import from `@lib/constants`
+- **No duplicate MIME/size constants** — import `DOCUMENT_MIME_TYPES` / `IMAGE_MIME_TYPES` / `getUploadLimitBytes` from `@lib/constants`
+
+---
+
+## 12. What NOT to Do
 
 - **No filesystem file writes** for user uploads — always Supabase Storage
 - **No raw hex colours** — use design system tokens
@@ -456,7 +494,7 @@ ON CONFLICT (society_id, module_key) DO NOTHING;
 
 ---
 
-## 12. Public Website (utamacs.org) Standards
+## 13. Public Website (utamacs.org) Standards
 
 The public site at `src/site/` (output → `docs/`) is static HTML only:
 - No Astro features — plain `.html` files
@@ -469,7 +507,7 @@ The public site at `src/site/` (output → `docs/`) is static HTML only:
 
 ---
 
-## 13. Skills Reference
+## 14. Skills Reference
 
 | Skill | Invocation | Purpose |
 |---|---|---|

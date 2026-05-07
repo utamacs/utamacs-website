@@ -4,9 +4,10 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // GET /api/v1/admin/sessions — list portal users with last sign-in metadata (admin only)
 export const GET: APIRoute = async ({ request }) => {
@@ -16,6 +17,9 @@ export const GET: APIRoute = async ({ request }) => {
     if (!user.isAdmin) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
 
     const sb = getSupabaseServiceClient();
+
+    const rules = await getRules(sb, SOCIETY_ID, ['SESSION_ACTIVE_WINDOW_MINUTES']);
+    const activeWindowMins = ruleInt(rules, 'SESSION_ACTIVE_WINDOW_MINUTES', 60);
 
     // Fetch auth users via Supabase Admin API
     const { data: { users }, error: authErr } = await sb.auth.admin.listUsers({ perPage: 500 });
@@ -28,7 +32,7 @@ export const GET: APIRoute = async ({ request }) => {
       .eq('society_id', SOCIETY_ID);
 
     const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
-    const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
+    const oneHourAgo = new Date(Date.now() - activeWindowMins * 60 * 1000).toISOString();
 
     const sessions = (users ?? []).map((u: any) => {
       const profile = profileMap.get(u.id);

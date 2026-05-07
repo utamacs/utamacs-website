@@ -5,6 +5,7 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const VALID_CATEGORIES = ['Lift','Generator','Pump','CCTV','Fire_Safety','Gate','Electrical','Other'] as const;
@@ -20,6 +21,9 @@ export const GET: APIRoute = async ({ request }) => {
 
     const sb = getSupabaseServiceClient();
     const today = new Date().toISOString().split('T')[0];
+
+    const rules = await getRules(sb, SOCIETY_ID, ['ASSET_SERVICE_WARNING_DAYS']);
+    const warningDays = ruleInt(rules, 'ASSET_SERVICE_WARNING_DAYS', 30);
 
     const { data, error } = await sb
       .from('infrastructure_assets')
@@ -37,7 +41,7 @@ export const GET: APIRoute = async ({ request }) => {
       warranty_expired: a.warranty_expiry && a.warranty_expiry < today,
       service_overdue: a.next_service_date && a.next_service_date < today,
       service_due_soon: a.next_service_date && a.next_service_date >= today &&
-        new Date(a.next_service_date).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000,
+        new Date(a.next_service_date).getTime() - Date.now() < warningDays * 24 * 60 * 60 * 1000,
     }));
 
     return new Response(JSON.stringify(assets), { headers: { 'Content-Type': 'application/json' } });

@@ -4,9 +4,9 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { getRules, ruleInt } from '@lib/utils/getRules';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Byelaw §7.5f: quorum = min(AGM_QUORUM_ABSOLUTE_MIN, ⌈total × AGM_QUORUM_PERCENTAGE/100⌉)
 // For 136 flats: min(68, ⌈136 × 50%⌉) = min(68, 68) = 68

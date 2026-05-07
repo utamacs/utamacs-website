@@ -7,9 +7,9 @@ import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { getRules, ruleInt } from '@lib/utils/getRules';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BUCKET = 'member-documents';
 const ALLOWED_MIME: Record<string, string> = {
   'application/pdf': 'pdf',
@@ -142,9 +142,12 @@ export const PATCH: APIRoute = async ({ request, params, url }) => {
 
       // Renew pass
       if (body.renew_pass === true) {
+        const renewRuleKey = type === 'maid' ? 'MAID_PASS_VALIDITY_DAYS' : 'STAFF_PASS_VALIDITY_DAYS';
+        const renewRules = await getRules(sb, SOCIETY_ID, [renewRuleKey]);
+        const renewDays = ruleInt(renewRules, renewRuleKey, 365);
         const expiresAt = body.security_pass_expires_at
           ? String(body.security_pass_expires_at)
-          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+          : new Date(Date.now() + renewDays * 24 * 60 * 60 * 1000).toISOString();
         updates.security_pass_expires_at = expiresAt;
         updates.kyc_status = 'pass_issued';
       }

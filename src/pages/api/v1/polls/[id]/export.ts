@@ -6,10 +6,10 @@ import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import PdfPrinter from 'pdfmake';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // GET /api/v1/polls/:id/export
 // Returns a signed URL to a generated PDF of poll results (polls.manage feature required)

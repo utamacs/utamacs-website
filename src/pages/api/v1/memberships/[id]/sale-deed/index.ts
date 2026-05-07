@@ -5,9 +5,9 @@ import { SupabaseStorageService } from '@lib/services/providers/supabase/Supabas
 import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog } from '@lib/middleware/auditLogger';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BUCKET = 'member-documents';
 const ALLOWED_MIME: Record<string, string> = {
   'application/pdf': 'pdf',

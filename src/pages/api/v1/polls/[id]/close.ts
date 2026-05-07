@@ -4,9 +4,9 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** POST /api/v1/polls/:id/close — immediately closes a poll by setting ends_at to now (exec only). */
 export const POST: APIRoute = async ({ request, params }) => {
