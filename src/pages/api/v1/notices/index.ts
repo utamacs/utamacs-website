@@ -43,8 +43,14 @@ export const POST: APIRoute = async ({ request }) => {
       status, scheduled_at, video_url, attachment_type,
     } = body;
 
+    const VALID_CATEGORIES = ['Urgent', 'General', 'Maintenance', 'Financial', 'Events', 'Governance'];
     if (!title || !category) {
       return new Response(JSON.stringify({ error: 'title and category are required' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (!VALID_CATEGORIES.includes(String(category))) {
+      return new Response(JSON.stringify({ error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` }), {
         status: 400, headers: { 'Content-Type': 'application/json' },
       });
     }

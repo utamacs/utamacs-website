@@ -1,0 +1,106 @@
+name: Playwright E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Nightly run at 2:30 AM IST (21:00 UTC previous day)
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+    inputs:
+      portal_url:
+        description: 'Portal URL to test against (leave blank for production)'
+        required: false
+        default: ''
+
+jobs:
+  test:
+    name: E2E Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Create auth state directory
+        run: mkdir -p tests/.auth
+
+      - name: Run Playwright tests
+        run: npx playwright test --shard=${{ matrix.shard }}/4
+        env:
+          PORTAL_URL: ${{ inputs.portal_url || secrets.PORTAL_URL || 'https://portal.utamacs.org' }}
+          PUBLIC_SOCIETY_ID: ${{ secrets.PUBLIC_SOCIETY_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEST_MEMBER_EMAIL: ${{ secrets.TEST_MEMBER_EMAIL }}
+          TEST_MEMBER_PASS: ${{ secrets.TEST_MEMBER_PASS }}
+          TEST_EXEC_EMAIL: ${{ secrets.TEST_EXEC_EMAIL }}
+          TEST_EXEC_PASS: ${{ secrets.TEST_EXEC_PASS }}
+          TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+          TEST_ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASS }}
+          TEST_GUARD_EMAIL: ${{ secrets.TEST_GUARD_EMAIL }}
+          TEST_GUARD_PASS: ${{ secrets.TEST_GUARD_PASS }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-shard-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  merge-reports:
+    name: Merge & Publish Report
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download all shard reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports
+
+      - name: Merge reports
+        run: npx playwright merge-reports --reporter html ./all-reports/**/playwright-report
+
+      - name: Upload merged HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-merged
+          path: playwright-report/
+          retention-days: 30

@@ -8,7 +8,7 @@ const localStore = new Map<string, Window>();
 interface RateLimitConfig { windowMs: number; maxRequests: number }
 const LOCAL_CONFIGS: Record<string, RateLimitConfig> = {
   default: { windowMs: 60_000, maxRequests: 100 },
-  auth:    { windowMs: 15 * 60_000, maxRequests: 10 },
+  auth:    { windowMs: 15 * 60_000, maxRequests: 50 },
 };
 
 function localCheck(ip: string, path: string): void {
@@ -39,7 +39,7 @@ function getUpstashLimiters(): { default: Ratelimit; auth: Ratelimit } | null {
   if (!defaultLimiter) {
     const redis = new Redis({ url, token });
     defaultLimiter = new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '60 s'),  prefix: 'rl:default' });
-    authLimiter    = new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10,  '15 m'),  prefix: 'rl:auth'    });
+    authLimiter    = new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(50,  '15 m'),  prefix: 'rl:auth'    });
   }
   return { default: defaultLimiter!, auth: authLimiter! };
 }
