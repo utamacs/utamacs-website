@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature, hasFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
@@ -10,13 +10,14 @@ const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // GET — list attendance records
-// Exec: all records for a given event_id (required)
+// events.manage: all records for a given event_id (required)
 // Member: their own records only
 export const GET: APIRoute = async ({ request, url }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
     const sb = getSupabaseServiceClient();
-    const isPrivileged = ['executive', 'admin', 'security_guard'].includes(user.role) || user.isAdmin;
+    const isPrivileged = hasFeature(user, 'events.manage');
 
     const eventId = url.searchParams.get('event_id');
 
@@ -68,7 +69,8 @@ export const GET: APIRoute = async ({ request, url }) => {
 // POST — RSVP (upsert on event_id + user_id conflict)
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
 
     const body = await request.json() as {
       event_id?: string;
@@ -136,13 +138,12 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
-// PATCH (exec/guard) — mark checked_in_at
+// PATCH (events.manage) — mark checked_in_at
 export const PATCH: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin', 'security_guard'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN', message: 'Exec or guard access required.' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'events.manage');
 
     const body = await request.json() as { id?: string; checked_in?: boolean };
 
@@ -192,10 +193,11 @@ export const PATCH: APIRoute = async ({ request }) => {
   }
 };
 
-// DELETE — member cancels their own RSVP
+// DELETE — member cancels their own RSVP; events.manage can delete any
 export const DELETE: APIRoute = async ({ request, url }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
 
     const id = url.searchParams.get('id');
     if (!id || !UUID_RE.test(id)) {
@@ -215,8 +217,7 @@ export const DELETE: APIRoute = async ({ request, url }) => {
       return Response.json({ error: 'NOT_FOUND', message: 'Attendance record not found.' }, { status: 404 });
     }
 
-    const isPrivileged = ['executive', 'admin'].includes(user.role) || user.isAdmin;
-    if (!isPrivileged && record.user_id !== user.id) {
+    if (!hasFeature(user, 'events.manage') && record.user_id !== user.id) {
       return Response.json({ error: 'FORBIDDEN', message: 'You can only cancel your own RSVP.' }, { status: 403 });
     }
 

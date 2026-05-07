@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
@@ -12,13 +12,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const VALID_GATE_TYPES = ['main_entry', 'exit', 'emergency', 'pedestrian'] as const;
 type GateType = typeof VALID_GATE_TYPES[number];
 
-// POST (exec only) — create a new gate
+// POST (admin.gates) — create a new gate
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN', message: 'Exec access required.' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'admin.gates');
 
     const body = await request.json() as {
       gate_name?: string;
@@ -72,13 +71,12 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
-// PATCH (exec only) — update an existing gate
+// PATCH (admin.gates) — update an existing gate
 export const PATCH: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN', message: 'Exec access required.' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'admin.gates');
 
     const body = await request.json() as {
       id?: string;

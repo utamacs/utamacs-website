@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
@@ -9,13 +9,12 @@ import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// GET — list expenses (exec/admin only)
+// GET — list expenses (finance.view feature required)
 export const GET: APIRoute = async ({ request, url }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'finance.view');
 
     const sb = getSupabaseServiceClient();
 
@@ -51,13 +50,12 @@ export const GET: APIRoute = async ({ request, url }) => {
   }
 };
 
-// POST — record a new expense (exec/admin only)
+// POST — record a new expense (finance.enter feature required)
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'finance.enter');
 
     const body = await request.json() as Record<string, unknown>;
     const {
@@ -119,13 +117,12 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
-// PATCH — update an expense (exec/admin only)
+// PATCH — update an expense (finance.enter feature required)
 export const PATCH: APIRoute = async ({ request, url }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'finance.enter');
 
     const id = url.searchParams.get('id') ?? '';
     if (!UUID_RE.test(id)) {

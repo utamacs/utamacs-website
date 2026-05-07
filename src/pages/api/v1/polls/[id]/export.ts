@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
@@ -9,22 +9,15 @@ import PdfPrinter from 'pdfmake';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
-function isPrivileged(role: string, portalRole?: string, isAdmin?: boolean) {
-  if (isAdmin) return true;
-  return ['executive', 'admin'].includes(role) ||
-    ['executive', 'secretary', 'president'].includes(portalRole ?? '');
-}
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // GET /api/v1/polls/:id/export
-// Returns a signed URL to a generated PDF of poll results (exec only)
+// Returns a signed URL to a generated PDF of poll results (polls.manage feature required)
 export const GET: APIRoute = async ({ request, params }) => {
   try {
-    const user = await validateJWT(request);
-    if (!isPrivileged(user.role, user.portalRole, user.isAdmin)) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'polls.manage');
 
     const pollId = params.id ?? '';
     if (!UUID_RE.test(pollId)) return Response.json({ error: 'VALIDATION', message: 'Invalid poll id' }, { status: 400 });
@@ -124,7 +117,7 @@ export const GET: APIRoute = async ({ request, params }) => {
           marginBottom: 20,
         },
         { text: `Total responses: ${totalVotes}`, fontSize: 10, color: '#374151', marginBottom: 4 },
-        { text: `Exported by: ${user.role} on ${now}`, style: 'footer' },
+        { text: `Exported by: ${user.portalRole} on ${now}`, style: 'footer' },
       ],
     };
 

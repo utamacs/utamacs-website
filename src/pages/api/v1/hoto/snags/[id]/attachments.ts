@@ -58,7 +58,7 @@ export const POST: APIRoute = async ({ request, params }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
     if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
-    requireFeature(user, 'snag.edit');
+    requireFeature(user, 'snag.create');
 
     const snagItemId = params.id ?? '';
     if (!snagItemId) return Response.json({ error: 'VALIDATION', message: 'Snag id required' }, { status: 400 });
@@ -127,9 +127,7 @@ export const DELETE: APIRoute = async ({ request, params, url }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
     if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
-
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
-    if (!isPrivileged) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
+    requireFeature(user, 'snag.delete');
 
     const attachmentId = url.searchParams.get('attachment_id') ?? '';
     if (!UUID_RE.test(attachmentId)) return Response.json({ error: 'VALIDATION', message: 'Invalid attachment_id' }, { status: 400 });

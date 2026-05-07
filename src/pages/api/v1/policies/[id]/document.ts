@@ -2,7 +2,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
@@ -10,12 +10,12 @@ const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000
 const BUCKET = 'policy-documents';
 const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
-// POST — upload PDF document for a policy
+// POST — upload PDF document for a policy (policies.manage required)
 export const POST: APIRoute = async ({ request, params }) => {
   try {
-    const user = await validateJWT(request);
-    const isPrivileged = ['executive', 'secretary', 'president', 'admin'].includes(user.portalRole ?? user.role);
-    if (!isPrivileged) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'policies.manage');
 
     const sb = getSupabaseServiceClient();
     const { data: policy, error: pErr } = await sb

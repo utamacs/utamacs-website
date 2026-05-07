@@ -2,6 +2,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
@@ -87,13 +88,12 @@ export const GET: APIRoute = async ({ request, url }) => {
   }
 };
 
-// POST — multipart file upload (exec/admin only)
+// POST — multipart file upload (documents.manage feature required)
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN', message: 'Only exec/admin can upload documents' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED', message: 'Authentication required' }, { status: 401 });
+    requireFeature(user, 'documents.manage');
 
     const formData = await request.formData();
     const file     = formData.get('file') as File | null;
@@ -168,13 +168,12 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
-// DELETE /api/v1/documents?id=<uuid>  (exec/admin only)
+// DELETE /api/v1/documents?id=<uuid>  (documents.manage feature required)
 export const DELETE: APIRoute = async ({ request, url }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'documents.manage');
 
     const id = url.searchParams.get('id') ?? '';
     if (!UUID_RE.test(id)) return Response.json({ error: 'VALIDATION', message: 'Valid document id required' }, { status: 400 });

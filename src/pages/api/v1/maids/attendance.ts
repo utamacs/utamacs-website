@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature, hasFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
@@ -11,9 +11,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // GET — list attendance (member: own unit; exec: filtered by maid/unit/date)
 export const GET: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'maids.view');
     const sb = getSupabaseServiceClient();
-    const isPrivileged = ['executive', 'admin', 'security_guard'].includes(user.role);
+    const isPrivileged = hasFeature(user, 'maids.manage');
     const url = new URL(request.url);
 
     let query = sb
@@ -57,7 +59,9 @@ export const GET: APIRoute = async ({ request }) => {
 // POST — log attendance entry
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'maids.manage');
     const body = await request.json() as {
       maid_id?: string; unit_id?: string;
       date?: string; entry_time?: string; exit_time?: string; notes?: string;
@@ -71,7 +75,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const sb = getSupabaseServiceClient();
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
+    const isPrivileged = hasFeature(user, 'maids.manage');
 
     if (!isPrivileged) {
       const { data: profile } = await sb.from('profiles').select('unit_id').eq('id', user.id).single();

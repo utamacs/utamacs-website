@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature, hasFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText, sanitizeHTML } from '@lib/utils/sanitize';
@@ -10,10 +10,12 @@ const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000
 
 export const GET: APIRoute = async ({ request, url }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'policies.view');
     const sb = getSupabaseServiceClient();
 
-    const isPrivileged = ['executive', 'secretary', 'president', 'admin'].includes(user.portalRole ?? user.role);
+    const isPrivileged = hasFeature(user, 'policies.manage');
     const statusFilter = url.searchParams.get('status') ?? (isPrivileged ? '' : 'active');
 
     let query = sb
@@ -51,9 +53,9 @@ export const GET: APIRoute = async ({ request, url }) => {
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    const isPrivileged = ['executive', 'secretary', 'president', 'admin'].includes(user.portalRole ?? user.role);
-    if (!isPrivileged) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'policies.manage');
 
     const body = await request.json() as Record<string, unknown>;
     const { title, description, policy_type, body: pBody, video_url, version, effective_date, acknowledgement_required, gate_portal_access, status } = body;

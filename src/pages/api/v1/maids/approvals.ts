@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature, hasFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
@@ -12,9 +12,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // GET — list approvals (member: own unit; exec: all or filtered by maid_id/unit_id)
 export const GET: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'maids.view');
     const sb = getSupabaseServiceClient();
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
+    const isPrivileged = hasFeature(user, 'maids.manage');
     const url = new URL(request.url);
 
     let query = sb
@@ -50,7 +52,9 @@ export const GET: APIRoute = async ({ request }) => {
 // POST — approve a maid for a unit (member: own unit; exec: any unit)
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'maids.approve');
     const body = await request.json() as { maid_id?: string; unit_id?: string; notes?: string };
 
     if (!body.maid_id || !body.unit_id) {
@@ -61,7 +65,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const sb = getSupabaseServiceClient();
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
+    const isPrivileged = hasFeature(user, 'maids.manage');
 
     // Non-exec can only approve for their own unit
     if (!isPrivileged) {
@@ -105,7 +109,9 @@ export const POST: APIRoute = async ({ request }) => {
 // PATCH — deactivate an approval
 export const PATCH: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'maids.approve');
     const body = await request.json() as { id?: string; is_active?: boolean };
     const approvalId = body.id;
 
@@ -114,7 +120,7 @@ export const PATCH: APIRoute = async ({ request }) => {
     }
 
     const sb = getSupabaseServiceClient();
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
+    const isPrivileged = hasFeature(user, 'maids.manage');
 
     // Check ownership if not exec
     const { data: approval } = await sb

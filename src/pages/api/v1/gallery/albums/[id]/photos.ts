@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
@@ -18,7 +18,9 @@ const MAX_PHOTOS_PER_UPLOAD = 10;
 // GET — list photos in an album with signed URLs
 export const GET: APIRoute = async ({ request, params }) => {
   try {
-    await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'gallery.view');
     const albumId = params.id!;
     if (!UUID_RE.test(albumId)) return Response.json({ error: 'INVALID_ID' }, { status: 400 });
 
@@ -48,13 +50,12 @@ export const GET: APIRoute = async ({ request, params }) => {
   }
 };
 
-// POST — upload photos to an album (exec only, multipart, up to 10 files)
+// POST — upload photos to an album (gallery.manage feature required)
 export const POST: APIRoute = async ({ request, params }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role)) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'gallery.manage');
 
     const albumId = params.id!;
     if (!UUID_RE.test(albumId)) return Response.json({ error: 'INVALID_ID' }, { status: 400 });
