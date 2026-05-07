@@ -4,8 +4,14 @@ dist/
 .DS_Store
 .env
 .env.local
+.env.test
 *.log
 .claude/settings.local.json
+
+# ─── Playwright ─────────────────────────────────────────────────────────────
+tests/.auth/          # saved login sessions — contain real tokens, never commit
+playwright-report/
+test-results/
 
 # ─── Upload safety net ──────────────────────────────────────────────────────
 # All user-uploaded files MUST go to Supabase Storage via SupabaseStorageService.
