@@ -12,6 +12,7 @@ export const GET: APIRoute = async ({ request, url }) => {
     const sb = getSupabaseServiceClient();
 
     const unreadOnly = url.searchParams.get('unread') === 'true';
+    const typeFilter = url.searchParams.get('type');
     const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '30'), 50);
 
     let query = sb
@@ -23,6 +24,7 @@ export const GET: APIRoute = async ({ request, url }) => {
       .limit(limit);
 
     if (unreadOnly) query = query.eq('is_read', false);
+    if (typeFilter) query = query.eq('type', typeFilter);
 
     const { data, error } = await query;
     if (error) throw Object.assign(new Error(error.message), { status: 500 });

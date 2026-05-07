@@ -46,7 +46,7 @@ export const PATCH: APIRoute = async ({ request }) => {
       'complaints', 'notices', 'events', 'polls', 'payments',
       'visitor_alerts', 'community', 'marketplace', 'maids',
       'gallery', 'feedback', 'snags',
-      'email_enabled', 'sms_enabled', 'push_enabled', 'whatsapp_enabled',
+      'email_enabled', 'email_digest_enabled', 'sms_enabled', 'push_enabled', 'whatsapp_enabled',
     ];
     const updates: Record<string, unknown> = {};
     for (const key of PATCHABLE_BOOLEANS) {
