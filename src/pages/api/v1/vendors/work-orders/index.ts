@@ -55,7 +55,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     const body = await request.json() as {
       vendor_id?: string; title?: string; description?: string;
-      complaint_id?: string; deadline?: string; quoted_amount?: number;
+      complaint_id?: string; snag_id?: string; deadline?: string; quoted_amount?: number;
     };
 
     if (!body.vendor_id || !body.title?.trim()) {
@@ -73,6 +73,7 @@ export const POST: APIRoute = async ({ request }) => {
         title: sanitizePlainText(body.title),
         description: body.description ? sanitizePlainText(body.description) : null,
         complaint_id: body.complaint_id ?? null,
+        snag_id: body.snag_id ?? null,
         status: 'draft',
         issued_at: new Date().toISOString(),
         deadline: body.deadline ?? null,
