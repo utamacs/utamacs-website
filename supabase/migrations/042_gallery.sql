@@ -96,7 +96,7 @@ CREATE INDEX IF NOT EXISTS idx_gallery_photos_album   ON gallery_photos(album_id
 
 -- ── Feature flag ─────────────────────────────────────────────────────────────
 
-INSERT INTO feature_flags (society_id, module_key, is_active, display_order)
-SELECT id, 'gallery', true, 18
+INSERT INTO module_configurations (society_id, module_key, display_name, display_order, icon, is_active)
+SELECT id, 'gallery', 'Photo Gallery', 18, 'fa-images', true
 FROM societies
 ON CONFLICT (society_id, module_key) DO NOTHING;
