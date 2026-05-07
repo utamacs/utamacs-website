@@ -26,7 +26,7 @@ export const GET: APIRoute = async ({ request, params }) => {
     requireFeature(user, 'snag.view');
 
     const snagItemId = params.id ?? '';
-    if (!UUID_RE.test(snagItemId)) return Response.json({ error: 'VALIDATION', message: 'Invalid snag id' }, { status: 400 });
+    if (!snagItemId) return Response.json({ error: 'VALIDATION', message: 'Snag id required' }, { status: 400 });
 
     const sb = getSupabaseServiceClient();
     const { data, error } = await sb
@@ -61,7 +61,7 @@ export const POST: APIRoute = async ({ request, params }) => {
     requireFeature(user, 'snag.edit');
 
     const snagItemId = params.id ?? '';
-    if (!UUID_RE.test(snagItemId)) return Response.json({ error: 'VALIDATION', message: 'Invalid snag id' }, { status: 400 });
+    if (!snagItemId) return Response.json({ error: 'VALIDATION', message: 'Snag id required' }, { status: 400 });
 
     const sb = getSupabaseServiceClient();
 
