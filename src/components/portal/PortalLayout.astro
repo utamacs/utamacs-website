@@ -59,6 +59,10 @@ const MODULE_PATHS: Record<string, string> = {
   notifications:    '/portal/notifications',
   analytics:        '/portal/analytics',
   letters:          '/portal/letters',
+  policies:         '/portal/policies',
+  maids:            '/portal/maids',
+  gallery:          '/portal/gallery',
+  feedback:         '/portal/feedback',
 };
 
 let allModules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = FALLBACK_MODULES;
@@ -123,13 +127,13 @@ if (isGuard) {
 } else {
   // ── Community ────────────────────────────────────────────────────────────
   const communityItems = (
-    ['members','complaints','notices','events','polls','community','documents','notifications'] as const
+    ['members','complaints','notices','events','polls','community','gallery','feedback','documents','notifications'] as const
   ).map(modItem).filter((x) => x != null) as NavItem[];
   if (communityItems.length) navGroups.push({ label: 'Community', items: communityItems });
 
   // ── Services ─────────────────────────────────────────────────────────────
   const serviceItems = (
-    ['finance','facility_booking','visitor_mgmt','parking'] as const
+    ['finance','facility_booking','visitor_mgmt','parking','maids'] as const
   ).map(modItem).filter((x) => x != null) as NavItem[];
   if (serviceItems.length) navGroups.push({ label: 'Services', items: serviceItems });
 
@@ -150,6 +154,7 @@ if (isGuard) {
   // ── Governance ────────────────────────────────────────────────────────────
   const govItems: NavItem[] = [];
   const agmMod = modItem('agm'); if (agmMod) govItems.push(agmMod);
+  const polMod = modItem('policies'); if (polMod) govItems.push(polMod);
   if (canSeeLetters) {
     const lm = modItem('letters'); if (lm) govItems.push(lm);
   }
