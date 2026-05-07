@@ -101,6 +101,13 @@ export const GET: APIRoute = async ({ request }) => {
     results.scheduled_notices = { error: err instanceof Error ? err.message : String(err) };
   }
 
+  // ── 10. Event reminder notifications ──────────────────────────────────────
+  try {
+    results.event_reminders = await runEventReminders(sb, now, nowIso);
+  } catch (err) {
+    results.event_reminders = { error: err instanceof Error ? err.message : String(err) };
+  }
+
   // ── Write master heartbeat ─────────────────────────────────────────────────
   try {
     await sb.from('cron_heartbeats').insert({
@@ -350,6 +357,78 @@ async function runScheduledNotices(sb: ReturnType<typeof getSupabaseServiceClien
   }
 
   return { published: ids.length };
+}
+
+async function runEventReminders(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Daily cron fires at 07:00 IST. We send two reminder types:
+  //   "Tomorrow" reminder — events starting in the next 20–32h window
+  //   "Today"    reminder — events starting in the next 0–20h window (same day)
+  const windowStart = new Date(now);
+  const windowTomorrow = new Date(now.getTime() + 20 * 3_600_000);
+  const windowEnd     = new Date(now.getTime() + 32 * 3_600_000);
+
+  const [{ data: todayEvents }, { data: tomorrowEvents }] = await Promise.all([
+    sb.from('events')
+      .select('id, title, starts_at')
+      .eq('society_id', SOCIETY_ID)
+      .eq('is_published', true)
+      .gte('starts_at', nowIso)
+      .lt('starts_at', windowTomorrow.toISOString())
+      .limit(20),
+    sb.from('events')
+      .select('id, title, starts_at')
+      .eq('society_id', SOCIETY_ID)
+      .eq('is_published', true)
+      .gte('starts_at', windowTomorrow.toISOString())
+      .lte('starts_at', windowEnd.toISOString())
+      .limit(20),
+  ]);
+
+  let reminders = 0;
+
+  const sendEventReminder = async (event: any, label: string) => {
+    // Dedup: skip if we already sent a reminder for this event today
+    const { count } = await sb.from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('society_id', SOCIETY_ID)
+      .eq('reference_id', event.id)
+      .eq('reference_table', 'events')
+      .eq('type', 'event')
+      .gte('created_at', windowStart.toISOString().slice(0, 10) + 'T00:00:00.000Z');
+    if (count && count > 0) return; // already reminded today
+
+    // Get all registered users for this event
+    const { data: regs } = await sb.from('event_registrations')
+      .select('user_id')
+      .eq('event_id', event.id)
+      .in('status', ['registered', 'waitlisted']);
+
+    if (!regs?.length) return;
+
+    const startsAt = new Date(event.starts_at);
+    const timeStr = startsAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+
+    try {
+      await sb.from('notifications').insert(
+        regs.map((r: any) => ({
+          society_id: SOCIETY_ID,
+          user_id: r.user_id,
+          title: `Reminder: ${event.title}`,
+          body: `${label} at ${timeStr} IST. Don't forget to attend!`,
+          type: 'event',
+          reference_table: 'events',
+          reference_id: event.id,
+          is_read: false,
+        })),
+      );
+      reminders += regs.length;
+    } catch { /* non-fatal */ }
+  };
+
+  for (const e of todayEvents ?? []) await sendEventReminder(e as any, 'Today');
+  for (const e of tomorrowEvents ?? []) await sendEventReminder(e as any, 'Tomorrow');
+
+  return { reminders };
 }
 
 // ── Shared helpers ───────────────────────────────────────────────────────────

@@ -31,6 +31,7 @@ const isOwner = (post as any).author_id === user.id;
 const isMod = ['executive', 'admin'].includes(user.role);
 const canDelete = isOwner || isMod;
 const canEdit = isOwner;
+const canPin = isMod;
 const canComment = !['security_guard', 'vendor'].includes(user.role);
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -88,6 +89,12 @@ const p = post as any;
           <span id="helpful-count">–</span> Helpful
         </button>
         <div class="ml-auto flex items-center gap-3">
+          {canPin && (
+            <button onclick="togglePin()" id="pin-btn" class="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-800 transition-colors">
+              <i class="fas fa-thumbtack" aria-hidden="true"></i>
+              {p.is_pinned ? 'Unpin' : 'Pin'}
+            </button>
+          )}
           {canEdit && (
             <button onclick="openEditModal()" class="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-800 transition-colors">
               <i class="fas fa-edit" aria-hidden="true"></i>
@@ -145,7 +152,7 @@ const p = post as any;
     )}
   </div>
 
-  <script define:vars={{ postId: id }}>
+  <script define:vars={{ postId: id, isPinned: p.is_pinned }}>
     async function loadReactions() {
       const res = await fetch(`/api/v1/community/posts/${postId}`, { credentials: 'include' });
       if (!res.ok) return;
@@ -246,11 +253,31 @@ const p = post as any;
       setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
     }
 
+    let pinned = isPinned;
+    async function togglePin() {
+      const btn = document.getElementById('pin-btn');
+      if (btn) btn.setAttribute('disabled', 'true');
+      const res = await fetch(`/api/v1/community/posts/${postId}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_pinned: !pinned }),
+      });
+      if (res.ok) {
+        pinned = !pinned;
+        if (btn) btn.innerHTML = `<i class="fas fa-thumbtack" aria-hidden="true"></i> ${pinned ? 'Unpin' : 'Pin'}`;
+        showToast(pinned ? 'Post pinned.' : 'Post unpinned.');
+      } else {
+        showToast('Failed to update pin status.', 'error');
+      }
+      if (btn) btn.removeAttribute('disabled');
+    }
+
     window.react = react;
     window.submitComment = submitComment;
     window.deletePost = deletePost;
     window.openEditModal = openEditModal;
     window.submitEdit = submitEdit;
+    window.togglePin = togglePin;
     loadReactions();
   </script>
 

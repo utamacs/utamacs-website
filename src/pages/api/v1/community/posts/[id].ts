@@ -64,19 +64,31 @@ export const PATCH: APIRoute = async ({ request, params }) => {
       });
     }
 
-    if (post.author_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'Forbidden — only the author can edit this post' }), {
-        status: 403, headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    const isMod = ['executive', 'admin'].includes(user.role);
+    const isAuthor = post.author_id === user.id;
 
-    const body = await request.json() as { title?: string; body?: string; category?: string };
+    const body = await request.json() as { title?: string; body?: string; category?: string; is_pinned?: boolean };
     const VALID_CATEGORIES = ['General', 'Help', 'Lost_Found', 'Recommendation', 'Alert'];
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
-    if (body.title?.trim()) updates.title = sanitizePlainText(body.title.trim());
-    if (body.body?.trim()) updates.body = sanitizeHTML(body.body.trim());
-    if (body.category && VALID_CATEGORIES.includes(body.category)) updates.category = body.category;
+    // is_pinned is exec-only; title/body/category are author-only
+    if (body.is_pinned !== undefined) {
+      if (!isMod) {
+        return new Response(JSON.stringify({ error: 'Forbidden — only moderators can pin posts' }), {
+          status: 403, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      updates.is_pinned = !!body.is_pinned;
+    } else {
+      if (!isAuthor) {
+        return new Response(JSON.stringify({ error: 'Forbidden — only the author can edit this post' }), {
+          status: 403, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (body.title?.trim()) updates.title = sanitizePlainText(body.title.trim());
+      if (body.body?.trim()) updates.body = sanitizeHTML(body.body.trim());
+      if (body.category && VALID_CATEGORIES.includes(body.category)) updates.category = body.category;
+    }
 
     if (Object.keys(updates).length === 1) {
       return new Response(JSON.stringify({ error: 'Nothing to update' }), {

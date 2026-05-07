@@ -163,7 +163,23 @@ const canUpload = canEdit;
         </div>
       </div>
 
-      <!-- Metadata -->
+      <!-- Assignee (exec only) -->
+    {canEdit && (
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light">
+          <h2 class="text-base font-semibold text-text-primary">Assigned To</h2>
+        </div>
+        <div class="p-4">
+          <select id="assignee-select"
+            class="w-full px-3 py-2 border border-border-light rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600">
+            <option value="">— Unassigned —</option>
+          </select>
+          <p id="assignee-status" class="text-xs text-text-secondary mt-1.5 hidden"></p>
+        </div>
+      </div>
+    )}
+
+    <!-- Metadata -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
           <h2 class="text-lg font-semibold text-text-primary">Details</h2>
@@ -294,6 +310,43 @@ const canUpload = canEdit;
 
     let state = { snag: null, files: [], comments: [] };
 
+    // ── Assignee dropdown (exec only) ─────────────────────────────────────────
+    if (canEdit) {
+      const sel = document.getElementById('assignee-select');
+      const statusEl = document.getElementById('assignee-status');
+
+      // Load committee members to populate dropdown (filter to exec/secretary/president)
+      fetch('/api/v1/members?limit=200', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : [])
+        .then((members) => {
+          if (!sel) return;
+          const committee = members.filter((m: any) =>
+            ['executive', 'secretary', 'president', 'admin'].includes(m.role ?? ''),
+          );
+          for (const m of committee) {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.full_name;
+            sel.appendChild(opt);
+          }
+        }).catch(() => {});
+
+      sel?.addEventListener('change', async () => {
+        const userId = (sel as HTMLSelectElement).value;
+        if (statusEl) { statusEl.textContent = 'Saving…'; statusEl.classList.remove('hidden', 'text-red-600', 'text-secondary-500'); }
+        const res = await fetch(`/api/v1/hoto/snags/${snagId}`, {
+          method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ responsible_user_id: userId || null }),
+        });
+        if (res.ok) {
+          if (statusEl) { statusEl.textContent = 'Saved'; statusEl.classList.add('text-secondary-500'); }
+          setTimeout(() => statusEl?.classList.add('hidden'), 2000);
+        } else {
+          if (statusEl) { statusEl.textContent = 'Failed to save'; statusEl.classList.add('text-red-600'); }
+        }
+      });
+    }
+
     async function loadData() {
       const res = await fetch(`/api/v1/hoto/snags/${snagId}`, { credentials: 'include' });
       if (!res.ok) {
@@ -333,6 +386,12 @@ const canUpload = canEdit;
 
       document.getElementById('snag-description').textContent = snag.description;
       document.getElementById('snag-description').classList.remove('animate-pulse', 'bg-gray-100', 'h-12', 'rounded');
+
+      // Sync assignee dropdown with current value
+      if (canEdit) {
+        const sel = document.getElementById('assignee-select') as HTMLSelectElement | null;
+        if (sel) sel.value = snag.responsible_user_id ?? '';
+      }
 
       // Files
       const filesEl = document.getElementById('files-list');
