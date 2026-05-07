@@ -64,6 +64,27 @@ if (!user || !['executive', 'admin'].includes(user.role)) {
         <div id="member-composition"></div>
       </div>
     </div>
+
+    <!-- Occupancy report -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <h2 class="text-lg font-semibold text-text-primary mb-1">Unit Occupancy</h2>
+      <p class="text-xs text-text-secondary mb-4">Owner-occupied vs rented vs vacant across all active member units.</p>
+      <div id="occupancy-chart"></div>
+    </div>
+
+    <!-- Monthly P&L -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <h2 class="text-lg font-semibold text-text-primary mb-1">Monthly P&amp;L (Last 6 Months)</h2>
+      <p class="text-xs text-text-secondary mb-4">Collections (income) vs expenses per month.</p>
+      <div id="monthly-pl" class="space-y-3"></div>
+    </div>
+
+    <!-- Collection efficiency -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <h2 class="text-lg font-semibold text-text-primary mb-1">Collection Efficiency by Month</h2>
+      <p class="text-xs text-text-secondary mb-4">Percentage of dues collected relative to total billed per month.</p>
+      <div id="collection-efficiency" class="space-y-2.5"></div>
+    </div>
   </div>
 
   <script>
@@ -192,6 +213,72 @@ if (!user || !['executive', 'admin'].includes(user.role)) {
           </div>
         </div>
       `;
+
+      // Occupancy report
+      const occ = d.occupancy;
+      const occTotal = occ.total || 1;
+      const occItems = [
+        { label: 'Owner Occupied', count: occ.owner_occupied, color: '#1E3A8A' },
+        { label: 'Rented', count: occ.rented, color: '#10B981' },
+        { label: 'Vacant', count: occ.vacant, color: '#F59E0B' },
+        ...Object.entries(occ.by_type as Record<string, number>)
+          .filter(([k]) => !['owner_occupied','rented','vacant'].includes(k))
+          .map(([k, v]) => ({ label: k.replace('_', ' '), count: v, color: '#9CA3AF' })),
+      ];
+      const maxOcc = Math.max(...occItems.map(o => o.count), 1);
+      document.getElementById('occupancy-chart')!.innerHTML = `
+        <div class="space-y-2.5 mb-4">
+          ${occItems.map(o => bar(o.label, o.count, maxOcc, o.color, ` (${occTotal > 0 ? Math.round((o.count/occTotal)*100) : 0}%)`)).join('')}
+        </div>
+        <div class="grid grid-cols-3 gap-3 text-center">
+          ${occItems.slice(0,3).map(o => `
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <div class="text-xl font-bold" style="color:${o.color}">${o.count}</div>
+              <div class="text-xs text-text-secondary">${o.label}</div>
+            </div>`).join('')}
+        </div>`;
+
+      // Monthly P&L
+      type MonthlyPL = { month: string; income: number; expenses: number; net: number };
+      const pl = (d.monthly_pl as MonthlyPL[]);
+      const plMax = Math.max(...pl.flatMap(m => [m.income, m.expenses]), 1);
+      document.getElementById('monthly-pl')!.innerHTML = pl.map(m => {
+        const [yr, mo] = m.month.split('-');
+        const label = new Date(Number(yr), Number(mo) - 1).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+        const netColor = m.net >= 0 ? 'text-green-600' : 'text-red-600';
+        const netSign = m.net >= 0 ? '+' : '';
+        return `
+          <div class="flex items-center gap-3">
+            <div class="w-14 text-xs text-text-secondary flex-shrink-0">${label}</div>
+            <div class="flex-1">
+              <div class="flex gap-1 mb-1">
+                <div class="h-2 rounded bg-green-500" style="width:${Math.round((m.income/plMax)*100)}%;min-width:${m.income > 0 ? 4 : 0}px"></div>
+              </div>
+              <div class="flex gap-1">
+                <div class="h-2 rounded bg-red-400" style="width:${Math.round((m.expenses/plMax)*100)}%;min-width:${m.expenses > 0 ? 4 : 0}px"></div>
+              </div>
+            </div>
+            <div class="text-right flex-shrink-0 min-w-20">
+              <div class="text-xs text-green-600">${fmt(m.income)}</div>
+              <div class="text-xs text-red-500">${fmt(m.expenses)}</div>
+            </div>
+            <div class="text-xs font-semibold ${netColor} min-w-14 text-right">${netSign}${fmt(m.net)}</div>
+          </div>`;
+      }).join('') + `
+        <div class="flex items-center gap-2 mt-1 pt-2 border-t border-border-light">
+          <div class="w-3 h-2 rounded bg-green-500"></div><span class="text-xs text-text-secondary">Income</span>
+          <div class="w-3 h-2 rounded bg-red-400 ml-3"></div><span class="text-xs text-text-secondary">Expenses</span>
+        </div>`;
+
+      // Collection efficiency
+      type CollEff = { month: string; total: number; paid: number; rate: number };
+      const eff = (d.collection_efficiency as CollEff[]);
+      document.getElementById('collection-efficiency')!.innerHTML = eff.map(e => {
+        const [yr, mo] = e.month.split('-');
+        const label = new Date(Number(yr), Number(mo) - 1).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+        const rateColor = e.rate >= 80 ? '#10B981' : e.rate >= 60 ? '#F59E0B' : '#EF4444';
+        return bar(`${label} — ${fmt(e.paid)} / ${fmt(e.total)}`, e.rate, 100, rateColor, '%');
+      }).join('') || '<div class="text-sm text-text-secondary text-center py-4">No dues data for the period.</div>';
     }
 
     loadAnalytics();

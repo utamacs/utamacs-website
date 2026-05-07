@@ -95,6 +95,15 @@ export const GET: APIRoute = async ({ request, params, url }) => {
         ? 'application/pdf'
         : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       const filename = `${data.title ?? 'letter'}.${format}`;
+
+      // Non-blocking download receipt: increment counter + set last_downloaded_at
+      Promise.resolve(
+        sb.from('generated_letters').update({
+          download_count: (data.download_count ?? 0) + 1,
+          last_downloaded_at: new Date().toISOString(),
+        }).eq('id', params.id!),
+      ).catch(() => {});
+
       return new Response(ghRes.body, {
         headers: {
           'Content-Type': contentType,

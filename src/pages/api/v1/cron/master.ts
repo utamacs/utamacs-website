@@ -115,6 +115,13 @@ export const GET: APIRoute = async ({ request }) => {
     results.event_reminders = { error: err instanceof Error ? err.message : String(err) };
   }
 
+  // ── 12. Feedback SLA escalation (exec response overdue > 7 days) ──────────
+  try {
+    results.feedback_sla = await runFeedbackSlaEscalation(sb, now, nowIso);
+  } catch (err) {
+    results.feedback_sla = { error: err instanceof Error ? err.message : String(err) };
+  }
+
   // ── Write master heartbeat ─────────────────────────────────────────────────
   try {
     await sb.from('cron_heartbeats').insert({
@@ -497,6 +504,67 @@ async function runEventReminders(sb: ReturnType<typeof getSupabaseServiceClient>
   for (const e of tomorrowEvents ?? []) await sendEventReminder(e as any, 'Tomorrow');
 
   return { reminders };
+}
+
+async function runFeedbackSlaEscalation(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Escalate feedback items that have had no exec response for >7 days.
+  // Feedback table: id, title, status, is_anonymous, submitted_by, created_at, response_at (nullable)
+  const SLA_HOURS = 7 * 24; // 7 days
+  const cutoff = new Date(now.getTime() - SLA_HOURS * 3_600_000).toISOString();
+
+  const { data: stale } = await sb
+    .from('feedbacks')
+    .select('id, subject, status')
+    .eq('society_id', SOCIETY_ID)
+    .in('status', ['open', 'acknowledged', 'in_progress'])
+    .lt('created_at', cutoff)
+    .is('responded_at', null)
+    .limit(30);
+
+  if (!stale?.length) return { escalated: 0 };
+
+  // Get exec/secretary/president IDs for notification
+  const { data: execProfiles } = await sb
+    .from('profiles')
+    .select('id')
+    .eq('society_id', SOCIETY_ID)
+    .in('portal_role', ['executive', 'secretary', 'president'])
+    .eq('is_active', true);
+
+  const execIds = (execProfiles ?? []).map((p: any) => p.id);
+  if (!execIds.length) return { escalated: 0 };
+
+  let escalated = 0;
+  for (const f of stale) {
+    // Dedup: only escalate once per feedback item per day
+    const { count } = await sb
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('society_id', SOCIETY_ID)
+      .eq('reference_id', f.id)
+      .eq('type', 'feedback')
+      .eq('title', 'Feedback awaiting response')
+      .gte('created_at', nowIso.slice(0, 10) + 'T00:00:00.000Z');
+    if (count && count > 0) continue;
+
+    try {
+      await sb.from('notifications').insert(
+        execIds.map((uid: string) => ({
+          society_id: SOCIETY_ID,
+          user_id: uid,
+          title: 'Feedback awaiting response',
+          body: `Resident feedback "${f.subject ?? 'Untitled'}" has had no response for over 7 days.`,
+          type: 'feedback',
+          reference_table: 'feedback',
+          reference_id: f.id,
+          is_read: false,
+        })),
+      );
+      escalated++;
+    } catch { /* non-fatal */ }
+  }
+
+  return { escalated };
 }
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
