@@ -89,7 +89,7 @@ CREATE INDEX IF NOT EXISTS idx_feedbacks_category ON feedbacks(society_id, categ
 
 -- ── Feature flag ─────────────────────────────────────────────────────────────
 
-INSERT INTO feature_flags (society_id, module_key, is_active, display_order)
-SELECT id, 'feedback', true, 19
+INSERT INTO module_configurations (society_id, module_key, display_name, display_order, icon, is_active)
+SELECT id, 'feedback', 'Resident Feedback', 19, 'fa-star', true
 FROM societies
 ON CONFLICT (society_id, module_key) DO NOTHING;

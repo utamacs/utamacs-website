@@ -173,7 +173,7 @@ CREATE INDEX IF NOT EXISTS idx_maid_attendance_unit ON maid_attendance(unit_id, 
 
 -- ── Feature flag ─────────────────────────────────────────────────────────────
 
-INSERT INTO feature_flags (society_id, module_key, is_active, display_order)
-SELECT id, 'maids', true, 17
+INSERT INTO module_configurations (society_id, module_key, display_name, display_order, icon, is_active)
+SELECT id, 'maids', 'Domestic Help Registry', 17, 'fa-users', true
 FROM societies
 ON CONFLICT (society_id, module_key) DO NOTHING;
