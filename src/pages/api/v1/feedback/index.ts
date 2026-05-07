@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature, hasFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
@@ -15,9 +15,11 @@ const VALID_PRIORITIES = ['low','normal','high','urgent'];
 
 export const GET: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
     const sb = getSupabaseServiceClient();
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
+    const isPrivileged = hasFeature(user, 'feedback.manage');
+    if (!isPrivileged) requireFeature(user, 'feedback.submit');
     const url = new URL(request.url);
 
     const status   = url.searchParams.get('status');
@@ -63,7 +65,9 @@ export const GET: APIRoute = async ({ request }) => {
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'feedback.submit');
     const body = await request.json() as Record<string, unknown>;
 
     const subject = String(body.subject ?? '').trim();
@@ -123,11 +127,13 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
-// PATCH — exec responds to or updates status of feedback
+// PATCH — exec responds to or updates status of feedback (feedback.manage required)
 export const PATCH: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'feedback.manage');
+    const isPrivileged = hasFeature(user, 'feedback.manage');
 
     const body = await request.json() as { id?: string; status?: string; response?: string; priority?: string };
     const feedbackId = body.id;

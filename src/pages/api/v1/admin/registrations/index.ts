@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
@@ -10,19 +10,12 @@ const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_STATUSES = ['approved', 'rejected', 'duplicate'] as const;
 
-function isPrivileged(role: string, portalRole?: string, isAdmin?: boolean) {
-  if (isAdmin) return true;
-  return ['executive', 'admin'].includes(role) ||
-    ['executive', 'secretary', 'president'].includes(portalRole ?? '');
-}
-
 // GET /api/v1/admin/registrations?status=pending&limit=50&offset=0
 export const GET: APIRoute = async ({ request, url }) => {
   try {
-    const user = await validateJWT(request);
-    if (!isPrivileged(user.role, user.portalRole, user.isAdmin)) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'admin.registrations');
 
     const status = url.searchParams.get('status') ?? '';
     const limit  = Math.min(parseInt(url.searchParams.get('limit') ?? '50'), 200);
@@ -63,10 +56,9 @@ export const GET: APIRoute = async ({ request, url }) => {
 // PATCH /api/v1/admin/registrations  { id, status, rejection_reason? }
 export const PATCH: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!isPrivileged(user.role, user.portalRole, user.isAdmin)) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'admin.registrations');
 
     const body = await request.json() as { id?: string; status?: string; rejection_reason?: string };
 

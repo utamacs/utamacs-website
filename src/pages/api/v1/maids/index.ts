@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature, hasFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
@@ -13,9 +13,11 @@ const VALID_ID_TYPES   = ['aadhaar','voter_id','passport','dl','other'];
 
 export const GET: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'maids.view');
     const sb = getSupabaseServiceClient();
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
+    const isPrivileged = hasFeature(user, 'maids.manage');
     const url = new URL(request.url);
     const activeOnly = url.searchParams.get('active') !== 'false';
     const search = url.searchParams.get('q')?.trim() ?? '';
@@ -84,10 +86,9 @@ export const GET: APIRoute = async ({ request }) => {
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role)) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'maids.manage');
 
     const body = await request.json() as Record<string, unknown>;
     const full_name = String(body.full_name ?? '').trim();

@@ -16,6 +16,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
     'snag.view',
     'vendor.view', 'vendor.vote',
     'notice.view',
+    'gallery.view', 'maids.approve', 'feedback.submit', 'policies.view',
   ],
 
   executive: [
@@ -28,6 +29,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
     // when committee_title = 'Treasurer' or 'Joint Treasurer' is assigned.
     // hoto.approve_president / hoto.approve_secretary: NOT included — granted as
     // user_feature_overrides when delegation is active (§8.2 / §8.4).
+    'community.moderate', 'gallery.view', 'gallery.manage',
+    'maids.view', 'maids.manage', 'maids.approve',
+    'feedback.submit', 'feedback.manage',
+    'policies.view', 'policies.manage',
+    'documents.manage', 'events.manage', 'polls.manage',
+    'admin.registrations', 'admin.gates',
   ],
 
   secretary: [
@@ -43,6 +50,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
     'finance.open_board_vote',
     'finance.view_member_phones',
     'users.view_directory', 'users.invite_member', 'users.deactivate',
+    'community.moderate', 'gallery.view', 'gallery.manage',
+    'maids.view', 'maids.manage', 'maids.approve',
+    'feedback.submit', 'feedback.manage',
+    'policies.view', 'policies.manage',
+    'documents.manage', 'events.manage', 'polls.manage',
+    'admin.registrations', 'admin.gates',
   ],
 
   president: [
@@ -58,6 +71,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
     'users.view_directory', 'users.invite_member', 'users.deactivate',
     'users.invite_committee', 'users.change_role',
     'admin.delegation', 'admin.elections', 'admin.permissions', 'admin.import',
+    'community.moderate', 'gallery.view', 'gallery.manage',
+    'maids.view', 'maids.manage', 'maids.approve',
+    'feedback.submit', 'feedback.manage',
+    'policies.view', 'policies.manage',
+    'documents.manage', 'events.manage', 'polls.manage',
+    'admin.registrations', 'admin.gates',
   ],
 };
 

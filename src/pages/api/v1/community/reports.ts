@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
@@ -15,13 +15,12 @@ type ReportReason = typeof VALID_REASONS[number];
 const VALID_STATUSES = ['reviewed', 'dismissed', 'actioned'] as const;
 type ReportStatus = typeof VALID_STATUSES[number];
 
-// GET (exec only) — list pending reports
+// GET (community.moderate) — list pending reports
 export const GET: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN', message: 'Exec access required.' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'community.moderate');
 
     const sb = getSupabaseServiceClient();
     const { data, error } = await sb
@@ -41,10 +40,11 @@ export const GET: APIRoute = async ({ request }) => {
   }
 };
 
-// POST (any member) — submit a report
+// POST (any authenticated member) — submit a report
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
 
     const body = await request.json() as {
       post_id?: string;
@@ -105,13 +105,12 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
-// PATCH (exec only) — update report status
+// PATCH (community.moderate) — update report status
 export const PATCH: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
-      return Response.json({ error: 'FORBIDDEN', message: 'Exec access required.' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'community.moderate');
 
     const body = await request.json() as { id?: string; status?: string };
 

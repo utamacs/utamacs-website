@@ -55,6 +55,39 @@ export const FEATURES = {
 
   // ── Audit ─────────────────────────────────────────────────────────────────
   'audit.view':                { label: 'View audit log',                           locked: false },
+
+  // ── Community ─────────────────────────────────────────────────────────────
+  'community.moderate':        { label: 'Moderate community board posts',            locked: false },
+
+  // ── Gallery ───────────────────────────────────────────────────────────────
+  'gallery.view':              { label: 'View photo gallery',                        locked: false },
+  'gallery.manage':            { label: 'Create albums and manage photos',           locked: false },
+
+  // ── Maids / Domestic Help ─────────────────────────────────────────────────
+  'maids.view':                { label: 'View domestic helper registry',             locked: false },
+  'maids.manage':              { label: 'Register and manage domestic helpers',      locked: false },
+  'maids.approve':             { label: 'Approve helpers for own unit',              locked: false },
+
+  // ── Feedback ─────────────────────────────────────────────────────────────
+  'feedback.submit':           { label: 'Submit resident feedback',                  locked: false },
+  'feedback.manage':           { label: 'View and respond to all feedback',          locked: false },
+
+  // ── Policies ─────────────────────────────────────────────────────────────
+  'policies.view':             { label: 'View society policies',                     locked: false },
+  'policies.manage':           { label: 'Create and publish policies',               locked: false },
+
+  // ── Documents ────────────────────────────────────────────────────────────
+  'documents.manage':          { label: 'Upload and delete documents',               locked: false },
+
+  // ── Events ───────────────────────────────────────────────────────────────
+  'events.manage':             { label: 'Create events and manage attendance',       locked: false },
+
+  // ── Polls ────────────────────────────────────────────────────────────────
+  'polls.manage':              { label: 'Create polls and export results',           locked: false },
+
+  // ── Admin: Registrations & Gates ─────────────────────────────────────────
+  'admin.registrations':       { label: 'Review member registration requests',       locked: false },
+  'admin.gates':               { label: 'Manage society access gates',               locked: false },
 } as const;
 
 export type Feature = keyof typeof FEATURES;

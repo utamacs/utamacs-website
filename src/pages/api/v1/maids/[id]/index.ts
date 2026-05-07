@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature, hasFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
@@ -13,12 +13,14 @@ const VALID_WORK_TYPES = ['cleaning','cooking','babysitting','elder_care','garde
 
 export const GET: APIRoute = async ({ request, params }) => {
   try {
-    const user = await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'maids.view');
     const maidId = params.id!;
     if (!UUID_RE.test(maidId)) return Response.json({ error: 'INVALID_ID' }, { status: 400 });
 
     const sb = getSupabaseServiceClient();
-    const isPrivileged = ['executive', 'admin'].includes(user.role);
+    const isPrivileged = hasFeature(user, 'maids.manage');
 
     const fields = isPrivileged
       ? 'id, full_name, phone, id_type, id_number, agency_name, work_type, is_active, police_verified, verification_date, photo_key, id_doc_key, registered_at'
@@ -40,10 +42,9 @@ export const GET: APIRoute = async ({ request, params }) => {
 
 export const PATCH: APIRoute = async ({ request, params }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role)) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'maids.manage');
 
     const maidId = params.id!;
     if (!UUID_RE.test(maidId)) return Response.json({ error: 'INVALID_ID' }, { status: 400 });

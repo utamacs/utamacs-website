@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
@@ -11,7 +11,9 @@ const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000
 
 export const GET: APIRoute = async ({ request }) => {
   try {
-    await validateJWT(request);
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'gallery.view');
     const sb = getSupabaseServiceClient();
 
     const { data, error } = await sb
@@ -42,10 +44,9 @@ export const GET: APIRoute = async ({ request }) => {
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role)) {
-      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
-    }
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    requireFeature(user, 'gallery.manage');
 
     const body = await request.json() as Record<string, unknown>;
     const title = String(body.title ?? '').trim();

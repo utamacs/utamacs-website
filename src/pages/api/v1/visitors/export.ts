@@ -1,16 +1,16 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { validateJWT } from '@lib/middleware/jwtValidator';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
 export const GET: APIRoute = async ({ request, url }) => {
   try {
-    const user = await validateJWT(request);
-    const isPrivileged = ['executive', 'secretary', 'president', 'admin'].includes(user.portalRole ?? user.role);
-    if (!isPrivileged) return new Response('Forbidden', { status: 403 });
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return new Response('Unauthorized', { status: 401 });
+    requireFeature(user, 'audit.view');
 
     const sb = getSupabaseServiceClient();
     const visitorType = url.searchParams.get('visitor_type')?.trim() ?? '';
