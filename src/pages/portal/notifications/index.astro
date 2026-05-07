@@ -18,15 +18,66 @@ if (!user) return Astro.redirect('/portal/login');
     </button>
   </div>
 
-  <!-- Filter tabs -->
-  <div class="flex gap-2 mb-5">
-    <button data-filter="all" class="filter-tab text-xs px-3 py-1.5 rounded-full font-medium border bg-primary-600 text-white border-primary-600">All</button>
-    <button data-filter="unread" class="filter-tab text-xs px-3 py-1.5 rounded-full font-medium border bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600">Unread</button>
+  <!-- Main tabs -->
+  <div class="flex gap-2 mb-5 border-b border-border-light">
+    <button id="tab-feed" class="main-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px">Feed</button>
+    <button id="tab-prefs" class="main-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Preferences</button>
   </div>
 
-  <div class="bg-white rounded-xl border border-border-light overflow-hidden">
-    <div id="notifications-list">
-      <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+  <!-- Feed panel -->
+  <div id="panel-feed">
+    <!-- Filter tabs -->
+    <div class="flex gap-2 mb-5">
+      <button data-filter="all" class="filter-tab text-xs px-3 py-1.5 rounded-full font-medium border bg-primary-600 text-white border-primary-600">All</button>
+      <button data-filter="unread" class="filter-tab text-xs px-3 py-1.5 rounded-full font-medium border bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600">Unread</button>
+    </div>
+
+    <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+      <div id="notifications-list">
+        <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preferences panel -->
+  <div id="panel-prefs" class="hidden">
+    <div class="card-premium p-6 space-y-6">
+      <div>
+        <h2 class="text-base font-semibold text-text-primary mb-1">Notification Categories</h2>
+        <p class="text-sm text-text-secondary mb-4">Choose which events you want to be notified about.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="category-toggles">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="border-t border-border-light pt-5">
+        <h2 class="text-base font-semibold text-text-primary mb-4">Delivery Channels</h2>
+        <div class="space-y-3" id="channel-toggles">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="border-t border-border-light pt-5">
+        <h2 class="text-base font-semibold text-text-primary mb-1">Quiet Hours</h2>
+        <p class="text-sm text-text-secondary mb-4">Suppress notifications outside these hours.</p>
+        <div class="flex items-center gap-4">
+          <div>
+            <label class="form-label text-xs" for="quiet-start">From</label>
+            <input id="quiet-start" type="time" class="form-input text-sm" style="width:130px" />
+          </div>
+          <div>
+            <label class="form-label text-xs" for="quiet-end">To</label>
+            <input id="quiet-end" type="time" class="form-input text-sm" style="width:130px" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <button id="save-prefs-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-save" aria-hidden="true"></i> Save Preferences
+        </button>
+        <span id="prefs-status" class="hidden text-sm text-secondary-500"></span>
+      </div>
     </div>
   </div>
 
@@ -83,7 +134,7 @@ if (!user) return Astro.redirect('/portal/login');
                   <div class="text-sm font-medium text-text-primary">${n.title}</div>
                   <div class="text-sm text-text-secondary mt-0.5">${n.body}</div>
                 </div>
-                <div class="flex items-center gap-2 flex-shrink-0">
+                <div class="flex-shrink-0">
                   ${!n.is_read ? '<div class="w-2 h-2 rounded-full bg-primary-600 mt-1"></div>' : ''}
                 </div>
               </div>
@@ -135,6 +186,109 @@ if (!user) return Astro.redirect('/portal/login');
         currentFilter = (btn as HTMLElement).dataset.filter!;
         loadNotifications();
       });
+    });
+
+    // ── Main tab switching ────────────────────────────────────────────────────
+    document.getElementById('tab-feed')!.addEventListener('click', () => {
+      document.getElementById('panel-feed')!.classList.remove('hidden');
+      document.getElementById('panel-prefs')!.classList.add('hidden');
+      document.getElementById('tab-feed')!.className = 'main-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+      document.getElementById('tab-prefs')!.className = 'main-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
+    });
+
+    document.getElementById('tab-prefs')!.addEventListener('click', () => {
+      document.getElementById('panel-feed')!.classList.add('hidden');
+      document.getElementById('panel-prefs')!.classList.remove('hidden');
+      document.getElementById('tab-prefs')!.className = 'main-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+      document.getElementById('tab-feed')!.className = 'main-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
+      if (!prefsLoaded) loadPrefs();
+    });
+
+    // ── Preferences ───────────────────────────────────────────────────────────
+    let prefsLoaded = false;
+    let currentPrefs: Record<string, any> = {};
+
+    const CATEGORY_PREFS: [string, string, string][] = [
+      ['complaints',    'Complaints',         'fa-wrench'],
+      ['notices',       'Notices',            'fa-bullhorn'],
+      ['events',        'Events',             'fa-calendar'],
+      ['polls',         'Polls & Voting',     'fa-poll'],
+      ['payments',      'Payments & Finance', 'fa-rupee-sign'],
+      ['visitor_alerts','Visitor Alerts',     'fa-user-check'],
+      ['community',     'Community Board',    'fa-comments'],
+      ['marketplace',   'Marketplace',        'fa-shopping-bag'],
+      ['feedback',      'Feedback Replies',   'fa-star'],
+      ['snags',         'Snag Updates',       'fa-hammer'],
+      ['gallery',       'Gallery',            'fa-images'],
+      ['maids',         'Maid Registry',      'fa-users'],
+    ];
+
+    const CHANNEL_PREFS: [string, string, string][] = [
+      ['email_enabled',    'Email',    'fa-envelope'],
+      ['sms_enabled',      'SMS',      'fa-sms'],
+      ['push_enabled',     'Push',     'fa-mobile-alt'],
+      ['whatsapp_enabled', 'WhatsApp', 'fa-whatsapp'],
+    ];
+
+    function toggleSwitch(key: string, checked: boolean) {
+      return `
+        <label class="flex items-center justify-between gap-4 p-3 rounded-xl border border-border-light bg-white cursor-pointer hover:bg-primary-50/30 transition-colors">
+          <div class="flex items-center gap-2.5">
+            <i class="fas ${CATEGORY_PREFS.find(c=>c[0]===key)?.[2] ?? CHANNEL_PREFS.find(c=>c[0]===key)?.[2] ?? 'fa-bell'} text-primary-600 text-sm w-4 text-center" aria-hidden="true"></i>
+            <span class="text-sm text-text-primary">${CATEGORY_PREFS.find(c=>c[0]===key)?.[1] ?? CHANNEL_PREFS.find(c=>c[0]===key)?.[1] ?? key}</span>
+          </div>
+          <input type="checkbox" data-key="${key}" ${checked ? 'checked' : ''} class="w-4 h-4 accent-primary-600 cursor-pointer" />
+        </label>
+      `;
+    }
+
+    async function loadPrefs() {
+      const res = await fetch('/api/v1/notifications/preferences', { credentials: 'include' });
+      if (!res.ok) return;
+      currentPrefs = await res.json();
+      prefsLoaded = true;
+
+      const catEl = document.getElementById('category-toggles')!;
+      catEl.innerHTML = CATEGORY_PREFS.map(([key]) => toggleSwitch(key, currentPrefs[key] !== false)).join('');
+
+      const chanEl = document.getElementById('channel-toggles')!;
+      chanEl.innerHTML = CHANNEL_PREFS.map(([key]) => toggleSwitch(key, currentPrefs[key] === true)).join('');
+
+      (document.getElementById('quiet-start') as HTMLInputElement).value = currentPrefs.quiet_hours_start ?? '';
+      (document.getElementById('quiet-end')   as HTMLInputElement).value = currentPrefs.quiet_hours_end   ?? '';
+    }
+
+    document.getElementById('save-prefs-btn')!.addEventListener('click', async () => {
+      const btn    = document.getElementById('save-prefs-btn') as HTMLButtonElement;
+      const status = document.getElementById('prefs-status')!;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Saving…';
+
+      const updates: Record<string, unknown> = {};
+      document.querySelectorAll('[data-key]').forEach(el => {
+        const input = el as HTMLInputElement;
+        updates[input.dataset.key!] = input.checked;
+      });
+      updates.quiet_hours_start = (document.getElementById('quiet-start') as HTMLInputElement).value || null;
+      updates.quiet_hours_end   = (document.getElementById('quiet-end')   as HTMLInputElement).value || null;
+
+      try {
+        const res = await fetch('/api/v1/notifications/preferences', {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+        if (!res.ok) throw new Error('Save failed');
+        status.textContent = 'Saved.';
+        status.classList.remove('hidden');
+        setTimeout(() => status.classList.add('hidden'), 2500);
+      } catch {
+        status.textContent = 'Error saving preferences.';
+        status.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save" aria-hidden="true"></i> Save Preferences';
+      }
     });
 
     (window as any).markRead = markRead;

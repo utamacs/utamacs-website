@@ -60,7 +60,7 @@ export const POST: APIRoute = async ({ request }) => {
     );
 
     const body = await request.json();
-    const { title, description, category, priority, unit_id } = body as Record<string, string>;
+    const { title, description, category, sub_category, priority, unit_id } = body as Record<string, string>;
 
     if (!title || !category || !unit_id) {
       return new Response(JSON.stringify({ error: 'title, category and unit_id are required' }), {
@@ -84,15 +84,16 @@ export const POST: APIRoute = async ({ request }) => {
     const { data, error } = await sb
       .from('complaints')
       .insert({
-        society_id: SOCIETY_ID,
-        title: sanitizePlainText(title),
-        description: description ? sanitizePlainText(description) : null,
+        society_id:   SOCIETY_ID,
+        title:        sanitizePlainText(title),
+        description:  description ? sanitizePlainText(description) : null,
         category,
-        priority: priority ?? 'Medium',
-        status: 'Open',
-        raised_by: user.id,
+        sub_category: sub_category ?? null,
+        priority:     priority ?? 'Medium',
+        status:       'Open',
+        raised_by:    user.id,
         unit_id,
-        sla_hours: slaHours,
+        sla_hours:    slaHours,
         sla_deadline: new Date(Date.now() + slaHours * 3_600_000).toISOString(),
       })
       .select()

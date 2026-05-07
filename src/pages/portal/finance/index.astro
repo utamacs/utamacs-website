@@ -145,12 +145,109 @@ const isExec = ['executive', 'admin'].includes(user.role);
     </div>
   )}
 
-  <div id="dues-list" class="space-y-4">
-    <div class="flex items-center justify-center h-32 text-text-secondary">
-      <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
-      Loading dues…
+  <!-- Main tabs (Dues / Expenses) — Expenses visible to exec only -->
+  <div class="flex gap-2 mb-5 border-b border-border-light">
+    <button id="tab-dues" class="main-fin-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px">
+      <i class="fas fa-file-invoice-dollar mr-1.5 text-xs" aria-hidden="true"></i>Dues
+    </button>
+    {isExec && (
+      <button id="tab-expenses" class="main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">
+        <i class="fas fa-receipt mr-1.5 text-xs" aria-hidden="true"></i>Expenses
+      </button>
+    )}
+  </div>
+
+  <!-- Dues panel -->
+  <div id="panel-dues">
+    <div id="dues-list" class="space-y-4">
+      <div class="flex items-center justify-center h-32 text-text-secondary">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+        Loading dues…
+      </div>
     </div>
   </div>
+
+  <!-- Expenses panel (exec only) -->
+  {isExec && (
+    <div id="panel-expenses" class="hidden">
+      <div class="mb-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <input id="exp-from" type="date" class="form-input text-sm" style="width:150px" placeholder="From" />
+          <input id="exp-to" type="date" class="form-input text-sm" style="width:150px" placeholder="To" />
+          <button onclick="loadExpenses()" class="btn-outline text-sm flex items-center gap-1.5 px-3 py-2">
+            <i class="fas fa-filter text-xs" aria-hidden="true"></i> Filter
+          </button>
+        </div>
+        <button id="add-expense-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-plus" aria-hidden="true"></i> Record Expense
+        </button>
+      </div>
+
+      <div id="expenses-list" class="space-y-3">
+        <div class="text-center py-10 text-text-secondary text-sm">
+          <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
+        </div>
+      </div>
+
+      <!-- Add expense modal -->
+      <div id="expense-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-large">
+          <div class="flex items-center justify-between mb-5">
+            <h2 class="text-lg font-semibold text-text-primary">Record Expense</h2>
+            <button id="close-expense-modal" class="text-text-secondary hover:text-text-primary text-lg" aria-label="Close">
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div id="expense-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+          <form id="expense-form" class="space-y-4">
+            <div>
+              <label class="form-label" for="exp-description">Description <span class="text-red-500">*</span></label>
+              <input id="exp-description" name="description" type="text" required maxlength="500" placeholder="e.g. Lift maintenance service"
+                class="form-input text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="form-label" for="exp-amount">Amount (₹) <span class="text-red-500">*</span></label>
+                <input id="exp-amount" name="amount" type="number" required min="1" step="0.01"
+                  class="form-input text-sm" />
+              </div>
+              <div>
+                <label class="form-label" for="exp-gst">GST Amount (₹)</label>
+                <input id="exp-gst" name="gst_amount" type="number" min="0" step="0.01" value="0"
+                  class="form-input text-sm" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="form-label" for="exp-tds">TDS Deducted (₹)</label>
+                <input id="exp-tds" name="tds_deducted" type="number" min="0" step="0.01" value="0"
+                  class="form-input text-sm" />
+              </div>
+              <div>
+                <label class="form-label" for="exp-bill-no">Bill Number</label>
+                <input id="exp-bill-no" name="bill_number" type="text" maxlength="100" placeholder="e.g. INV-2025-001"
+                  class="form-input text-sm" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="form-label" for="exp-bill-date">Bill Date</label>
+                <input id="exp-bill-date" name="bill_date" type="date" class="form-input text-sm" />
+              </div>
+              <div>
+                <label class="form-label" for="exp-payment-date">Payment Date</label>
+                <input id="exp-payment-date" name="payment_date" type="date" class="form-input text-sm" />
+              </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button type="submit" id="expense-submit-btn" class="btn-primary flex-1">Save Expense</button>
+              <button type="button" id="cancel-expense-btn" class="btn-outline flex-1">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )}
 
   <script define:vars={{ isExec }}>
     const STATUS_STYLES = {
@@ -306,6 +403,140 @@ const isExec = ['executive', 'admin'].includes(user.role);
 
     window.handlePay = handlePay;
     window.generateGstInvoice = generateGstInvoice;
+
+    // ── Tab switching (Dues / Expenses) ────────────────────────────────────────
+    let expensesLoaded = false;
+    const tabDues     = document.getElementById('tab-dues');
+    const tabExpenses = document.getElementById('tab-expenses');
+    const panelDues   = document.getElementById('panel-dues');
+    const panelExp    = document.getElementById('panel-expenses');
+
+    function activateTab(which: 'dues' | 'expenses') {
+      const active   = 'main-fin-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+      const inactive = 'main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
+      if (which === 'dues') {
+        tabDues?.setAttribute('class', active);
+        tabExpenses?.setAttribute('class', inactive);
+        panelDues?.classList.remove('hidden');
+        panelExp?.classList.add('hidden');
+      } else {
+        tabExpenses?.setAttribute('class', active);
+        tabDues?.setAttribute('class', inactive);
+        panelExp?.classList.remove('hidden');
+        panelDues?.classList.add('hidden');
+        if (!expensesLoaded) { expensesLoaded = true; loadExpenses(); }
+      }
+    }
+
+    tabDues?.addEventListener('click', () => activateTab('dues'));
+    tabExpenses?.addEventListener('click', () => activateTab('expenses'));
+
+    // ── Expenses ──────────────────────────────────────────────────────────────
+    async function loadExpenses() {
+      const list = document.getElementById('expenses-list');
+      if (!list) return;
+      list.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+
+      const from = (document.getElementById('exp-from') as HTMLInputElement)?.value ?? '';
+      const to   = (document.getElementById('exp-to')   as HTMLInputElement)?.value ?? '';
+      const params = new URLSearchParams({ limit: '50' });
+      if (from) params.set('from', from);
+      if (to)   params.set('to', to);
+
+      try {
+        const res = await fetch(`/api/v1/finance/expenses?${params}`, { credentials: 'include' });
+        const data = res.ok ? await res.json() : [];
+
+        if (!data.length) {
+          list.innerHTML = '<div class="text-center py-12 text-text-secondary"><i class="fas fa-receipt text-4xl text-primary-200 mb-3 block" aria-hidden="true"></i><p class="text-sm">No expenses recorded yet.</p></div>';
+          return;
+        }
+
+        const totalNet = data.reduce((s: number, e: any) => s + Number(e.net_payable ?? 0), 0);
+        list.innerHTML = `
+          <div class="bg-primary-50 border border-primary-100 rounded-xl px-5 py-3 mb-4 flex items-center justify-between">
+            <span class="text-sm font-medium text-primary-700">${data.length} expense${data.length !== 1 ? 's' : ''} found</span>
+            <span class="text-base font-bold text-primary-700">Total Net: ₹${totalNet.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          ${data.map((e: any) => `
+            <div class="card-premium p-4">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                  <h3 class="text-sm font-semibold text-text-primary truncate">${e.description}</h3>
+                  <p class="text-xs text-text-secondary mt-0.5">
+                    ${e.expense_categories?.name ? `<span class="font-medium">${e.expense_categories.name}</span> · ` : ''}
+                    ${e.vendors?.name ? `Vendor: ${e.vendors.name} · ` : ''}
+                    ${e.payment_date ? `Paid: ${new Date(e.payment_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'No payment date'}
+                    ${e.bill_number ? ` · Bill: ${e.bill_number}` : ''}
+                  </p>
+                </div>
+                <div class="text-right flex-shrink-0">
+                  <p class="text-base font-bold text-text-primary">₹${Number(e.net_payable ?? e.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <p class="text-[10px] text-text-secondary">
+                    ${Number(e.gst_amount ?? 0) > 0 ? `+GST ₹${Number(e.gst_amount).toFixed(2)} ` : ''}
+                    ${Number(e.tds_deducted ?? 0) > 0 ? `-TDS ₹${Number(e.tds_deducted).toFixed(2)}` : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        `;
+      } catch {
+        list.innerHTML = '<p class="text-center text-red-600 py-8 text-sm">Failed to load expenses.</p>';
+      }
+    }
+
+    if (isExec) {
+      const expModal     = document.getElementById('expense-modal');
+      const addExpBtn    = document.getElementById('add-expense-btn');
+      const closeExpBtn  = document.getElementById('close-expense-modal');
+      const cancelExpBtn = document.getElementById('cancel-expense-btn');
+      const expForm      = document.getElementById('expense-form') as HTMLFormElement | null;
+      const expErrEl     = document.getElementById('expense-error');
+
+      addExpBtn?.addEventListener('click', () => expModal?.classList.remove('hidden'));
+      closeExpBtn?.addEventListener('click', () => expModal?.classList.add('hidden'));
+      cancelExpBtn?.addEventListener('click', () => expModal?.classList.add('hidden'));
+
+      expForm?.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        expErrEl?.classList.add('hidden');
+        const btn = document.getElementById('expense-submit-btn') as HTMLButtonElement;
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+
+        const fd = new FormData(expForm);
+        const body: Record<string, unknown> = {
+          description:   fd.get('description'),
+          amount:        parseFloat(String(fd.get('amount'))),
+          gst_amount:    parseFloat(String(fd.get('gst_amount') ?? '0')) || 0,
+          tds_deducted:  parseFloat(String(fd.get('tds_deducted') ?? '0')) || 0,
+          bill_number:   fd.get('bill_number') || null,
+          bill_date:     fd.get('bill_date') || null,
+          payment_date:  fd.get('payment_date') || null,
+        };
+
+        const res = await fetch('/api/v1/finance/expenses', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          expModal?.classList.add('hidden');
+          expForm.reset();
+          loadExpenses();
+        } else {
+          if (expErrEl) { expErrEl.textContent = data.message ?? data.error ?? 'Failed to save.'; expErrEl.classList.remove('hidden'); }
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Save Expense';
+      });
+    }
+
+    window.loadExpenses = loadExpenses;
     loadDues();
   </script>
 </PortalLayout>

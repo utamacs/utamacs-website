@@ -1,0 +1,282 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
+  return new Response('Forbidden', { status: 403 });
+}
+---
+
+<PortalLayout title="Content Moderation" user={user} activeModule="admin_audit">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <a href="/portal/admin" class="inline-flex items-center gap-2 text-xs text-text-secondary hover:text-primary-600 mb-2 transition-colors">
+        <i class="fas fa-arrow-left text-[10px]" aria-hidden="true"></i> Admin
+      </a>
+      <h1 class="text-2xl font-bold text-text-primary">Content Moderation</h1>
+      <p class="text-sm text-text-secondary mt-1">Review reported community posts and take action.</p>
+    </div>
+    <button id="refresh-btn" class="btn-ghost text-sm flex items-center gap-2">
+      <i class="fas fa-sync-alt text-xs" aria-hidden="true"></i>
+      Refresh
+    </button>
+  </div>
+
+  <!-- Status filter tabs -->
+  <div class="flex gap-2 mb-5 border-b border-border-light">
+    <button data-status="pending"   class="filter-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px">Pending</button>
+    <button data-status="all"       class="filter-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">All</button>
+    <button data-status="reviewed"  class="filter-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Reviewed</button>
+    <button data-status="actioned"  class="filter-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Actioned</button>
+    <button data-status="dismissed" class="filter-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Dismissed</button>
+  </div>
+
+  <div id="reports-list" class="space-y-4">
+    <div class="text-center py-12 text-text-secondary text-sm">
+      <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading reports…
+    </div>
+  </div>
+
+  <!-- Review drawer -->
+  <div id="review-panel" class="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-primary-600">Review Report</h2>
+      <button id="close-panel" class="text-text-secondary hover:text-text-primary" aria-label="Close panel">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="p-5 space-y-5" id="panel-body"></div>
+  </div>
+  <div id="panel-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+
+  <script>
+    const REASON_LABELS: Record<string, string> = {
+      spam: 'Spam',
+      offensive: 'Offensive',
+      misinformation: 'Misinformation',
+      harassment: 'Harassment',
+      other: 'Other',
+    };
+
+    const STATUS_BADGE: Record<string, string> = {
+      pending:   'bg-amber-100 text-amber-700',
+      reviewed:  'bg-blue-100 text-blue-700',
+      actioned:  'bg-red-100 text-red-700',
+      dismissed: 'bg-gray-100 text-gray-500',
+    };
+
+    let currentFilter = 'pending';
+    let allReports: any[] = [];
+
+    function filteredReports() {
+      if (currentFilter === 'all') return allReports;
+      return allReports.filter((r: any) => r.status === currentFilter);
+    }
+
+    async function loadReports() {
+      const list = document.getElementById('reports-list')!;
+      list.innerHTML = '<div class="text-center py-12 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+      try {
+        const res = await fetch('/api/v1/community/reports', { credentials: 'include' });
+        allReports = res.ok ? await res.json() : [];
+        renderList();
+      } catch {
+        list.innerHTML = '<p class="text-center text-red-600 py-8">Failed to load reports.</p>';
+      }
+    }
+
+    function renderList() {
+      const list = document.getElementById('reports-list')!;
+      const reports = filteredReports();
+      if (!reports.length) {
+        list.innerHTML = `<div class="text-center py-16">
+          <i class="fas fa-shield-check text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+          <h3 class="text-lg font-semibold text-text-primary mb-2">No ${currentFilter === 'all' ? '' : currentFilter} reports</h3>
+          <p class="text-text-secondary text-sm">All clear for this filter.</p>
+        </div>`;
+        return;
+      }
+
+      list.innerHTML = reports.map((r: any) => {
+        const post = r.community_posts;
+        const body = post?.body ?? '—';
+        const preview = body.length > 120 ? body.slice(0, 120) + '…' : body;
+        const ago = formatTimeAgo(new Date(r.created_at));
+        return `
+          <div class="card-premium p-5 cursor-pointer hover:border-primary-300 transition-colors" onclick="openReport('${r.id}')">
+            <div class="flex items-start justify-between gap-4 mb-3">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.status] ?? 'bg-gray-100 text-gray-500'}">
+                  ${r.status}
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                  ${REASON_LABELS[r.reason] ?? r.reason}
+                </span>
+              </div>
+              <span class="text-xs text-text-secondary flex-shrink-0">${ago}</span>
+            </div>
+            <div class="bg-gray-50 rounded-lg px-4 py-3 border border-border-light mb-3">
+              <p class="text-sm text-text-secondary italic">"${preview}"</p>
+            </div>
+            ${r.details ? `<p class="text-xs text-text-secondary mb-3"><span class="font-medium text-text-primary">Reporter note:</span> ${r.details}</p>` : ''}
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-text-secondary">Report ID: ${r.id.slice(0, 8).toUpperCase()}</span>
+              ${r.status === 'pending' ? `
+                <div class="flex items-center gap-2">
+                  <button onclick="event.stopPropagation(); updateStatus('${r.id}', 'reviewed')"
+                    class="text-xs px-3 py-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors font-medium">
+                    Mark Reviewed
+                  </button>
+                  <button onclick="event.stopPropagation(); updateStatus('${r.id}', 'dismissed')"
+                    class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors font-medium">
+                    Dismiss
+                  </button>
+                  <button onclick="event.stopPropagation(); updateStatus('${r.id}', 'actioned')"
+                    class="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors font-medium">
+                    Action &amp; Remove
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openReport(id: string) {
+      const r = allReports.find((x: any) => x.id === id);
+      if (!r) return;
+      const panel = document.getElementById('review-panel')!;
+      const body  = document.getElementById('panel-body')!;
+      const post  = r.community_posts;
+
+      body.innerHTML = `
+        <div>
+          <p class="text-xs font-medium text-text-secondary uppercase tracking-wide mb-1">Reported Post</p>
+          <div class="bg-gray-50 rounded-xl border border-border-light px-4 py-4">
+            <p class="text-sm text-text-primary leading-relaxed">${post?.body ?? '(post unavailable)'}</p>
+            ${post?.submitted_by ? `<p class="text-xs text-text-secondary mt-2">Posted by user ${String(post.submitted_by).slice(0,8)}…</p>` : ''}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <p class="text-xs font-medium text-text-secondary mb-1">Report Reason</p>
+            <p class="text-sm text-text-primary font-medium">${REASON_LABELS[r.reason] ?? r.reason}</p>
+          </div>
+          <div>
+            <p class="text-xs font-medium text-text-secondary mb-1">Status</p>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.status] ?? 'bg-gray-100 text-gray-500'}">${r.status}</span>
+          </div>
+          <div>
+            <p class="text-xs font-medium text-text-secondary mb-1">Reported</p>
+            <p class="text-sm text-text-primary">${new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          </div>
+          <div>
+            <p class="text-xs font-medium text-text-secondary mb-1">Report ID</p>
+            <p class="text-sm text-text-primary font-mono">${r.id.slice(0,8).toUpperCase()}</p>
+          </div>
+        </div>
+
+        ${r.details ? `<div>
+          <p class="text-xs font-medium text-text-secondary mb-1">Reporter Note</p>
+          <p class="text-sm text-text-primary">${r.details}</p>
+        </div>` : ''}
+
+        ${r.status === 'pending' ? `
+          <div class="border-t border-border-light pt-4 space-y-2">
+            <p class="text-xs font-medium text-text-secondary mb-2">Take Action</p>
+            <button onclick="updateStatus('${r.id}', 'reviewed'); closePanel()"
+              class="w-full btn-outline text-sm flex items-center justify-center gap-2 py-2.5">
+              <i class="fas fa-eye text-xs text-blue-600" aria-hidden="true"></i>
+              Mark as Reviewed (no action on post)
+            </button>
+            <button onclick="updateStatus('${r.id}', 'dismissed'); closePanel()"
+              class="w-full btn-ghost text-sm flex items-center justify-center gap-2 py-2.5 border border-border-light">
+              <i class="fas fa-times text-xs" aria-hidden="true"></i>
+              Dismiss Report (post remains visible)
+            </button>
+            <button onclick="updateStatus('${r.id}', 'actioned'); closePanel()"
+              class="w-full text-sm flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors font-medium">
+              <i class="fas fa-ban text-xs" aria-hidden="true"></i>
+              Action: Remove Post
+            </button>
+          </div>
+        ` : `<div class="border-t border-border-light pt-4">
+          <p class="text-xs text-text-secondary text-center">This report has been ${r.status}.</p>
+        </div>`}
+      `;
+
+      panel.classList.remove('translate-x-full');
+      document.getElementById('panel-backdrop')!.classList.remove('hidden');
+    }
+
+    function closePanel() {
+      document.getElementById('review-panel')!.classList.add('translate-x-full');
+      document.getElementById('panel-backdrop')!.classList.add('hidden');
+    }
+
+    async function updateStatus(id: string, status: string) {
+      const res = await fetch('/api/v1/community/reports', {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status }),
+      });
+      if (res.ok) {
+        showToast(status === 'actioned' ? 'Post removed and report actioned.' : `Report marked ${status}.`, 'success');
+        // Update local cache
+        const idx = allReports.findIndex((r: any) => r.id === id);
+        if (idx !== -1) allReports[idx] = { ...allReports[idx], status };
+        renderList();
+      } else {
+        showToast('Failed to update report status.', 'error');
+      }
+    }
+
+    function formatTimeAgo(date: Date): string {
+      const diff = Date.now() - date.getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h ago`;
+      return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    }
+
+    function showToast(message: string, type = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => {
+        toast.classList.add('translate-y-4', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Tab switching
+    document.querySelectorAll('.filter-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-tab').forEach(b => {
+          b.className = 'filter-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
+        });
+        btn.className = 'filter-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+        currentFilter = (btn as HTMLElement).dataset.status!;
+        renderList();
+      });
+    });
+
+    document.getElementById('refresh-btn')!.addEventListener('click', loadReports);
+    document.getElementById('close-panel')!.addEventListener('click', closePanel);
+    document.getElementById('panel-backdrop')!.addEventListener('click', closePanel);
+
+    (window as any).openReport   = openReport;
+    (window as any).updateStatus = updateStatus;
+
+    loadReports();
+  </script>
+</PortalLayout>

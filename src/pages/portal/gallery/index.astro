@@ -1,0 +1,333 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+---
+
+<PortalLayout title="Photo Gallery" user={user} activeModule="gallery">
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Photo Gallery</h1>
+      <p class="text-text-secondary text-sm mt-1">Community memories and event photos.</p>
+    </div>
+    {isPrivileged && (
+      <button id="new-album-btn" class="btn-primary text-sm whitespace-nowrap">
+        <i class="fas fa-plus mr-2" aria-hidden="true"></i>New Album
+      </button>
+    )}
+  </div>
+
+  <!-- Albums grid (view state) -->
+  <div id="view-albums">
+    <div id="albums-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div class="col-span-full text-center py-12 text-text-secondary">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading albums…
+      </div>
+    </div>
+  </div>
+
+  <!-- Album detail (lightbox state) -->
+  <div id="view-album-detail" class="hidden">
+    <button onclick="backToAlbums()" class="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 mb-4">
+      <i class="fas fa-arrow-left" aria-hidden="true"></i>Back to Albums
+    </button>
+    <div class="mb-4 flex items-center justify-between gap-4">
+      <div>
+        <h2 id="album-title" class="text-xl font-bold text-text-primary font-poppins"></h2>
+        <p id="album-subtitle" class="text-sm text-text-secondary mt-0.5"></p>
+      </div>
+      {isPrivileged && (
+        <div class="flex gap-2">
+          <label class="btn-primary text-sm cursor-pointer">
+            <i class="fas fa-upload mr-2" aria-hidden="true"></i>Upload Photos
+            <input type="file" id="photo-upload-input" accept="image/jpeg,image/png,image/webp,image/heic" multiple class="hidden" />
+          </label>
+        </div>
+      )}
+    </div>
+    <div id="upload-status" class="hidden mb-3 text-sm p-3 rounded-lg bg-blue-50 text-blue-700"></div>
+    <div id="photos-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <div class="col-span-full text-center py-10 text-text-secondary">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading photos…
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="lightbox" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+    <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white text-2xl p-2 hover:text-gray-300">
+      <i class="fas fa-times" aria-hidden="true"></i>
+    </button>
+    <button onclick="lightboxPrev()" class="absolute left-4 text-white text-3xl p-2 hover:text-gray-300">
+      <i class="fas fa-chevron-left" aria-hidden="true"></i>
+    </button>
+    <button onclick="lightboxNext()" class="absolute right-4 text-white text-3xl p-2 hover:text-gray-300">
+      <i class="fas fa-chevron-right" aria-hidden="true"></i>
+    </button>
+    <img id="lightbox-img" src="" alt="" class="max-w-[90vw] max-h-[90vh] object-contain rounded" />
+    <p id="lightbox-caption" class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white text-sm bg-black/60 px-4 py-2 rounded-lg"></p>
+  </div>
+
+  <!-- New Album Modal (exec) -->
+  {isPrivileged && (
+    <div id="new-album-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+        <div class="p-6 border-b border-border-light flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-text-primary">Create Album</h2>
+          <button onclick="closeNewAlbumModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label for="album-title-input" class="block text-sm font-medium text-text-primary mb-1">Album Title *</label>
+            <input id="album-title-input" type="text" maxlength="150" placeholder="e.g. Diwali 2024, AGM Ceremony"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label for="album-desc" class="block text-sm font-medium text-text-primary mb-1">Description</label>
+            <textarea id="album-desc" rows="2" maxlength="500"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm resize-none"></textarea>
+          </div>
+          <div>
+            <label for="album-date" class="block text-sm font-medium text-text-primary mb-1">Event Date</label>
+            <input type="date" id="album-date" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div id="new-album-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+        </div>
+        <div class="p-6 pt-0 flex gap-3">
+          <button onclick="closeNewAlbumModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+          <button id="new-album-save-btn" class="flex-1 btn-primary text-sm">Create Album</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ isPrivileged }}>
+    let currentAlbumId = null;
+    let albumPhotos = [];
+    let lightboxIdx = 0;
+
+    // ── Albums list ──────────────────────────────────────────────────────────
+
+    async function loadAlbums() {
+      const container = document.getElementById('albums-grid');
+      try {
+        const res = await fetch('/api/v1/gallery/albums', { credentials: 'include' });
+        const albums = await res.json();
+
+        if (!Array.isArray(albums) || !albums.length) {
+          container.innerHTML = `
+            <div class="col-span-full text-center py-16">
+              <i class="fas fa-images text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+              <h3 class="text-lg font-semibold text-text-primary mb-2">No albums yet</h3>
+              <p class="text-text-secondary text-sm">${isPrivileged ? 'Click "New Album" to create the first photo album.' : 'Photo albums will appear here.'}</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = albums.map(a => `
+          <div class="card-premium overflow-hidden cursor-pointer hover:shadow-medium transition-shadow"
+               onclick="openAlbum('${a.id}','${encodeURIComponent(a.title)}','${a.event_date ?? ''}','${a.photo_count ?? 0}')">
+            <div class="aspect-video bg-gray-100 overflow-hidden">
+              ${a.cover_url
+                ? `<img src="${a.cover_url}" alt="${a.title}" class="w-full h-full object-cover" />`
+                : `<div class="w-full h-full flex items-center justify-center text-gray-300">
+                     <i class="fas fa-images text-4xl" aria-hidden="true"></i>
+                   </div>`}
+            </div>
+            <div class="p-4">
+              <h3 class="font-semibold text-text-primary text-sm">${a.title}</h3>
+              <div class="flex items-center justify-between mt-1">
+                <span class="text-xs text-text-secondary">${a.photo_count ?? 0} photo${a.photo_count !== 1 ? 's' : ''}</span>
+                ${a.event_date ? `<span class="text-xs text-text-secondary">${new Date(a.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>` : ''}
+              </div>
+              ${a.description ? `<p class="text-xs text-text-secondary mt-1 line-clamp-2">${a.description}</p>` : ''}
+            </div>
+          </div>`).join('');
+      } catch {
+        container.innerHTML = `<div class="col-span-full text-center text-red-600 py-8">Failed to load albums.</div>`;
+      }
+    }
+
+    async function openAlbum(albumId, titleEnc, eventDate, photoCount) {
+      currentAlbumId = albumId;
+      document.getElementById('view-albums').classList.add('hidden');
+      document.getElementById('view-album-detail').classList.remove('hidden');
+      document.getElementById('album-title').textContent = decodeURIComponent(titleEnc);
+      document.getElementById('album-subtitle').textContent =
+        (eventDate ? new Date(eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' : '') +
+        `${photoCount} photo${photoCount !== 1 ? 's' : ''}`;
+
+      await loadPhotos(albumId);
+    }
+
+    function backToAlbums() {
+      document.getElementById('view-album-detail').classList.add('hidden');
+      document.getElementById('view-albums').classList.remove('hidden');
+      currentAlbumId = null;
+      albumPhotos = [];
+    }
+
+    // ── Photos ───────────────────────────────────────────────────────────────
+
+    async function loadPhotos(albumId) {
+      const container = document.getElementById('photos-grid');
+      container.innerHTML = `<div class="col-span-full text-center py-10 text-text-secondary"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>`;
+      try {
+        const res = await fetch(`/api/v1/gallery/albums/${albumId}/photos`, { credentials: 'include' });
+        const photos = await res.json();
+        albumPhotos = Array.isArray(photos) ? photos : [];
+
+        if (!albumPhotos.length) {
+          container.innerHTML = `
+            <div class="col-span-full text-center py-12 text-text-secondary">
+              <i class="fas fa-camera text-4xl mb-3 block opacity-30" aria-hidden="true"></i>
+              <p class="text-sm">${isPrivileged ? 'No photos yet. Upload some using the button above.' : 'No photos in this album.'}</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = albumPhotos.map((p, idx) => `
+          <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+               onclick="openLightbox(${idx})">
+            <img src="${p.url ?? ''}" alt="${p.caption ?? ''}" class="w-full h-full object-cover"
+                 onerror="this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-gray-300\\'><i class=\\'fas fa-broken-image text-2xl\\'></i></div>'" />
+          </div>`).join('');
+      } catch {
+        container.innerHTML = `<div class="col-span-full text-center text-red-600 py-8">Failed to load photos.</div>`;
+      }
+    }
+
+    // ── Lightbox ─────────────────────────────────────────────────────────────
+
+    function openLightbox(idx) {
+      lightboxIdx = idx;
+      showLightboxPhoto();
+      document.getElementById('lightbox').classList.remove('hidden');
+      document.addEventListener('keydown', lightboxKeyHandler);
+    }
+
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.add('hidden');
+      document.removeEventListener('keydown', lightboxKeyHandler);
+    }
+
+    function lightboxPrev() {
+      lightboxIdx = (lightboxIdx - 1 + albumPhotos.length) % albumPhotos.length;
+      showLightboxPhoto();
+    }
+
+    function lightboxNext() {
+      lightboxIdx = (lightboxIdx + 1) % albumPhotos.length;
+      showLightboxPhoto();
+    }
+
+    function showLightboxPhoto() {
+      const p = albumPhotos[lightboxIdx];
+      if (!p) return;
+      document.getElementById('lightbox-img').src = p.url ?? '';
+      document.getElementById('lightbox-img').alt = p.caption ?? '';
+      const cap = document.getElementById('lightbox-caption');
+      cap.textContent = p.caption ?? '';
+      cap.classList.toggle('hidden', !p.caption);
+    }
+
+    function lightboxKeyHandler(e) {
+      if (e.key === 'ArrowLeft') lightboxPrev();
+      else if (e.key === 'ArrowRight') lightboxNext();
+      else if (e.key === 'Escape') closeLightbox();
+    }
+
+    // ── Photo upload (exec) ──────────────────────────────────────────────────
+
+    document.getElementById('photo-upload-input')?.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files ?? []);
+      if (!files.length || !currentAlbumId) return;
+      const status = document.getElementById('upload-status');
+      status.textContent = `Uploading ${files.length} photo${files.length !== 1 ? 's' : ''}…`;
+      status.className = 'mb-3 text-sm p-3 rounded-lg bg-blue-50 text-blue-700';
+      status.classList.remove('hidden');
+
+      const fd = new FormData();
+      files.forEach(f => fd.append('files', f));
+
+      try {
+        const res = await fetch(`/api/v1/gallery/albums/${currentAlbumId}/photos`, {
+          method: 'POST', credentials: 'include', body: fd,
+        });
+        const data = await res.json();
+        if (res.ok) {
+          status.textContent = `${data.uploaded} photo${data.uploaded !== 1 ? 's' : ''} uploaded.`;
+          status.className = 'mb-3 text-sm p-3 rounded-lg bg-green-50 text-green-700';
+          await loadPhotos(currentAlbumId);
+          setTimeout(() => status.classList.add('hidden'), 3000);
+        } else {
+          status.textContent = data.message ?? 'Upload failed.';
+          status.className = 'mb-3 text-sm p-3 rounded-lg bg-red-50 text-red-700';
+        }
+      } catch {
+        status.textContent = 'Network error during upload.';
+        status.className = 'mb-3 text-sm p-3 rounded-lg bg-red-50 text-red-700';
+      }
+      e.target.value = '';
+    });
+
+    // ── New Album Modal ──────────────────────────────────────────────────────
+
+    document.getElementById('new-album-btn')?.addEventListener('click', () => {
+      document.getElementById('new-album-modal')?.classList.remove('hidden');
+      document.getElementById('new-album-error')?.classList.add('hidden');
+    });
+
+    function closeNewAlbumModal() {
+      document.getElementById('new-album-modal')?.classList.add('hidden');
+    }
+
+    document.getElementById('new-album-save-btn')?.addEventListener('click', async () => {
+      const title = document.getElementById('album-title-input')?.value.trim();
+      const errEl = document.getElementById('new-album-error');
+      const btn = document.getElementById('new-album-save-btn');
+
+      if (!title) { errEl.textContent = 'Album title is required.'; errEl.classList.remove('hidden'); return; }
+
+      btn.disabled = true; btn.textContent = 'Creating…';
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/gallery/albums', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            description: document.getElementById('album-desc')?.value.trim() || undefined,
+            event_date: document.getElementById('album-date')?.value || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.message ?? 'Failed to create album.'; errEl.classList.remove('hidden'); return; }
+        closeNewAlbumModal();
+        document.getElementById('album-title-input').value = '';
+        document.getElementById('album-desc').value = '';
+        document.getElementById('album-date').value = '';
+        loadAlbums();
+        // Open the new album immediately
+        openAlbum(data.id, encodeURIComponent(data.title), data.event_date ?? '', 0);
+      } catch {
+        errEl.textContent = 'Network error.';
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Create Album';
+      }
+    });
+
+    // Initialize
+    loadAlbums();
+  </script>
+</PortalLayout>

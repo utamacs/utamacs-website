@@ -116,13 +116,46 @@ const isAdmin = user.isAdmin;
     </div>
   )}
 
-  <!-- Search -->
-  <div class="mb-5">
-    <div class="relative max-w-sm">
+  <!-- Filter bar -->
+  <div class="flex flex-wrap gap-3 mb-5 items-center">
+    <!-- Search -->
+    <div class="relative">
       <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
       <input type="search" id="search-input" placeholder="Search by name…"
-        class="w-full pl-10 pr-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        class="pl-10 pr-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 w-52" />
     </div>
+
+    <!-- Block / Wing filter -->
+    <select id="filter-block"
+            class="py-2.5 px-3 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+      <option value="">All Wings</option>
+    </select>
+
+    <!-- Occupancy filter -->
+    <select id="filter-occupancy"
+            class="py-2.5 px-3 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+      <option value="">All Occupancy</option>
+      <option value="owner_occupied">Owner Occupied</option>
+      <option value="tenant_occupied">Tenant Occupied</option>
+      <option value="vacant">Vacant</option>
+      <option value="under_renovation">Under Renovation</option>
+    </select>
+
+    <!-- Tenancy expiry shortcut (exec only) -->
+    {isPrivileged && (
+      <button id="filter-expiring"
+              class="flex items-center gap-1.5 py-2.5 px-3 border border-amber-300 rounded-xl text-sm text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors font-medium">
+        <i class="fas fa-clock" aria-hidden="true"></i>Expiring in 30 days
+      </button>
+    )}
+
+    <!-- CSV export (exec only) -->
+    {isPrivileged && (
+      <button id="export-csv"
+              class="flex items-center gap-1.5 py-2.5 px-3 border border-border-light rounded-xl text-sm text-text-secondary hover:text-primary-600 hover:border-primary-300 transition-colors ml-auto">
+        <i class="fas fa-download" aria-hidden="true"></i>Export CSV
+      </button>
+    )}
   </div>
 
   <div id="member-count" class="text-xs text-text-secondary mb-4">Loading…</div>
@@ -153,12 +186,31 @@ const isAdmin = user.isAdmin;
     let debounceTimer;
     let roleTargetId = null;
 
-    async function loadMembers(q = '') {
-      const params = new URLSearchParams({ limit: '100' });
-      if (q) params.set('q', q);
+    // ── Populate block/wing filter from fetched data ───────────────────────
+    function populateBlockFilter(members) {
+      const select = document.getElementById('filter-block');
+      const existing = new Set(Array.from(select.options).map(o => o.value).filter(Boolean));
+      const blocks = [...new Set(members.map(m => m.block).filter(Boolean))].sort();
+      blocks.forEach(b => {
+        if (!existing.has(b)) {
+          const opt = document.createElement('option');
+          opt.value = b; opt.textContent = `Block ${b}`;
+          select.appendChild(opt);
+        }
+      });
+    }
+
+    async function loadMembers(q = '', block = '', occupancy = '', expiringOnly = false) {
+      const params = new URLSearchParams({ limit: '200' });
+      if (q)           params.set('q', q);
+      if (block)       params.set('block', block);
+      if (occupancy)   params.set('occupancy', occupancy);
+      if (expiringOnly) params.set('expiring_within', '30');
 
       const res = await fetch(`/api/v1/members?${params}`, { credentials: 'include' });
       const members = res.ok ? await res.json() : [];
+
+      populateBlockFilter(members);
 
       document.getElementById('member-count').textContent = `${members.length} resident${members.length !== 1 ? 's' : ''} found`;
 
@@ -253,9 +305,45 @@ const isAdmin = user.isAdmin;
       roleTargetId = null;
     });
 
+    // ── Helper: read all current filter values ────────────────────────────
+    function currentFilters() {
+      return {
+        q:         document.getElementById('search-input').value.trim(),
+        block:     document.getElementById('filter-block')?.value ?? '',
+        occupancy: document.getElementById('filter-occupancy')?.value ?? '',
+      };
+    }
+
+    function reloadWithFilters(expiringOnly = false) {
+      const { q, block, occupancy } = currentFilters();
+      loadMembers(q, block, occupancy, expiringOnly);
+    }
+
     document.getElementById('search-input').addEventListener('input', (e) => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => loadMembers(e.target.value.trim()), 350);
+      debounceTimer = setTimeout(() => reloadWithFilters(), 350);
+    });
+
+    document.getElementById('filter-block')?.addEventListener('change', () => reloadWithFilters());
+    document.getElementById('filter-occupancy')?.addEventListener('change', () => reloadWithFilters());
+    document.getElementById('filter-expiring')?.addEventListener('click', () => reloadWithFilters(true));
+
+    // ── CSV Export ────────────────────────────────────────────────────────
+    document.getElementById('export-csv')?.addEventListener('click', async () => {
+      const { q, block, occupancy } = currentFilters();
+      const params = new URLSearchParams({ format: 'csv', limit: '500' });
+      if (q)       params.set('q', q);
+      if (block)   params.set('block', block);
+      if (occupancy) params.set('occupancy', occupancy);
+      const res = await fetch(`/api/v1/members/export?${params}`, { credentials: 'include' });
+      if (!res.ok) { alert('Export failed. Please try again.'); return; }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = `urban-trilla-members-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
     });
 
     // ── Reset Password ────────────────────────────────────────────────────────

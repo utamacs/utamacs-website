@@ -1,0 +1,710 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+---
+
+<PortalLayout title="Domestic Help Registry" user={user} activeModule="maids">
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-user-friends text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Domestic staff are registered once and approved per flat — members can track daily attendance and manage their approved helpers.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5 pt-4 border-t border-primary-100 text-xs text-text-secondary space-y-1">
+      <p><i class="fas fa-check-circle text-secondary-500 mr-1.5"></i>Exec/admin registers a domestic helper once with identity verification</p>
+      <p><i class="fas fa-check-circle text-secondary-500 mr-1.5"></i>Each flat approves which helpers can enter their unit</p>
+      <p><i class="fas fa-check-circle text-secondary-500 mr-1.5"></i>Members log daily attendance for their approved helpers</p>
+    </div>
+  </details>
+
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Domestic Help Registry</h1>
+      <p class="text-text-secondary text-sm mt-1">
+        {isPrivileged ? 'Manage registered domestic helpers and view unit approvals.' : 'View your approved helpers and log attendance.'}
+      </p>
+    </div>
+    {isPrivileged && (
+      <button id="add-maid-btn" class="btn-primary text-sm whitespace-nowrap">
+        <i class="fas fa-plus mr-2" aria-hidden="true"></i>Register Helper
+      </button>
+    )}
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit flex-wrap">
+    {isPrivileged ? (
+      <>
+        <button onclick="switchTab('all')" id="tab-all"
+          class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-white text-primary-600 shadow-sm">
+          All Helpers
+        </button>
+        <button onclick="switchTab('attendance')" id="tab-attendance"
+          class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+          Attendance Log
+        </button>
+      </>
+    ) : (
+      <>
+        <button onclick="switchTab('my')" id="tab-my"
+          class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-white text-primary-600 shadow-sm">
+          My Helpers
+        </button>
+        <button onclick="switchTab('attendance')" id="tab-attendance"
+          class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+          Attendance
+        </button>
+        <button onclick="switchTab('add-helper')" id="tab-add-helper"
+          class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+          Find &amp; Add
+        </button>
+      </>
+    )}
+  </div>
+
+  <!-- Panel: All Helpers (exec) / My Helpers (member) -->
+  <div id="panel-all">
+    <div id="maids-container">
+      <div class="text-center py-12 text-text-secondary">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
+      </div>
+    </div>
+  </div>
+
+  <!-- Alias panel for member view -->
+  <div id="panel-my" class="hidden">
+    <div id="my-helpers-container">
+      <div class="text-center py-12 text-text-secondary">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance panel -->
+  <div id="panel-attendance" class="hidden">
+    <div class="flex flex-wrap gap-3 mb-4">
+      <input type="date" id="att-date" class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white" />
+      {isPrivileged && (
+        <input type="text" id="att-search" placeholder="Search helper name…"
+          class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white w-48" />
+      )}
+      <button onclick="loadAttendance()" class="btn-outline text-sm">
+        <i class="fas fa-filter mr-1" aria-hidden="true"></i>Filter
+      </button>
+    </div>
+    <div id="attendance-container">
+      <div class="text-center py-12 text-text-secondary">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
+      </div>
+    </div>
+  </div>
+
+  <!-- Find & Add panel (member) -->
+  <div id="panel-add-helper" class="hidden">
+    <div class="max-w-lg">
+      <p class="text-sm text-text-secondary mb-4">Browse all registered helpers and approve them for your flat.</p>
+      <input id="search-helpers" type="text" placeholder="Search by name or work type…" oninput="searchHelpers()"
+        class="w-full mb-4 border border-border-light rounded-lg px-3 py-2 text-sm" />
+      <div id="all-helpers-list">
+        <div class="text-center py-8 text-text-secondary"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register Helper Modal (exec) -->
+  {isPrivileged && (
+    <div id="add-maid-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b border-border-light flex items-center justify-between sticky top-0 bg-white">
+          <h2 class="text-lg font-semibold text-text-primary">Register Domestic Helper</h2>
+          <button onclick="closeAddMaidModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label for="maid-name" class="block text-sm font-medium text-text-primary mb-1">Full Name *</label>
+            <input id="maid-name" type="text" maxlength="100" placeholder="Full legal name"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="maid-phone" class="block text-sm font-medium text-text-primary mb-1">Phone</label>
+              <input id="maid-phone" type="tel" maxlength="15" placeholder="9XXXXXXXXX"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label for="maid-work-type" class="block text-sm font-medium text-text-primary mb-1">Work Type *</label>
+              <select id="maid-work-type" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+                <option value="cleaning">Cleaning</option>
+                <option value="cooking">Cooking</option>
+                <option value="babysitting">Babysitting</option>
+                <option value="elder_care">Elder Care</option>
+                <option value="gardening">Gardening</option>
+                <option value="laundry">Laundry</option>
+                <option value="multiple">Multiple</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label for="maid-agency" class="block text-sm font-medium text-text-primary mb-1">Agency (if any)</label>
+            <input id="maid-agency" type="text" maxlength="100" placeholder="Agency or independent"
+              class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="maid-id-type" class="block text-sm font-medium text-text-primary mb-1">ID Type</label>
+              <select id="maid-id-type" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+                <option value="">None</option>
+                <option value="aadhaar">Aadhaar</option>
+                <option value="voter_id">Voter ID</option>
+                <option value="passport">Passport</option>
+                <option value="dl">Driving Licence</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="maid-id-number" class="block text-sm font-medium text-text-primary mb-1">ID Number</label>
+              <input id="maid-id-number" type="text" maxlength="30"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div class="bg-gray-50 border border-border-light rounded-xl p-4">
+            <label class="flex items-center gap-3 text-sm cursor-pointer">
+              <input type="checkbox" id="maid-police-verified" class="rounded border-border-light text-primary-600" />
+              <div>
+                <span class="font-medium">Police verified</span>
+                <p class="text-xs text-text-secondary">Check if background verification has been completed</p>
+              </div>
+            </label>
+            <div id="verification-date-row" class="hidden mt-3">
+              <label for="maid-verification-date" class="block text-xs font-medium text-text-primary mb-1">Verification Date</label>
+              <input type="date" id="maid-verification-date"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div id="add-maid-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+        </div>
+        <div class="p-6 pt-0 flex gap-3">
+          <button onclick="closeAddMaidModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+          <button id="add-maid-save-btn" class="flex-1 btn-primary text-sm">Register</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Log Attendance Modal -->
+  <div id="log-att-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-sm">
+      <div class="p-6 border-b border-border-light flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-text-primary">Log Attendance</h2>
+        <button onclick="closeLogAttModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <p id="log-att-maid-name" class="font-medium text-text-primary"></p>
+        <input type="hidden" id="log-att-maid-id" />
+        <input type="hidden" id="log-att-unit-id" />
+        <div>
+          <label for="log-att-date" class="block text-sm font-medium text-text-primary mb-1">Date</label>
+          <input type="date" id="log-att-date" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="log-att-entry" class="block text-sm font-medium text-text-primary mb-1">Entry Time</label>
+            <input type="time" id="log-att-entry" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label for="log-att-exit" class="block text-sm font-medium text-text-primary mb-1">Exit Time</label>
+            <input type="time" id="log-att-exit" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label for="log-att-notes" class="block text-sm font-medium text-text-primary mb-1">Notes</label>
+          <input type="text" id="log-att-notes" maxlength="200" placeholder="Optional"
+            class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div id="log-att-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+      </div>
+      <div class="p-6 pt-0 flex gap-3">
+        <button onclick="closeLogAttModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+        <button id="log-att-save-btn" class="flex-1 btn-primary text-sm">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script define:vars={{ isPrivileged }}>
+    const WORK_TYPE_LABELS = {
+      cleaning: 'Cleaning', cooking: 'Cooking', babysitting: 'Babysitting',
+      elder_care: 'Elder Care', gardening: 'Gardening', laundry: 'Laundry',
+      multiple: 'Multiple', other: 'Other',
+    };
+
+    let currentTab = isPrivileged ? 'all' : 'my';
+    let allHelpers = [];
+    let myApprovals = [];
+    let myUnitId = null;
+
+    function switchTab(tab) {
+      currentTab = tab;
+      const panels = ['all', 'my', 'attendance', 'add-helper'];
+      panels.forEach(p => {
+        const el = document.getElementById(`panel-${p}`);
+        if (el) el.classList.toggle('hidden', p !== tab);
+        const btn = document.getElementById(`tab-${p}`);
+        if (btn) {
+          btn.classList.toggle('bg-white', p === tab);
+          btn.classList.toggle('text-primary-600', p === tab);
+          btn.classList.toggle('shadow-sm', p === tab);
+          btn.classList.toggle('text-text-secondary', p !== tab);
+          btn.classList.toggle('hover:text-text-primary', p !== tab);
+        }
+      });
+
+      if (tab === 'all' && !allHelpers.length) loadAllHelpers();
+      if (tab === 'my' && !myApprovals.length) loadMyHelpers();
+      if (tab === 'attendance') loadAttendance();
+      if (tab === 'add-helper') loadAllHelpersForSearch();
+    }
+
+    async function loadAllHelpers() {
+      const container = document.getElementById('maids-container');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/maids', { credentials: 'include' });
+        const maids = await res.json();
+        allHelpers = Array.isArray(maids) ? maids : [];
+
+        if (!allHelpers.length) {
+          container.innerHTML = `
+            <div class="text-center py-16">
+              <i class="fas fa-user-friends text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+              <h3 class="text-lg font-semibold text-text-primary mb-2">No helpers registered</h3>
+              <p class="text-text-secondary text-sm">Click "Register Helper" to add your first domestic staff entry.</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-border-light">
+                <tr>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Name</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Work Type</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Agency</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Verification</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Status</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${allHelpers.map(m => `
+                  <tr class="border-b border-border-light hover:bg-gray-50">
+                    <td class="py-3 px-4">
+                      <div class="flex items-center gap-2">
+                        ${m.photo_key
+                          ? `<img src="/api/v1/maids/${m.id}/photo-thumb" class="w-8 h-8 rounded-full object-cover bg-gray-100" alt="${m.full_name}" onerror="this.style.display='none'" />`
+                          : `<div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-xs font-bold">${m.full_name[0]}</div>`}
+                        <span class="font-medium">${m.full_name}</span>
+                      </div>
+                    </td>
+                    <td class="py-3 px-4 text-text-secondary capitalize">${WORK_TYPE_LABELS[m.work_type] ?? m.work_type}</td>
+                    <td class="py-3 px-4 text-text-secondary">${m.agency_name ?? '—'}</td>
+                    <td class="py-3 px-4">
+                      ${m.police_verified
+                        ? `<span class="inline-flex items-center gap-1 text-xs text-secondary-500"><i class="fas fa-shield-check"></i> Verified</span>`
+                        : `<span class="text-xs text-amber-600"><i class="fas fa-clock mr-1"></i>Pending</span>`}
+                    </td>
+                    <td class="py-3 px-4">
+                      <span class="px-2 py-0.5 rounded-full text-xs font-medium ${m.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">
+                        ${m.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td class="py-3 px-4">
+                      ${isPrivileged
+                        ? `<button onclick="toggleMaidActive('${m.id}', ${m.is_active})"
+                             class="text-xs ${m.is_active ? 'text-red-600 hover:text-red-700' : 'text-secondary-500 hover:text-secondary-600'}">
+                             ${m.is_active ? 'Deactivate' : 'Reactivate'}
+                           </button>`
+                        : ''}
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load helpers.</div>`;
+      }
+    }
+
+    async function loadMyHelpers() {
+      const container = document.getElementById('my-helpers-container');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/maids/approvals', { credentials: 'include' });
+        const approvals = await res.json();
+        myApprovals = Array.isArray(approvals) ? approvals : [];
+
+        if (!myApprovals.length) {
+          container.innerHTML = `
+            <div class="text-center py-16">
+              <i class="fas fa-user-friends text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+              <h3 class="text-lg font-semibold text-text-primary mb-2">No helpers approved yet</h3>
+              <p class="text-text-secondary text-sm mb-4">Switch to "Find & Add" to approve domestic helpers for your flat.</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          ${myApprovals.map(a => {
+            const m = a.maids ?? {};
+            const active = a.is_active;
+            return `
+            <div class="card-premium p-4">
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
+                    ${(m.full_name ?? '?')[0]}
+                  </div>
+                  <div>
+                    <p class="font-semibold text-text-primary text-sm">${m.full_name ?? '—'}</p>
+                    <p class="text-xs text-text-secondary capitalize">${WORK_TYPE_LABELS[m.work_type] ?? m.work_type ?? '—'}</p>
+                  </div>
+                </div>
+                ${m.police_verified ? '<i class="fas fa-shield-check text-secondary-500 text-sm" title="Verified"></i>' : ''}
+              </div>
+              <div class="flex gap-2 mt-2">
+                <button onclick="openLogAtt('${a.maid_id}','${m.full_name ?? ''}')"
+                  class="flex-1 text-xs btn-outline py-1.5">
+                  <i class="fas fa-calendar-check mr-1"></i>Log Attendance
+                </button>
+                <button onclick="toggleApproval('${a.id}', ${!active})"
+                  class="text-xs px-3 py-1.5 rounded-lg border ${active ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}">
+                  ${active ? 'Remove' : 'Re-add'}
+                </button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load your helpers.</div>`;
+      }
+    }
+
+    async function loadAttendance() {
+      const container = document.getElementById('attendance-container');
+      if (!container) return;
+      const dateEl = document.getElementById('att-date');
+      const date = dateEl?.value || new Date().toISOString().slice(0, 10);
+      const params = new URLSearchParams({ limit: '100' });
+      if (date) params.set('from', date);
+      if (date) params.set('to', date);
+
+      try {
+        const res = await fetch(`/api/v1/maids/attendance?${params}`, { credentials: 'include' });
+        const records = await res.json();
+
+        if (!Array.isArray(records) || !records.length) {
+          container.innerHTML = `<div class="text-center py-10 text-text-secondary text-sm">No attendance records for this date.</div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-border-light">
+                <tr>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Helper</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Unit</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Date</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Entry</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Exit</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${records.map(r => `
+                  <tr class="border-b border-border-light hover:bg-gray-50">
+                    <td class="py-3 px-4 font-medium">${r.maids?.full_name ?? '—'}</td>
+                    <td class="py-3 px-4 text-text-secondary">${r.units?.unit_number ?? '—'}</td>
+                    <td class="py-3 px-4 text-text-secondary">${r.date}</td>
+                    <td class="py-3 px-4">${r.entry_time ? r.entry_time.slice(0,5) : '—'}</td>
+                    <td class="py-3 px-4">${r.exit_time  ? r.exit_time.slice(0,5)  : '—'}</td>
+                    <td class="py-3 px-4 text-text-secondary">${r.notes ?? '—'}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load attendance.</div>`;
+      }
+    }
+
+    async function loadAllHelpersForSearch() {
+      const container = document.getElementById('all-helpers-list');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/v1/maids', { credentials: 'include' });
+        const maids = await res.json();
+        allHelpers = Array.isArray(maids) ? maids : [];
+        renderHelperSearch();
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-4">Failed to load helpers.</div>`;
+      }
+    }
+
+    function searchHelpers() {
+      renderHelperSearch();
+    }
+
+    function renderHelperSearch() {
+      const container = document.getElementById('all-helpers-list');
+      if (!container) return;
+      const q = (document.getElementById('search-helpers')?.value ?? '').toLowerCase();
+      const filtered = allHelpers.filter(m =>
+        m.full_name.toLowerCase().includes(q) ||
+        (WORK_TYPE_LABELS[m.work_type] ?? m.work_type).toLowerCase().includes(q)
+      );
+      if (!filtered.length) {
+        container.innerHTML = `<p class="text-center text-text-secondary py-6 text-sm">No helpers found.</p>`;
+        return;
+      }
+      const approvedIds = new Set(myApprovals.map(a => a.maid_id));
+      container.innerHTML = filtered.map(m => {
+        const approved = approvedIds.has(m.id);
+        return `
+        <div class="flex items-center justify-between bg-white border border-border-light rounded-xl px-4 py-3 mb-2">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-sm">
+              ${m.full_name[0]}
+            </div>
+            <div>
+              <p class="font-medium text-sm text-text-primary">${m.full_name}</p>
+              <p class="text-xs text-text-secondary capitalize">${WORK_TYPE_LABELS[m.work_type] ?? m.work_type}</p>
+            </div>
+          </div>
+          <button onclick="approveMaid('${m.id}')" ${approved ? 'disabled' : ''}
+            class="text-xs btn-${approved ? 'ghost text-text-secondary cursor-default' : 'primary'} py-1.5 px-3">
+            ${approved ? 'Approved' : 'Approve'}
+          </button>
+        </div>`;
+      }).join('');
+    }
+
+    async function approveMaid(maidId) {
+      try {
+        const res = await fetch('/api/v1/maids/approvals', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maid_id: maidId, unit_id: myUnitId }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          myApprovals.push(data);
+          renderHelperSearch();
+          showToast('Helper approved for your flat.');
+        } else {
+          const d = await res.json();
+          alert(d.message ?? 'Failed to approve helper.');
+        }
+      } catch {
+        alert('Network error.');
+      }
+    }
+
+    async function toggleApproval(approvalId, newActive) {
+      try {
+        const res = await fetch('/api/v1/maids/approvals', {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: approvalId, is_active: newActive }),
+        });
+        if (res.ok) {
+          myApprovals = [];
+          loadMyHelpers();
+          showToast(newActive ? 'Helper re-added.' : 'Helper removed.');
+        } else {
+          const d = await res.json();
+          alert(d.message ?? 'Failed to update.');
+        }
+      } catch {
+        alert('Network error.');
+      }
+    }
+
+    async function toggleMaidActive(maidId, currentlyActive) {
+      if (!confirm(`${currentlyActive ? 'Deactivate' : 'Reactivate'} this helper?`)) return;
+      try {
+        const res = await fetch(`/api/v1/maids/${maidId}`, {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: !currentlyActive }),
+        });
+        if (res.ok) { allHelpers = []; loadAllHelpers(); showToast('Updated.'); }
+        else { const d = await res.json(); alert(d.message ?? 'Failed.'); }
+      } catch { alert('Network error.'); }
+    }
+
+    // ── Attendance logging ────────────────────────────────────────────────────
+
+    function openLogAtt(maidId, maidName) {
+      document.getElementById('log-att-maid-id').value = maidId;
+      document.getElementById('log-att-maid-name').textContent = maidName;
+      document.getElementById('log-att-date').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('log-att-entry').value = '';
+      document.getElementById('log-att-exit').value = '';
+      document.getElementById('log-att-notes').value = '';
+      document.getElementById('log-att-error').classList.add('hidden');
+      // Set unit_id from profile (loaded once)
+      if (myUnitId) document.getElementById('log-att-unit-id').value = myUnitId;
+      document.getElementById('log-att-modal').classList.remove('hidden');
+    }
+
+    function closeLogAttModal() {
+      document.getElementById('log-att-modal').classList.add('hidden');
+    }
+
+    document.getElementById('log-att-save-btn')?.addEventListener('click', async () => {
+      const maidId  = document.getElementById('log-att-maid-id').value;
+      const unitId  = document.getElementById('log-att-unit-id').value;
+      const date    = document.getElementById('log-att-date').value;
+      const entry   = document.getElementById('log-att-entry').value;
+      const exit    = document.getElementById('log-att-exit').value;
+      const notes   = document.getElementById('log-att-notes').value.trim();
+      const errEl   = document.getElementById('log-att-error');
+      const btn     = document.getElementById('log-att-save-btn');
+
+      if (!date) { errEl.textContent = 'Date is required.'; errEl.classList.remove('hidden'); return; }
+      if (!unitId) { errEl.textContent = 'Could not determine your unit. Please refresh.'; errEl.classList.remove('hidden'); return; }
+
+      btn.disabled = true; btn.textContent = 'Saving…';
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/maids/attendance', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maid_id: maidId, unit_id: unitId, date,
+            entry_time: entry || undefined, exit_time: exit || undefined, notes: notes || undefined }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.message ?? 'Failed to log.'; errEl.classList.remove('hidden'); return; }
+        closeLogAttModal();
+        showToast('Attendance logged.');
+        if (currentTab === 'attendance') loadAttendance();
+      } catch {
+        errEl.textContent = 'Network error.';
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save';
+      }
+    });
+
+    // ── Register Helper Modal (exec) ──────────────────────────────────────────
+
+    document.getElementById('add-maid-btn')?.addEventListener('click', () => {
+      document.getElementById('add-maid-modal')?.classList.remove('hidden');
+      document.getElementById('add-maid-error')?.classList.add('hidden');
+    });
+
+    function closeAddMaidModal() {
+      document.getElementById('add-maid-modal')?.classList.add('hidden');
+    }
+
+    document.getElementById('maid-police-verified')?.addEventListener('change', (e) => {
+      document.getElementById('verification-date-row')?.classList.toggle('hidden', !e.target.checked);
+    });
+
+    document.getElementById('add-maid-save-btn')?.addEventListener('click', async () => {
+      const fullName = document.getElementById('maid-name')?.value.trim();
+      const errEl = document.getElementById('add-maid-error');
+      const btn = document.getElementById('add-maid-save-btn');
+
+      if (!fullName) { errEl.textContent = 'Full name is required.'; errEl.classList.remove('hidden'); return; }
+
+      const policeVerified = document.getElementById('maid-police-verified')?.checked ?? false;
+
+      btn.disabled = true; btn.textContent = 'Registering…';
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/maids', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: fullName,
+            phone:      document.getElementById('maid-phone')?.value.trim() || undefined,
+            work_type:  document.getElementById('maid-work-type')?.value,
+            agency_name: document.getElementById('maid-agency')?.value.trim() || undefined,
+            id_type:    document.getElementById('maid-id-type')?.value || undefined,
+            id_number:  document.getElementById('maid-id-number')?.value.trim() || undefined,
+            police_verified: policeVerified,
+            verification_date: policeVerified ? document.getElementById('maid-verification-date')?.value || undefined : undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.message ?? 'Failed to register.'; errEl.classList.remove('hidden'); return; }
+        closeAddMaidModal();
+        allHelpers = [];
+        loadAllHelpers();
+        showToast('Helper registered successfully.');
+      } catch {
+        errEl.textContent = 'Network error.';
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Register';
+      }
+    });
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    // ── Initialize ─────────────────────────────────────────────────────────────
+
+    // Set today's date in attendance filter
+    const attDateEl = document.getElementById('att-date');
+    if (attDateEl) attDateEl.value = new Date().toISOString().slice(0, 10);
+
+    // Load unit_id for member (needed for attendance logging + approval)
+    if (!isPrivileged) {
+      fetch('/api/v1/members?limit=1', { credentials: 'include' })
+        .then(r => r.json())
+        .then(data => {
+          const list = Array.isArray(data) ? data : (data.data ?? []);
+          myUnitId = list[0]?.unit_id ?? null;
+        })
+        .catch(() => {});
+    }
+
+    if (isPrivileged) {
+      loadAllHelpers();
+    } else {
+      loadMyHelpers();
+    }
+  </script>
+</PortalLayout>

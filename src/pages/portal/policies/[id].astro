@@ -1,0 +1,258 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+const { id } = Astro.params;
+
+const sb = getSupabaseServiceClient();
+const { data: policy, error } = await sb
+  .from('policies')
+  .select('*')
+  .eq('id', id!)
+  .eq('society_id', SOCIETY_ID)
+  .single();
+
+if (error || !policy || (policy.status !== 'active' && !isPrivileged)) {
+  return new Response('Policy not found', { status: 404 });
+}
+
+// Generate PDF signed URL
+let document_url: string | null = null;
+if (policy.document_key) {
+  try {
+    const storage = new SupabaseStorageService();
+    document_url = await storage.getSignedUrl('policy-documents', policy.document_key, 3600);
+  } catch { /* non-fatal */ }
+}
+
+// Check acknowledgement
+const { data: ack } = await sb
+  .from('policy_acknowledgements')
+  .select('acked_at')
+  .eq('policy_id', id!)
+  .eq('user_id', user.id)
+  .maybeSingle();
+
+const acknowledged = !!ack;
+
+// Exec: ack count
+let ackCount: number | null = null;
+if (isPrivileged) {
+  const { count } = await sb.from('policy_acknowledgements').select('*', { count: 'exact', head: true }).eq('policy_id', id!);
+  ackCount = count;
+}
+---
+
+<PortalLayout title={policy.title} user={user} activeModule="policies">
+  <div class="mb-6">
+    <nav class="text-sm text-text-secondary mb-3">
+      <a href="/portal/policies" class="hover:text-primary-600">Policies</a>
+      <span class="mx-2">›</span>
+      <span class="text-text-primary">{policy.title}</span>
+    </nav>
+  </div>
+
+  <div class="max-w-3xl">
+    <!-- Header card -->
+    <div class="card-premium p-6 mb-4">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            <h1 class="text-2xl font-bold text-primary-600 font-poppins">{policy.title}</h1>
+            {policy.status !== 'active' && (
+              <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium capitalize">{policy.status}</span>
+            )}
+          </div>
+          {policy.description && <p class="text-text-secondary text-sm">{policy.description}</p>}
+        </div>
+        {isPrivileged && (
+          <a href={`/portal/policies/${id}/edit`} class="btn-outline text-sm flex-shrink-0">
+            <i class="fas fa-edit mr-1" aria-hidden="true"></i>Edit
+          </a>
+        )}
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm border-t border-border-light pt-4">
+        <div><span class="text-text-secondary text-xs block">Version</span><span class="font-medium">v{policy.version}</span></div>
+        <div><span class="text-text-secondary text-xs block">Type</span><span class="font-medium capitalize">{policy.policy_type.replace('_', ' ')}</span></div>
+        <div><span class="text-text-secondary text-xs block">Effective</span><span class="font-medium">{new Date(policy.effective_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
+        {isPrivileged && ackCount !== null && (
+          <div><span class="text-text-secondary text-xs block">Acknowledged by</span><span class="font-medium">{ackCount} member{ackCount !== 1 ? 's' : ''}</span></div>
+        )}
+      </div>
+    </div>
+
+    <!-- Content card -->
+    <div class="card-premium p-6 mb-4">
+      {policy.policy_type === 'text' && policy.body && (
+        <div class="prose prose-sm max-w-none text-text-primary" set:html={policy.body} />
+      )}
+
+      {policy.policy_type === 'pdf' && document_url && (
+        <div>
+          <div class="flex items-center gap-3 mb-4">
+            <i class="fas fa-file-pdf text-red-500 text-xl" aria-hidden="true"></i>
+            <p class="text-sm text-text-secondary">This policy is in PDF format. You can view it inline or open in a new tab.</p>
+            <a href={document_url} target="_blank" rel="noopener noreferrer" class="btn-outline text-sm ml-auto flex-shrink-0">
+              <i class="fas fa-external-link-alt mr-1" aria-hidden="true"></i>Open PDF
+            </a>
+          </div>
+          <iframe src={document_url} class="w-full rounded-xl border border-border-light" style="height: 600px;" title={policy.title} />
+        </div>
+      )}
+
+      {policy.policy_type === 'pdf' && !document_url && (
+        <div class="text-center py-8 text-text-secondary">
+          <i class="fas fa-file-pdf text-4xl text-red-200 mb-3" aria-hidden="true"></i>
+          <p class="text-sm">PDF document is not available at this time.</p>
+        </div>
+      )}
+
+      {policy.policy_type === 'video_url' && policy.video_url && (
+        <div>
+          <p class="text-sm text-text-secondary mb-4">This policy is presented as a video. Please watch before acknowledging.</p>
+          <div class="aspect-video rounded-xl overflow-hidden border border-border-light bg-black">
+            {policy.video_url.includes('youtube') || policy.video_url.includes('youtu.be') ? (
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${policy.video_url.split('v=')[1]?.split('&')[0] ?? policy.video_url.split('/').pop()}`}
+                class="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                title={policy.title}
+              />
+            ) : (
+              <a href={policy.video_url} target="_blank" rel="noopener noreferrer" class="flex items-center justify-center h-full text-white gap-3">
+                <i class="fas fa-external-link-alt text-xl" aria-hidden="true"></i>
+                <span>Open video link</span>
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+
+    <!-- Acknowledgement card -->
+    {policy.acknowledgement_required && (
+      <div class={`card-premium p-5 ${acknowledged ? 'border-secondary-500 bg-green-50' : 'border-amber-400 bg-amber-50'}`}>
+        {acknowledged ? (
+          <div class="flex items-center gap-3 text-secondary-500">
+            <i class="fas fa-check-circle text-2xl" aria-hidden="true"></i>
+            <div>
+              <p class="font-semibold">You have acknowledged this policy</p>
+              <p class="text-sm text-text-secondary">Acknowledged on {new Date(ack!.acked_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div class="flex items-start gap-3 mb-4">
+              <i class="fas fa-exclamation-triangle text-amber-500 text-xl mt-0.5" aria-hidden="true"></i>
+              <div>
+                <p class="font-semibold text-text-primary">Acknowledgement required</p>
+                <p class="text-sm text-text-secondary mt-0.5">Please read the policy above before acknowledging.</p>
+              </div>
+            </div>
+            <label class="flex items-start gap-3 cursor-pointer mb-4">
+              <input type="checkbox" id="ack-checkbox" class="mt-0.5 rounded border-border-light text-primary-600 focus:ring-primary-600" />
+              <span class="text-sm text-text-primary">I have read and understood the <strong>{policy.title}</strong> policy and agree to comply with it.</span>
+            </label>
+            <button id="ack-btn" disabled class="btn-primary opacity-50 cursor-not-allowed text-sm">
+              <i class="fas fa-check mr-2" aria-hidden="true"></i>Acknowledge Policy
+            </button>
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* Exec: upload PDF section */}
+    {isPrivileged && policy.policy_type !== 'video_url' && (
+      <div class="card-premium p-5 mt-4">
+        <h3 class="text-base font-semibold text-text-primary mb-3">
+          <i class="fas fa-upload text-primary-600 mr-2" aria-hidden="true"></i>
+          {policy.document_key ? 'Replace PDF Document' : 'Upload PDF Document'}
+        </h3>
+        <div id="pdf-drop-zone"
+          class="border-2 border-dashed border-border-light rounded-xl p-5 text-center cursor-pointer hover:border-primary-600 transition-colors">
+          <i class="fas fa-file-pdf text-2xl text-red-400 mb-2" aria-hidden="true"></i>
+          <p class="text-sm text-text-secondary">Drag & drop or <span class="text-primary-600 font-medium">click to browse</span></p>
+          <p class="text-xs text-text-secondary mt-1">PDF only, max 20 MB</p>
+          <input type="file" id="pdf-file-input" accept="application/pdf" class="hidden" aria-hidden="true" />
+        </div>
+        <div id="pdf-upload-status" class="hidden mt-3 text-sm"></div>
+      </div>
+    )}
+  </div>
+
+  <script define:vars={{ policyId: id, requiresAck: policy.acknowledgement_required, isPrivileged }}>
+    // ── Acknowledgement ──────────────────────────────────────────────────────
+    const ackCheckbox = document.getElementById('ack-checkbox');
+    const ackBtn = document.getElementById('ack-btn');
+
+    ackCheckbox?.addEventListener('change', () => {
+      if (ackBtn) {
+        ackBtn.disabled = !ackCheckbox.checked;
+        ackBtn.classList.toggle('opacity-50', !ackCheckbox.checked);
+        ackBtn.classList.toggle('cursor-not-allowed', !ackCheckbox.checked);
+      }
+    });
+
+    ackBtn?.addEventListener('click', async () => {
+      ackBtn.disabled = true;
+      ackBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Acknowledging…';
+      const res = await fetch(`/api/v1/policies/${policyId}/acknowledge`, {
+        method: 'POST', credentials: 'include',
+      });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        const d = await res.json();
+        alert(d.message ?? d.error ?? 'Failed to acknowledge policy.');
+        ackBtn.disabled = false;
+        ackBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Acknowledge Policy';
+      }
+    });
+
+    // ── PDF Upload (exec) ────────────────────────────────────────────────────
+    if (isPrivileged) {
+      const dropZone = document.getElementById('pdf-drop-zone');
+      const fileInput = document.getElementById('pdf-file-input');
+      const status = document.getElementById('pdf-upload-status');
+
+      dropZone?.addEventListener('click', () => fileInput?.click());
+      dropZone?.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-primary-600'); });
+      dropZone?.addEventListener('dragleave', () => dropZone?.classList.remove('border-primary-600'));
+      dropZone?.addEventListener('drop', (e) => {
+        e.preventDefault(); dropZone.classList.remove('border-primary-600');
+        const f = e.dataTransfer?.files[0];
+        if (f) uploadPdf(f);
+      });
+      fileInput?.addEventListener('change', () => { if (fileInput.files?.[0]) uploadPdf(fileInput.files[0]); });
+
+      async function uploadPdf(file) {
+        if (file.type !== 'application/pdf') { alert('Only PDF files allowed.'); return; }
+        if (file.size > 20 * 1024 * 1024) { alert('PDF must be under 20 MB.'); return; }
+        status.classList.remove('hidden');
+        status.innerHTML = '<i class="fas fa-spinner fa-spin mr-2 text-primary-600"></i>Uploading…';
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`/api/v1/policies/${policyId}/document`, {
+          method: 'POST', credentials: 'include', body: fd,
+        });
+        if (res.ok) {
+          status.innerHTML = '<i class="fas fa-check-circle text-secondary-500 mr-2"></i>PDF uploaded. Reloading…';
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          const d = await res.json();
+          status.innerHTML = `<span class="text-red-600"><i class="fas fa-times-circle mr-2"></i>${d.message ?? 'Upload failed.'}</span>`;
+        }
+      }
+    }
+  </script>
+</PortalLayout>

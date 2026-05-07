@@ -84,6 +84,55 @@ const canUpload = canEdit;
         )}
       </div>
 
+      <!-- Photo Attachments -->
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-text-primary">
+            Photos
+            <span id="photo-count-badge" class="hidden ml-2 text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 font-medium"></span>
+          </h2>
+          {canUpload && (
+            <label for="photo-file-input" class="text-xs text-primary-600 hover:text-primary-700 font-medium cursor-pointer flex items-center gap-1">
+              <i class="fas fa-camera text-xs" aria-hidden="true"></i> Add Photos
+            </label>
+          )}
+        </div>
+
+        <!-- Photo grid -->
+        <div id="photo-grid" class="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div class="col-span-full text-sm text-text-secondary text-center py-4">Loading…</div>
+        </div>
+
+        {canUpload && (
+          <>
+            <input type="file" id="photo-file-input" multiple accept="image/jpeg,image/png,image/webp,image/heic,video/mp4" class="hidden" />
+            <!-- Drop zone (shown when no photos yet or always below grid) -->
+            <div id="photo-drop-zone"
+              class="mx-4 mb-4 border-2 border-dashed border-border-light rounded-xl p-6 text-center text-sm text-text-secondary hover:border-primary-400 hover:bg-primary-50/30 transition-colors cursor-pointer">
+              <i class="fas fa-cloud-upload-alt text-2xl text-primary-300 mb-2 block" aria-hidden="true"></i>
+              Drop photos here or <span class="text-primary-600 font-medium">click to select</span>
+              <div class="text-xs mt-1 text-text-secondary">JPEG, PNG, WebP, HEIC, MP4 — up to 50 MB each</div>
+            </div>
+            <div id="photo-upload-status" class="hidden px-5 pb-4 text-xs text-text-secondary"></div>
+          </>
+        )}
+      </div>
+
+      <!-- Photo Lightbox -->
+      <div id="photo-lightbox" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+        <button id="lb-close" class="absolute top-4 right-4 text-white/70 hover:text-white text-2xl" aria-label="Close">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+        <button id="lb-prev" class="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-2xl px-3 py-6" aria-label="Previous">
+          <i class="fas fa-chevron-left" aria-hidden="true"></i>
+        </button>
+        <img id="lb-img" src="" alt="Photo" class="max-w-full max-h-full object-contain rounded-lg" />
+        <div id="lb-caption" class="absolute bottom-6 left-0 right-0 text-center text-white/80 text-sm px-8"></div>
+        <button id="lb-next" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-2xl px-3 py-6" aria-label="Next">
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+        </button>
+      </div>
+
       <!-- Comments -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
@@ -581,6 +630,140 @@ const canUpload = canEdit;
         errEl.classList.remove('hidden');
       }
     });
+
+    // ── Photo Attachments ────────────────────────────────────────────────────────
+    let photoData = [];
+    let lbIndex = 0;
+
+    async function loadPhotos() {
+      const res = await fetch(`/api/v1/hoto/snags/${snagId}/attachments`, { credentials: 'include' });
+      if (!res.ok) return;
+      photoData = await res.json();
+      renderPhotos();
+    }
+
+    function renderPhotos() {
+      const grid = document.getElementById('photo-grid');
+      const badge = document.getElementById('photo-count-badge');
+      if (!grid) return;
+
+      if (!photoData.length) {
+        grid.innerHTML = '<div class="col-span-full text-sm text-text-secondary text-center py-4">No photos yet.</div>';
+        badge?.classList.add('hidden');
+        return;
+      }
+
+      badge.textContent = String(photoData.length);
+      badge.classList.remove('hidden');
+
+      grid.innerHTML = photoData.map((p, i) => {
+        const isVideo = p.mime_type === 'video/mp4';
+        return `
+          <div class="relative group aspect-square bg-gray-100 rounded-xl overflow-hidden cursor-pointer" data-idx="${i}">
+            ${isVideo
+              ? `<video src="${p.signed_url}" class="w-full h-full object-cover" preload="metadata"></video>`
+              : `<img src="${p.signed_url}" alt="${p.caption ?? 'Photo'}" class="w-full h-full object-cover" loading="lazy" />`
+            }
+            ${p.caption ? `<div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs px-2 py-1 truncate">${p.caption}</div>` : ''}
+            ${canUpload ? `
+              <button class="delete-photo-btn hidden group-hover:flex absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full items-center justify-center text-xs" data-id="${p.id}" title="Delete">
+                <i class="fas fa-times"></i>
+              </button>` : ''}
+            ${isVideo ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none"><i class="fas fa-play-circle text-white text-3xl opacity-70"></i></div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      // Lightbox click
+      grid.querySelectorAll('[data-idx]').forEach(el => {
+        el.addEventListener('click', (e) => {
+          if ((e.target as Element).closest('.delete-photo-btn')) return;
+          openLightbox(parseInt(el.dataset.idx));
+        });
+      });
+
+      // Delete clicks
+      grid.querySelectorAll('.delete-photo-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (!confirm('Delete this photo?')) return;
+          const id = (btn as HTMLElement).dataset.id;
+          const res = await fetch(`/api/v1/hoto/snags/${snagId}/attachments?attachment_id=${id}`, {
+            method: 'DELETE', credentials: 'include',
+          });
+          if (res.ok) await loadPhotos();
+        });
+      });
+    }
+
+    function openLightbox(idx: number) {
+      const lb = document.getElementById('photo-lightbox')!;
+      lbIndex = idx;
+      lb.classList.remove('hidden');
+      showLbPhoto();
+      document.addEventListener('keydown', lbKeyHandler);
+    }
+
+    function closeLightbox() {
+      document.getElementById('photo-lightbox')!.classList.add('hidden');
+      document.removeEventListener('keydown', lbKeyHandler);
+    }
+
+    function showLbPhoto() {
+      const p = photoData[lbIndex];
+      if (!p) return;
+      const img = document.getElementById('lb-img') as HTMLImageElement;
+      img.src = p.signed_url ?? '';
+      document.getElementById('lb-caption')!.textContent = p.caption ?? '';
+    }
+
+    function lbKeyHandler(e: KeyboardEvent) {
+      if (e.key === 'Escape')     closeLightbox();
+      if (e.key === 'ArrowLeft')  { lbIndex = (lbIndex - 1 + photoData.length) % photoData.length; showLbPhoto(); }
+      if (e.key === 'ArrowRight') { lbIndex = (lbIndex + 1) % photoData.length; showLbPhoto(); }
+    }
+
+    document.getElementById('lb-close')?.addEventListener('click', closeLightbox);
+    document.getElementById('lb-prev')?.addEventListener('click',  () => { lbIndex = (lbIndex - 1 + photoData.length) % photoData.length; showLbPhoto(); });
+    document.getElementById('lb-next')?.addEventListener('click',  () => { lbIndex = (lbIndex + 1) % photoData.length; showLbPhoto(); });
+    document.getElementById('photo-lightbox')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeLightbox(); });
+
+    if (canUpload) {
+      async function uploadPhotoFiles(files: FileList | File[]) {
+        const statusEl = document.getElementById('photo-upload-status')!;
+        statusEl.classList.remove('hidden');
+        let uploaded = 0;
+        for (const file of Array.from(files)) {
+          statusEl.textContent = `Uploading ${file.name}…`;
+          const fd = new FormData();
+          fd.append('file', file);
+          const res = await fetch(`/api/v1/hoto/snags/${snagId}/attachments`, {
+            method: 'POST', credentials: 'include', body: fd,
+          });
+          if (res.ok) uploaded++;
+        }
+        statusEl.textContent = `${uploaded} of ${files.length} photo(s) uploaded.`;
+        setTimeout(() => statusEl.classList.add('hidden'), 3000);
+        await loadPhotos();
+      }
+
+      const photoInput = document.getElementById('photo-file-input') as HTMLInputElement;
+      const dropZone   = document.getElementById('photo-drop-zone')!;
+
+      photoInput?.addEventListener('change', () => {
+        if (photoInput.files?.length) uploadPhotoFiles(photoInput.files);
+      });
+      dropZone?.addEventListener('click', () => photoInput?.click());
+      dropZone?.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-primary-400', 'bg-primary-50/50'); });
+      dropZone?.addEventListener('dragleave', ()  => { dropZone.classList.remove('border-primary-400', 'bg-primary-50/50'); });
+      dropZone?.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-primary-400', 'bg-primary-50/50');
+        if (e.dataTransfer?.files.length) uploadPhotoFiles(e.dataTransfer.files);
+      });
+    }
+
+    loadPhotos();
 
     // Comment input
     document.getElementById('comment-input')?.addEventListener('keydown', async e => {

@@ -6,11 +6,42 @@ const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
 
 const isGuard = user.role === 'security_guard';
-const isMember = user.role === 'member';
+const isExec = ['executive', 'admin'].includes(user.role);
+
+const VISITOR_TYPES = [
+  { value: 'guest',                label: 'Guest' },
+  { value: 'relative',             label: 'Relative' },
+  { value: 'friend',               label: 'Friend' },
+  { value: 'domestic_help',        label: 'Domestic Help' },
+  { value: 'cook',                 label: 'Cook' },
+  { value: 'driver',               label: 'Driver' },
+  { value: 'nurse',                label: 'Nurse / Caregiver' },
+  { value: 'tutor',                label: 'Tutor' },
+  { value: 'plumber',              label: 'Plumber' },
+  { value: 'electrician',          label: 'Electrician' },
+  { value: 'carpenter',            label: 'Carpenter' },
+  { value: 'painter',              label: 'Painter' },
+  { value: 'pest_control_tech',    label: 'Pest Control Tech' },
+  { value: 'courier',              label: 'Courier' },
+  { value: 'food_delivery',        label: 'Food Delivery' },
+  { value: 'grocery_delivery',     label: 'Grocery Delivery' },
+  { value: 'ecommerce_delivery',   label: 'E-commerce Delivery' },
+  { value: 'cab_driver',           label: 'Cab Driver' },
+  { value: 'auto_driver',          label: 'Auto Driver' },
+  { value: 'medical',              label: 'Medical / Doctor' },
+  { value: 'emergency',            label: 'Emergency' },
+  { value: 'real_estate_agent',    label: 'Real Estate Agent' },
+  { value: 'prospective_buyer',    label: 'Prospective Buyer' },
+  { value: 'prospective_tenant',   label: 'Prospective Tenant' },
+  { value: 'maintenance_staff',    label: 'Maintenance Staff' },
+  { value: 'security_audit',       label: 'Security Audit' },
+  { value: 'govt_official',        label: 'Govt. Official' },
+  { value: 'other',                label: 'Other' },
+];
 ---
 
 <PortalLayout title="Visitor Management" user={user} activeModule="visitor_mgmt">
-  <!-- Process info panel -->
+  <!-- How it works panel -->
   <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
     <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
@@ -24,56 +55,32 @@ const isMember = user.role === 'member';
     </summary>
     <div class="px-5 pb-5">
       <div class="pt-4 border-t border-primary-100 space-y-4">
-        <!-- Main flow -->
         <div class="process-snake-flow -mx-1 px-1">
           <div class="flex-shrink-0 w-52 rounded-lg border border-dashed border-primary-300 bg-blue-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Pre-Register</p>
             <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Resident adds guest</p>
             <p class="text-[10px] text-blue-400 whitespace-nowrap">(optional)</p>
           </div>
-
           <div class="flex-shrink-0 w-52 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Arrival</p>
             <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Visitor reaches gate</p>
           </div>
-
           <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Guard Verifies</p>
             <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">ID + resident confirm</p>
           </div>
-
           <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Entry Logged</p>
-            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Timestamp &amp; details</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Type &amp; gate captured</p>
           </div>
-
           <div class="flex-shrink-0 w-52 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Exit Logged</p>
             <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Departure recorded</p>
           </div>
         </div>
-        <!-- Annotation row -->
         <div class="flex items-center gap-2 text-xs text-text-secondary">
           <i class="fas fa-info-circle text-primary-400 text-[10px]" aria-hidden="true"></i>
           <span>Pre-registered guests skip the resident call — dashed border indicates the optional step</span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
-          <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Pre-registered guests are approved instantly at the gate — no resident call needed</span>
-          </div>
-          <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Walk-in visitors require the guard to call the resident for verbal approval</span>
-          </div>
-          <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Visitor logs are retained for 90 days and accessible to executives</span>
-          </div>
-          <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Delivery agents and service staff use the same flow with a 'type' tag</span>
-          </div>
         </div>
       </div>
     </div>
@@ -83,7 +90,7 @@ const isMember = user.role === 'member';
     <div>
       <h1 class="text-2xl font-bold text-text-primary">Visitor Management</h1>
       <p class="text-sm text-text-secondary mt-1">
-        {isGuard ? 'Log visitor entry and exit.' : 'Manage visitor pre-approvals.'}
+        {isGuard ? 'Log visitor entry and exit.' : 'Manage visitor pre-approvals and review logs.'}
       </p>
     </div>
     {!isGuard && (
@@ -94,7 +101,7 @@ const isMember = user.role === 'member';
     )}
   </div>
 
-  <!-- Guard View: Entry/Exit Logging -->
+  <!-- Guard Entry/Exit panel -->
   {isGuard && (
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <!-- Log Entry -->
@@ -116,6 +123,15 @@ const isMember = user.role === 'member';
             <option value="service">Service</option>
             <option value="vendor">Vendor</option>
           </select>
+          <select id="entry-visitor-type"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">Visitor type (optional)</option>
+            {VISITOR_TYPES.map(vt => <option value={vt.value}>{vt.label}</option>)}
+          </select>
+          <select id="entry-gate"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="">Select gate</option>
+          </select>
           <input type="text" id="entry-vehicle" placeholder="Vehicle number (optional)"
             class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
           <button type="submit" class="btn-primary w-full text-sm">
@@ -124,7 +140,7 @@ const isMember = user.role === 'member';
         </form>
       </div>
 
-      <!-- Active Visitors / Log Exit -->
+      <!-- Active Visitors -->
       <div class="bg-white rounded-xl border border-border-light p-6">
         <h2 class="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
           <i class="fas fa-sign-out-alt text-red-600" aria-hidden="true"></i>
@@ -137,7 +153,7 @@ const isMember = user.role === 'member';
     </div>
   )}
 
-  <!-- Member View: Pre-Approvals -->
+  <!-- Member: My Pre-Approvals -->
   {!isGuard && (
     <div id="pre-approvals-panel" class="bg-white rounded-xl border border-border-light overflow-hidden mb-6">
       <div class="px-5 py-4 border-b border-border-light bg-gray-50">
@@ -149,7 +165,7 @@ const isMember = user.role === 'member';
     </div>
   )}
 
-  <!-- Tabs: Visitor Logs | Deliveries -->
+  <!-- Tabs -->
   <div class="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1 w-fit">
     <button id="tab-logs" onclick="switchTab('logs')"
       class="tab-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white text-text-primary shadow-soft">
@@ -162,9 +178,35 @@ const isMember = user.role === 'member';
   </div>
 
   <!-- Visitor Logs panel -->
-  <div id="panel-logs" class="bg-white rounded-xl border border-border-light overflow-hidden">
-    <div id="visitor-logs-list">
-      <p class="text-sm text-text-secondary text-center py-6">Loading…</p>
+  <div id="panel-logs" class="space-y-4">
+    <!-- Filter bar (exec / guard view) -->
+    {(isExec || isGuard) && (
+      <div class="flex flex-wrap items-center gap-3 bg-white border border-border-light rounded-xl px-4 py-3">
+        <select id="filter-vtype"
+          class="text-sm border border-border-light rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+          <option value="">All types</option>
+          {VISITOR_TYPES.map(vt => <option value={vt.value}>{vt.label}</option>)}
+        </select>
+        <select id="filter-gate"
+          class="text-sm border border-border-light rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+          <option value="">All gates</option>
+        </select>
+        <input type="date" id="filter-date-from"
+          class="text-sm border border-border-light rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        <span class="text-text-secondary text-sm">to</span>
+        <input type="date" id="filter-date-to"
+          class="text-sm border border-border-light rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        <button id="filter-apply" class="btn-primary text-sm py-2">Apply</button>
+        <button id="export-csv" class="btn-outline text-sm py-2 flex items-center gap-1.5 ml-auto">
+          <i class="fas fa-download" aria-hidden="true"></i>Export CSV
+        </button>
+      </div>
+    )}
+
+    <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+      <div id="visitor-logs-list">
+        <p class="text-sm text-text-secondary text-center py-6">Loading…</p>
+      </div>
     </div>
   </div>
 
@@ -173,10 +215,8 @@ const isMember = user.role === 'member';
     <div class="bg-white rounded-xl border border-border-light overflow-hidden mb-4">
       <div class="px-5 py-4 border-b border-border-light bg-gray-50 flex items-center justify-between">
         <h2 class="text-lg font-semibold text-text-primary">Delivery Log</h2>
-        <div class="flex items-center gap-2">
-          <input type="date" id="delivery-date"
-            class="text-sm border border-border-light rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        </div>
+        <input type="date" id="delivery-date"
+          class="text-sm border border-border-light rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-600" />
       </div>
       <div id="deliveries-list" class="p-5">
         <p class="text-sm text-text-secondary text-center py-4">Loading…</p>
@@ -210,11 +250,13 @@ const isMember = user.role === 'member';
     )}
   </div>
 
-  <script define:vars={{ isGuard, userId: user.id }}>
+  <script define:vars={{ isGuard, isExec, userId: user.id }}>
     const STATUS_BADGE = {
       approved: 'bg-green-100 text-green-700', pending: 'bg-yellow-100 text-yellow-700',
       used: 'bg-gray-100 text-gray-600', expired: 'bg-red-100 text-red-700', cancelled: 'bg-red-100 text-red-700',
     };
+
+    let allGates = [];
 
     function switchTab(tab) {
       const logs = document.getElementById('panel-logs');
@@ -237,11 +279,97 @@ const isMember = user.role === 'member';
       }
     }
 
+    async function loadGates() {
+      const res = await fetch('/api/v1/visitors/gates', { credentials: 'include' });
+      if (!res.ok) return;
+      allGates = await res.json();
+
+      // Populate entry gate select (guard form)
+      const entryGate = document.getElementById('entry-gate');
+      if (entryGate) {
+        allGates.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = g.name;
+          entryGate.appendChild(opt);
+        });
+      }
+
+      // Populate filter gate select
+      const filterGate = document.getElementById('filter-gate');
+      if (filterGate) {
+        allGates.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = g.name;
+          filterGate.appendChild(opt);
+        });
+      }
+    }
+
+    function currentLogFilters() {
+      return {
+        visitor_type: document.getElementById('filter-vtype')?.value ?? '',
+        gate_id:      document.getElementById('filter-gate')?.value ?? '',
+        date_from:    document.getElementById('filter-date-from')?.value ?? '',
+        date_to:      document.getElementById('filter-date-to')?.value ?? '',
+      };
+    }
+
     async function loadAll() {
       await Promise.all([
         isGuard ? loadActiveVisitors() : loadPreApprovals(),
         loadLogs(),
       ]);
+    }
+
+    async function loadLogs(filters = {}) {
+      const container = document.getElementById('visitor-logs-list');
+      if (!container) return;
+      const f = { ...currentLogFilters(), ...filters };
+      const params = new URLSearchParams({ limit: '100' });
+      if (f.visitor_type) params.set('visitor_type', f.visitor_type);
+      if (f.gate_id)      params.set('gate_id', f.gate_id);
+      if (f.date_from)    params.set('date_from', f.date_from);
+      if (f.date_to)      params.set('date_to', f.date_to);
+
+      const res = await fetch(`/api/v1/visitors/logs?${params}`, { credentials: 'include' });
+      const logs = res.ok ? await res.json() : [];
+
+      if (!logs.length) {
+        container.innerHTML = '<p class="text-sm text-text-secondary text-center py-6">No visitor logs.</p>';
+        return;
+      }
+      container.innerHTML = `
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-border-light">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Visitor</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary hidden md:table-cell">Unit</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Type</th>
+              ${(isExec || isGuard) ? '<th class="px-4 py-3 text-left text-xs font-medium text-text-secondary hidden lg:table-cell">Gate</th>' : ''}
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Entry</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Exit</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border-light">
+            ${logs.map((l) => `
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium text-text-primary">${l.visitor_name}</td>
+                <td class="px-4 py-3 hidden md:table-cell text-text-secondary">${l.units?.unit_number ?? '—'}</td>
+                <td class="px-4 py-3 text-text-secondary capitalize text-xs">
+                  ${l.visitor_type ? l.visitor_type.replace(/_/g,' ') : l.entry_type.replace(/_/g,' ')}
+                </td>
+                ${(isExec || isGuard) ? `<td class="px-4 py-3 hidden lg:table-cell text-text-secondary text-xs">${l.gates?.name ?? '—'}</td>` : ''}
+                <td class="px-4 py-3 text-text-secondary text-xs">${new Date(l.entry_time).toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})}</td>
+                <td class="px-4 py-3 text-xs ${l.exit_time ? 'text-text-secondary' : 'text-green-600 font-medium'}">
+                  ${l.exit_time ? new Date(l.exit_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '● Still inside'}
+                  ${isGuard && !l.exit_time ? `<button onclick="logExit('${l.id}')" class="ml-2 text-red-600 hover:underline text-xs">Exit</button>` : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
     }
 
     async function loadDeliveries(date) {
@@ -268,7 +396,7 @@ const isMember = user.role === 'member';
             ${items.map((d) => `
               <tr class="hover:bg-gray-50">
                 <td class="px-4 py-3 font-medium text-text-primary">${d.units?.unit_number ?? '—'}</td>
-                <td class="px-4 py-3 text-text-secondary">${d.courier_company ?? '—'}${d.tracking_number ? ` <span class="text-xs text-text-secondary">(${d.tracking_number})</span>` : ''}</td>
+                <td class="px-4 py-3 text-text-secondary">${d.courier_company ?? '—'}${d.tracking_number ? ` <span class="text-xs">(${d.tracking_number})</span>` : ''}</td>
                 <td class="px-4 py-3 text-xs text-text-secondary">${new Date(d.received_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</td>
                 <td class="px-4 py-3">
                   ${d.collected_at
@@ -281,18 +409,8 @@ const isMember = user.role === 'member';
               </tr>
             `).join('')}
           </tbody>
-        </table>
-      `;
+        </table>`;
     }
-
-    async function markCollected(deliveryId) {
-      const res = await fetch(`/api/v1/visitors/deliveries/${deliveryId}/collect`, { method: 'PUT', credentials: 'include' });
-      if (res.ok) loadDeliveries(document.getElementById('delivery-date')?.value);
-      else alert('Failed to mark as collected.');
-    }
-
-    window.switchTab = switchTab;
-    window.markCollected = markCollected;
 
     async function loadPreApprovals() {
       const container = document.getElementById('pre-approvals-list');
@@ -331,7 +449,10 @@ const isMember = user.role === 'member';
         <div class="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50">
           <div>
             <div class="font-medium text-sm text-text-primary">${l.visitor_name}</div>
-            <div class="text-xs text-text-secondary mt-0.5">Unit: ${l.units?.unit_number ?? '—'} · In: ${new Date(l.entry_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
+            <div class="text-xs text-text-secondary mt-0.5">
+              Unit: ${l.units?.unit_number ?? '—'} · In: ${new Date(l.entry_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
+              ${l.visitor_type ? `· ${l.visitor_type.replace(/_/g,' ')}` : ''}
+            </div>
           </div>
           <button onclick="logExit('${l.id}')" class="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg font-medium transition-colors">
             <i class="fas fa-sign-out-alt mr-1" aria-hidden="true"></i>Log Exit
@@ -340,67 +461,61 @@ const isMember = user.role === 'member';
       `).join('');
     }
 
-    async function loadLogs() {
-      const container = document.getElementById('visitor-logs-list');
-      if (!container) return;
-      const res = await fetch('/api/v1/visitors/logs', { credentials: 'include' });
-      const logs = await res.json();
-      if (!logs.length) {
-        container.innerHTML = '<p class="text-sm text-text-secondary text-center py-6">No visitor logs.</p>';
-        return;
-      }
-      container.innerHTML = `
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 border-b border-border-light">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Visitor</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary hidden md:table-cell">Unit</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Entry</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Exit</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-border-light">
-            ${logs.map((l) => `
-              <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 font-medium text-text-primary">${l.visitor_name}</td>
-                <td class="px-4 py-3 hidden md:table-cell text-text-secondary">${l.units?.unit_number ?? '—'}</td>
-                <td class="px-4 py-3 text-text-secondary capitalize">${l.entry_type.replace('_',' ')}</td>
-                <td class="px-4 py-3 text-text-secondary text-xs">${new Date(l.entry_time).toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})}</td>
-                <td class="px-4 py-3 text-xs ${l.exit_time ? 'text-text-secondary' : 'text-green-600 font-medium'}">
-                  ${l.exit_time ? new Date(l.exit_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '● Still inside'}
-                  ${isGuard && !l.exit_time ? `<button onclick="logExit('${l.id}')" class="ml-2 text-red-600 hover:underline text-xs">Exit</button>` : ''}
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>`;
-    }
-
     async function logExit(logId) {
       const res = await fetch(`/api/v1/visitors/logs/${logId}/exit`, { method: 'PUT', credentials: 'include' });
       if (res.ok) loadAll();
       else alert('Failed to log exit.');
     }
 
-    // Entry form
+    async function markCollected(deliveryId) {
+      const res = await fetch(`/api/v1/visitors/deliveries/${deliveryId}/collect`, { method: 'PUT', credentials: 'include' });
+      if (res.ok) loadDeliveries(document.getElementById('delivery-date')?.value);
+      else alert('Failed to mark as collected.');
+    }
+
+    // ── Filter bar events ────────────────────────────────────────────────────
+    document.getElementById('filter-apply')?.addEventListener('click', () => loadLogs());
+
+    document.getElementById('export-csv')?.addEventListener('click', async () => {
+      const f = currentLogFilters();
+      const params = new URLSearchParams();
+      if (f.visitor_type) params.set('visitor_type', f.visitor_type);
+      if (f.gate_id)      params.set('gate_id', f.gate_id);
+      if (f.date_from)    params.set('date_from', f.date_from);
+      if (f.date_to)      params.set('date_to', f.date_to);
+      const res = await fetch(`/api/v1/visitors/export?${params}`, { credentials: 'include' });
+      if (!res.ok) { alert('Export failed. Please try again.'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `visitor-logs-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // ── Entry form (guard) ───────────────────────────────────────────────────
     document.getElementById('entry-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('entry-visitor-name').value.trim();
-      const unitText = document.getElementById('entry-unit').value.trim();
-      const entryType = document.getElementById('entry-type').value;
-      const vehicle = document.getElementById('entry-vehicle').value.trim();
+      const name       = document.getElementById('entry-visitor-name').value.trim();
+      const unitText   = document.getElementById('entry-unit').value.trim();
+      const entryType  = document.getElementById('entry-type').value;
+      const visitorType = document.getElementById('entry-visitor-type').value || null;
+      const gateId     = document.getElementById('entry-gate').value || null;
+      const vehicle    = document.getElementById('entry-vehicle').value.trim();
 
       if (!name || !unitText) return alert('Visitor name and host unit are required.');
 
-      // Look up unit id from unit_number
       const unitRes = await fetch(`/api/v1/visitors/lookup-unit?unit_number=${encodeURIComponent(unitText)}`, { credentials: 'include' });
       const unitData = unitRes.ok ? await unitRes.json() : null;
       if (!unitData?.id) return alert('Unit not found. Please enter exact unit number (e.g. A-101).');
 
       const res = await fetch('/api/v1/visitors/logs', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ visitor_name: name, host_unit_id: unitData.id, entry_type: entryType, vehicle_number: vehicle || null }),
+        body: JSON.stringify({
+          visitor_name: name, host_unit_id: unitData.id, entry_type: entryType,
+          visitor_type: visitorType, gate_id: gateId, vehicle_number: vehicle || null,
+        }),
       });
 
       if (res.ok) {
@@ -415,18 +530,18 @@ const isMember = user.role === 'member';
       }
     });
 
-    // Delivery date picker
+    // ── Delivery date picker ─────────────────────────────────────────────────
     const deliveryDateInput = document.getElementById('delivery-date');
     if (deliveryDateInput) {
       deliveryDateInput.value = new Date().toISOString().slice(0, 10);
       deliveryDateInput.addEventListener('change', () => loadDeliveries(deliveryDateInput.value));
     }
 
-    // Delivery form (guard only)
+    // ── Delivery form (guard) ────────────────────────────────────────────────
     document.getElementById('delivery-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const unitText = document.getElementById('del-unit').value.trim();
-      const courier = document.getElementById('del-courier').value.trim();
+      const courier  = document.getElementById('del-courier').value.trim();
       const tracking = document.getElementById('del-tracking').value.trim();
 
       const unitRes = await fetch(`/api/v1/visitors/lookup-unit?unit_number=${encodeURIComponent(unitText)}`, { credentials: 'include' });
@@ -450,7 +565,10 @@ const isMember = user.role === 'member';
       }
     });
 
+    window.switchTab = switchTab;
+    window.markCollected = markCollected;
     window.logExit = logExit;
-    loadAll();
+
+    loadGates().then(() => loadAll());
   </script>
 </PortalLayout>

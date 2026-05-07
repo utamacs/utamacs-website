@@ -1,0 +1,341 @@
+---
+export const prerender = false;
+// Public page — intentionally no auth check so prospective residents can access it
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — UTAMACS Resident Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #F8FAFC; }
+    .step-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; transition: all 0.2s; }
+    .step-active  { background: #1E3A8A; color: white; }
+    .step-done    { background: #10B981; color: white; }
+    .step-pending { background: #E5E7EB; color: #6B7280; }
+    .form-input { width: 100%; padding: 10px 14px; border: 1px solid #E5E7EB; border-radius: 10px; font-size: 14px; outline: none; transition: border 0.15s; }
+    .form-input:focus { border-color: #1E3A8A; box-shadow: 0 0 0 3px rgba(30,58,138,0.08); }
+    .form-label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 5px; }
+    .btn-primary { background: #1E3A8A; color: white; padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: background 0.15s; }
+    .btn-primary:hover { background: #1e3a8a; filter: brightness(1.15); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-outline { background: white; color: #1E3A8A; padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; border: 2px solid #1E3A8A; transition: all 0.15s; }
+    .btn-outline:hover { background: #EFF6FF; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 px-6 py-4">
+    <div class="max-w-2xl mx-auto flex items-center gap-3">
+      <a href="/" class="text-blue-900 hover:text-blue-700 text-sm flex items-center gap-1.5">
+        <i class="fas fa-arrow-left text-xs"></i> Back to site
+      </a>
+      <span class="text-gray-300 text-sm">|</span>
+      <span class="text-sm font-semibold text-gray-900">UTAMACS Resident Registration</span>
+    </div>
+  </header>
+
+  <main class="flex-1 py-10 px-4">
+    <div class="max-w-2xl mx-auto">
+      <!-- Progress -->
+      <div class="flex items-center gap-3 mb-8">
+        <div class="flex items-center gap-2">
+          <div id="dot-1" class="step-dot step-active">1</div>
+          <span id="label-1" class="text-sm font-medium text-blue-900">Personal Info</span>
+        </div>
+        <div class="flex-1 h-px bg-gray-200"></div>
+        <div class="flex items-center gap-2">
+          <div id="dot-2" class="step-dot step-pending">2</div>
+          <span id="label-2" class="text-sm text-gray-500">Flat & Identity</span>
+        </div>
+        <div class="flex-1 h-px bg-gray-200"></div>
+        <div class="flex items-center gap-2">
+          <div id="dot-3" class="step-dot step-pending">3</div>
+          <span id="label-3" class="text-sm text-gray-500">Review & Submit</span>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        <!-- ── Step 1: Personal Info ── -->
+        <div id="step-1">
+          <h2 class="text-xl font-bold text-blue-900 mb-1">Personal Information</h2>
+          <p class="text-sm text-gray-500 mb-6">Please provide your name and contact details.</p>
+
+          <div class="space-y-4">
+            <div>
+              <label class="form-label" for="r-full-name">Full Name <span class="text-red-500">*</span></label>
+              <input id="r-full-name" type="text" maxlength="100" class="form-input" placeholder="As per your ID document" />
+            </div>
+            <div>
+              <label class="form-label" for="r-email">Email Address <span class="text-red-500">*</span></label>
+              <input id="r-email" type="email" maxlength="254" class="form-input" placeholder="you@example.com" />
+            </div>
+            <div>
+              <label class="form-label" for="r-phone">Mobile Number</label>
+              <input id="r-phone" type="tel" maxlength="15" class="form-input" placeholder="+91XXXXXXXXXX" />
+            </div>
+            <div>
+              <label class="form-label" for="r-occupancy">Occupancy Type <span class="text-red-500">*</span></label>
+              <select id="r-occupancy" class="form-input bg-white">
+                <option value="owner">Owner</option>
+                <option value="tenant">Tenant</option>
+                <option value="co_owner">Co-owner</option>
+                <option value="family">Family Member</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="step1-error" class="hidden mt-4 p-3 bg-red-50 rounded-xl text-sm text-red-700"></div>
+
+          <div class="mt-6 flex justify-end">
+            <button id="step1-next" class="btn-primary flex items-center gap-2">
+              Next <i class="fas fa-arrow-right text-xs"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Step 2: Flat & Identity ── -->
+        <div id="step-2" class="hidden">
+          <h2 class="text-xl font-bold text-blue-900 mb-1">Flat & Identity</h2>
+          <p class="text-sm text-gray-500 mb-6">Select your flat and provide ID details (optional but recommended).</p>
+
+          <div class="space-y-4">
+            <div>
+              <label class="form-label" for="r-unit">Flat / Unit</label>
+              <select id="r-unit" class="form-input bg-white">
+                <option value="">— Select your flat (optional) —</option>
+              </select>
+              <p class="text-xs text-gray-400 mt-1">Your flat selection will be verified by the executive committee.</p>
+            </div>
+            <div>
+              <label class="form-label" for="r-movein">Move-in Date</label>
+              <input id="r-movein" type="date" class="form-input" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="form-label" for="r-id-type">ID Type</label>
+                <select id="r-id-type" class="form-input bg-white">
+                  <option value="">— Select —</option>
+                  <option value="aadhaar">Aadhaar Card</option>
+                  <option value="voter_id">Voter ID</option>
+                  <option value="passport">Passport</option>
+                  <option value="dl">Driving Licence</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="r-id-number">ID Number</label>
+                <input id="r-id-number" type="text" maxlength="30" class="form-input" placeholder="Last 4 digits only for Aadhaar" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="form-label" for="r-veh-reg">Vehicle Reg. No.</label>
+                <input id="r-veh-reg" type="text" maxlength="20" class="form-input" placeholder="TS 09 AA 1234" />
+              </div>
+              <div>
+                <label class="form-label" for="r-veh-make">Vehicle Make</label>
+                <input id="r-veh-make" type="text" maxlength="50" class="form-input" placeholder="Maruti, Honda…" />
+              </div>
+            </div>
+          </div>
+
+          <div id="step2-error" class="hidden mt-4 p-3 bg-red-50 rounded-xl text-sm text-red-700"></div>
+
+          <div class="mt-6 flex justify-between">
+            <button id="step2-back" class="btn-outline flex items-center gap-2">
+              <i class="fas fa-arrow-left text-xs"></i> Back
+            </button>
+            <button id="step2-next" class="btn-primary flex items-center gap-2">
+              Review <i class="fas fa-arrow-right text-xs"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Step 3: Review & Submit ── -->
+        <div id="step-3" class="hidden">
+          <h2 class="text-xl font-bold text-blue-900 mb-1">Review & Submit</h2>
+          <p class="text-sm text-gray-500 mb-6">Please confirm your details before submitting.</p>
+
+          <div id="review-content" class="space-y-3 text-sm">
+            <!-- Populated by JS -->
+          </div>
+
+          <div class="mt-5 p-4 bg-blue-50 rounded-xl text-xs text-blue-700">
+            <i class="fas fa-shield-alt mr-1"></i>
+            Your details will only be used for society management purposes. Personal data is protected per DPDPA 2023.
+            Once submitted, an executive will review your request within 2–3 business days.
+          </div>
+
+          <div id="step3-error" class="hidden mt-4 p-3 bg-red-50 rounded-xl text-sm text-red-700"></div>
+
+          <div class="mt-6 flex justify-between">
+            <button id="step3-back" class="btn-outline flex items-center gap-2">
+              <i class="fas fa-arrow-left text-xs"></i> Edit
+            </button>
+            <button id="submit-btn" class="btn-primary flex items-center gap-2">
+              <i class="fas fa-paper-plane text-xs"></i> Submit Request
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Step 4: Success ── -->
+        <div id="step-success" class="hidden text-center py-6">
+          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-check text-green-600 text-2xl"></i>
+          </div>
+          <h2 class="text-xl font-bold text-gray-900 mb-2">Request Submitted!</h2>
+          <p class="text-sm text-gray-500 mb-6">
+            Your registration request has been submitted. The executive committee will review it shortly.
+            You'll be notified by email once it's approved.
+          </p>
+          <p class="text-xs text-gray-400">Reference ID: <span id="ref-id" class="font-mono font-medium text-gray-600"></span></p>
+          <div class="mt-6">
+            <a href="/portal/login" class="btn-primary inline-flex items-center gap-2">
+              <i class="fas fa-sign-in-alt text-xs"></i> Go to Login
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      full_name: '', email: '', phone: '', occupancy_type: 'owner',
+      unit_id: null as string | null, move_in_date: null as string | null,
+      id_type: null as string | null, id_number: null as string | null,
+      vehicle_reg_no: null as string | null, vehicle_make: null as string | null,
+    };
+    let unitsMap: Record<string, string> = {};
+
+    function goTo(step: number) {
+      [1, 2, 3].forEach(n => {
+        document.getElementById(`step-${n}`)!.classList.toggle('hidden', n !== step);
+        const dot = document.getElementById(`dot-${n}`)!;
+        const label = document.getElementById(`label-${n}`)!;
+        dot.className = `step-dot ${n < step ? 'step-done' : n === step ? 'step-active' : 'step-pending'}`;
+        label.className = `text-sm ${n === step ? 'font-medium text-blue-900' : 'text-gray-500'}`;
+        if (n < step) dot.innerHTML = '<i class="fas fa-check" style="font-size:10px"></i>';
+        else dot.textContent = String(n);
+      });
+    }
+
+    async function loadUnits() {
+      try {
+        const res = await fetch('/api/v1/register/units');
+        if (!res.ok) return;
+        const units: { id: string; unit_number: string; block: string }[] = await res.json();
+        const sel = document.getElementById('r-unit') as HTMLSelectElement;
+        units.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = u.id;
+          opt.textContent = `${u.unit_number} (Block ${u.block})`;
+          sel.appendChild(opt);
+          unitsMap[u.id] = `${u.unit_number} (Block ${u.block})`;
+        });
+      } catch { /* non-fatal */ }
+    }
+
+    function val(id: string) {
+      return (document.getElementById(id) as HTMLInputElement | HTMLSelectElement)?.value?.trim() ?? '';
+    }
+
+    // Step 1 → 2
+    document.getElementById('step1-next')!.addEventListener('click', () => {
+      const name  = val('r-full-name');
+      const email = val('r-email');
+      const errEl = document.getElementById('step1-error')!;
+      errEl.classList.add('hidden');
+
+      if (name.length < 2)   { errEl.textContent = 'Full name is required (min 2 chars)'; errEl.classList.remove('hidden'); return; }
+      if (!email.includes('@')) { errEl.textContent = 'Valid email is required'; errEl.classList.remove('hidden'); return; }
+
+      state.full_name = name;
+      state.email = email;
+      state.phone = val('r-phone') || '';
+      state.occupancy_type = val('r-occupancy') || 'owner';
+
+      loadUnits();
+      goTo(2);
+    });
+
+    // Step 2 → back
+    document.getElementById('step2-back')!.addEventListener('click', () => goTo(1));
+
+    // Step 2 → review
+    document.getElementById('step2-next')!.addEventListener('click', () => {
+      state.unit_id      = val('r-unit') || null;
+      state.move_in_date = val('r-movein') || null;
+      state.id_type      = val('r-id-type') || null;
+      state.id_number    = val('r-id-number') || null;
+      state.vehicle_reg_no = val('r-veh-reg') || null;
+      state.vehicle_make   = val('r-veh-make') || null;
+
+      const rows: [string, string][] = [
+        ['Full Name', state.full_name],
+        ['Email', state.email],
+        ['Phone', state.phone || '—'],
+        ['Occupancy', state.occupancy_type.replace('_', ' ')],
+        ['Flat', state.unit_id ? (unitsMap[state.unit_id] ?? state.unit_id) : '—'],
+        ['Move-in Date', state.move_in_date ?? '—'],
+        ['ID Type', state.id_type ?? '—'],
+        ['ID Number', state.id_number ?? '—'],
+        ['Vehicle', [state.vehicle_make, state.vehicle_reg_no].filter(Boolean).join(' / ') || '—'],
+      ];
+
+      const content = document.getElementById('review-content')!;
+      content.innerHTML = rows.map(([k, v]) => `
+        <div class="flex items-start justify-between gap-4 py-2 border-b border-gray-100">
+          <span class="text-gray-500 min-w-[120px]">${k}</span>
+          <span class="text-gray-900 font-medium text-right">${v}</span>
+        </div>
+      `).join('');
+
+      goTo(3);
+    });
+
+    // Step 3 → back
+    document.getElementById('step3-back')!.addEventListener('click', () => goTo(2));
+
+    // Submit
+    document.getElementById('submit-btn')!.addEventListener('click', async () => {
+      const btn   = document.getElementById('submit-btn') as HTMLButtonElement;
+      const errEl = document.getElementById('step3-error')!;
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i> Submitting…';
+
+      try {
+        const payload: Record<string, unknown> = { ...state };
+        // Remove null/empty values
+        Object.keys(payload).forEach(k => { if (!payload[k]) delete payload[k]; });
+        payload.full_name = state.full_name;
+        payload.email = state.email;
+
+        const res = await fetch('/api/v1/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.status === 409) throw new Error('A registration for this email already exists.');
+        if (!res.ok) throw new Error(data.message ?? 'Submission failed. Please try again.');
+
+        document.getElementById('ref-id')!.textContent = data.id?.slice(0, 8).toUpperCase() ?? '';
+        document.getElementById('step-3')!.classList.add('hidden');
+        document.getElementById('step-success')!.classList.remove('hidden');
+      } catch (err: any) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane text-xs"></i> Submit Request';
+      }
+    });
+  </script>
+</body>
+</html>

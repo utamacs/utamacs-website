@@ -198,15 +198,36 @@ const isExec = ['executive', 'admin'].includes(user.role);
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label for="alloc-vehicle-number" class="block text-sm font-medium text-text-primary mb-1">Vehicle Number</label>
+              <label for="alloc-vehicle-number" class="block text-sm font-medium text-text-primary mb-1">Vehicle Reg. No.</label>
               <input id="alloc-vehicle-number" type="text" placeholder="TS09AB1234"
                 class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
-              <label for="alloc-vehicle-make" class="block text-sm font-medium text-text-primary mb-1">Vehicle Make</label>
-              <input id="alloc-vehicle-make" type="text" placeholder="Maruti Swift"
+              <label for="alloc-vehicle-make" class="block text-sm font-medium text-text-primary mb-1">Make</label>
+              <input id="alloc-vehicle-make" type="text" placeholder="Maruti"
                 class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
             </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="alloc-vehicle-model" class="block text-sm font-medium text-text-primary mb-1">Model</label>
+              <input id="alloc-vehicle-model" type="text" placeholder="Swift Dzire"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label for="alloc-vehicle-colour" class="block text-sm font-medium text-text-primary mb-1">Colour</label>
+              <input id="alloc-vehicle-colour" type="text" placeholder="White"
+                class="w-full border border-border-light rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1">RC Document <span class="text-text-secondary font-normal">(optional, PDF/image, max 5 MB)</span></label>
+            <div id="rc-drop-zone" class="border-2 border-dashed border-border-light rounded-lg p-3 text-center cursor-pointer hover:border-primary-600 transition-colors text-sm">
+              <i class="fas fa-file-upload text-text-secondary mr-2" aria-hidden="true"></i>
+              <span class="text-text-secondary">Click or drag RC document here</span>
+              <input type="file" id="rc-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" aria-hidden="true" />
+            </div>
+            <p id="rc-file-name" class="text-xs text-primary-600 mt-1 hidden"></p>
           </div>
           <div>
             <label for="alloc-expires-at" class="block text-sm font-medium text-text-primary mb-1">Expires At (optional)</label>
@@ -227,6 +248,43 @@ const isExec = ['executive', 'admin'].includes(user.role);
       </div>
     </div>
   )}
+
+  <!-- Transfer Request Modal (all authenticated members) -->
+  <div id="transfer-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+      <div class="p-6 border-b border-border-light flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-text-primary">Request Slot Transfer</h2>
+        <button onclick="closeTransferModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <p class="text-sm text-text-secondary">Request to transfer your slot to another flat. The management committee will review and approve.</p>
+        <input type="hidden" id="transfer-slot-id" />
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1">Your Slot</label>
+          <input id="transfer-slot-display" type="text" readonly
+            class="w-full border border-border-light rounded-lg px-3 py-2 bg-gray-50 text-sm text-text-primary" />
+        </div>
+        <div>
+          <label for="transfer-to-unit" class="block text-sm font-medium text-text-primary mb-1">Transfer To (Unit) *</label>
+          <select id="transfer-to-unit" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+            <option value="">Loading units…</option>
+          </select>
+        </div>
+        <div>
+          <label for="transfer-reason" class="block text-sm font-medium text-text-primary mb-1">Reason</label>
+          <textarea id="transfer-reason" rows="3" maxlength="500" placeholder="Why are you requesting this transfer?"
+            class="w-full border border-border-light rounded-lg px-3 py-2 text-sm resize-none"></textarea>
+        </div>
+        <div id="transfer-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+      </div>
+      <div class="p-6 pt-0 flex gap-3">
+        <button onclick="closeTransferModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+        <button id="transfer-save-btn" class="flex-1 btn-primary text-sm">Submit Request</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Add Slot Modal (exec only) -->
   {isExec && (
@@ -310,6 +368,37 @@ const isExec = ['executive', 'admin'].includes(user.role);
     let allSlots = [];
     let allMembers = [];
     let currentTab = 'slots';
+    let rcFile = null;
+
+    function initRcDropZone() {
+      const dropZone = document.getElementById('rc-drop-zone');
+      const fileInput = document.getElementById('rc-file-input');
+      const fileNameEl = document.getElementById('rc-file-name');
+      if (!dropZone || dropZone._rcInit) return;
+      dropZone._rcInit = true;
+
+      function handleRcFile(file) {
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+        if (!allowed.includes(file.type)) { alert('Only PDF, JPEG, PNG, or WebP allowed.'); return; }
+        if (file.size > 5 * 1024 * 1024) { alert('RC document must be under 5 MB.'); return; }
+        rcFile = file;
+        fileNameEl.textContent = `Selected: ${file.name}`;
+        fileNameEl.classList.remove('hidden');
+      }
+
+      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-primary-600'); });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-primary-600'));
+      dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('border-primary-600');
+        const f = e.dataTransfer?.files[0];
+        if (f) handleRcFile(f);
+      });
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files?.[0]) handleRcFile(fileInput.files[0]);
+      });
+    }
 
     function switchTab(tab) {
       currentTab = tab;
@@ -430,8 +519,16 @@ const isExec = ['executive', 'admin'].includes(user.role);
                 <p class="font-medium">${slot?.level != null ? (slot.level === 0 ? 'Ground' : `Level ${slot.level}`) : '—'}</p>
               </div>
               <div>
-                <p class="text-text-secondary text-xs">Vehicle</p>
-                <p class="font-medium">${activeAlloc.vehicle_number ?? '—'} ${activeAlloc.vehicle_make ? `(${activeAlloc.vehicle_make})` : ''}</p>
+                <p class="text-text-secondary text-xs">Vehicle Reg. No.</p>
+                <p class="font-medium">${activeAlloc.vehicle_number ?? '—'}</p>
+              </div>
+              <div>
+                <p class="text-text-secondary text-xs">Make / Model</p>
+                <p class="font-medium">${[activeAlloc.vehicle_make, slot?.vehicle_model].filter(Boolean).join(' ') || '—'}</p>
+              </div>
+              <div>
+                <p class="text-text-secondary text-xs">Colour</p>
+                <p class="font-medium">${slot?.vehicle_colour ?? '—'}</p>
               </div>
               <div>
                 <p class="text-text-secondary text-xs">Allocated On</p>
@@ -443,6 +540,12 @@ const isExec = ['executive', 'admin'].includes(user.role);
               </div>
             </div>
             ${activeAlloc.notes ? `<p class="text-xs text-text-secondary mt-4 bg-gray-50 rounded-lg p-3">${activeAlloc.notes}</p>` : ''}
+            <div class="mt-4 pt-4 border-t border-border-light">
+              <button onclick="openTransferModal('${activeAlloc.slot_id}','${slot?.slot_number ?? ''}')"
+                class="btn-outline text-sm">
+                <i class="fas fa-exchange-alt mr-2" aria-hidden="true"></i>Request Slot Transfer
+              </button>
+            </div>
           </div>`;
         }
 
@@ -638,6 +741,9 @@ const isExec = ['executive', 'admin'].includes(user.role);
       document.getElementById('alloc-slot-id').value = slotId;
       document.getElementById('alloc-slot-display').value = slotNumber;
       document.getElementById('alloc-error').classList.add('hidden');
+      rcFile = null;
+      document.getElementById('rc-file-name')?.classList.add('hidden');
+      initRcDropZone();
       document.getElementById('allocate-modal').classList.remove('hidden');
 
       // Load units + members
@@ -683,6 +789,8 @@ const isExec = ['executive', 'admin'].includes(user.role);
       const userId = document.getElementById('alloc-user').value;
       const vehicleNumber = document.getElementById('alloc-vehicle-number').value.trim();
       const vehicleMake = document.getElementById('alloc-vehicle-make').value.trim();
+      const vehicleModel = document.getElementById('alloc-vehicle-model').value.trim();
+      const vehicleColour = document.getElementById('alloc-vehicle-colour').value.trim();
       const expiresAt = document.getElementById('alloc-expires-at').value;
       const notes = document.getElementById('alloc-notes').value.trim();
       const errEl = document.getElementById('alloc-error');
@@ -699,12 +807,29 @@ const isExec = ['executive', 'admin'].includes(user.role);
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slot_id: slotId, unit_id: unitId, user_id: userId,
-            vehicle_number: vehicleNumber || undefined, vehicle_make: vehicleMake || undefined,
-            expires_at: expiresAt || undefined, notes: notes || undefined }),
+          body: JSON.stringify({
+            slot_id: slotId, unit_id: unitId, user_id: userId,
+            vehicle_number: vehicleNumber || undefined,
+            vehicle_make: vehicleMake || undefined,
+            vehicle_model: vehicleModel || undefined,
+            vehicle_colour: vehicleColour || undefined,
+            expires_at: expiresAt || undefined,
+            notes: notes || undefined,
+          }),
         });
         const data = await res.json();
         if (!res.ok) { errEl.textContent = data.error || 'Allocation failed.'; errEl.classList.remove('hidden'); return; }
+
+        // Upload RC document if selected
+        if (rcFile) {
+          btn.textContent = 'Uploading RC…';
+          const fd = new FormData();
+          fd.append('file', rcFile);
+          await fetch(`/api/v1/parking/slots/${slotId}/rc-document`, {
+            method: 'POST', credentials: 'include', body: fd,
+          });
+        }
+
         closeAllocateModal();
         allSlots = [];
         loadSlots();
@@ -825,6 +950,75 @@ const isExec = ['executive', 'admin'].includes(user.role);
       } finally {
         btn.disabled = false;
         btn.textContent = 'Create Slot';
+      }
+    });
+
+    // ── Transfer Request Modal ───────────────────────────────────────────────
+
+    async function openTransferModal(slotId, slotNumber) {
+      document.getElementById('transfer-slot-id').value = slotId;
+      document.getElementById('transfer-slot-display').value = slotNumber;
+      document.getElementById('transfer-error').classList.add('hidden');
+      document.getElementById('transfer-reason').value = '';
+      document.getElementById('transfer-modal').classList.remove('hidden');
+
+      // Load all units
+      const unitSelect = document.getElementById('transfer-to-unit');
+      unitSelect.innerHTML = '<option value="">Loading…</option>';
+      try {
+        const res = await fetch('/api/v1/members?limit=300', { credentials: 'include' });
+        const members = await res.json();
+        const list = Array.isArray(members) ? members : (members.data ?? []);
+        const unitMap = new Map();
+        list.forEach(m => {
+          if (m.unit_id && m.units && !unitMap.has(m.unit_id)) {
+            unitMap.set(m.unit_id, m.units.unit_number || m.unit_id);
+          }
+        });
+        unitSelect.innerHTML = '<option value="">Select unit…</option>' +
+          Array.from(unitMap.entries())
+            .sort((a, b) => a[1].localeCompare(b[1]))
+            .map(([uid, num]) => `<option value="${uid}">${num}</option>`)
+            .join('');
+      } catch {
+        unitSelect.innerHTML = '<option value="">Failed to load units</option>';
+      }
+    }
+
+    function closeTransferModal() {
+      document.getElementById('transfer-modal').classList.add('hidden');
+    }
+
+    document.getElementById('transfer-save-btn')?.addEventListener('click', async () => {
+      const slotId = document.getElementById('transfer-slot-id').value;
+      const toUnitId = document.getElementById('transfer-to-unit').value;
+      const reason = document.getElementById('transfer-reason').value.trim();
+      const errEl = document.getElementById('transfer-error');
+      const btn = document.getElementById('transfer-save-btn');
+
+      if (!toUnitId) { errEl.textContent = 'Please select the unit you want to transfer to.'; errEl.classList.remove('hidden'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/parking/transfers', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slot_id: slotId, to_unit_id: toUnitId, reason: reason || undefined }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.message || data.error || 'Request failed.'; errEl.classList.remove('hidden'); return; }
+        closeTransferModal();
+        alert('Transfer request submitted. The management committee will review it.');
+      } catch {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Submit Request';
       }
     });
 

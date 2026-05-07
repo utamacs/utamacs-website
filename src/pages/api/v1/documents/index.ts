@@ -5,102 +5,206 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const VALID_CATEGORIES = ['Bylaws', 'Minutes', 'Financial', 'Legal', 'Circulars', 'Forms', 'Other'] as const;
+
+// Expanded category list matching migration 050
+const VALID_CATEGORIES = [
+  'Bylaws', 'Minutes', 'Financial', 'Legal',
+  'Circulars', 'Forms', 'HOTO', 'Governance', 'Maintenance', 'Other',
+] as const;
+
+const VALID_ROLES = ['member', 'executive', 'admin'] as const;
+
+const ALLOWED_MIME: Record<string, string> = {
+  'application/pdf':  'pdf',
+  'image/jpeg':       'jpg',
+  'image/png':        'png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':       'xlsx',
+  'application/vnd.ms-excel': 'xls',
+  'text/csv':         'csv',
+};
+const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const GET: APIRoute = async ({ request, url }) => {
   try {
     const user = await validateJWT(request);
     const sb = getSupabaseServiceClient();
 
-    const category = url.searchParams.get('category');
+    const category  = url.searchParams.get('category') ?? '';
+    const folder_id = url.searchParams.get('folder_id') ?? '';
+    const q         = url.searchParams.get('q')?.trim() ?? '';
+    const archived  = url.searchParams.get('archived') === 'true';
 
     let query = sb
       .from('documents')
-      .select('id, title, description, category, file_name, mime_type, file_size_bytes, version, is_public, requires_role, created_by, created_at')
+      .select('id, title, description, category, file_name, mime_type, file_size_bytes, version, is_public, requires_role, storage_key, folder_id, tags, is_archived, download_count, created_by, created_at')
       .eq('society_id', SOCIETY_ID)
+      .eq('is_archived', archived)
       .order('category')
       .order('title');
 
     // Role-based visibility
-    if (user.role === 'member') {
-      query = query.or('is_public.eq.true,requires_role.eq.member');
-    } else if (['executive', 'admin'].includes(user.role)) {
+    if (['executive', 'admin'].includes(user.role) || user.isAdmin) {
       // See all
     } else {
-      query = query.eq('is_public', true);
+      query = query.or('is_public.eq.true,requires_role.eq.member');
     }
 
     if (category && VALID_CATEGORIES.includes(category as typeof VALID_CATEGORIES[number])) {
       query = query.eq('category', category);
     }
+    if (folder_id && UUID_RE.test(folder_id)) {
+      query = query.eq('folder_id', folder_id);
+    } else if (folder_id === 'root') {
+      query = query.is('folder_id', null);
+    }
+    if (q) query = query.ilike('title', `%${q}%`);
 
     const { data, error } = await query;
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
-    return new Response(JSON.stringify(data ?? []), { headers: { 'Content-Type': 'application/json' } });
+    // Generate signed URLs in parallel (1h expiry)
+    const storage = new SupabaseStorageService();
+    const withUrls = await Promise.all(
+      (data ?? []).map(async (doc: any) => {
+        let download_url: string | null = null;
+        try {
+          download_url = await storage.getSignedUrl('policy-documents', doc.storage_key, 3600);
+        } catch { /* skip — key may not exist yet */ }
+        const { storage_key: _sk, ...rest } = doc;
+        return { ...rest, download_url };
+      })
+    );
+
+    return Response.json(withUrls);
   } catch (err) {
     return normalizeError(err, request.url);
   }
 };
 
+// POST — multipart file upload (exec/admin only)
 export const POST: APIRoute = async ({ request }) => {
   try {
     const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role)) {
-      return new Response(JSON.stringify({ error: 'Only executive and admin can upload documents' }), {
-        status: 403, headers: { 'Content-Type': 'application/json' },
-      });
+    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
+      return Response.json({ error: 'FORBIDDEN', message: 'Only exec/admin can upload documents' }, { status: 403 });
     }
 
-    const body = await request.json() as {
-      title?: string; description?: string; category?: string;
-      storage_key?: string; file_name?: string; mime_type?: string;
-      file_size_bytes?: number; is_public?: boolean; requires_role?: string;
-    };
+    const formData = await request.formData();
+    const file     = formData.get('file') as File | null;
+    const title    = sanitizePlainText(String(formData.get('title') ?? '')).trim();
+    const category = String(formData.get('category') ?? '');
+    const description  = sanitizePlainText(String(formData.get('description') ?? '')).trim() || null;
+    const requires_role = String(formData.get('requires_role') ?? 'member');
+    const is_public    = formData.get('is_public') === 'true';
+    const folder_id    = String(formData.get('folder_id') ?? '') || null;
+    const tagsRaw      = String(formData.get('tags') ?? '');
+    const tags: string[] = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
 
-    if (!body.title?.trim() || !body.storage_key?.trim() || !body.category) {
-      return new Response(JSON.stringify({ error: 'title, storage_key, and category are required' }), {
-        status: 400, headers: { 'Content-Type': 'application/json' },
-      });
+    if (!file)  return Response.json({ error: 'VALIDATION', message: 'No file provided' }, { status: 400 });
+    if (!title) return Response.json({ error: 'VALIDATION', message: 'Title is required' }, { status: 400 });
+    if (!VALID_CATEGORIES.includes(category as typeof VALID_CATEGORIES[number])) {
+      return Response.json({ error: 'VALIDATION', message: `category must be one of: ${VALID_CATEGORIES.join(', ')}` }, { status: 400 });
+    }
+    if (!VALID_ROLES.includes(requires_role as typeof VALID_ROLES[number])) {
+      return Response.json({ error: 'VALIDATION', message: 'Invalid requires_role' }, { status: 400 });
+    }
+    if (folder_id && !UUID_RE.test(folder_id)) {
+      return Response.json({ error: 'VALIDATION', message: 'Invalid folder_id' }, { status: 400 });
     }
 
-    if (!VALID_CATEGORIES.includes(body.category as typeof VALID_CATEGORIES[number])) {
-      return new Response(JSON.stringify({ error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` }), {
-        status: 400, headers: { 'Content-Type': 'application/json' },
-      });
+    const ext = ALLOWED_MIME[file.type];
+    if (!ext) return Response.json({ error: 'VALIDATION', message: 'Unsupported file type (PDF, DOCX, XLSX, CSV, JPG, PNG allowed)' }, { status: 400 });
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    if (buffer.length > MAX_BYTES) {
+      return Response.json({ error: 'VALIDATION', message: 'File exceeds 20 MB limit' }, { status: 400 });
     }
+
+    const key = `documents/${SOCIETY_ID}/${crypto.randomUUID()}.${ext}`;
+    const storage = new SupabaseStorageService();
+    await storage.upload('policy-documents', key, buffer, file.type);
 
     const sb = getSupabaseServiceClient();
     const { data, error } = await sb
       .from('documents')
       .insert({
-        society_id: SOCIETY_ID,
-        title: sanitizePlainText(body.title),
-        description: body.description ? sanitizePlainText(body.description) : null,
-        category: body.category,
-        storage_key: body.storage_key,
-        file_name: body.file_name ?? null,
-        mime_type: body.mime_type ?? null,
-        file_size_bytes: body.file_size_bytes ?? null,
-        version: 1,
-        is_public: body.is_public ?? false,
-        requires_role: body.requires_role ?? 'member',
-        created_by: user.id,
+        society_id:    SOCIETY_ID,
+        title,
+        description,
+        category,
+        storage_key:   key,
+        file_name:     file.name,
+        mime_type:     file.type,
+        file_size_bytes: buffer.length,
+        version:       1,
+        is_public,
+        requires_role,
+        folder_id:     folder_id ?? null,
+        tags,
+        created_by:    user.id,
       })
-      .select()
+      .select('id, title, category, file_name, mime_type, file_size_bytes, version, is_public, requires_role, folder_id, tags, created_at')
       .single();
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
     await writeAuditLog({
       societyId: SOCIETY_ID, userId: user.id,
-      action: 'CREATE', resourceType: 'documents', resourceId: data.id,
-      ip: extractClientIP(request), newValues: { category: data.category, title: data.title },
+      action: 'CREATE', resourceType: 'document', resourceId: data.id,
+      ip: extractClientIP(request), newValues: { category, title, file_name: file.name },
     });
 
-    return new Response(JSON.stringify(data), { status: 201, headers: { 'Content-Type': 'application/json' } });
+    const download_url = await storage.getSignedUrl('policy-documents', key, 3600);
+    return Response.json({ ...data, download_url }, { status: 201 });
+  } catch (err) {
+    return normalizeError(err, request.url);
+  }
+};
+
+// DELETE /api/v1/documents?id=<uuid>  (exec/admin only)
+export const DELETE: APIRoute = async ({ request, url }) => {
+  try {
+    const user = await validateJWT(request);
+    if (!['executive', 'admin'].includes(user.role) && !user.isAdmin) {
+      return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    const id = url.searchParams.get('id') ?? '';
+    if (!UUID_RE.test(id)) return Response.json({ error: 'VALIDATION', message: 'Valid document id required' }, { status: 400 });
+
+    const sb = getSupabaseServiceClient();
+
+    const { data: doc, error: fetchErr } = await sb
+      .from('documents')
+      .select('id, title, storage_key')
+      .eq('id', id)
+      .eq('society_id', SOCIETY_ID)
+      .single();
+
+    if (fetchErr || !doc) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
+
+    // Soft-archive rather than hard delete to preserve audit trail
+    const { error } = await sb
+      .from('documents')
+      .update({ is_archived: true })
+      .eq('id', id);
+
+    if (error) throw Object.assign(new Error(error.message), { status: 500 });
+
+    await writeAuditLog({
+      societyId: SOCIETY_ID, userId: user.id,
+      action: 'DELETE', resourceType: 'document', resourceId: id,
+      ip: extractClientIP(request), oldValues: { title: doc.title },
+    });
+
+    return Response.json({ success: true });
   } catch (err) {
     return normalizeError(err, request.url);
   }

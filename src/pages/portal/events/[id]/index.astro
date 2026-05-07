@@ -1,0 +1,442 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const { id } = Astro.params;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+if (!id || !UUID_RE.test(id)) return Astro.redirect('/portal/events');
+
+const sb = getSupabaseServiceClient();
+const { data: event } = await sb
+  .from('events')
+  .select('id, title, description, category, starts_at, ends_at, location, capacity, is_paid, ticket_price, registration_deadline, is_published, created_at')
+  .eq('id', id)
+  .eq('society_id', SOCIETY_ID)
+  .single();
+
+const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
+
+if (!event || (!event.is_published && !isExec)) {
+  return Astro.redirect('/portal/events');
+}
+
+const startDate = new Date(event.starts_at);
+const endDate   = event.ends_at ? new Date(event.ends_at) : null;
+const isPast    = startDate < new Date();
+
+const CATEGORY_ICON: Record<string, string> = {
+  Cultural: 'fa-music', Sports: 'fa-running', Governance: 'fa-gavel',
+  Social: 'fa-heart', Educational: 'fa-book', General: 'fa-calendar',
+};
+
+function fmtDate(d: Date) {
+  return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+function fmtTime(d: Date) {
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+---
+
+<PortalLayout title={event.title} user={user} activeModule="events">
+  <!-- Back nav -->
+  <div class="mb-5">
+    <a href="/portal/events" class="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-primary-600 transition-colors">
+      <i class="fas fa-arrow-left text-xs" aria-hidden="true"></i>
+      Back to Events
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left: main content -->
+    <div class="lg:col-span-2 space-y-5">
+      <!-- Hero card -->
+      <div class="card-premium overflow-hidden">
+        <div class="bg-primary-600 px-6 py-4 flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+            <i class={`fas ${CATEGORY_ICON[event.category] ?? 'fa-calendar'} text-white`} aria-hidden="true"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <span class="text-white/70 text-xs font-medium uppercase tracking-wide">{event.category}</span>
+          </div>
+          {!event.is_published && (
+            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-400/30 text-amber-100 font-medium border border-amber-300/40">Draft</span>
+          )}
+          {isPast && (
+            <span class="text-xs px-2 py-0.5 rounded-full bg-white/20 text-white font-medium">Completed</span>
+          )}
+        </div>
+        <div class="p-6">
+          <h1 class="text-2xl font-bold text-text-primary font-poppins mb-4">{event.title}</h1>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fas fa-calendar-alt text-primary-600 text-sm" aria-hidden="true"></i>
+              </div>
+              <div>
+                <p class="text-xs text-text-secondary font-medium mb-0.5">Date</p>
+                <p class="text-sm text-text-primary font-medium">{fmtDate(startDate)}</p>
+                {endDate && startDate.toDateString() !== endDate.toDateString() && (
+                  <p class="text-xs text-text-secondary">to {fmtDate(endDate)}</p>
+                )}
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fas fa-clock text-primary-600 text-sm" aria-hidden="true"></i>
+              </div>
+              <div>
+                <p class="text-xs text-text-secondary font-medium mb-0.5">Time</p>
+                <p class="text-sm text-text-primary font-medium">{fmtTime(startDate)}</p>
+                {endDate && <p class="text-xs text-text-secondary">to {fmtTime(endDate)}</p>}
+              </div>
+            </div>
+
+            {event.location && (
+              <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <i class="fas fa-map-marker-alt text-primary-600 text-sm" aria-hidden="true"></i>
+                </div>
+                <div>
+                  <p class="text-xs text-text-secondary font-medium mb-0.5">Location</p>
+                  <p class="text-sm text-text-primary font-medium">{event.location}</p>
+                </div>
+              </div>
+            )}
+
+            {event.capacity && (
+              <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <i class="fas fa-users text-primary-600 text-sm" aria-hidden="true"></i>
+                </div>
+                <div>
+                  <p class="text-xs text-text-secondary font-medium mb-0.5">Capacity</p>
+                  <p class="text-sm text-text-primary font-medium" id="capacity-display">{event.capacity} seats</p>
+                </div>
+              </div>
+            )}
+
+            {event.is_paid && event.ticket_price && (
+              <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <i class="fas fa-rupee-sign text-secondary-500 text-sm" aria-hidden="true"></i>
+                </div>
+                <div>
+                  <p class="text-xs text-text-secondary font-medium mb-0.5">Entry Fee</p>
+                  <p class="text-sm text-text-primary font-medium">₹{event.ticket_price} per person</p>
+                </div>
+              </div>
+            )}
+
+            {event.registration_deadline && (
+              <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <i class="fas fa-hourglass-half text-accent-500 text-sm" aria-hidden="true"></i>
+                </div>
+                <div>
+                  <p class="text-xs text-text-secondary font-medium mb-0.5">Register by</p>
+                  <p class="text-sm text-text-primary font-medium">
+                    {new Date(event.registration_deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {event.description && (
+            <div class="border-t border-border-light pt-5">
+              <h2 class="text-sm font-semibold text-text-primary mb-2">About this event</h2>
+              <p class="text-sm text-text-secondary leading-relaxed whitespace-pre-line">{event.description}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <!-- Exec: Attendees section -->
+      {isExec && (
+        <div class="card-premium p-5" id="attendees-section">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-semibold text-text-primary">Attendees</h2>
+              <p class="text-xs text-text-secondary mt-0.5" id="attendee-summary">Loading…</p>
+            </div>
+            <button id="refresh-attendees" class="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5">
+              <i class="fas fa-sync-alt text-xs" aria-hidden="true"></i>
+              Refresh
+            </button>
+          </div>
+
+          <div id="attendees-list">
+            <div class="text-sm text-text-secondary text-center py-6">
+              <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+
+    <!-- Right: RSVP card -->
+    <div class="lg:col-span-1">
+      <div class="card-premium p-5 sticky top-6" id="rsvp-card">
+        <h2 class="text-base font-semibold text-text-primary mb-4">Your Registration</h2>
+
+        <div id="rsvp-status-block">
+          <div class="text-sm text-text-secondary text-center py-4">
+            <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+          </div>
+        </div>
+
+        {!isPast && (
+          <div id="rsvp-actions" class="mt-4 space-y-2"></div>
+        )}
+
+        {isPast && (
+          <div class="mt-2 text-center py-3 bg-gray-50 rounded-lg">
+            <p class="text-xs text-text-secondary">This event has concluded.</p>
+          </div>
+        )}
+
+        {event.capacity && (
+          <div class="mt-5 pt-4 border-t border-border-light">
+            <div class="flex items-center justify-between text-xs mb-2">
+              <span class="text-text-secondary">Capacity</span>
+              <span class="font-medium text-text-primary" id="spots-label">—</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-1.5">
+              <div id="capacity-bar" class="bg-primary-600 h-1.5 rounded-full transition-all duration-500" style="width:0%"></div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+
+  <!-- Exec: Check-in drawer -->
+  {isExec && (
+    <>
+      <div id="checkin-panel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-primary-600">Check-in</h2>
+          <button id="close-checkin" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+            <i class="fas fa-times text-xl" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-4" id="checkin-content"></div>
+      </div>
+      <div id="checkin-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+    </>
+  )}
+
+  <script define:vars={{ eventId: id, isPast, isExec, hasCapacity: !!event.capacity, capacity: event.capacity }}>
+    async function loadRsvp() {
+      const block  = document.getElementById('rsvp-status-block');
+      const actions = document.getElementById('rsvp-actions');
+      if (!block) return;
+
+      try {
+        const res = await fetch(`/api/v1/events/${eventId}/register`, { credentials: 'include' });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        const reg = data.registration;
+        const spotsLeft = data.spots_left;
+        const total = data.capacity ?? 0;
+        const registeredCount = data.registered_count ?? 0;
+
+        // Update capacity bar
+        if (hasCapacity && total > 0) {
+          const pct = Math.min(100, (registeredCount / total) * 100);
+          const bar = document.getElementById('capacity-bar');
+          const label = document.getElementById('spots-label');
+          if (bar) bar.style.width = `${pct}%`;
+          if (label) label.textContent = spotsLeft === 0 ? 'Full' : `${spotsLeft} of ${total} spots left`;
+          if (bar) bar.className = `h-1.5 rounded-full transition-all duration-500 ${pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-primary-600'}`;
+          const capDisplay = document.getElementById('capacity-display');
+          if (capDisplay) capDisplay.textContent = `${registeredCount} / ${total} registered`;
+        }
+
+        // Status block
+        if (!reg || reg.status === 'cancelled') {
+          block.innerHTML = `<div class="text-center py-2">
+            <i class="fas fa-calendar-plus text-3xl text-primary-200 mb-2" aria-hidden="true"></i>
+            <p class="text-sm text-text-secondary">You haven't registered yet.</p>
+          </div>`;
+          if (actions && !isPast) {
+            const isFull = hasCapacity && spotsLeft === 0;
+            actions.innerHTML = `
+              <div class="mb-3">
+                <label class="form-label text-xs" for="attendees-count">Number of attendees</label>
+                <select id="attendees-count" class="form-input text-sm">
+                  <option value="1">1 (just me)</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </div>
+              <button id="rsvp-btn" onclick="doRsvp()"
+                class="${isFull ? 'btn-outline' : 'btn-primary'} w-full text-sm flex items-center justify-center gap-2">
+                <i class="fas ${isFull ? 'fa-clock' : 'fa-check'}" aria-hidden="true"></i>
+                ${isFull ? 'Join Waitlist' : 'Register Now'}
+              </button>
+            `;
+          }
+        } else {
+          const isWait = reg.status === 'waitlisted';
+          const color  = isWait ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-green-700 bg-green-50 border-green-200';
+          block.innerHTML = `
+            <div class="rounded-xl border px-4 py-3 ${color}">
+              <div class="flex items-center gap-2 mb-1">
+                <i class="fas ${isWait ? 'fa-clock' : 'fa-check-circle'} text-sm" aria-hidden="true"></i>
+                <span class="text-sm font-semibold">${isWait ? 'On Waitlist' : 'Registered'}</span>
+              </div>
+              <p class="text-xs opacity-80">${reg.attendees_count} attendee${reg.attendees_count > 1 ? 's' : ''} · Confirmed ${new Date(reg.registered_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+            </div>
+          `;
+          if (actions && !isPast) {
+            actions.innerHTML = `<button onclick="doCancelRsvp()" class="w-full text-sm text-red-500 hover:text-red-700 py-2 hover:bg-red-50 rounded-lg transition-colors">
+              <i class="fas fa-times mr-1" aria-hidden="true"></i> Cancel Registration
+            </button>`;
+          }
+        }
+      } catch {
+        if (block) block.innerHTML = '<p class="text-xs text-red-600 text-center py-2">Failed to load registration status.</p>';
+      }
+    }
+
+    async function doRsvp() {
+      const btn = document.getElementById('rsvp-btn');
+      const count = parseInt((document.getElementById('attendees-count') as HTMLSelectElement)?.value ?? '1', 10);
+      if (btn) { btn.setAttribute('disabled', ''); btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Registering…'; }
+      const res = await fetch(`/api/v1/events/${eventId}/register`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attendees_count: count }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.registration?.status === 'waitlisted' ? 'Added to waitlist!' : 'Registration confirmed!', 'success');
+        loadRsvp();
+      } else {
+        showToast(data.message ?? data.error ?? 'Registration failed', 'error');
+        if (btn) { btn.removeAttribute('disabled'); btn.innerHTML = 'Register Now'; }
+      }
+    }
+
+    async function doCancelRsvp() {
+      if (!confirm('Cancel your registration for this event?')) return;
+      const res = await fetch(`/api/v1/events/${eventId}/register`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok || res.status === 204) {
+        showToast('Registration cancelled.', 'success');
+        loadRsvp();
+      } else {
+        showToast('Failed to cancel registration.', 'error');
+      }
+    }
+
+    // ── Exec: Attendees ────────────────────────────────────────────────────────
+    async function loadAttendees() {
+      if (!isExec) return;
+      const list    = document.getElementById('attendees-list');
+      const summary = document.getElementById('attendee-summary');
+      if (!list) return;
+
+      try {
+        const res = await fetch(`/api/v1/events/attendance?event_id=${eventId}`, { credentials: 'include' });
+        const records = res.ok ? await res.json() : [];
+
+        const checkedIn = records.filter((r: any) => r.checked_in_at).length;
+        if (summary) summary.textContent = `${records.length} registered · ${checkedIn} checked in`;
+
+        if (!records.length) {
+          list.innerHTML = '<p class="text-sm text-text-secondary text-center py-6">No registrations yet.</p>';
+          return;
+        }
+
+        list.innerHTML = `
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border-light">
+                  <th class="text-left text-xs font-medium text-text-secondary py-2 pr-4">Resident</th>
+                  <th class="text-left text-xs font-medium text-text-secondary py-2 pr-4">Unit</th>
+                  <th class="text-center text-xs font-medium text-text-secondary py-2 pr-4">Guests</th>
+                  <th class="text-center text-xs font-medium text-text-secondary py-2">Check-in</th>
+                </tr>
+              </thead>
+              <tbody id="attendee-rows">
+                ${records.map((r: any) => `
+                  <tr class="border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors" data-record-id="${r.id}">
+                    <td class="py-3 pr-4 font-medium text-text-primary">${r.profiles?.full_name ?? '—'}</td>
+                    <td class="py-3 pr-4 text-text-secondary">${r.units?.unit_number ?? '—'}</td>
+                    <td class="py-3 pr-4 text-center text-text-secondary">${r.guest_count ?? 0}</td>
+                    <td class="py-3 text-center">
+                      <button
+                        onclick="toggleCheckin('${r.id}', ${!r.checked_in_at})"
+                        class="text-xs px-3 py-1 rounded-full font-medium transition-colors ${r.checked_in_at ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-primary-50 hover:text-primary-600'}"
+                        title="${r.checked_in_at ? `Checked in ${new Date(r.checked_in_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Mark as checked in'}"
+                      >
+                        ${r.checked_in_at ? '<i class="fas fa-check mr-1"></i>In' : 'Check in'}
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } catch {
+        if (list) list.innerHTML = '<p class="text-sm text-red-600 text-center py-4">Failed to load attendees.</p>';
+      }
+    }
+
+    async function toggleCheckin(recordId: string, checkIn: boolean) {
+      const btn = document.querySelector(`[data-record-id="${recordId}"] button`) as HTMLButtonElement;
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i>'; }
+
+      const res = await fetch('/api/v1/events/attendance', {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: recordId, checked_in: checkIn }),
+      });
+
+      if (res.ok) {
+        showToast(checkIn ? 'Checked in!' : 'Check-in removed', 'success');
+        loadAttendees();
+      } else {
+        showToast('Failed to update check-in', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Check in'; }
+      }
+    }
+
+    document.getElementById('refresh-attendees')?.addEventListener('click', loadAttendees);
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+    function showToast(message: string, type = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => {
+        toast.classList.add('translate-y-4', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    (window as any).doRsvp         = doRsvp;
+    (window as any).doCancelRsvp   = doCancelRsvp;
+    (window as any).toggleCheckin  = toggleCheckin;
+
+    loadRsvp();
+    if (isExec) loadAttendees();
+  </script>
+</PortalLayout>
