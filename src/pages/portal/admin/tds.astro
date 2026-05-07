@@ -34,7 +34,7 @@ if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal'
   <div id="pan-alert" class="hidden mb-6"></div>
 
   <!-- Tabs -->
-  <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+  <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit flex-wrap">
     <button onclick="switchTab('vendors')" id="tab-vendors"
       class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-white text-primary-600 shadow-sm">
       Vendor TDS (194C)
@@ -46,6 +46,10 @@ if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal'
     <button onclick="switchTab('expenses')" id="tab-expenses"
       class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
       Expense Ledger
+    </button>
+    <button onclick="switchTab('gst')" id="tab-gst"
+      class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+      GST Compliance
     </button>
   </div>
 
@@ -64,6 +68,12 @@ if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal'
   <div id="panel-expenses" class="hidden">
     <div id="expenses-container">
       <div class="text-center text-text-secondary py-12"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>
+    </div>
+  </div>
+
+  <div id="panel-gst" class="hidden">
+    <div id="gst-container">
+      <div class="text-center text-text-secondary py-12"><i class="fas fa-spinner fa-spin mr-2"></i>Loading GST data…</div>
     </div>
   </div>
 
@@ -87,7 +97,7 @@ if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal'
 
     function switchTab(tab: string) {
       currentTab = tab;
-      ['vendors', 'payments', 'expenses'].forEach(t => {
+      ['vendors', 'payments', 'expenses', 'gst'].forEach(t => {
         const el = document.getElementById(`panel-${t}`);
         if (el) el.classList.toggle('hidden', t !== tab);
         const btn = document.getElementById(`tab-${t}`);
@@ -167,6 +177,7 @@ if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal'
       if (currentTab === 'vendors') renderVendors();
       else if (currentTab === 'payments') renderPayments();
       else if (currentTab === 'expenses') renderExpenses();
+      else if (currentTab === 'gst') loadGST();
     }
 
     function renderVendors() {
@@ -298,6 +309,101 @@ if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal'
             </tbody>
           </table>
         </div>`;
+    }
+
+    async function loadGST() {
+      const container = document.getElementById('gst-container');
+      if (!container) return;
+      const fy = (document.getElementById('fy-select') as HTMLSelectElement)?.value || '';
+      container.innerHTML = '<div class="text-center text-text-secondary py-12"><i class="fas fa-spinner fa-spin mr-2"></i>Loading GST data…</div>';
+      try {
+        const res = await fetch(`/api/v1/finance/gst-report?fy=${fy}`, { credentials: 'include' });
+        const g = await res.json();
+        const fmt = (n: number) => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+        const summaryHTML = `
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div class="card-premium p-4 text-center">
+              <div class="text-xs text-text-secondary uppercase tracking-wide mb-1">GST Collected</div>
+              <div class="text-xl font-bold text-primary-600">${fmt(g.summary.total_gst_collected)}</div>
+              <div class="text-xs text-text-secondary mt-1">Output tax (dues)</div>
+            </div>
+            <div class="card-premium p-4 text-center">
+              <div class="text-xs text-text-secondary uppercase tracking-wide mb-1">ITC Available</div>
+              <div class="text-xl font-bold text-secondary-500">${fmt(g.summary.total_itc_claimed)}</div>
+              <div class="text-xs text-text-secondary mt-1">Input tax (expenses)</div>
+            </div>
+            <div class="card-premium p-4 text-center">
+              <div class="text-xs text-text-secondary uppercase tracking-wide mb-1">Net GST Payable</div>
+              <div class="text-xl font-bold ${g.summary.net_gst_liability > 0 ? 'text-red-600' : 'text-secondary-500'}">${fmt(g.summary.net_gst_liability)}</div>
+              <div class="text-xs text-text-secondary mt-1">Output minus ITC</div>
+            </div>
+            <div class="card-premium p-4 text-center">
+              <div class="text-xs text-text-secondary uppercase tracking-wide mb-1">GST Payments</div>
+              <div class="text-xl font-bold text-primary-600">${g.summary.gst_applicable_payments}</div>
+              <div class="text-xs text-text-secondary mt-1">Collections with GST</div>
+            </div>
+          </div>`;
+
+        const quarterLabels: Record<string, string> = { Q1: 'Apr–Jun', Q2: 'Jul–Sep', Q3: 'Oct–Dec', Q4: 'Jan–Mar' };
+        const breakdownHTML = `
+          <div class="card-premium p-5 mb-6">
+            <h3 class="text-base font-semibold text-text-primary mb-4">Quarterly GST Breakdown (FY ${g.fy}–${String(g.fy + 1).slice(-2)})</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="text-xs text-text-secondary border-b border-border-light">
+                  <tr>
+                    <th class="py-3 px-4 text-left">Quarter</th>
+                    <th class="py-3 px-4 text-right">Base (Dues)</th>
+                    <th class="py-3 px-4 text-right">GST Output</th>
+                    <th class="py-3 px-4 text-right">GST Input (ITC)</th>
+                    <th class="py-3 px-4 text-right">Net Liability</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(g.quarterly_breakdown ?? []).map((q: any) => `
+                    <tr class="border-b border-border-light hover:bg-gray-50">
+                      <td class="py-3 px-4 font-medium">${q.quarter} <span class="text-xs text-text-secondary">(${quarterLabels[q.quarter] ?? ''})</span></td>
+                      <td class="py-3 px-4 text-right text-text-secondary">${fmt(q.base_amount)}</td>
+                      <td class="py-3 px-4 text-right font-medium text-primary-600">${fmt(q.gst_output)}</td>
+                      <td class="py-3 px-4 text-right text-secondary-500">${fmt(q.gst_input)}</td>
+                      <td class="py-3 px-4 text-right font-semibold ${q.net_liability > 0 ? 'text-red-600' : 'text-secondary-500'}">${fmt(q.net_liability)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+
+        const today = new Date().toISOString().slice(0, 10);
+        const deadlinesHTML = g.upcoming_deadlines?.length ? `
+          <div class="card-premium p-5">
+            <h3 class="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
+              <i class="fas fa-calendar-alt text-primary-300 text-sm" aria-hidden="true"></i>
+              Upcoming Filing Deadlines
+            </h3>
+            <div class="space-y-2">
+              ${(g.upcoming_deadlines ?? []).map((d: any) => {
+                const urgent = d.days_until <= 7;
+                return `
+                  <div class="flex items-center justify-between p-3 rounded-xl border ${urgent ? 'border-red-200 bg-red-50' : 'border-border-light bg-white'}">
+                    <div>
+                      <span class="text-sm font-medium ${urgent ? 'text-red-700' : 'text-text-primary'}">${d.name}</span>
+                      <span class="text-xs text-text-secondary ml-2">${d.period}</span>
+                    </div>
+                    <div class="text-right">
+                      <div class="text-sm font-semibold ${urgent ? 'text-red-600' : 'text-text-primary'}">${new Date(d.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
+                      <div class="text-xs ${urgent ? 'text-red-500 font-medium' : 'text-text-secondary'}">${d.days_until}d remaining</div>
+                    </div>
+                  </div>`;
+              }).join('')}
+            </div>
+          </div>` : '';
+
+        container.innerHTML = summaryHTML + breakdownHTML + deadlinesHTML;
+      } catch {
+        container.innerHTML = '<div class="text-center text-red-600 py-8">Failed to load GST data.</div>';
+      }
     }
 
     // Init
