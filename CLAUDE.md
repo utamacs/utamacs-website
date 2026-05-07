@@ -494,7 +494,37 @@ const mode  = ruleStr(rules, 'ANOTHER_RULE', 'auto');
 
 ---
 
-## 13. Public Website (utamacs.org) Standards
+## 13. Commit Security — Sensitive Data Must Never Be Checked In
+
+**Before every commit, verify no sensitive file is staged. This is non-negotiable.**
+
+### Files that must NEVER be committed
+| Pattern | Why |
+|---|---|
+| `.env`, `.env.*` (except `.env.example`) | Supabase keys, encryption keys, salts |
+| `tests/.auth/*.json` | Playwright saved sessions — contain live Supabase refresh tokens |
+| `*.pem`, `*.key`, `*.p12`, `*.pfx` | TLS/private keys |
+| `**/service-account*.json`, `**/credentials.json` | GCP / Firebase service accounts |
+| Any file with a real `sb_publishable_*` or `sb_secret_*` key | Supabase credentials |
+| Any file with a real JWT, Bearer token, or refresh token | Auth material |
+
+### Pre-commit checklist (run before every `git add`)
+```bash
+# Quick scan for common credential patterns
+git diff --cached | grep -iE "(password|secret|token|refresh_token|api_key|anon_key|service_role)" | grep "^\+" | grep -v "REPLACE_WITH\|YOUR_.*_HERE\|example\|placeholder"
+```
+
+### What to do if sensitive data is accidentally committed
+1. **Do not push** — if not yet pushed, `git rm --cached <file>` and recommit
+2. **If already pushed** — immediately rotate/revoke the exposed credential; do not rely on git history rewrite alone as forks/caches may have it
+3. Verify `.gitignore` covers the file pattern so it cannot recur
+
+### `.env.example` is the only env file that may be committed
+It must contain only placeholder values (`YOUR_KEY_HERE`, `REPLACE_WITH_*`), never real credentials. All other `.env.*` files are gitignored.
+
+---
+
+## 15. Public Website (utamacs.org) Standards
 
 The public site at `src/site/` (output → `docs/`) is static HTML only:
 - No Astro features — plain `.html` files
@@ -507,7 +537,7 @@ The public site at `src/site/` (output → `docs/`) is static HTML only:
 
 ---
 
-## 14. Skills Reference
+## 16. Skills Reference
 
 | Skill | Invocation | Purpose |
 |---|---|---|
