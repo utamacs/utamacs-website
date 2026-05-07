@@ -122,6 +122,13 @@ export const GET: APIRoute = async ({ request }) => {
     results.feedback_sla = { error: err instanceof Error ? err.message : String(err) };
   }
 
+  // ── 13. AMC renewal reminders (30 days before end_date) ──────────────────
+  try {
+    results.amc_reminders = await runAmcRenewalReminders(sb, now, nowIso);
+  } catch (err) {
+    results.amc_reminders = { error: err instanceof Error ? err.message : String(err) };
+  }
+
   // ── Write master heartbeat ─────────────────────────────────────────────────
   try {
     await sb.from('cron_heartbeats').insert({
@@ -504,6 +511,67 @@ async function runEventReminders(sb: ReturnType<typeof getSupabaseServiceClient>
   for (const e of tomorrowEvents ?? []) await sendEventReminder(e as any, 'Tomorrow');
 
   return { reminders };
+}
+
+async function runAmcRenewalReminders(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Send exec notifications for AMC contracts expiring within 30 days.
+  // One reminder per contract per day (dedup on reference_id).
+  const in30Days = new Date(now);
+  in30Days.setDate(in30Days.getDate() + 30);
+
+  const { data: expiring } = await sb
+    .from('amc_contracts')
+    .select('id, equipment_name, end_date')
+    .eq('society_id', SOCIETY_ID)
+    .eq('is_active', true)
+    .gte('end_date', now.toISOString().slice(0, 10))   // not yet expired
+    .lte('end_date', in30Days.toISOString().slice(0, 10))
+    .limit(20);
+
+  if (!expiring?.length) return { reminded: 0 };
+
+  const { data: execProfiles } = await sb
+    .from('profiles')
+    .select('id')
+    .eq('society_id', SOCIETY_ID)
+    .in('portal_role', ['executive', 'secretary', 'president'])
+    .eq('is_active', true);
+
+  const execIds = (execProfiles ?? []).map((p: any) => p.id);
+  if (!execIds.length) return { reminded: 0 };
+
+  let reminded = 0;
+  for (const contract of expiring) {
+    // Dedup: skip if already reminded today
+    const { count } = await sb
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('society_id', SOCIETY_ID)
+      .eq('reference_id', contract.id)
+      .eq('type', 'amc')
+      .eq('title', 'AMC renewal due')
+      .gte('created_at', nowIso.slice(0, 10) + 'T00:00:00.000Z');
+    if (count && count > 0) continue;
+
+    const daysLeft = Math.ceil((new Date(contract.end_date).getTime() - now.getTime()) / 86400000);
+    try {
+      await sb.from('notifications').insert(
+        execIds.map((uid: string) => ({
+          society_id: SOCIETY_ID,
+          user_id: uid,
+          title: 'AMC renewal due',
+          body: `"${contract.equipment_name}" AMC expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''} (${contract.end_date}). Renew to avoid service gap.`,
+          type: 'amc',
+          reference_table: 'amc_contracts',
+          reference_id: contract.id,
+          is_read: false,
+        })),
+      );
+      reminded++;
+    } catch { /* non-fatal */ }
+  }
+
+  return { reminded };
 }
 
 async function runFeedbackSlaEscalation(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {

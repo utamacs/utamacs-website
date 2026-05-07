@@ -1,0 +1,396 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user || !['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal/admin');
+---
+
+<PortalLayout title="AMC Contracts" user={user} activeModule="admin_amc">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/admin" class="hover:text-primary-600">Admin</a>
+        <span class="mx-2">›</span><span class="text-text-primary">AMC Contracts</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">AMC Contracts</h1>
+      <p class="text-sm text-text-secondary mt-1">Annual maintenance contracts — renewal tracker and service log.</p>
+    </div>
+    <button id="add-amc-btn" class="btn-primary text-sm flex items-center gap-2">
+      <i class="fas fa-plus" aria-hidden="true"></i>New Contract
+    </button>
+  </div>
+
+  <!-- Expiry alert banner -->
+  <div id="expiry-banner" class="hidden mb-5"></div>
+
+  <!-- Tabs -->
+  <div class="flex gap-2 mb-5">
+    <button id="tab-active" class="text-sm px-4 py-2 rounded-lg font-medium bg-primary-600 text-white">Active</button>
+    <button id="tab-expiring" class="text-sm px-4 py-2 rounded-lg font-medium text-text-secondary hover:bg-gray-100">Expiring (30d)</button>
+  </div>
+
+  <!-- Contract list -->
+  <div id="amc-container">
+    <div class="text-center py-12 text-text-secondary text-sm">Loading…</div>
+  </div>
+
+  <!-- Service log drawer -->
+  <div id="log-panel" class="fixed inset-y-0 right-0 w-full sm:w-[460px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 id="log-panel-title" class="text-lg font-semibold text-primary-600">Service Logs</h2>
+      <button id="log-panel-close" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="p-4">
+      <!-- Log a service visit -->
+      <form id="log-form" class="bg-gray-50 rounded-xl p-4 mb-5 space-y-3">
+        <h3 class="text-sm font-semibold text-text-primary">Log Service Visit</h3>
+        <input type="hidden" id="log-amc-id" />
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="form-label text-xs">Date <span class="text-red-500">*</span></label>
+            <input type="date" id="log-date" required class="form-input text-sm py-2" />
+          </div>
+          <div>
+            <label class="form-label text-xs">Engineer Name</label>
+            <input type="text" id="log-engineer" maxlength="200" placeholder="Engineer / technician" class="form-input text-sm py-2" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label text-xs">Remarks</label>
+          <textarea id="log-remarks" rows="2" maxlength="2000" placeholder="Work done, parts replaced, next due…" class="form-input text-sm py-2 resize-none"></textarea>
+        </div>
+        <div id="log-error" class="hidden form-error"></div>
+        <button type="submit" class="btn-primary w-full text-sm">Log Service</button>
+      </form>
+
+      <!-- Existing logs -->
+      <h3 class="text-sm font-semibold text-text-primary mb-3">Service History</h3>
+      <div id="log-history" class="space-y-3">
+        <div class="text-center py-4 text-text-secondary text-sm">Loading…</div>
+      </div>
+    </div>
+  </div>
+  <div id="log-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+
+  <!-- Add / Edit AMC Modal -->
+  <div id="amc-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <h3 id="modal-title" class="font-semibold text-text-primary mb-4">New AMC Contract</h3>
+      <div id="modal-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+      <form id="amc-form" class="space-y-3">
+        <input type="hidden" id="edit-id" />
+        <div>
+          <label class="form-label">Equipment Name <span class="text-red-500">*</span></label>
+          <input type="text" id="f-name" required maxlength="200" placeholder="e.g. Lift A — Otis" class="form-input" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label">Equipment Type</label>
+            <select id="f-type" class="form-input">
+              {['lift','generator','pump','cctv','fire_system','hvac','intercom','solar','other'].map(t => (
+                <option value={t}>{t.replace('_',' ')}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Payment Frequency</label>
+            <select id="f-freq" class="form-input">
+              {['annual','quarterly','half_yearly','monthly','one_time'].map(f => (
+                <option value={f}>{f.replace('_',' ')}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="form-label">Start Date <span class="text-red-500">*</span></label>
+            <input type="date" id="f-start" required class="form-input" />
+          </div>
+          <div>
+            <label class="form-label">End Date <span class="text-red-500">*</span></label>
+            <input type="date" id="f-end" required class="form-input" />
+          </div>
+          <div>
+            <label class="form-label">Amount (₹)</label>
+            <input type="number" id="f-amount" min="0" step="0.01" class="form-input" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Scope / Coverage</label>
+          <textarea id="f-scope" rows="2" maxlength="2000" placeholder="What is covered under this contract?" class="form-input resize-none"></textarea>
+        </div>
+        <div>
+          <label class="form-label">Notes</label>
+          <input type="text" id="f-notes" maxlength="500" class="form-input" />
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="submit" id="modal-submit" class="btn-primary flex-1 text-sm">Save Contract</button>
+          <button type="button" id="modal-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const TYPE_ICONS: Record<string, string> = {
+      lift: 'fa-elevator text-blue-600', generator: 'fa-bolt text-amber-600',
+      pump: 'fa-tint text-cyan-600', cctv: 'fa-video text-purple-600',
+      fire_system: 'fa-fire-extinguisher text-red-600', hvac: 'fa-snowflake text-blue-400',
+      intercom: 'fa-interphone text-green-600', solar: 'fa-solar-panel text-yellow-500',
+      other: 'fa-wrench text-gray-500',
+    };
+    const TYPE_LABELS: Record<string, string> = {
+      lift: 'Lift', generator: 'Generator', pump: 'Pump', cctv: 'CCTV',
+      fire_system: 'Fire System', hvac: 'HVAC', intercom: 'Intercom', solar: 'Solar', other: 'Other',
+    };
+    const FREQ_LABELS: Record<string, string> = {
+      annual: 'Annual', quarterly: 'Quarterly', half_yearly: 'Half-Yearly',
+      monthly: 'Monthly', one_time: 'One-Time',
+    };
+
+    let activeTab: 'active' | 'expiring' = 'active';
+    let contracts: any[] = [];
+    let currentAmcId = '';
+
+    function fmt(n?: number | null) {
+      if (!n) return '—';
+      return n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : n >= 1000 ? `₹${(n / 1000).toFixed(0)}K` : `₹${n}`;
+    }
+
+    function daysUntil(dateStr: string) {
+      const d = new Date(dateStr);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      return Math.ceil((d.getTime() - now.getTime()) / 86400000);
+    }
+
+    function expiryBadge(endDate: string) {
+      const days = daysUntil(endDate);
+      if (days < 0) return `<span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Expired ${Math.abs(days)}d ago</span>`;
+      if (days <= 30) return `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Expires in ${days}d</span>`;
+      return `<span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Active</span>`;
+    }
+
+    async function loadContracts() {
+      const params = activeTab === 'expiring' ? '?expiring_soon=30' : '';
+      const res = await fetch(`/api/v1/admin/amc${params}`, { credentials: 'include' });
+      contracts = res.ok ? await res.json() : [];
+
+      const expired = contracts.filter((c: any) => daysUntil(c.end_date) < 0);
+      const expiring = contracts.filter((c: any) => { const d = daysUntil(c.end_date); return d >= 0 && d <= 30; });
+      const banner = document.getElementById('expiry-banner')!;
+      if (expired.length || expiring.length) {
+        banner.className = 'mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl';
+        banner.innerHTML = `
+          <div class="flex items-center gap-2 text-amber-800 font-medium text-sm mb-1">
+            <i class="fas fa-exclamation-triangle"></i>
+            ${expired.length ? `${expired.length} contract${expired.length > 1 ? 's' : ''} expired` : ''}${expired.length && expiring.length ? ', ' : ''}${expiring.length ? `${expiring.length} expiring within 30 days` : ''}
+          </div>
+          <p class="text-xs text-amber-700">Renew contracts to avoid service gaps.</p>`;
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+
+      renderContracts();
+    }
+
+    function renderContracts() {
+      const container = document.getElementById('amc-container')!;
+      if (!contracts.length) {
+        container.innerHTML = `
+          <div class="text-center py-16">
+            <i class="fas fa-file-contract text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+            <h3 class="text-lg font-semibold text-text-primary mb-2">No contracts yet</h3>
+            <p class="text-text-secondary text-sm">Add your first AMC contract to start tracking renewal dates.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = `<div class="space-y-4">${contracts.map((c: any) => {
+        const icon = TYPE_ICONS[c.equipment_type] ?? 'fa-wrench text-gray-500';
+        const lastService = c.amc_service_logs?.length
+          ? c.amc_service_logs.reduce((a: any, b: any) => a.service_date > b.service_date ? a : b)
+          : null;
+        return `
+          <div class="card-premium p-5">
+            <div class="flex items-start gap-4">
+              <div class="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+                <i class="fas ${icon} text-base" aria-hidden="true"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 flex-wrap">
+                  <h3 class="font-semibold text-text-primary">${c.equipment_name}</h3>
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-600 font-medium">${TYPE_LABELS[c.equipment_type] ?? c.equipment_type}</span>
+                  ${expiryBadge(c.end_date)}
+                </div>
+                <div class="mt-1.5 flex flex-wrap gap-4 text-xs text-text-secondary">
+                  <span><i class="fas fa-calendar-alt mr-1" aria-hidden="true"></i>${c.start_date} → ${c.end_date}</span>
+                  ${c.amount ? `<span><i class="fas fa-rupee-sign mr-1" aria-hidden="true"></i>${fmt(c.amount)} / ${FREQ_LABELS[c.payment_frequency] ?? c.payment_frequency}</span>` : ''}
+                  ${c.vendors?.name ? `<span><i class="fas fa-building mr-1" aria-hidden="true"></i>${c.vendors.name}</span>` : ''}
+                  <span><i class="fas fa-tools mr-1" aria-hidden="true"></i>${c.amc_service_logs?.length ?? 0} service visits</span>
+                  ${lastService ? `<span><i class="fas fa-clock mr-1" aria-hidden="true"></i>Last: ${lastService.service_date}</span>` : ''}
+                </div>
+                ${c.scope ? `<p class="mt-1 text-xs text-text-secondary line-clamp-1">${c.scope}</p>` : ''}
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <button onclick="openLogPanel('${c.id}', '${c.equipment_name.replace(/'/g, "\\'")}', ${JSON.stringify(c.amc_service_logs ?? [])})"
+                  class="text-xs px-3 py-1.5 rounded-lg border border-border-light hover:bg-gray-50 text-text-secondary">
+                  <i class="fas fa-history mr-1" aria-hidden="true"></i>Service Log
+                </button>
+                <button onclick="openEdit(${JSON.stringify(c)})"
+                  class="text-xs px-3 py-1.5 rounded-lg border border-border-light hover:bg-gray-50 text-text-secondary">
+                  <i class="fas fa-pencil-alt" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+          </div>`;
+      }).join('')}</div>`;
+    }
+
+    function openLogPanel(amcId: string, name: string, logs: any[]) {
+      currentAmcId = amcId;
+      (document.getElementById('log-amc-id') as HTMLInputElement).value = amcId;
+      document.getElementById('log-panel-title')!.textContent = `Service Logs — ${name}`;
+      document.getElementById('log-date')!.setAttribute('value', new Date().toISOString().slice(0, 10));
+
+      const history = document.getElementById('log-history')!;
+      if (!logs.length) {
+        history.innerHTML = '<div class="text-sm text-text-secondary text-center py-4">No service visits logged yet.</div>';
+      } else {
+        const sorted = [...logs].sort((a, b) => b.service_date.localeCompare(a.service_date));
+        history.innerHTML = sorted.map(l => `
+          <div class="p-3 bg-gray-50 rounded-lg">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-medium text-text-primary">${l.service_date}</span>
+              ${l.engineer_name ? `<span class="text-xs text-text-secondary">${l.engineer_name}</span>` : ''}
+            </div>
+            ${l.remarks ? `<p class="text-xs text-text-secondary">${l.remarks}</p>` : ''}
+          </div>`).join('');
+      }
+
+      document.getElementById('log-panel')!.classList.replace('translate-x-full', 'translate-x-0');
+      document.getElementById('log-backdrop')!.classList.remove('hidden');
+    }
+
+    function closeLogPanel() {
+      document.getElementById('log-panel')!.classList.replace('translate-x-0', 'translate-x-full');
+      document.getElementById('log-backdrop')!.classList.add('hidden');
+    }
+
+    document.getElementById('log-panel-close')!.addEventListener('click', closeLogPanel);
+    document.getElementById('log-backdrop')!.addEventListener('click', closeLogPanel);
+
+    document.getElementById('log-form')!.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById('log-error')!;
+      errEl.classList.add('hidden');
+      const amcId = (document.getElementById('log-amc-id') as HTMLInputElement).value;
+      const body = {
+        service_date: (document.getElementById('log-date') as HTMLInputElement).value,
+        engineer_name: (document.getElementById('log-engineer') as HTMLInputElement).value.trim() || undefined,
+        remarks: (document.getElementById('log-remarks') as HTMLTextAreaElement).value.trim() || undefined,
+      };
+      const res = await fetch(`/api/v1/admin/amc/${amcId}/service-logs`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        errEl.textContent = err.message ?? 'Failed to log service visit';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      showToast('Service visit logged');
+      closeLogPanel();
+      loadContracts();
+    });
+
+    // Modal open/close
+    document.getElementById('add-amc-btn')!.addEventListener('click', () => openModal());
+    document.getElementById('modal-cancel')!.addEventListener('click', closeModal);
+    document.getElementById('modal-title') // ensure it is present
+
+    function openModal(c?: any) {
+      document.getElementById('modal-title')!.textContent = c ? 'Edit Contract' : 'New AMC Contract';
+      (document.getElementById('edit-id') as HTMLInputElement).value = c?.id ?? '';
+      (document.getElementById('f-name') as HTMLInputElement).value = c?.equipment_name ?? '';
+      (document.getElementById('f-type') as HTMLSelectElement).value = c?.equipment_type ?? 'other';
+      (document.getElementById('f-freq') as HTMLSelectElement).value = c?.payment_frequency ?? 'annual';
+      (document.getElementById('f-start') as HTMLInputElement).value = c?.start_date ?? '';
+      (document.getElementById('f-end') as HTMLInputElement).value = c?.end_date ?? '';
+      (document.getElementById('f-amount') as HTMLInputElement).value = c?.amount ?? '';
+      (document.getElementById('f-scope') as HTMLTextAreaElement).value = c?.scope ?? '';
+      (document.getElementById('f-notes') as HTMLInputElement).value = c?.notes ?? '';
+      document.getElementById('modal-error')!.classList.add('hidden');
+      document.getElementById('amc-modal')!.classList.remove('hidden');
+    }
+
+    function closeModal() { document.getElementById('amc-modal')!.classList.add('hidden'); }
+
+    (window as any).openEdit = (c: any) => openModal(c);
+
+    document.getElementById('amc-form')!.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById('modal-error')!;
+      errEl.classList.add('hidden');
+      const id = (document.getElementById('edit-id') as HTMLInputElement).value;
+      const body = {
+        equipment_name: (document.getElementById('f-name') as HTMLInputElement).value.trim(),
+        equipment_type: (document.getElementById('f-type') as HTMLSelectElement).value,
+        payment_frequency: (document.getElementById('f-freq') as HTMLSelectElement).value,
+        start_date: (document.getElementById('f-start') as HTMLInputElement).value,
+        end_date: (document.getElementById('f-end') as HTMLInputElement).value,
+        amount: (document.getElementById('f-amount') as HTMLInputElement).value || undefined,
+        scope: (document.getElementById('f-scope') as HTMLTextAreaElement).value.trim() || undefined,
+        notes: (document.getElementById('f-notes') as HTMLInputElement).value.trim() || undefined,
+      };
+      const url = id ? `/api/v1/admin/amc/${id}` : '/api/v1/admin/amc';
+      const method = id ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method, credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        errEl.textContent = err.message ?? 'Failed to save contract';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      showToast(id ? 'Contract updated' : 'Contract created');
+      closeModal();
+      loadContracts();
+    });
+
+    // Tab switching
+    document.getElementById('tab-active')!.addEventListener('click', () => {
+      activeTab = 'active';
+      document.getElementById('tab-active')!.className = 'text-sm px-4 py-2 rounded-lg font-medium bg-primary-600 text-white';
+      document.getElementById('tab-expiring')!.className = 'text-sm px-4 py-2 rounded-lg font-medium text-text-secondary hover:bg-gray-100';
+      loadContracts();
+    });
+    document.getElementById('tab-expiring')!.addEventListener('click', () => {
+      activeTab = 'expiring';
+      document.getElementById('tab-expiring')!.className = 'text-sm px-4 py-2 rounded-lg font-medium bg-amber-500 text-white';
+      document.getElementById('tab-active')!.className = 'text-sm px-4 py-2 rounded-lg font-medium text-text-secondary hover:bg-gray-100';
+      loadContracts();
+    });
+
+    function showToast(message: string, type = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    loadContracts();
+  </script>
+</PortalLayout>
