@@ -202,7 +202,7 @@ export const DELETE: APIRoute = async ({ request, params }) => {
     if (reg.status === 'registered') {
       const { data: next } = await sb
         .from('event_registrations')
-        .select('id')
+        .select('id, user_id')
         .eq('event_id', params.id!)
         .eq('status', 'waitlisted')
         .order('registered_at', { ascending: true })
@@ -211,6 +211,25 @@ export const DELETE: APIRoute = async ({ request, params }) => {
 
       if (next) {
         await sb.from('event_registrations').update({ status: 'registered' }).eq('id', next.id);
+
+        // Notify the promoted member (fire-and-forget)
+        const { data: event } = await sb
+          .from('events')
+          .select('title')
+          .eq('id', params.id!)
+          .single();
+        Promise.resolve(
+          sb.from('notifications').insert({
+            user_id: (next as any).user_id,
+            society_id: SOCIETY_ID,
+            title: 'You\'re in! Waitlist spot confirmed',
+            body: `A spot opened up for "${(event as any)?.title ?? 'the event'}". You are now registered.`,
+            type: 'event',
+            reference_table: 'events',
+            reference_id: params.id!,
+            is_read: false,
+          }),
+        ).catch(() => {});
       }
     }
 
