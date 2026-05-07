@@ -46,6 +46,20 @@ if (!['executive','admin'].includes(user.role)) return Astro.redirect('/portal')
       </div>
     )}
 
+    <!-- Session Management -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+          <i class="fas fa-user-lock text-red-600" aria-hidden="true"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-semibold text-text-primary">Session Management</h2>
+          <p class="text-xs text-text-secondary">Active sessions, force sign-out (DPDPA)</p>
+        </div>
+      </div>
+      <a href="/portal/admin/sessions" class="btn-primary text-sm w-full text-center block">Manage Sessions</a>
+    </div>
+
     <!-- Member Management -->
     <div class="bg-white rounded-xl border border-border-light p-5">
       <div class="flex items-center gap-3 mb-4">
