@@ -70,7 +70,9 @@ if (!user) return Astro.redirect('/portal/login');
                 <span class="text-white font-semibold truncate">${e.category}</span>
               </div>
               <div class="p-4">
-                <h2 class="text-lg font-semibold text-text-primary mb-1">${e.title}</h2>
+                <h2 class="text-lg font-semibold text-text-primary mb-1">
+                  <a href="/portal/events/${e.id}" class="hover:text-primary-600 transition-colors">${e.title}</a>
+                </h2>
                 ${e.description ? `<p class="text-xs text-text-secondary mb-3 line-clamp-2">${e.description}</p>` : ''}
                 <div class="space-y-1 text-xs text-text-secondary">
                   <div class="flex items-center gap-2">

@@ -6,3 +6,15 @@ dist/
 .env.local
 *.log
 .claude/settings.local.json
+
+# ─── Upload safety net ──────────────────────────────────────────────────────
+# All user-uploaded files MUST go to Supabase Storage via SupabaseStorageService.
+# The HOTO governance upload is the only exception and it goes to a SEPARATE
+# governance GitHub repo via GitHub API — never to this repo's working tree.
+# These patterns prevent any accidental filesystem write from reaching git.
+uploads/
+tmp/
+temp/
+public/uploads/
+src/uploads/
+docs/uploads/

@@ -161,6 +161,9 @@ const canPost = ['member', 'executive', 'admin'].includes(user.role);
             <a href="/portal/community/${p.id}" class="flex items-center gap-1 hover:text-primary-600 transition-colors">
               <i class="fas fa-comment"></i> View
             </a>
+            <button onclick="openReportModal('${p.id}')" class="ml-auto flex items-center gap-1 hover:text-red-600 transition-colors text-gray-300">
+              <i class="fas fa-flag text-xs"></i>
+            </button>
           </div>
         `;
         feed.appendChild(card);
@@ -200,6 +203,101 @@ const canPost = ['member', 'executive', 'admin'].includes(user.role);
     document.getElementById('load-more-btn').addEventListener('click', () => loadPosts(false));
 
     window.react = react;
+    window.openReportModal = openReportModal;
     loadPosts(true);
+
+    // ── Report Post ──────────────────────────────────────────────────────────
+    let reportPostId = null;
+
+    function openReportModal(postId) {
+      reportPostId = postId;
+      document.getElementById('report-reason').value = 'spam';
+      document.getElementById('report-details').value = '';
+      document.getElementById('report-error').classList.add('hidden');
+      document.getElementById('report-modal').classList.remove('hidden');
+    }
+
+    function closeReportModal() {
+      document.getElementById('report-modal').classList.add('hidden');
+    }
+
+    document.getElementById('report-submit-btn')?.addEventListener('click', async () => {
+      if (!reportPostId) return;
+      const reason  = document.getElementById('report-reason').value;
+      const details = document.getElementById('report-details').value.trim();
+      const errEl   = document.getElementById('report-error');
+      const btn     = document.getElementById('report-submit-btn');
+
+      btn.disabled = true; btn.textContent = 'Submitting…';
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/community/reports', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ post_id: reportPostId, reason, details: details || undefined }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          closeReportModal();
+          showToast('Report submitted. Thank you.');
+        } else if (res.status === 409) {
+          errEl.textContent = 'You have already reported this post.';
+          errEl.classList.remove('hidden');
+        } else {
+          errEl.textContent = data.message ?? 'Failed to submit report.';
+          errEl.classList.remove('hidden');
+        }
+      } catch {
+        errEl.textContent = 'Network error.';
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Submit Report';
+      }
+    });
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
   </script>
+
+  <!-- Report Post Modal -->
+  <div id="report-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-sm">
+      <div class="p-6 border-b border-border-light flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-text-primary">Report Post</h2>
+        <button onclick="closeReportModal()" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label for="report-reason" class="block text-sm font-medium text-text-primary mb-1">Reason *</label>
+          <select id="report-reason" class="w-full border border-border-light rounded-lg px-3 py-2 text-sm">
+            <option value="spam">Spam</option>
+            <option value="offensive">Offensive Content</option>
+            <option value="misinformation">Misinformation</option>
+            <option value="harassment">Harassment</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="report-details" class="block text-sm font-medium text-text-primary mb-1">Additional Details</label>
+          <textarea id="report-details" rows="3" maxlength="300" placeholder="Optional — describe the issue"
+            class="w-full border border-border-light rounded-lg px-3 py-2 text-sm resize-none"></textarea>
+        </div>
+        <div id="report-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+      </div>
+      <div class="p-6 pt-0 flex gap-3">
+        <button onclick="closeReportModal()" class="flex-1 btn-outline text-sm">Cancel</button>
+        <button id="report-submit-btn" class="flex-1 btn-primary text-sm bg-red-600 hover:bg-red-700">Submit Report</button>
+      </div>
+    </div>
+  </div>
 </PortalLayout>

@@ -1,0 +1,119 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+
+const sb = getSupabaseServiceClient();
+const { data: policies } = await sb
+  .from('policies')
+  .select('id, title, description, policy_type, version, effective_date, acknowledgement_required, gate_portal_access, status, created_at')
+  .eq('society_id', SOCIETY_ID)
+  .eq('status', isPrivileged ? '' : 'active')  // will override below
+  .order('effective_date', { ascending: false });
+
+// Requery without status filter for exec, with filter for members
+const { data: policiesData } = isPrivileged
+  ? await sb.from('policies').select('id, title, description, policy_type, version, effective_date, acknowledgement_required, gate_portal_access, status, created_at').eq('society_id', SOCIETY_ID).order('effective_date', { ascending: false })
+  : await sb.from('policies').select('id, title, description, policy_type, version, effective_date, acknowledgement_required, gate_portal_access, status, created_at').eq('society_id', SOCIETY_ID).eq('status', 'active').order('effective_date', { ascending: false });
+
+// Fetch user's acknowledgements
+const { data: acks } = await sb
+  .from('policy_acknowledgements')
+  .select('policy_id')
+  .eq('user_id', user.id)
+  .in('policy_id', (policiesData ?? []).map((p: any) => p.id));
+
+const ackedSet = new Set((acks ?? []).map((a: any) => a.policy_id));
+
+const typeIcon: Record<string, string> = {
+  text: 'fa-file-alt',
+  pdf:  'fa-file-pdf',
+  video_url: 'fa-video',
+};
+const typeLabel: Record<string, string> = {
+  text: 'Text', pdf: 'PDF', video_url: 'Video',
+};
+---
+
+<PortalLayout title="Policies" user={user} activeModule="policies">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Society Policies</h1>
+      <p class="text-text-secondary text-sm mt-1">Review and acknowledge your society's policies.</p>
+    </div>
+    {isPrivileged && (
+      <a href="/portal/policies/new" class="btn-primary flex items-center gap-2 text-sm">
+        <i class="fas fa-plus" aria-hidden="true"></i>Add Policy
+      </a>
+    )}
+  </div>
+
+  {(policiesData ?? []).length === 0 ? (
+    <div class="text-center py-16">
+      <i class="fas fa-shield-alt text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+      <h3 class="text-lg font-semibold text-text-primary mb-2">No policies yet</h3>
+      <p class="text-text-secondary text-sm">{isPrivileged ? 'Add the first policy to get started.' : 'Your society has not published any policies yet.'}</p>
+    </div>
+  ) : (
+    <div class="space-y-3">
+      {(policiesData ?? []).map((p: any) => {
+        const acked = ackedSet.has(p.id);
+        const needsAck = p.acknowledgement_required && !acked && p.status === 'active';
+        return (
+          <a href={`/portal/policies/${p.id}`}
+            class="card-premium block p-5 hover:shadow-medium transition-shadow">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3 flex-1 min-w-0">
+                <div class="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
+                  <i class={`fas ${typeIcon[p.policy_type] ?? 'fa-file'} text-primary-600`} aria-hidden="true"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h3 class="text-base font-semibold text-text-primary">{p.title}</h3>
+                    {p.status !== 'active' && isPrivileged && (
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium capitalize">{p.status}</span>
+                    )}
+                    {p.gate_portal_access && (
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-medium">
+                        <i class="fas fa-lock mr-1" aria-hidden="true"></i>Required
+                      </span>
+                    )}
+                  </div>
+                  {p.description && (
+                    <p class="text-sm text-text-secondary mt-0.5 line-clamp-2">{p.description}</p>
+                  )}
+                  <div class="flex items-center gap-3 mt-2 text-xs text-text-secondary">
+                    <span><i class="fas fa-tag mr-1" aria-hidden="true"></i>{typeLabel[p.policy_type]}</span>
+                    <span>v{p.version}</span>
+                    <span>Effective {new Date(p.effective_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex-shrink-0 flex flex-col items-end gap-2">
+                {p.acknowledgement_required && (
+                  acked ? (
+                    <span class="inline-flex items-center gap-1 text-xs font-medium text-secondary-500">
+                      <i class="fas fa-check-circle" aria-hidden="true"></i>Acknowledged
+                    </span>
+                  ) : (
+                    <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
+                      <i class="fas fa-exclamation-circle" aria-hidden="true"></i>Action needed
+                    </span>
+                  )
+                )}
+                <i class="fas fa-chevron-right text-text-secondary text-sm" aria-hidden="true"></i>
+              </div>
+            </div>
+          </a>
+        );
+      })}
+    </div>
+  )}
+</PortalLayout>

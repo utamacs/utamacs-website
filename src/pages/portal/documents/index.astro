@@ -5,7 +5,7 @@ import PortalLayout from '@portal/PortalLayout.astro';
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
 
-const canUpload = ['executive', 'admin'].includes(user.role);
+const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
 ---
 
 <PortalLayout title="Documents" user={user} activeModule="documents">
@@ -29,53 +29,49 @@ const canUpload = ['executive', 'admin'].includes(user.role);
               <i class="fas fa-folder-open text-primary-600 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Document Categories</div>
-            <div class="text-xs text-text-secondary">Society records are organised into: Governance, Finance, Legal, Meeting Minutes, HOTO, and Circulars.</div>
+            <div class="text-xs text-text-secondary">Society records organised into Governance, Finance, Legal, Minutes, HOTO, Circulars, and more.</div>
           </div>
           <div class="bg-white rounded-lg border border-border-light p-4">
             <div class="w-8 h-8 rounded-lg bg-secondary-50 flex items-center justify-center mb-2">
               <i class="fas fa-lock text-secondary-500 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Access Control</div>
-            <div class="text-xs text-text-secondary">Some documents (e.g. audit reports) are restricted to executives. All published notices are accessible to all members.</div>
+            <div class="text-xs text-text-secondary">Some documents are restricted to executives. Members can view all member-level and public documents.</div>
           </div>
           <div class="bg-white rounded-lg border border-border-light p-4">
             <div class="w-8 h-8 rounded-lg bg-accent-500/10 flex items-center justify-center mb-2">
               <i class="fas fa-upload text-accent-500 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Uploading Documents</div>
-            <div class="text-xs text-text-secondary">Only Secretary and above can upload or delete documents. Version history is preserved.</div>
-          </div>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
-          <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Important documents are referenced from the relevant HOTO item, complaint, or AGM record</span>
-          </div>
-          <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Documents can be linked to formal resolutions for audit trail compliance</span>
+            <div class="text-xs text-text-secondary">Only Secretary and above can upload or archive documents. PDF, DOCX, XLSX, and CSV supported.</div>
           </div>
         </div>
       </div>
     </div>
   </details>
 
-  <div class="mb-6 flex items-center justify-between">
+  <div class="mb-5 flex items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold text-text-primary">Documents</h1>
-      <p class="text-sm text-text-secondary mt-1">Society bylaws, meeting minutes, circulars, and more.</p>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Documents</h1>
+      <p class="text-text-secondary text-sm mt-1">Society bylaws, meeting minutes, circulars, and more.</p>
     </div>
-    {canUpload && (
-      <button id="upload-btn" class="btn-primary text-sm flex items-center gap-2">
-        <i class="fas fa-upload" aria-hidden="true"></i>
-        Upload Document
-      </button>
-    )}
+    <div class="flex items-center gap-3">
+      <div class="relative">
+        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-xs" aria-hidden="true"></i>
+        <input id="search-input" type="text" placeholder="Search documents…" class="form-input pl-8 py-2 text-sm" style="width:200px" />
+      </div>
+      {canUpload && (
+        <button id="upload-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-upload" aria-hidden="true"></i>
+          Upload
+        </button>
+      )}
+    </div>
   </div>
 
-  <!-- Category tabs -->
+  <!-- Category tabs (include new categories from migration 050) -->
   <div class="flex gap-2 flex-wrap mb-5" id="category-filters">
-    {['All','Bylaws','Minutes','Financial','Legal','Circulars','Forms','Other'].map(cat => (
+    {['All','Bylaws','Minutes','Financial','Legal','Circulars','Governance','HOTO','Maintenance','Forms','Other'].map(cat => (
       <button data-cat={cat === 'All' ? '' : cat}
         class={`filter-btn text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${cat === 'All' ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600'}`}>
         {cat}
@@ -89,113 +85,165 @@ const canUpload = ['executive', 'admin'].includes(user.role);
 
   <!-- Upload modal (exec/admin only) -->
   {canUpload && (
-    <div id="upload-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl p-6 w-full max-w-md">
-        <h3 class="font-semibold text-text-primary mb-4 flex items-center justify-between">
-          Upload Document
-          <button id="modal-close" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
-        </h3>
-        <div id="upload-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
-        <form id="upload-form" class="space-y-4">
+    <div id="upload-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-border-light flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-primary-600">Upload Document</h3>
+          <button id="modal-close" class="text-text-secondary hover:text-text-primary p-2" aria-label="Close">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div id="upload-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
           <div>
-            <label class="block text-sm font-medium text-text-primary mb-1.5">Title <span class="text-red-500">*</span></label>
-            <input type="text" name="title" required maxlength="200"
-              class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            <label class="form-label" for="up-file">File <span class="text-red-500">*</span></label>
+            <div id="file-drop-zone"
+              class="border-2 border-dashed border-border-light rounded-xl p-5 text-center text-sm text-text-secondary hover:border-primary-400 hover:bg-primary-50/30 transition-colors cursor-pointer">
+              <i class="fas fa-cloud-upload-alt text-2xl text-primary-300 mb-2 block" aria-hidden="true"></i>
+              <span id="file-drop-label">Drop file here or <span class="text-primary-600 font-medium">click to select</span></span>
+              <div class="text-xs mt-1 text-text-secondary">PDF, DOCX, XLSX, CSV, JPG, PNG — up to 20 MB</div>
+            </div>
+            <input type="file" id="up-file" accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png" class="hidden" />
           </div>
+
           <div>
-            <label class="block text-sm font-medium text-text-primary mb-1.5">Category <span class="text-red-500">*</span></label>
-            <select name="category" required class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
-              <option value="">Select</option>
-              {['Bylaws','Minutes','Financial','Legal','Circulars','Forms','Other'].map(c => (
-                <option value={c}>{c}</option>
-              ))}
-            </select>
+            <label class="form-label" for="up-title">Title <span class="text-red-500">*</span></label>
+            <input id="up-title" type="text" maxlength="200" class="form-input" placeholder="e.g. AGM Minutes April 2025" />
           </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="up-category">Category <span class="text-red-500">*</span></label>
+              <select id="up-category" class="form-input bg-white">
+                <option value="">Select</option>
+                {['Bylaws','Minutes','Financial','Legal','Circulars','Governance','HOTO','Maintenance','Forms','Other'].map(c => (
+                  <option value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="up-access">Access</label>
+              <select id="up-access" class="form-input bg-white">
+                <option value="member">Members</option>
+                <option value="executive">Exec only</option>
+              </select>
+            </div>
+          </div>
+
           <div>
-            <label class="block text-sm font-medium text-text-primary mb-1.5">Storage Key <span class="text-red-500">*</span></label>
-            <input type="text" name="storage_key" required placeholder="documents/filename.pdf"
-              class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-            <p class="text-xs text-text-secondary mt-1">Path in storage bucket after uploading the file.</p>
+            <label class="form-label" for="up-description">Description</label>
+            <textarea id="up-description" rows="2" maxlength="500" class="form-input resize-none" placeholder="Brief description (optional)"></textarea>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-1.5">Description</label>
-            <textarea name="description" rows="2" maxlength="500"
-              class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
-          </div>
+
           <div class="flex items-center gap-2">
-            <input type="checkbox" name="is_public" id="is_public" class="rounded border-border-light" />
-            <label for="is_public" class="text-sm text-text-primary">Public (visible without login)</label>
+            <input type="checkbox" id="up-public" class="w-4 h-4 accent-primary-600" />
+            <label for="up-public" class="text-sm text-text-primary">Public (visible without login)</label>
           </div>
-          <div class="flex gap-3 pt-2">
-            <button type="submit" class="btn-primary flex-1 text-sm">Upload</button>
-            <button type="button" id="modal-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
-          </div>
-        </form>
+        </div>
+        <div class="px-6 pb-6 flex gap-3">
+          <button id="upload-submit-btn" class="btn-primary flex-1 flex items-center justify-center gap-2 text-sm">
+            <i class="fas fa-upload" aria-hidden="true"></i>
+            <span id="upload-submit-label">Upload Document</span>
+          </button>
+          <button id="modal-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
       </div>
     </div>
   )}
 
   <script define:vars={{ canUpload }}>
-    const MIME_ICONS = {
+    const MIME_ICONS: Record<string, string> = {
       'application/pdf': 'fa-file-pdf text-red-500',
       'application/msword': 'fa-file-word text-blue-500',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'fa-file-word text-blue-500',
       'application/vnd.ms-excel': 'fa-file-excel text-green-500',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'fa-file-excel text-green-500',
+      'text/csv': 'fa-file-csv text-green-600',
       'image/jpeg': 'fa-file-image text-purple-500',
       'image/png': 'fa-file-image text-purple-500',
     };
 
-    function formatSize(bytes) {
+    function formatSize(bytes: number) {
       if (!bytes) return '';
       if (bytes < 1024) return `${bytes} B`;
-      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+      if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1048576).toFixed(1)} MB`;
+    }
+
+    function showToast(message: string, type: 'success' | 'error' = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
     }
 
     let currentCategory = '';
+    let searchQuery = '';
+    let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
     async function loadDocuments() {
-      const container = document.getElementById('documents-container');
+      const container = document.getElementById('documents-container')!;
       const params = new URLSearchParams();
       if (currentCategory) params.set('category', currentCategory);
+      if (searchQuery)     params.set('q', searchQuery);
 
       const res = await fetch(`/api/v1/documents?${params}`, { credentials: 'include' });
-      const docs = res.ok ? await res.json() : [];
+      const docs: any[] = res.ok ? await res.json() : [];
 
       if (!docs.length) {
         container.innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">No documents found.</div>';
         return;
       }
 
-      // Group by category
-      const grouped = {};
-      docs.forEach((d) => {
+      // Group by category when not filtered
+      const grouped: Record<string, any[]> = {};
+      docs.forEach(d => {
         if (!grouped[d.category]) grouped[d.category] = [];
         grouped[d.category].push(d);
       });
 
       container.innerHTML = Object.entries(grouped).map(([cat, items]) => `
         <div class="mb-6">
-          <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">${cat}</h2>
+          <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3 flex items-center gap-2">
+            <i class="fas fa-folder text-primary-300 text-xs" aria-hidden="true"></i>
+            ${cat}
+            <span class="text-xs font-normal text-text-secondary">(${items.length})</span>
+          </h2>
           <div class="bg-white rounded-xl border border-border-light overflow-hidden">
-            ${items.map((d) => {
+            ${items.map((d: any) => {
               const icon = MIME_ICONS[d.mime_type] ?? 'fa-file text-gray-400';
               return `
                 <div class="flex items-center gap-4 px-5 py-4 border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors">
-                  <i class="fas ${icon} text-xl w-6 text-center" aria-hidden="true"></i>
+                  <i class="fas ${icon} text-xl w-6 text-center flex-shrink-0" aria-hidden="true"></i>
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium text-text-primary truncate">${d.title}</div>
                     <div class="text-xs text-text-secondary mt-0.5">
                       ${d.file_name ? `${d.file_name} · ` : ''}${formatSize(d.file_size_bytes)}
-                      ${d.version > 1 ? ` · v${d.version}` : ''}
-                      · ${new Date(d.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}
+                      ${(d.version ?? 1) > 1 ? ` · v${d.version}` : ''}
+                      · ${new Date(d.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </div>
                     ${d.description ? `<div class="text-xs text-text-secondary mt-0.5 truncate">${d.description}</div>` : ''}
                   </div>
-                  <div class="flex items-center gap-2">
-                    ${!d.is_public ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Members only</span>' : ''}
-                    <span class="text-xs text-text-secondary">${d.profiles?.full_name ? `by ${d.profiles.full_name}` : ''}</span>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    ${d.requires_role === 'executive' ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Exec only</span>' : ''}
+                    ${d.download_url
+                      ? `<a href="${d.download_url}" target="_blank" rel="noopener"
+                           class="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1 text-primary-600">
+                           <i class="fas fa-download text-xs" aria-hidden="true"></i> Download
+                         </a>`
+                      : ''
+                    }
+                    ${canUpload
+                      ? `<button onclick="archiveDoc('${d.id}')"
+                           class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-red-600" title="Archive">
+                           <i class="fas fa-archive text-xs" aria-hidden="true"></i>
+                         </button>`
+                      : ''
+                    }
                   </div>
                 </div>
               `;
@@ -205,8 +253,18 @@ const canUpload = ['executive', 'admin'].includes(user.role);
       `).join('');
     }
 
-    document.getElementById('category-filters')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.filter-btn');
+    async function archiveDoc(id: string) {
+      if (!confirm('Archive this document? It can be recovered by administrators.')) return;
+      const res = await fetch(`/api/v1/documents?id=${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) { showToast('Document archived.'); loadDocuments(); }
+      else { showToast('Failed to archive document.', 'error'); }
+    }
+
+    (window as any).archiveDoc = archiveDoc;
+
+    // Category filter
+    document.getElementById('category-filters')!.addEventListener('click', (e) => {
+      const btn = (e.target as Element).closest('.filter-btn') as HTMLElement | null;
       if (!btn) return;
       document.querySelectorAll('.filter-btn').forEach(b => {
         b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
@@ -218,35 +276,80 @@ const canUpload = ['executive', 'admin'].includes(user.role);
       loadDocuments();
     });
 
+    // Search
+    document.getElementById('search-input')!.addEventListener('input', (e) => {
+      if (searchTimeout) clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        searchQuery = (e.target as HTMLInputElement).value.trim();
+        loadDocuments();
+      }, 300);
+    });
+
+    // Upload modal
     if (canUpload) {
-      const modal = document.getElementById('upload-modal');
-      document.getElementById('upload-btn')?.addEventListener('click', () => modal?.classList.remove('hidden'));
-      document.getElementById('modal-close')?.addEventListener('click', () => modal?.classList.add('hidden'));
-      document.getElementById('modal-cancel')?.addEventListener('click', () => modal?.classList.add('hidden'));
+      const modal      = document.getElementById('upload-modal')!;
+      const fileInput  = document.getElementById('up-file') as HTMLInputElement;
+      const dropZone   = document.getElementById('file-drop-zone')!;
+      const dropLabel  = document.getElementById('file-drop-label')!;
+      const errEl      = document.getElementById('upload-error')!;
+      const submitBtn  = document.getElementById('upload-submit-btn') as HTMLButtonElement;
+      const submitLabel= document.getElementById('upload-submit-label')!;
 
-      document.getElementById('upload-form')?.addEventListener('submit', async (e) => {
+      function openModal() { modal.classList.remove('hidden'); errEl.classList.add('hidden'); fileInput.value = ''; dropLabel.innerHTML = 'Drop file here or <span class="text-primary-600 font-medium">click to select</span>'; }
+      function closeModal() { modal.classList.add('hidden'); }
+
+      document.getElementById('upload-btn')!.addEventListener('click', openModal);
+      document.getElementById('modal-close')!.addEventListener('click', closeModal);
+      document.getElementById('modal-cancel')!.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-primary-400', 'bg-primary-50/50'); });
+      dropZone.addEventListener('dragleave', ()  => { dropZone.classList.remove('border-primary-400', 'bg-primary-50/50'); });
+      dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
-        const form = e.target;
-        const fd = new FormData(form);
-        const errEl = document.getElementById('upload-error');
-        errEl?.classList.add('hidden');
+        dropZone.classList.remove('border-primary-400', 'bg-primary-50/50');
+        const file = e.dataTransfer?.files[0];
+        if (file) { fileInput.files = e.dataTransfer!.files; dropLabel.textContent = file.name; }
+      });
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files?.[0]) dropLabel.textContent = fileInput.files[0].name;
+      });
 
-        const res = await fetch('/api/v1/documents', {
-          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: fd.get('title'), category: fd.get('category'),
-            storage_key: fd.get('storage_key'), description: fd.get('description') || null,
-            is_public: fd.has('is_public'),
-          }),
-        });
+      document.getElementById('upload-submit-btn')!.addEventListener('click', async () => {
+        errEl.classList.add('hidden');
+        const file     = fileInput.files?.[0];
+        const title    = (document.getElementById('up-title') as HTMLInputElement).value.trim();
+        const category = (document.getElementById('up-category') as HTMLSelectElement).value;
 
-        if (res.ok) {
-          modal?.classList.add('hidden');
-          form.reset();
-          loadDocuments();
-        } else {
+        if (!file)     { errEl.textContent = 'Please select a file.';       errEl.classList.remove('hidden'); return; }
+        if (!title)    { errEl.textContent = 'Title is required.';           errEl.classList.remove('hidden'); return; }
+        if (!category) { errEl.textContent = 'Category is required.';        errEl.classList.remove('hidden'); return; }
+
+        submitBtn.disabled = true;
+        submitLabel.textContent = 'Uploading…';
+
+        const fd = new FormData();
+        fd.append('file',         file);
+        fd.append('title',        title);
+        fd.append('category',     category);
+        fd.append('description',  (document.getElementById('up-description') as HTMLTextAreaElement).value.trim());
+        fd.append('requires_role',(document.getElementById('up-access') as HTMLSelectElement).value);
+        fd.append('is_public',    String((document.getElementById('up-public') as HTMLInputElement).checked));
+
+        try {
+          const res = await fetch('/api/v1/documents', { method: 'POST', credentials: 'include', body: fd });
           const data = await res.json();
-          if (errEl) { errEl.textContent = data.detail ?? data.error ?? 'Upload failed.'; errEl.classList.remove('hidden'); }
+          if (!res.ok) throw new Error(data.message ?? data.error ?? 'Upload failed');
+          showToast('Document uploaded successfully.');
+          closeModal();
+          loadDocuments();
+        } catch (err: any) {
+          errEl.textContent = err.message;
+          errEl.classList.remove('hidden');
+        } finally {
+          submitBtn.disabled = false;
+          submitLabel.textContent = 'Upload Document';
         }
       });
     }

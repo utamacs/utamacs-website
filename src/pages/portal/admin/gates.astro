@@ -1,0 +1,370 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive', 'admin'].includes(user.role) || user.isAdmin;
+if (!isPrivileged) return new Response('Forbidden', { status: 403 });
+---
+
+<PortalLayout title="Gates Management" user={user} activeModule="admin">
+  <!-- Page header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/admin" class="hover:text-primary-600">Admin</a>
+        <span class="mx-2">›</span>
+        <span class="text-text-primary">Gates Management</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Gates Management</h1>
+      <p class="text-text-secondary text-sm mt-1">Manage entry/exit gates and security guard assignments.</p>
+    </div>
+    <button
+      id="open-add-modal"
+      class="btn-primary flex items-center gap-2 text-sm"
+    >
+      <i class="fas fa-plus" aria-hidden="true"></i>
+      Add Gate
+    </button>
+  </div>
+
+  <!-- Gates table -->
+  <div class="card-premium overflow-hidden">
+    <div id="gates-table-container">
+      <div class="flex items-center justify-center h-40 text-text-secondary text-sm">
+        <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+        Loading gates…
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Add Gate Modal ──────────────────────────────────────── -->
+  <div
+    id="add-gate-modal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modal-title"
+  >
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-md overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-border-light">
+        <h2 id="modal-title" class="text-lg font-semibold text-primary-600">Add Gate</h2>
+        <button id="close-add-modal" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+          <i class="fas fa-times text-xl" aria-hidden="true"></i>
+        </button>
+      </div>
+      <form id="add-gate-form" class="p-6 space-y-4" novalidate>
+        <div id="modal-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+        <div>
+          <label class="form-label" for="gate_name">Gate Name <span class="text-red-500">*</span></label>
+          <input
+            id="gate_name"
+            name="gate_name"
+            type="text"
+            required
+            maxlength="100"
+            placeholder="e.g. Main Entry Gate"
+            class="form-input"
+          />
+        </div>
+
+        <div>
+          <label class="form-label" for="gate_code">Gate Code</label>
+          <input
+            id="gate_code"
+            name="gate_code"
+            type="text"
+            maxlength="20"
+            placeholder="e.g. G1, MAIN, NORTH"
+            class="form-input"
+          />
+          <p class="text-xs text-text-secondary mt-1">Short identifier used on guard tablets.</p>
+        </div>
+
+        <div>
+          <label class="form-label" for="gate_type">Gate Type</label>
+          <select id="gate_type" name="gate_type" class="form-input bg-white">
+            <option value="">Select type</option>
+            <option value="main_entry">Main Entry</option>
+            <option value="exit">Exit</option>
+            <option value="emergency">Emergency</option>
+            <option value="pedestrian">Pedestrian</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="form-label" for="notes">Notes</label>
+          <textarea
+            id="notes"
+            name="notes"
+            rows="2"
+            maxlength="300"
+            placeholder="Optional description or notes"
+            class="form-input resize-none"
+          ></textarea>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="btn-primary flex-1 flex items-center justify-center gap-2 text-sm">
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span id="submit-label">Add Gate</span>
+          </button>
+          <button type="button" id="cancel-add-modal" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Edit Gate Modal ──────────────────────────────────────── -->
+  <div
+    id="edit-gate-modal"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="edit-modal-title"
+  >
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-md overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-border-light">
+        <h2 id="edit-modal-title" class="text-lg font-semibold text-primary-600">Edit Gate</h2>
+        <button id="close-edit-modal" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+          <i class="fas fa-times text-xl" aria-hidden="true"></i>
+        </button>
+      </div>
+      <form id="edit-gate-form" class="p-6 space-y-4" novalidate>
+        <input type="hidden" id="edit_gate_id" name="id" />
+        <div id="edit-modal-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+        <div>
+          <label class="form-label" for="edit_gate_name">Gate Name <span class="text-red-500">*</span></label>
+          <input
+            id="edit_gate_name"
+            name="gate_name"
+            type="text"
+            required
+            maxlength="100"
+            class="form-input"
+          />
+        </div>
+
+        <div>
+          <label class="form-label" for="edit_notes">Notes</label>
+          <textarea
+            id="edit_notes"
+            name="notes"
+            rows="2"
+            maxlength="300"
+            class="form-input resize-none"
+          ></textarea>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <input type="checkbox" id="edit_is_active" name="is_active" class="w-4 h-4 accent-primary-600" />
+          <label for="edit_is_active" class="text-sm font-medium text-text-primary">Gate is active</label>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="btn-primary flex-1 flex items-center justify-center gap-2 text-sm">
+            <i class="fas fa-save" aria-hidden="true"></i>
+            Save Changes
+          </button>
+          <button type="button" id="cancel-edit-modal" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // ── Helpers ──────────────────────────────────────────────────
+    function showToast(message: string, type: 'success' | 'error' = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large
+        text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => {
+        toast.classList.add('translate-y-4', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function gateBadge(isActive: boolean) {
+      return isActive
+        ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>`
+        : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>`;
+    }
+
+    // ── Load gates ───────────────────────────────────────────────
+    let gatesCache: any[] = [];
+
+    async function loadGates() {
+      const container = document.getElementById('gates-table-container')!;
+      try {
+        const res = await fetch('/api/v1/visitors/gates', { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load gates');
+        const data: any[] = await res.json();
+        gatesCache = data;
+
+        if (!data.length) {
+          container.innerHTML = `
+            <div class="text-center py-16">
+              <i class="fas fa-archway text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+              <h3 class="text-lg font-semibold text-text-primary mb-2">No gates yet</h3>
+              <p class="text-text-secondary text-sm">Add the first gate using the button above.</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <table class="min-w-full text-sm">
+            <thead class="bg-section-alt border-b border-border-light">
+              <tr>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Gate Name</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Code</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Description</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Status</th>
+                <th class="px-5 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border-light bg-white">
+              ${data.map((gate: any) => `
+                <tr class="hover:bg-primary-50 transition-colors">
+                  <td class="px-5 py-3.5 font-medium text-text-primary">${escapeHtml(gate.name)}</td>
+                  <td class="px-5 py-3.5 text-text-secondary font-mono text-xs">${gate.gate_code ? escapeHtml(gate.gate_code) : '—'}</td>
+                  <td class="px-5 py-3.5 text-text-secondary max-w-xs truncate">${gate.description ? escapeHtml(gate.description) : '—'}</td>
+                  <td class="px-5 py-3.5">${gateBadge(gate.is_active !== false)}</td>
+                  <td class="px-5 py-3.5 text-right">
+                    <button
+                      class="btn-ghost text-xs px-3 py-1.5 edit-gate-btn"
+                      data-id="${gate.id}"
+                      data-name="${escapeHtml(gate.name)}"
+                      data-notes="${gate.description ? escapeHtml(gate.description) : ''}"
+                      data-active="${gate.is_active !== false}"
+                    >
+                      <i class="fas fa-edit mr-1" aria-hidden="true"></i>Edit
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>`;
+
+        // Wire edit buttons
+        document.querySelectorAll('.edit-gate-btn').forEach(btn => {
+          btn.addEventListener('click', () => openEditModal(btn as HTMLElement));
+        });
+      } catch {
+        container.innerHTML = `<p class="text-center text-red-600 py-12">Failed to load gates. Please refresh the page.</p>`;
+      }
+    }
+
+    function escapeHtml(str: string) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ── Add gate modal ───────────────────────────────────────────
+    const addModal   = document.getElementById('add-gate-modal')!;
+    const addForm    = document.getElementById('add-gate-form') as HTMLFormElement;
+    const addError   = document.getElementById('modal-error')!;
+
+    document.getElementById('open-add-modal')!.addEventListener('click', () => {
+      addForm.reset();
+      addError.classList.add('hidden');
+      addModal.classList.remove('hidden');
+    });
+
+    function closeAddModal() { addModal.classList.add('hidden'); }
+    document.getElementById('close-add-modal')!.addEventListener('click', closeAddModal);
+    document.getElementById('cancel-add-modal')!.addEventListener('click', closeAddModal);
+    addModal.addEventListener('click', (e) => { if (e.target === addModal) closeAddModal(); });
+
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      addError.classList.add('hidden');
+      const fd = new FormData(addForm);
+      const payload: Record<string, unknown> = {
+        gate_name: (fd.get('gate_name') as string).trim(),
+        gate_code: (fd.get('gate_code') as string).trim() || undefined,
+        gate_type: (fd.get('gate_type') as string) || undefined,
+        notes:     (fd.get('notes') as string).trim() || undefined,
+      };
+
+      const submitLabel = document.getElementById('submit-label')!;
+      submitLabel.textContent = 'Saving…';
+      try {
+        const res = await fetch('/api/v1/admin/gates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message ?? json.error ?? 'Failed to add gate');
+        showToast('Gate added successfully.');
+        closeAddModal();
+        await loadGates();
+      } catch (err: any) {
+        addError.textContent = err.message;
+        addError.classList.remove('hidden');
+      } finally {
+        submitLabel.textContent = 'Add Gate';
+      }
+    });
+
+    // ── Edit gate modal ──────────────────────────────────────────
+    const editModal  = document.getElementById('edit-gate-modal')!;
+    const editForm   = document.getElementById('edit-gate-form') as HTMLFormElement;
+    const editError  = document.getElementById('edit-modal-error')!;
+
+    function openEditModal(btn: HTMLElement) {
+      const { id, name, notes, active } = btn.dataset;
+      (document.getElementById('edit_gate_id') as HTMLInputElement).value = id!;
+      (document.getElementById('edit_gate_name') as HTMLInputElement).value = name!;
+      (document.getElementById('edit_notes') as HTMLTextAreaElement).value = notes ?? '';
+      (document.getElementById('edit_is_active') as HTMLInputElement).checked = active === 'true';
+      editError.classList.add('hidden');
+      editModal.classList.remove('hidden');
+    }
+
+    function closeEditModal() { editModal.classList.add('hidden'); }
+    document.getElementById('close-edit-modal')!.addEventListener('click', closeEditModal);
+    document.getElementById('cancel-edit-modal')!.addEventListener('click', closeEditModal);
+    editModal.addEventListener('click', (e) => { if (e.target === editModal) closeEditModal(); });
+
+    editForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      editError.classList.add('hidden');
+      const fd = new FormData(editForm);
+      const payload: Record<string, unknown> = {
+        id:        (fd.get('id') as string),
+        gate_name: (fd.get('gate_name') as string).trim(),
+        notes:     (fd.get('notes') as string).trim() || undefined,
+        is_active: (document.getElementById('edit_is_active') as HTMLInputElement).checked,
+      };
+
+      try {
+        const res = await fetch('/api/v1/admin/gates', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message ?? json.error ?? 'Failed to update gate');
+        showToast('Gate updated successfully.');
+        closeEditModal();
+        await loadGates();
+      } catch (err: any) {
+        editError.textContent = err.message;
+        editError.classList.remove('hidden');
+      }
+    });
+
+    // ── Init ─────────────────────────────────────────────────────
+    loadGates();
+  </script>
+</PortalLayout>

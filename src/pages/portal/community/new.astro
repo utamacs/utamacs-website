@@ -22,6 +22,7 @@ if (!user || user.role === 'security_guard' || user.role === 'vendor') {
     <div id="error-banner" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
 
     <form id="post-form" class="bg-white rounded-xl border border-border-light p-6 space-y-5">
+      <!-- Category -->
       <div>
         <label for="category" class="block text-sm font-medium text-text-primary mb-1.5">Category <span class="text-red-500">*</span></label>
         <select id="category" name="category" required
@@ -29,12 +30,13 @@ if (!user || user.role === 'security_guard' || user.role === 'vendor') {
           <option value="">Select category</option>
           <option value="General">General</option>
           <option value="Help">Help / Request</option>
-          <option value="Lost_Found">Lost & Found</option>
+          <option value="Lost_Found">Lost &amp; Found</option>
           <option value="Recommendation">Recommendation</option>
           <option value="Alert">Alert</option>
         </select>
       </div>
 
+      <!-- Title -->
       <div>
         <label for="title" class="block text-sm font-medium text-text-primary mb-1.5">Title <span class="text-red-500">*</span></label>
         <input type="text" id="title" name="title" required maxlength="200"
@@ -42,6 +44,7 @@ if (!user || user.role === 'security_guard' || user.role === 'vendor') {
           class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
       </div>
 
+      <!-- Message -->
       <div>
         <label for="body" class="block text-sm font-medium text-text-primary mb-1.5">Message <span class="text-red-500">*</span></label>
         <textarea id="body" name="body" required rows="6" maxlength="5000"
@@ -50,6 +53,24 @@ if (!user || user.role === 'security_guard' || user.role === 'vendor') {
         <p class="text-xs text-text-secondary mt-1"><span id="char-count">0</span>/5000</p>
       </div>
 
+      <!-- Image attachment -->
+      <div>
+        <label class="block text-sm font-medium text-text-primary mb-1.5">
+          Photos <span class="text-text-secondary font-normal">(optional, up to 5 images, max 5 MB each)</span>
+        </label>
+        <div id="img-drop-zone"
+          class="border-2 border-dashed border-border-light rounded-xl p-5 text-center cursor-pointer hover:border-primary-600 transition-colors"
+          role="button" tabindex="0" aria-label="Click or drag to attach photos">
+          <i class="fas fa-image text-2xl text-text-secondary mb-2" aria-hidden="true"></i>
+          <p class="text-sm text-text-secondary">Drag & drop or <span class="text-primary-600 font-medium">click to browse</span></p>
+          <p class="text-xs text-text-secondary mt-1">JPEG, PNG, WebP, HEIC</p>
+          <input type="file" id="img-file-input" accept="image/jpeg,image/png,image/webp,image/heic"
+            multiple class="hidden" aria-hidden="true" />
+        </div>
+        <div id="img-preview" class="hidden mt-3 grid grid-cols-3 gap-2"></div>
+      </div>
+
+      <!-- Actions -->
       <div class="flex items-center gap-3 pt-2">
         <button type="submit" id="submit-btn" class="btn-primary flex items-center gap-2">
           <i class="fas fa-paper-plane" aria-hidden="true"></i>
@@ -62,16 +83,74 @@ if (!user || user.role === 'security_guard' || user.role === 'vendor') {
   </div>
 
   <script>
-    const form = document.getElementById('post-form') as HTMLFormElement;
+    const form       = document.getElementById('post-form') as HTMLFormElement;
     const errorBanner = document.getElementById('error-banner')!;
-    const bodyEl = document.getElementById('body') as HTMLTextAreaElement;
-    const charCount = document.getElementById('char-count')!;
-    const btnText = document.getElementById('btn-text')!;
+    const bodyEl     = document.getElementById('body') as HTMLTextAreaElement;
+    const charCount  = document.getElementById('char-count')!;
+    const btnText    = document.getElementById('btn-text')!;
     const btnSpinner = document.getElementById('btn-spinner')!;
-    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+    const submitBtn  = document.getElementById('submit-btn') as HTMLButtonElement;
+    const dropZone   = document.getElementById('img-drop-zone')!;
+    const fileInput  = document.getElementById('img-file-input') as HTMLInputElement;
+    const imgPreview = document.getElementById('img-preview')!;
+
+    const ALLOWED = new Set(['image/jpeg','image/png','image/webp','image/heic']);
+    const MAX_BYTES = 5 * 1024 * 1024;
+    const MAX_IMGS = 5;
+    let selectedImages: File[] = [];
 
     bodyEl.addEventListener('input', () => { charCount.textContent = bodyEl.value.length.toString(); });
 
+    // ── Drop zone ────────────────────────────────────────────────────────────
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-primary-600'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-primary-600'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault(); dropZone.classList.remove('border-primary-600');
+      addImages(Array.from(e.dataTransfer?.files ?? []));
+    });
+    fileInput.addEventListener('change', () => {
+      addImages(Array.from(fileInput.files ?? []));
+      fileInput.value = '';
+    });
+
+    function addImages(files: File[]) {
+      for (const f of files) {
+        if (selectedImages.length >= MAX_IMGS) break;
+        if (!ALLOWED.has(f.type)) { alert(`${f.name}: only images allowed`); continue; }
+        if (f.size > MAX_BYTES) { alert(`${f.name}: exceeds 5 MB`); continue; }
+        selectedImages.push(f);
+      }
+      renderImagePreview();
+    }
+
+    function renderImagePreview() {
+      if (!selectedImages.length) { imgPreview.classList.add('hidden'); return; }
+      imgPreview.classList.remove('hidden');
+      imgPreview.innerHTML = selectedImages.map((f, i) => {
+        const url = URL.createObjectURL(f);
+        return `
+          <div class="relative rounded-lg overflow-hidden border border-border-light aspect-square">
+            <img src="${url}" alt="${f.name}" class="w-full h-full object-cover" />
+            <button type="button" data-idx="${i}"
+              class="remove-img absolute top-1 right-1 w-6 h-6 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center text-xs"
+              aria-label="Remove image">
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </div>`;
+      }).join('');
+
+      imgPreview.querySelectorAll('.remove-img').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt((btn as HTMLElement).dataset.idx!);
+          selectedImages.splice(idx, 1);
+          renderImagePreview();
+        });
+      });
+    }
+
+    // ── Form submit ──────────────────────────────────────────────────────────
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorBanner.classList.add('hidden');
@@ -80,21 +159,39 @@ if (!user || user.role === 'security_guard' || user.role === 'vendor') {
       submitBtn.disabled = true;
 
       const fd = new FormData(form);
+
+      // Step 1: create post
       const res = await fetch('/api/v1/community/posts', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: fd.get('title'), body: fd.get('body'), category: fd.get('category') }),
       });
-
       const data = await res.json();
-      if (res.ok) {
-        window.location.href = `/portal/community/${data.id}`;
-      } else {
+
+      if (!res.ok) {
         errorBanner.textContent = data.detail ?? data.error ?? 'Failed to create post.';
         errorBanner.classList.remove('hidden');
         btnText.classList.remove('hidden');
         btnSpinner.classList.add('hidden');
         submitBtn.disabled = false;
+        return;
       }
+
+      const postId = data.id;
+
+      // Step 2: upload images if any
+      if (selectedImages.length) {
+        const imgFd = new FormData();
+        selectedImages.forEach(f => imgFd.append('images', f));
+        try {
+          await fetch(`/api/v1/community/posts/${postId}/images`, {
+            method: 'POST', credentials: 'include', body: imgFd,
+          });
+        } catch {
+          // Non-fatal
+        }
+      }
+
+      window.location.href = `/portal/community/${postId}`;
     });
   </script>
 </PortalLayout>

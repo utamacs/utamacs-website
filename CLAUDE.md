@@ -1,98 +1,481 @@
-# UTA MACS Website — Claude Context
+# UTA MACS — Claude Context & Mandatory Standards
 
-## Project Overview
-Static website for **UTA MACS** (Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited), a residential cooperative in Kondakal, Shankarpalle, Ranga Reddy District, Telangana. Deployed at `utamacs.org` via GitHub Pages.
+> These rules are **non-negotiable**. Every implementation decision, every file written,
+> every API route, every SQL migration must conform to these standards. When in doubt,
+> read this file before writing any code.
 
-## Tech Stack
-- **HTML** — semantic, ARIA-annotated markup
-- **Tailwind CSS v3** — utility-first with a custom design system in `tailwind.config.js`
-- **Vanilla JS** — no frameworks; `src/js/main.js` handles all interactivity
-- **Font Awesome** — icons via CDN kit `5a2b2f0b4f.js`
-- **Google Fonts** — Inter (primary font)
-- **live-server** — local dev server
+---
 
-## Directory Layout
-```
-src/
-  pages/          ← HTML pages (index, about, committee, contact, downloads, events, login, notices, portal, 404)
-  components/     ← Shared fragments injected via fetch: nav.html, footer.html
-  css/styles.css  ← Tailwind entry with @layer base/components/utilities
-  js/main.js      ← App init, theme, mobile menu, scroll effects, accessibility
-docs/             ← GitHub Pages output (manually synced from src/)
-dist/             ← Local build output (npm run build)
-tailwind.config.js
-package.json
-```
+## 1. Project Identity
 
-## NPM Scripts
-| Command | What it does |
-|---------|-------------|
-| `npm run dev` | `npx live-server src --port=3000` |
-| `npm run build` | `cp -r src/* dist/` |
-| `npm run deploy` | build → git add dist → commit → push |
+**Name**: UTA MACS — Urban Trilla Apartment Owners Mutually Aided Cooperative Maintenance Society Limited  
+**Location**: Kondakal, Shankarpalle, Ranga Reddy District, Telangana  
+**Public site**: `utamacs.org` (GitHub Pages, `docs/` folder)  
+**Resident portal**: `portal.utamacs.org` (Vercel serverless, Astro hybrid)
 
-## Design System (tailwind.config.js)
+**FORBIDDEN**: Never reference competitor products, third-party society management platforms, or any specific external system by name in code, comments, commit messages, UI text, or documentation. Features are designed for UTAMACS residents — not derived from, compared with, or named after any other platform. If a feature idea came from a specification document, implement it with UTAMACS identity and never acknowledge the source system.
 
-### Brand Colors
-| Token | Hex | Use |
-|-------|-----|-----|
-| `primary-600` | `#1E3A8A` | CTAs, nav active, headings |
-| `secondary-500` | `#10B981` | Success, highlights, secondary CTAs |
-| `accent-500` | `#F59E0B` | Warnings, badges, accents |
+---
+
+## 2. Architecture — Two Separate Systems
+
+### 2A. Public Website (`src/site/` → `docs/`)
+- Pure static HTML + Tailwind CSS v3 + Vanilla JS
+- No frameworks, no npm dependencies at runtime
+- Built with: `npm run build` → `docs/`
+- Served by: GitHub Pages at `utamacs.org`
+
+### 2B. Resident Portal (`src/` → Vercel)
+- **Astro 4** with `output: 'hybrid'` (SSR + static prerender)
+- **React 18** for interactive dashboard components only
+- **Tailwind CSS v3** via `@astrojs/tailwind`
+- **Supabase** for auth, database, and file storage
+- **pdfmake** for server-side PDF generation (invoice, receipt, poll export)
+- **Vercel** adapter — every portal page has `export const prerender = false`
+
+### 2C. Build Scripts
+| Script | What it does |
+|--------|-------------|
+| `npm run dev` | Portal dev server (Astro) |
+| `npm run build` | Public site build → `docs/` |
+| `npm run build:portal` | Portal build → Vercel |
+| `npm run supabase:types` | Generate TypeScript types from Supabase schema |
+
+---
+
+## 3. Design System — Mandatory Tokens
+
+**NEVER** use raw hex colours, hardcoded font sizes, or arbitrary Tailwind values in portal pages. Always use the design system tokens below.
+
+### 3A. Colour Tokens (`tailwind.config.cjs`)
+| Token | Hex | Semantic Use |
+|-------|-----|-------------|
+| `primary-600` | `#1E3A8A` | CTAs, active nav, headings, primary actions |
+| `primary-50`  | (light blue) | Hover backgrounds, info banners |
+| `primary-100` | (light blue) | Icon backgrounds, subtle fills |
+| `secondary-500` | `#10B981` | Success states, secondary CTAs, positive indicators |
+| `accent-500` | `#F59E0B` | Warnings, amber badges, attention |
 | `background` | `#FFFFFF` | Page background |
 | `section-alt` | `#F8FAFC` | Alternating section backgrounds |
-| `text-primary` | `#111827` | Body text |
-| `text-secondary` | `#4B5563` | Muted/supporting text |
-| `border-light` | `#E5E7EB` | Subtle borders |
+| `text-primary` | `#111827` | All body text |
+| `text-secondary` | `#4B5563` | Muted, supporting, metadata |
+| `border-light` | `#E5E7EB` | Subtle borders, dividers |
 
-### Custom Font Sizes
-`text-hero`, `text-hero-lg`, `text-section`, `text-section-lg`, `text-card`, `text-card-lg`, `text-body`, `text-body-lg`, `text-small`, `text-button`
+Status colours (use directly, not design token names):
+- Danger/Destructive: `red-600`, `red-500`, `red-100`, `red-700`
+- Warning: `amber-500`, `amber-600`, `amber-50`
+- Info: `blue-500`, `blue-50`
 
-### Custom Shadows
-`shadow-soft`, `shadow-medium`, `shadow-large`, `shadow-glow`, `shadow-glow-secondary`
+### 3B. Typography
+- **Display / Headings**: `font-poppins` — `text-2xl font-bold text-primary-600 font-poppins`
+- **Body**: `font-inter` (default sans) — all prose, labels, descriptions
+- **Custom scale**: `text-hero`, `text-section`, `text-card`, `text-body`, `text-small`, `text-button`
+- Section heading in portal: `text-2xl font-bold text-primary-600 font-poppins`
+- Sub-heading: `text-lg font-semibold text-text-primary`
+- Label: `text-sm font-medium text-text-secondary`
 
-### Custom Animations
-`animate-fade-in`, `animate-slide-up`, `animate-bounce-gentle`, `animate-float`, `animate-shimmer`, `animate-morph`
+### 3C. Component Classes (from `src/styles/global.css`)
+Use these classes — never re-implement the same styles inline.
 
-## Reusable CSS Classes (src/css/styles.css)
-- **Layout**: `container-custom`, `section`, `section-alt`, `section-hero`
-- **Buttons**: `btn-primary`, `btn-secondary`, `btn-outline`
-- **Cards**: `card-premium`, `card-feature`, `card-stats`, `card-hero`
-- **Navigation**: `nav-link`, `mobile-nav-link`, `mobile-menu`
-- **Scroll animations**: `animate-on-scroll` (add `.animate` class via IntersectionObserver)
+**Cards:**
+- `.card-premium` — standard content card (white, rounded-xl, shadow-soft, hover:shadow-medium)
+- `.card-hero` — hero/featured card (rounded-2xl, shadow-large)
+- `.card-feature` — centred icon + content card
+- `.card-stats` — stat display card with `.number` and `.label` children
 
-## Component System
-Nav and footer are loaded via `fetch()` in `main.js`:
-```js
-loadComponent('header-placeholder', 'components/nav.html');
-loadComponent('footer-placeholder', 'components/footer.html');
+**Buttons:**
+- `.btn-primary` — primary action (primary-600 bg, white text, rounded-xl)
+- `.btn-secondary` — secondary action (secondary-500 bg)
+- `.btn-outline` — outlined action (border-2 border-primary-600)
+- `.btn-ghost` — ghost (transparent, hover bg-primary-50)
+
+**Forms:**
+- `.form-input` — all text/select/textarea inputs (w-full, px-4 py-3, border-border-light, focus:ring-primary-600)
+- `.form-label` — all labels (block, text-sm, font-medium, mb-2)
+- `.form-error` — validation error messages (text-sm, text-red-600)
+
+**Shadows:** `shadow-soft` < `shadow-medium` < `shadow-large` < `shadow-glow`
+
+### 3D. Standard UI Patterns
+
+**Page header** (every portal page):
+```html
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-primary-600 font-poppins">{Title}</h1>
+    <p class="text-text-secondary text-sm mt-1">{Subtitle}</p>
+  </div>
+  <!-- Primary action button, exec-gated if write operation -->
+</div>
 ```
-Pages from `src/pages/` reference components at `../components/nav.html`.
-The root `index.html` references them at `components/nav.html`.
 
-## Navigation / Link Conventions
-- Root `index.html` links to pages as `pages/about.html`, `pages/events.html`, etc.
-- Pages inside `src/pages/` link back to root as `../index.html` and to siblings as `events.html`.
-- `docs/` mirrors this same structure for GitHub Pages.
+**Status badge:**
+```html
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {color-classes}">
+  {status}
+</span>
+```
 
-## Accessibility Standards
-- All icons use `aria-hidden="true"`.
-- Interactive elements have explicit `aria-label`.
-- Focus rings on all interactive elements.
-- Mobile menu uses `role="dialog"` with `aria-modal="true"`.
+**Empty state:**
+```html
+<div class="text-center py-16">
+  <i class="fas fa-{icon} text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+  <h3 class="text-lg font-semibold text-text-primary mb-2">{No items yet}</h3>
+  <p class="text-text-secondary text-sm mb-4">{Helpful description}</p>
+</div>
+```
 
-## JavaScript Conventions
-- Vanilla JS only — no jQuery, no frameworks.
-- Module-like functions: `initializeTheme()`, `initializeMobileMenu()`, `initializeScrollEffects()`, `initializeAccessibility()`, `initializePerformance()`.
-- Global `AppState` object for shared state.
-- `localStorage` for theme persistence (`'light'` | `'dark'`).
+**Detail drawer** (right-side panel, not a modal, for detail views):
+```html
+<div id="detail-panel" class="fixed inset-y-0 right-0 w-full sm:w-96 lg:w-[480px] bg-white
+     shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+  <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+    <h2 class="text-lg font-semibold text-primary-600">{Title}</h2>
+    <button id="close-panel" class="text-text-secondary hover:text-text-primary" aria-label="Close panel">
+      <i class="fas fa-times text-xl" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div class="p-4"><!-- content --></div>
+</div>
+<div id="panel-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+```
 
-## Deployment
-GitHub Pages serves from the `docs/` folder on the `main` branch. After editing `src/`, copy changes into `docs/` (or run `npm run deploy`).
+**Toast notification** (call from vanilla JS):
+```javascript
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div')
+  const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500'
+  toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large
+    text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`
+  toast.textContent = message
+  document.body.appendChild(toast)
+  requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'))
+  setTimeout(() => {
+    toast.classList.add('translate-y-4', 'opacity-0')
+    setTimeout(() => toast.remove(), 300)
+  }, 3000)
+}
+```
 
-## What NOT to Do
-- Do not add npm dependencies for things vanilla JS handles fine.
-- Do not convert to a JS framework — this is intentionally static HTML.
-- Do not add backend/server logic — purely static.
-- Do not change the Tailwind color token names; many CSS classes depend on them.
-- Do not inline large CSS blocks in HTML; extend `styles.css` instead.
+---
+
+## 4. File Upload & Storage — CRITICAL RULE
+
+**RULE: User-uploaded files MUST NEVER be written to the local filesystem or committed to this git repository.**
+
+### 4A. Standard Upload Path (all new modules)
+All uploads go through `SupabaseStorageService` at `src/lib/services/providers/supabase/SupabaseStorageService.ts`.
+
+**Server-side API route pattern:**
+```typescript
+// 1. Read file from multipart/form-data
+const file = formData.get('file') as File
+const bytes = await file.arrayBuffer()
+const buffer = Buffer.from(bytes)
+
+// 2. Validate: MIME type, file size, filename
+const ALLOWED_MIME = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' }
+if (!ALLOWED_MIME[file.type]) return error(400, 'File type not allowed')
+if (buffer.length > 5 * 1024 * 1024) return error(400, 'Exceeds 5MB limit')
+
+// 3. Build storage key: {module}/{society_id}/{uuid}.{ext}
+const ext = ALLOWED_MIME[file.type]
+const key = `{module}/${societyId}/${crypto.randomUUID()}.${ext}`
+
+// 4. Upload to Supabase Storage — NEVER to filesystem
+const storageService = new SupabaseStorageService()
+const { storageKey } = await storageService.upload('{bucket-name}', key, buffer, file.type)
+
+// 5. Save storageKey to database column (never the raw file bytes)
+await db.from('table').insert({ ..., document_key: storageKey })
+```
+
+**Client-side retrieval pattern:**
+```typescript
+// Generate a signed URL (1-hour expiry) — never expose the raw storage key
+const signedUrl = await storageService.getSignedUrl('{bucket}', record.document_key, 3600)
+// Return signedUrl to client; client opens in new tab or <img src>
+```
+
+### 4B. The HOTO GitHub Exception
+The HOTO governance upload (`src/pages/api/v1/hoto/upload/index.ts`) commits documents to a **separate governance repository** via the GitHub API. This is intentional and specific to HOTO. It does NOT write to this repo's working tree. Do not replicate this pattern in any other module.
+
+### 4C. Storage Buckets (create in Supabase dashboard)
+Each module has a dedicated private bucket. Files are served via signed URLs only.
+
+| Bucket Name | Module | Max File Size |
+|---|---|---|
+| `notice-attachments` | Notices | 10 MB |
+| `policy-documents` | Policies | 20 MB |
+| `complaint-attachments` | Complaints | 50 MB (videos) |
+| `facility-photos` | Facilities | 5 MB |
+| `gallery-photos` | Photo Gallery | 10 MB |
+| `community-images` | Community Board | 5 MB |
+| `marketplace-images` | Marketplace | 5 MB |
+| `maid-documents` | Maid Registry | 5 MB |
+| `member-documents` | Member profiles, leases | 10 MB |
+| `event-banners` | Events | 5 MB |
+| `onboarding-docs` | Registration | 10 MB |
+| `invoice-pdfs` | Finance | 1 MB |
+| `receipt-pdfs` | Finance | 1 MB |
+| `society-assets` | Public (logo) | 2 MB |
+| `avatars` | Profile photos | 2 MB |
+| `poll-exports` | Poll result PDFs | 1 MB |
+| `parking-docs` | RC/insurance | 5 MB |
+
+### 4D. .gitignore Safety Net
+`uploads/`, `tmp/`, `temp/`, `public/uploads/`, `src/uploads/`, `docs/uploads/` are gitignored. If any code attempts to write a user file to disk, it will not reach git. Fix the code, not the gitignore.
+
+---
+
+## 5. Database Standards
+
+### 5A. Every new table must have:
+```sql
+id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+society_id  uuid NOT NULL REFERENCES societies(id) ON DELETE CASCADE,
+created_at  timestamptz NOT NULL DEFAULT now()
+```
+
+### 5B. Row Level Security — mandatory on every table:
+```sql
+ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;
+-- At minimum: member reads their own society's data
+CREATE POLICY "society_read_{table}" ON {table} FOR SELECT
+  USING (society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid()));
+-- Write operations: exec/admin only
+CREATE POLICY "exec_manage_{table}" ON {table} FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM profiles WHERE id = auth.uid()
+    AND (portal_role IN ('executive','secretary','president') OR is_admin)
+  ));
+```
+
+### 5C. Role hierarchy (use these exact column values — never invent new roles):
+- `user_roles.role`: `'member'` | `'executive'` | `'admin'` | `'security_guard'` | `'vendor'`
+- `profiles.portal_role`: `'member'` | `'executive'` | `'secretary'` | `'president'`
+- `profiles.is_admin`: boolean — orthogonal to portal_role; grants all access
+
+### 5D. Migration naming:
+Files go in `supabase/migrations/`. Name format: `{seq}_{description}.sql` where seq is the next sequential number after the last migration. Read the last migration number before writing a new one.
+
+### 5E. Immutable tables:
+- `payments` — NO UPDATE, NO DELETE RLS policies. Payments are immutable records.
+- `audit_logs` — NO UPDATE, NO DELETE RLS policies. Append-only.
+- `privacy_consents` — NO UPDATE, NO DELETE. Consent history preserved.
+
+### 5F. Sensitive data handling:
+- Aadhaar numbers: encrypt at application layer; display only last 4 digits
+- Phone numbers: use `phone_encrypted` column where encryption is applied
+- Uploaded identity documents: private Supabase bucket, 1-hour signed URLs, log access in audit_logs
+
+---
+
+## 6. Portal Page Standards
+
+### 6A. Every portal page (`src/pages/portal/**/*.astro`):
+```astro
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+// Role guards — example for exec-only pages:
+const isPrivileged = ['executive','secretary','president'].includes(user.portalRole) || user.isAdmin;
+if (!isPrivileged) return new Response('Forbidden', { status: 403 });
+---
+<PortalLayout title="{Page Title}" user={user} activeModule="{module-key}">
+  <!-- Page content -->
+</PortalLayout>
+```
+
+### 6B. Access control tiers:
+| Page type | Gate |
+|---|---|
+| All authenticated users | `if (!user) redirect('/portal/login')` |
+| Member + exec | No role gate after auth check |
+| Exec only | `if (!isPrivileged) return 403` |
+| Admin only | `if (!user.isAdmin) return 403` |
+| Guard only | `if (user.role !== 'security_guard') return 403` |
+
+### 6C. Data fetching — server-side only:
+Fetch all initial data in the Astro frontmatter using Supabase service client. Never fetch sensitive data client-side. Interactive filtering and pagination can call `/api/v1/` routes.
+
+### 6D. Interactive components:
+Use vanilla JS for all portal interactivity (filter, sort, form submit, drawer open/close, toast). Use React only for dashboard chart components that use recharts (MemberDashboard, ExecutiveDashboard).
+
+---
+
+## 7. API Route Standards
+
+### 7A. Every API route (`src/pages/api/v1/**/*.ts`):
+```typescript
+export const prerender = false;
+import type { APIRoute } from 'astro';
+import { resolveFromRequest, requireRole } from '@lib/permissions';
+import { normalizeError } from '@lib/middleware/errorNormalizer';
+import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+
+export const POST: APIRoute = async ({ request }) => {
+  try {
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    // role check if needed...
+    // business logic...
+    // audit log for writes...
+    return Response.json({ ...result }, { status: 200 });
+  } catch (err) {
+    return normalizeError(err, request.url);
+  }
+};
+```
+
+### 7B. Error response shape (always use normalizeError):
+```json
+{ "error": "ERROR_CODE", "message": "Human-readable description" }
+```
+
+### 7C. Audit log writes:
+Every CREATE / UPDATE / DELETE operation on sensitive data must call `writeAuditLog()` with action, resourceType, resourceId, oldValues, newValues.
+
+### 7D. Input validation:
+- Validate all inputs at the API boundary — never trust client values
+- UUIDs: validate with regex `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
+- Enum fields: explicit CHECK constraints in SQL + server-side validation in API
+- Text fields: trim whitespace, enforce maxlength in SQL (`varchar(255)` or explicit `CHECK (length(field) <= 255)`)
+
+---
+
+## 8. DPDPA 2023 Compliance Rules
+
+UTAMACS is committed to India's Digital Personal Data Protection Act 2023. Every new feature that touches personal data must:
+
+1. **Collect minimum data** — only fields necessary for the stated purpose
+2. **Document purpose** — add a SQL comment on columns containing personal data: `-- personal data: {purpose}`
+3. **Enable deletion** — when a member requests account deletion, their personal data must be erasable without breaking society-level records (use SET NULL foreign keys, not CASCADE on personal data columns)
+4. **Audit access** — any exec/admin access to member personal data (Aadhaar, phone, ID documents) must be logged in `audit_logs`
+5. **Consent before use** — the `privacy_consents` table and the Policies portal gate enforce consent; new personal data categories require a consent version bump
+6. **Anonymous feedback** — when `is_anonymous = true`, display layer hides member identity; DB still records `submitted_by` for rate-limiting only
+7. **Signed URLs expire** — identity document signed URLs must expire in ≤ 3600 seconds (1 hour)
+
+---
+
+## 9. Directory Layout (Current)
+
+```
+src/
+  pages/
+    portal/           ← Portal pages (Astro, SSR)
+      admin/          ← Admin-only pages (audit, assets, rules, rbac, staff, tds, etc.)
+      agm/            ← AGM & Governance
+      analytics/      ← Reports Hub
+      community/      ← Community Board + Marketplace
+      complaints/     ← Complaint tracking
+      documents/      ← Document library
+      events/         ← Events & RSVP
+      facilities/     ← Facility booking
+      finance/        ← Finance & Dues
+      hoto/           ← HOTO Tracker
+      letters/        ← Official Letters
+      maids/          ← Domestic Help Registry   [to be built]
+      members/        ← Member directory
+      notices/        ← Notices & Announcements
+      notifications/  ← Notification centre
+      parking/        ← Parking management
+      policies/       ← Policy acknowledgements  [to be built]
+      polls/          ← Polls & Voting
+      feedback/       ← Resident feedback        [to be built]
+      gallery/        ← Photo Gallery            [to be built]
+      register/       ← Self-registration        [to be built]
+      snags/          ← Snag / Defect tracking
+      vendors/        ← Vendors & Work Orders
+      visitors/       ← Visitor Management
+    api/v1/           ← API routes (TypeScript)
+  components/
+    portal/           ← Portal components (PortalLayout, Dashboard components)
+  lib/
+    services/
+      interfaces/     ← IAuthService, IStorageService, etc.
+      providers/
+        supabase/     ← Supabase implementations
+        azure/        ← Azure implementations (alternative)
+  styles/
+    global.css        ← @layer base/components/utilities
+supabase/
+  migrations/         ← SQL migrations (sequential numbering)
+src/site/             ← Public website source (separate from portal)
+docs/                 ← GitHub Pages output (public website)
+design/               ← Planning documents (NOT deployed)
+tailwind.config.cjs
+astro.config.mjs          ← Public site config (output: static)
+astro.portal.config.mjs   ← Portal config (output: hybrid, Vercel)
+```
+
+---
+
+## 10. Navigation & Module Registration
+
+New portal modules must be registered in two places:
+
+**A. `src/components/portal/PortalLayout.astro`** — add to fallback modules array:
+```typescript
+{ key: 'module-key', displayName: 'Display Name', icon: 'fas fa-icon-name', path: '/portal/module-key' }
+```
+
+**B. `supabase/migrations/{seq}_feature_flag_seeds.sql`** — insert into `feature_flags`:
+```sql
+INSERT INTO feature_flags (society_id, module_key, is_active, display_order)
+SELECT id, 'module-key', true, {next_order}
+FROM societies
+ON CONFLICT (society_id, module_key) DO NOTHING;
+```
+
+---
+
+## 11. What NOT to Do
+
+- **No filesystem file writes** for user uploads — always Supabase Storage
+- **No raw hex colours** — use design system tokens
+- **No inline `<style>` blocks** — extend `global.css` with named classes
+- **No third-party UI libraries** — Tailwind + vanilla JS + recharts (dashboards only)
+- **No jQuery or additional JS frameworks**
+- **No hardcoded society_id** — always read from `PUBLIC_SOCIETY_ID` env var
+- **No competitor product names** in any code, comment, UI text, or commit message
+- **No UPDATE/DELETE on payments, audit_logs, or privacy_consents**
+- **No skipping RLS** — every new table needs row level security
+- **No prerender = true** on portal pages — they are all SSR (`prerender = false`)
+- **No new npm runtime dependencies** without explicit approval — check if Supabase or existing deps can solve it
+- **No AI features** — deferred to backlog; do not implement
+- **No breaking changes to existing Tailwind token names** — many CSS classes depend on them
+
+---
+
+## 12. Public Website (utamacs.org) Standards
+
+The public site at `src/site/` (output → `docs/`) is static HTML only:
+- No Astro features — plain `.html` files
+- Tailwind via CDN in `<script src="https://cdn.tailwindcss.com">`
+- Font Awesome via kit `5a2b2f0b4f.js`
+- Components (nav, footer) loaded via `fetch()` in `main.js`
+- Page paths from `src/pages/` use `../` prefix for CSS/JS: `../css/styles.css`
+- `docs/CNAME` = `utamacs.org` — never delete
+- After changes to `src/site/`, sync to `docs/` using `/deploy` skill
+
+---
+
+## 13. Skills Reference
+
+| Skill | Invocation | Purpose |
+|---|---|---|
+| Standards Review | `/standards-review` | Audits staged/unstaged changes against all rules in this file |
+| New Portal Module | `/new-module` | Scaffolds a complete new portal module with all boilerplate |
+| Storage Audit | `/storage-audit` | Checks that no upload bypasses Supabase Storage |
+| New Page (public site) | `/new-page` | Creates a new public website page |
+| Add Notice | `/add-notice` | Adds a notice card to the public site |
+| Deploy | `/deploy` | Syncs public site to docs/ and pushes |

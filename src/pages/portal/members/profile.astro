@@ -1,0 +1,316 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+---
+
+<PortalLayout title="My Profile" user={user} activeModule="members">
+  <!-- Page header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/members" class="hover:text-primary-600">Members</a>
+        <span class="mx-2">›</span>
+        <span class="text-text-primary">My Profile</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">My Profile</h1>
+      <p class="text-text-secondary text-sm mt-1">Manage your personal information and preferences.</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left: Avatar + quick info -->
+    <div class="lg:col-span-1 space-y-4">
+      <!-- Avatar card -->
+      <div class="card-premium p-6 text-center">
+        <div id="avatar-wrapper" class="relative inline-block mb-4">
+          <div id="avatar-circle"
+            class="w-24 h-24 rounded-full bg-primary-600 text-white flex items-center justify-center text-3xl font-bold mx-auto">
+            <span id="avatar-initials">…</span>
+          </div>
+          <img id="avatar-img" src="" alt="Avatar"
+            class="hidden w-24 h-24 rounded-full object-cover mx-auto border-2 border-primary-100" />
+          <label for="avatar-file-input"
+            class="absolute bottom-0 right-0 w-7 h-7 bg-primary-600 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-primary-700 transition-colors shadow-md"
+            title="Change photo">
+            <i class="fas fa-camera text-xs" aria-hidden="true"></i>
+          </label>
+          <input id="avatar-file-input" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" />
+        </div>
+        <div id="avatar-upload-status" class="hidden text-xs text-text-secondary mt-1">Uploading…</div>
+        <h2 id="profile-name" class="text-lg font-semibold text-text-primary">Loading…</h2>
+        <p id="profile-unit" class="text-sm text-text-secondary mt-0.5"></p>
+        <p id="profile-role" class="mt-2 inline-block text-xs px-2.5 py-0.5 rounded-full bg-primary-50 text-primary-700 font-medium"></p>
+      </div>
+
+      <!-- Unit info card -->
+      <div class="card-premium p-5">
+        <h3 class="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+          <i class="fas fa-home text-primary-600 text-xs" aria-hidden="true"></i> Flat Information
+        </h3>
+        <dl class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <dt class="text-text-secondary">Unit</dt>
+            <dd id="info-unit" class="font-medium text-text-primary">—</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-text-secondary">Block / Floor</dt>
+            <dd id="info-block" class="font-medium text-text-primary">—</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-text-secondary">Area</dt>
+            <dd id="info-area" class="font-medium text-text-primary">—</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-text-secondary">Residency</dt>
+            <dd id="info-residency" class="font-medium text-text-primary">—</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-text-secondary">Move-in</dt>
+            <dd id="info-movein" class="font-medium text-text-primary">—</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Right: Edit form -->
+    <div class="lg:col-span-2 space-y-4">
+      <!-- Personal info -->
+      <div class="card-premium p-6">
+        <h3 class="text-base font-semibold text-text-primary mb-5 flex items-center gap-2">
+          <i class="fas fa-user text-primary-600 text-sm" aria-hidden="true"></i> Personal Information
+        </h3>
+        <div class="space-y-4">
+          <div>
+            <label class="form-label" for="f-full-name">Full Name</label>
+            <input id="f-full-name" type="text" maxlength="100" class="form-input" placeholder="Your full name" />
+          </div>
+          <div>
+            <label class="form-label" for="f-bio">Bio / About Me</label>
+            <textarea id="f-bio" rows="3" maxlength="500" class="form-input resize-none"
+              placeholder="A short description about yourself (optional)"></textarea>
+            <p class="text-xs text-text-secondary mt-1"><span id="bio-count">0</span>/500 characters</p>
+          </div>
+          <div>
+            <label class="form-label" for="f-language">Preferred Language</label>
+            <select id="f-language" class="form-input bg-white">
+              <option value="en">English</option>
+              <option value="te">Telugu</option>
+              <option value="hi">Hindi</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="f-whatsapp">WhatsApp Number</label>
+            <input id="f-whatsapp" type="tel" maxlength="15" class="form-input"
+              placeholder="+91XXXXXXXXXX" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Emergency contact -->
+      <div class="card-premium p-6">
+        <h3 class="text-base font-semibold text-text-primary mb-5 flex items-center gap-2">
+          <i class="fas fa-phone-alt text-accent-500 text-sm" aria-hidden="true"></i> Emergency Contact
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="form-label" for="f-emg-name">Name</label>
+            <input id="f-emg-name" type="text" maxlength="100" class="form-input" placeholder="Contact name" />
+          </div>
+          <div>
+            <label class="form-label" for="f-emg-phone">Phone</label>
+            <input id="f-emg-phone" type="tel" maxlength="15" class="form-input" placeholder="+91XXXXXXXXXX" />
+          </div>
+          <div>
+            <label class="form-label" for="f-emg-relation">Relation</label>
+            <input id="f-emg-relation" type="text" maxlength="50" class="form-input" placeholder="e.g. Spouse, Parent" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Vehicle info -->
+      <div class="card-premium p-6">
+        <h3 class="text-base font-semibold text-text-primary mb-5 flex items-center gap-2">
+          <i class="fas fa-car text-secondary-500 text-sm" aria-hidden="true"></i> Vehicle Details
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="form-label" for="f-veh-reg">Reg. No.</label>
+            <input id="f-veh-reg" type="text" maxlength="20" class="form-input" placeholder="TS 09 AA 1234" />
+          </div>
+          <div>
+            <label class="form-label" for="f-veh-make">Make</label>
+            <input id="f-veh-make" type="text" maxlength="50" class="form-input" placeholder="Honda, Maruti…" />
+          </div>
+          <div>
+            <label class="form-label" for="f-veh-model">Model</label>
+            <input id="f-veh-model" type="text" maxlength="50" class="form-input" placeholder="City, Swift…" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Save row -->
+      <div class="flex items-center gap-4">
+        <button id="save-btn" class="btn-primary flex items-center gap-2 text-sm">
+          <i class="fas fa-save" aria-hidden="true"></i> Save Changes
+        </button>
+        <span id="save-status" class="hidden text-sm"></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let profileData: any = null;
+
+    function showToast(message: string, type: 'success' | 'error' = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    function setField(id: string, value: string | null | undefined) {
+      const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+      if (el) el.value = value ?? '';
+    }
+
+    function renderProfile(p: any) {
+      profileData = p;
+
+      const name = p.full_name ?? '';
+      const unit = p.units;
+
+      document.getElementById('profile-name')!.textContent = name || 'No name set';
+      document.getElementById('profile-unit')!.textContent = unit
+        ? `Flat ${unit.unit_number}, Block ${unit.block}`
+        : '';
+      document.getElementById('profile-role')!.textContent = p.role ?? '';
+
+      if (p.avatar_url) {
+        const img = document.getElementById('avatar-img') as HTMLImageElement;
+        img.src = p.avatar_url;
+        img.classList.remove('hidden');
+        document.getElementById('avatar-circle')!.classList.add('hidden');
+      } else {
+        document.getElementById('avatar-initials')!.textContent =
+          name ? name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) : '?';
+      }
+
+      document.getElementById('info-unit')!.textContent = unit?.unit_number ?? '—';
+      document.getElementById('info-block')!.textContent = unit ? `${unit.block} / Floor ${unit.floor}` : '—';
+      document.getElementById('info-area')!.textContent = unit?.area_sqft ? `${unit.area_sqft} sq ft` : '—';
+      document.getElementById('info-residency')!.textContent = p.residency_type ?? '—';
+      document.getElementById('info-movein')!.textContent = p.move_in_date
+        ? new Date(p.move_in_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+        : '—';
+
+      setField('f-full-name',    p.full_name);
+      setField('f-bio',          p.bio);
+      setField('f-language',     p.preferred_language ?? 'en');
+      setField('f-whatsapp',     p.whatsapp_number);
+      setField('f-emg-name',     p.emergency_name);
+      setField('f-emg-phone',    p.emergency_phone);
+      setField('f-emg-relation', p.emergency_relation);
+      setField('f-veh-reg',      p.vehicle_reg_no);
+      setField('f-veh-make',     p.vehicle_make);
+      setField('f-veh-model',    p.vehicle_model);
+
+      const bioEl = document.getElementById('f-bio') as HTMLTextAreaElement;
+      document.getElementById('bio-count')!.textContent = String((bioEl.value ?? '').length);
+    }
+
+    async function loadProfile() {
+      const res = await fetch('/api/v1/members/me', { credentials: 'include' });
+      if (!res.ok) { showToast('Failed to load profile', 'error'); return; }
+      const data = await res.json();
+      renderProfile(data);
+    }
+
+    // Bio counter
+    document.getElementById('f-bio')!.addEventListener('input', (e) => {
+      const val = (e.target as HTMLTextAreaElement).value;
+      document.getElementById('bio-count')!.textContent = String(val.length);
+    });
+
+    // Save changes
+    document.getElementById('save-btn')!.addEventListener('click', async () => {
+      const btn = document.getElementById('save-btn') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Saving…';
+
+      const payload: Record<string, string> = {};
+      const fields: [string, string][] = [
+        ['f-full-name',    'full_name'],
+        ['f-bio',          'bio'],
+        ['f-language',     'preferred_language'],
+        ['f-whatsapp',     'whatsapp_number'],
+        ['f-emg-name',     'emergency_name'],
+        ['f-emg-phone',    'emergency_phone'],
+        ['f-emg-relation', 'emergency_relation'],
+        ['f-veh-reg',      'vehicle_reg_no'],
+        ['f-veh-make',     'vehicle_make'],
+        ['f-veh-model',    'vehicle_model'],
+      ];
+      for (const [elId, key] of fields) {
+        const el = document.getElementById(elId) as HTMLInputElement;
+        payload[key] = el.value;
+      }
+
+      try {
+        const res = await fetch('/api/v1/members/me', {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message ?? 'Save failed');
+        showToast('Profile updated successfully.');
+        renderProfile({ ...profileData, ...data });
+      } catch (err: any) {
+        showToast(err.message ?? 'Failed to save', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save" aria-hidden="true"></i> Save Changes';
+      }
+    });
+
+    // Avatar upload
+    document.getElementById('avatar-file-input')!.addEventListener('change', async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const status = document.getElementById('avatar-upload-status')!;
+      status.classList.remove('hidden');
+      status.textContent = 'Uploading…';
+
+      const fd = new FormData();
+      fd.append('file', file);
+
+      try {
+        const res = await fetch('/api/v1/members/avatar', {
+          method: 'POST', credentials: 'include', body: fd,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message ?? 'Upload failed');
+
+        const img = document.getElementById('avatar-img') as HTMLImageElement;
+        img.src = data.signed_url;
+        img.classList.remove('hidden');
+        document.getElementById('avatar-circle')!.classList.add('hidden');
+        status.textContent = 'Photo updated.';
+        setTimeout(() => status.classList.add('hidden'), 2000);
+        showToast('Avatar updated.');
+      } catch (err: any) {
+        status.textContent = err.message ?? 'Upload failed';
+        showToast(err.message ?? 'Upload failed', 'error');
+      }
+    });
+
+    loadProfile();
+  </script>
+</PortalLayout>

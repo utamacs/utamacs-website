@@ -19,7 +19,7 @@ export const GET: APIRoute = async ({ request }) => {
       .select(`
         id, slot_id, unit_id, user_id, vehicle_number, vehicle_make,
         status, allocated_at, released_at, expires_at, notes,
-        parking_slots(slot_number, slot_type, vehicle_type, level),
+        parking_slots(slot_number, slot_type, vehicle_type, level, vehicle_model, vehicle_colour),
         units(unit_number, block),
         profiles(full_name)
       `)
@@ -51,6 +51,7 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json() as {
       slot_id?: string; unit_id?: string; user_id?: string;
       vehicle_number?: string; vehicle_make?: string;
+      vehicle_model?: string; vehicle_colour?: string;
       expires_at?: string; notes?: string;
     };
 
@@ -109,6 +110,17 @@ export const POST: APIRoute = async ({ request }) => {
       .single();
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
+
+    // Persist vehicle info to the slot itself (DPDPA: personal data on slot)
+    const slotVehicleUpdate: Record<string, string | null> = {
+      vehicle_reg_no: body.vehicle_number ? sanitizePlainText(body.vehicle_number) : null,
+      vehicle_make:   body.vehicle_make   ? sanitizePlainText(body.vehicle_make)   : null,
+      vehicle_model:  body.vehicle_model  ? sanitizePlainText(body.vehicle_model)  : null,
+      vehicle_colour: body.vehicle_colour ? sanitizePlainText(body.vehicle_colour) : null,
+    };
+    if (Object.values(slotVehicleUpdate).some(v => v !== null)) {
+      await sb.from('parking_slots').update(slotVehicleUpdate).eq('id', body.slot_id);
+    }
 
     // Insert parking audit entry
     await sb.from('parking_audit').insert({

@@ -1,0 +1,590 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!['executive', 'admin'].includes(user.role)) return new Response('Forbidden', { status: 403 });
+---
+
+<PortalLayout title="Registration Requests" user={user} activeModule="admin_registrations">
+  <!-- Page header -->
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2" aria-label="Breadcrumb">
+        <a href="/portal/admin" class="hover:text-primary-600 transition-colors">Admin</a>
+        <span class="mx-2" aria-hidden="true">›</span>
+        <span class="text-text-primary">Registration Requests</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Registration Requests</h1>
+      <p class="text-text-secondary text-sm mt-1">Review and approve or reject member self-registration submissions.</p>
+    </div>
+    <div id="pending-badge-wrap" class="hidden">
+      <span id="pending-count-badge"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 text-amber-700">
+        <i class="fas fa-clock text-xs" aria-hidden="true"></i>
+        <span id="pending-count-text">0 pending</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Status filter tabs -->
+  <div class="flex gap-1 mb-5 bg-gray-100 rounded-xl p-1 w-fit overflow-x-auto" role="tablist" aria-label="Filter by status">
+    <button id="tab-pending" role="tab" aria-selected="true" onclick="switchTab('pending')"
+      class="tab-btn active px-4 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap bg-white text-text-primary shadow-soft">
+      Pending
+    </button>
+    <button id="tab-all" role="tab" aria-selected="false" onclick="switchTab('all')"
+      class="tab-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap text-text-secondary hover:text-text-primary">
+      All
+    </button>
+    <button id="tab-approved" role="tab" aria-selected="false" onclick="switchTab('approved')"
+      class="tab-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap text-text-secondary hover:text-text-primary">
+      Approved
+    </button>
+    <button id="tab-rejected" role="tab" aria-selected="false" onclick="switchTab('rejected')"
+      class="tab-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap text-text-secondary hover:text-text-primary">
+      Rejected
+    </button>
+    <button id="tab-duplicate" role="tab" aria-selected="false" onclick="switchTab('duplicate')"
+      class="tab-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap text-text-secondary hover:text-text-primary">
+      Duplicate
+    </button>
+  </div>
+
+  <!-- Registrations list container -->
+  <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+    <div id="registrations-loading" class="text-center py-16 text-text-secondary text-sm">
+      <i class="fas fa-spinner fa-spin text-2xl text-primary-200 mb-3 block" aria-hidden="true"></i>
+      Loading registration requests…
+    </div>
+
+    <!-- Table (shown when data loads) -->
+    <div id="registrations-table-wrap" class="hidden overflow-x-auto">
+      <table class="w-full text-sm" aria-label="Registration requests">
+        <thead class="bg-section-alt border-b border-border-light">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Applicant</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary hidden sm:table-cell">Unit</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary hidden md:table-cell">Occupancy</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary hidden lg:table-cell">Submitted</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-text-secondary">Status</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-text-secondary">Action</th>
+          </tr>
+        </thead>
+        <tbody id="registrations-tbody" class="divide-y divide-border-light">
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty state (shown when no records) -->
+    <div id="registrations-empty" class="hidden text-center py-16">
+      <i class="fas fa-user-check text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+      <h3 class="text-lg font-semibold text-text-primary mb-2" id="empty-heading">No requests found</h3>
+      <p class="text-text-secondary text-sm" id="empty-desc">There are no registration requests matching this filter.</p>
+    </div>
+
+    <!-- Load more -->
+    <div id="load-more-wrap" class="hidden px-5 py-4 border-t border-border-light flex items-center justify-center">
+      <button id="load-more-btn" onclick="loadMore()"
+        class="btn-ghost text-sm flex items-center gap-2">
+        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+        Load more
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Right-side detail drawer ────────────────────────────────────────── -->
+  <div id="detail-panel"
+    class="fixed inset-y-0 right-0 w-full sm:w-96 lg:w-[480px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto"
+    aria-label="Registration detail"
+    role="dialog"
+    aria-modal="true">
+
+    <!-- Sticky header -->
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between z-10">
+      <h2 class="text-lg font-semibold text-primary-600" id="drawer-title">Application Details</h2>
+      <button id="close-panel" aria-label="Close panel"
+        class="text-text-secondary hover:text-text-primary transition-colors p-1 rounded-lg hover:bg-gray-100">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <!-- Drawer body -->
+    <div class="p-5 space-y-5" id="drawer-body">
+      <!-- populated by JS -->
+    </div>
+  </div>
+
+  <!-- Backdrop -->
+  <div id="panel-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden" aria-hidden="true"></div>
+
+  <script>
+    // ── State ────────────────────────────────────────────────────────────────
+    let currentTab: string = 'pending';
+    let currentOffset: number = 0;
+    const PAGE_SIZE = 50;
+    let currentRecord: any = null;
+    let isSubmitting: boolean = false;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function fmt(date: string | null): string {
+      if (!date) return '—';
+      return new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function fmtTime(date: string | null): string {
+      if (!date) return '—';
+      return new Date(date).toLocaleString('en-IN', {
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    }
+
+    function capitalize(str: string): string {
+      if (!str) return '—';
+      return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, ' ');
+    }
+
+    function statusBadge(status: string): string {
+      const map: Record<string, string> = {
+        pending:   'bg-amber-100 text-amber-700',
+        approved:  'bg-green-100 text-green-700',
+        rejected:  'bg-red-100 text-red-700',
+        duplicate: 'bg-gray-100 text-gray-600',
+      };
+      const cls = map[status] ?? 'bg-gray-100 text-gray-600';
+      return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}">${capitalize(status)}</span>`;
+    }
+
+    function showToast(message: string, type: 'success' | 'error' = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => {
+        toast.classList.add('translate-y-4', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // ── Drawer ───────────────────────────────────────────────────────────────
+    function openDrawer(record: any) {
+      currentRecord = record;
+      const panel = document.getElementById('detail-panel')!;
+      const backdrop = document.getElementById('panel-backdrop')!;
+      const title = document.getElementById('drawer-title')!;
+      const body = document.getElementById('drawer-body')!;
+
+      title.textContent = record.full_name ?? 'Application Details';
+      body.innerHTML = renderDrawerBody(record);
+
+      backdrop.classList.remove('hidden');
+      panel.classList.remove('translate-x-full');
+
+      // Bind action buttons
+      document.getElementById('btn-approve')?.addEventListener('click', () => handleApprove());
+      document.getElementById('btn-reject')?.addEventListener('click', () => toggleRejectForm(true));
+      document.getElementById('btn-reject-cancel')?.addEventListener('click', () => toggleRejectForm(false));
+      document.getElementById('btn-reject-submit')?.addEventListener('click', () => handleReject());
+      document.getElementById('btn-duplicate')?.addEventListener('click', () => handleDuplicate());
+    }
+
+    function closeDrawer() {
+      const panel = document.getElementById('detail-panel')!;
+      const backdrop = document.getElementById('panel-backdrop')!;
+      panel.classList.add('translate-x-full');
+      backdrop.classList.add('hidden');
+      currentRecord = null;
+    }
+
+    function renderDrawerBody(r: any): string {
+      const unit = r.units ? `${r.units.block ? r.units.block + '-' : ''}${r.units.unit_number}` : '—';
+      const isPending = r.status === 'pending';
+
+      return `
+        <!-- Status -->
+        <div class="flex items-center gap-3">
+          ${statusBadge(r.status)}
+          <span class="text-xs text-text-secondary">Submitted ${fmtTime(r.created_at)}</span>
+        </div>
+
+        <!-- Applicant details -->
+        <div class="rounded-xl border border-border-light overflow-hidden">
+          <div class="bg-section-alt px-4 py-2.5 border-b border-border-light">
+            <span class="text-xs font-semibold text-text-secondary uppercase tracking-wide">Applicant Details</span>
+          </div>
+          <div class="divide-y divide-border-light">
+            ${detailRow('fas fa-user', 'Full Name', r.full_name ?? '—')}
+            ${detailRow('fas fa-envelope', 'Email', r.email ?? '—')}
+            ${detailRow('fas fa-phone', 'Phone', r.phone ?? '—')}
+            ${detailRow('fas fa-home', 'Unit', unit)}
+            ${detailRow('fas fa-door-open', 'Occupancy', capitalize(r.occupancy_type ?? ''))}
+            ${detailRow('fas fa-calendar-alt', 'Move-in Date', fmt(r.move_in_date))}
+          </div>
+        </div>
+
+        <!-- Identity -->
+        <div class="rounded-xl border border-border-light overflow-hidden">
+          <div class="bg-section-alt px-4 py-2.5 border-b border-border-light">
+            <span class="text-xs font-semibold text-text-secondary uppercase tracking-wide">Identity & Vehicle</span>
+          </div>
+          <div class="divide-y divide-border-light">
+            ${detailRow('fas fa-id-card', 'ID Type', capitalize(r.id_type ?? ''))}
+            ${r.id_doc_key
+              ? `<div class="flex items-center gap-3 px-4 py-3">
+                  <i class="fas fa-file-alt text-text-secondary text-sm w-4 flex-shrink-0" aria-hidden="true"></i>
+                  <span class="text-xs font-medium text-text-secondary w-28 flex-shrink-0">ID Document</span>
+                  <button onclick="viewDocument('${r.id_doc_key}')"
+                    class="text-sm text-primary-600 hover:text-primary-700 font-medium hover:underline flex items-center gap-1">
+                    <i class="fas fa-external-link-alt text-xs" aria-hidden="true"></i> View document
+                  </button>
+                </div>`
+              : detailRow('fas fa-file-alt', 'ID Document', 'Not uploaded')
+            }
+            ${r.vehicle_reg_no
+              ? detailRow('fas fa-car', 'Vehicle', `${r.vehicle_reg_no}${r.vehicle_make ? ' · ' + r.vehicle_make : ''}`)
+              : detailRow('fas fa-car', 'Vehicle', 'None declared')
+            }
+          </div>
+        </div>
+
+        <!-- Review history (if already actioned) -->
+        ${!isPending && r.reviewed_at ? `
+        <div class="rounded-xl border border-border-light overflow-hidden">
+          <div class="bg-section-alt px-4 py-2.5 border-b border-border-light">
+            <span class="text-xs font-semibold text-text-secondary uppercase tracking-wide">Review</span>
+          </div>
+          <div class="divide-y divide-border-light">
+            ${detailRow('fas fa-calendar-check', 'Reviewed At', fmtTime(r.reviewed_at))}
+            ${r.rejection_reason ? detailRow('fas fa-comment-alt', 'Rejection Reason', r.rejection_reason) : ''}
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Action buttons (pending only) -->
+        ${isPending ? `
+        <div id="action-section" class="space-y-3">
+          <div class="grid grid-cols-3 gap-2">
+            <button id="btn-approve"
+              class="flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 transition-colors text-xs font-semibold">
+              <i class="fas fa-check-circle text-lg text-green-600" aria-hidden="true"></i>
+              Approve
+            </button>
+            <button id="btn-reject"
+              class="flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors text-xs font-semibold">
+              <i class="fas fa-times-circle text-lg text-red-500" aria-hidden="true"></i>
+              Reject
+            </button>
+            <button id="btn-duplicate"
+              class="flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors text-xs font-semibold">
+              <i class="fas fa-copy text-lg text-gray-400" aria-hidden="true"></i>
+              Duplicate
+            </button>
+          </div>
+
+          <!-- Reject form (hidden by default) -->
+          <div id="reject-form-wrap" class="hidden rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
+            <p class="text-sm font-medium text-red-700">
+              <i class="fas fa-exclamation-triangle mr-1.5" aria-hidden="true"></i>
+              Provide a reason for rejection (sent to the applicant):
+            </p>
+            <textarea id="rejection-reason" rows="3" maxlength="500" placeholder="e.g. Submitted ID is not legible — please resubmit with a clear photo."
+              class="w-full px-3 py-2.5 border border-red-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white resize-none"></textarea>
+            <div class="flex gap-2">
+              <button id="btn-reject-submit"
+                class="flex-1 py-2 rounded-xl text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center justify-center gap-1.5">
+                <i class="fas fa-times-circle" aria-hidden="true"></i>Confirm Rejection
+              </button>
+              <button id="btn-reject-cancel"
+                class="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-300 text-text-secondary hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+      `;
+    }
+
+    function detailRow(icon: string, label: string, value: string): string {
+      return `
+        <div class="flex items-start gap-3 px-4 py-3">
+          <i class="${icon} text-text-secondary text-sm w-4 flex-shrink-0 mt-0.5" aria-hidden="true"></i>
+          <span class="text-xs font-medium text-text-secondary w-28 flex-shrink-0 pt-0.5">${label}</span>
+          <span class="text-sm text-text-primary flex-1 min-w-0 break-words">${value}</span>
+        </div>
+      `;
+    }
+
+    function toggleRejectForm(show: boolean) {
+      const wrap = document.getElementById('reject-form-wrap');
+      const btnReject = document.getElementById('btn-reject');
+      if (show) {
+        wrap?.classList.remove('hidden');
+        btnReject?.classList.add('opacity-40', 'pointer-events-none');
+      } else {
+        wrap?.classList.add('hidden');
+        btnReject?.classList.remove('opacity-40', 'pointer-events-none');
+        const ta = document.getElementById('rejection-reason') as HTMLTextAreaElement | null;
+        if (ta) ta.value = '';
+      }
+    }
+
+    // ── API actions ──────────────────────────────────────────────────────────
+    async function patchRegistration(payload: object) {
+      const res = await fetch('/api/v1/admin/registrations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      return res;
+    }
+
+    async function handleApprove() {
+      if (!currentRecord || isSubmitting) return;
+      isSubmitting = true;
+      const btn = document.getElementById('btn-approve') as HTMLButtonElement | null;
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-lg"></i><span>Approving…</span>'; }
+
+      const res = await patchRegistration({ id: currentRecord.id, status: 'approved' });
+      isSubmitting = false;
+
+      if (res.ok) {
+        showToast(`${currentRecord.full_name} approved successfully.`, 'success');
+        closeDrawer();
+        await loadRegistrations(currentTab, 0, true);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showToast(d.message ?? 'Failed to approve. Please try again.', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle text-lg text-green-600"></i>Approve'; }
+      }
+    }
+
+    async function handleReject() {
+      if (!currentRecord || isSubmitting) return;
+      const ta = document.getElementById('rejection-reason') as HTMLTextAreaElement | null;
+      const reason = ta?.value.trim() ?? '';
+
+      if (!reason) {
+        ta?.focus();
+        ta?.classList.add('ring-2', 'ring-red-400');
+        return;
+      }
+      ta?.classList.remove('ring-2', 'ring-red-400');
+
+      isSubmitting = true;
+      const btn = document.getElementById('btn-reject-submit') as HTMLButtonElement | null;
+      if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+
+      const res = await patchRegistration({ id: currentRecord.id, status: 'rejected', rejection_reason: reason });
+      isSubmitting = false;
+
+      if (res.ok) {
+        showToast(`${currentRecord.full_name}'s application rejected.`, 'success');
+        closeDrawer();
+        await loadRegistrations(currentTab, 0, true);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showToast(d.message ?? 'Failed to reject. Please try again.', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-times-circle"></i>Confirm Rejection'; }
+      }
+    }
+
+    async function handleDuplicate() {
+      if (!currentRecord || isSubmitting) return;
+      if (!confirm(`Mark ${currentRecord.full_name}'s application as duplicate? This cannot be undone.`)) return;
+
+      isSubmitting = true;
+      const btn = document.getElementById('btn-duplicate') as HTMLButtonElement | null;
+      if (btn) { btn.disabled = true; }
+
+      const res = await patchRegistration({ id: currentRecord.id, status: 'duplicate' });
+      isSubmitting = false;
+
+      if (res.ok) {
+        showToast(`${currentRecord.full_name}'s application marked as duplicate.`, 'success');
+        closeDrawer();
+        await loadRegistrations(currentTab, 0, true);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showToast(d.message ?? 'Failed to update. Please try again.', 'error');
+        if (btn) { btn.disabled = false; }
+      }
+    }
+
+    async function viewDocument(docKey: string) {
+      const res = await fetch(`/api/v1/admin/registrations/doc-url?key=${encodeURIComponent(docKey)}`, { credentials: 'include' });
+      if (res.ok) {
+        const { url } = await res.json();
+        window.open(url, '_blank', 'noopener');
+      } else {
+        showToast('Could not load document. Please try again.', 'error');
+      }
+    }
+
+    // ── Data loading ─────────────────────────────────────────────────────────
+    let allRecords: any[] = [];
+    let hasMore: boolean = false;
+
+    async function loadRegistrations(status: string, offset: number = 0, reset: boolean = false) {
+      const loadingEl = document.getElementById('registrations-loading')!;
+      const tableWrap = document.getElementById('registrations-table-wrap')!;
+      const emptyEl = document.getElementById('registrations-empty')!;
+      const loadMoreWrap = document.getElementById('load-more-wrap')!;
+
+      if (reset || offset === 0) {
+        allRecords = [];
+        loadingEl.classList.remove('hidden');
+        tableWrap.classList.add('hidden');
+        emptyEl.classList.add('hidden');
+        loadMoreWrap.classList.add('hidden');
+      }
+
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+      if (status !== 'all') params.set('status', status);
+
+      const res = await fetch(`/api/v1/admin/registrations?${params}`, { credentials: 'include' });
+      const records: any[] = res.ok ? await res.json() : [];
+
+      hasMore = records.length === PAGE_SIZE;
+      allRecords = offset === 0 ? records : [...allRecords, ...records];
+      currentOffset = offset + records.length;
+
+      loadingEl.classList.add('hidden');
+
+      if (!allRecords.length) {
+        emptyEl.classList.remove('hidden');
+        tableWrap.classList.add('hidden');
+        loadMoreWrap.classList.add('hidden');
+        setEmptyState(status);
+        updatePendingBadge(0);
+        return;
+      }
+
+      tableWrap.classList.remove('hidden');
+      emptyEl.classList.add('hidden');
+      renderTable(allRecords);
+
+      if (hasMore) {
+        loadMoreWrap.classList.remove('hidden');
+      } else {
+        loadMoreWrap.classList.add('hidden');
+      }
+
+      // Update pending badge only when loading pending tab
+      if (status === 'pending') {
+        updatePendingBadge(allRecords.length);
+      }
+    }
+
+    function setEmptyState(status: string) {
+      const heading = document.getElementById('empty-heading')!;
+      const desc = document.getElementById('empty-desc')!;
+      const emptyMessages: Record<string, [string, string]> = {
+        pending:   ['No pending requests', 'All registration requests have been reviewed. Check back when new applications arrive.'],
+        approved:  ['No approved applications', 'No registration requests have been approved yet.'],
+        rejected:  ['No rejected applications', 'No registration requests have been rejected yet.'],
+        duplicate: ['No duplicate entries', 'No registrations have been marked as duplicate.'],
+        all:       ['No registration requests', 'No registration submissions have been received yet.'],
+      };
+      const [h, d] = emptyMessages[status] ?? emptyMessages['all'];
+      heading.textContent = h;
+      desc.textContent = d;
+    }
+
+    function updatePendingBadge(count: number) {
+      const wrap = document.getElementById('pending-badge-wrap')!;
+      const text = document.getElementById('pending-count-text')!;
+      if (count > 0) {
+        wrap.classList.remove('hidden');
+        text.textContent = `${count} pending`;
+      } else {
+        wrap.classList.add('hidden');
+      }
+    }
+
+    function renderTable(records: any[]) {
+      const tbody = document.getElementById('registrations-tbody')!;
+      tbody.innerHTML = records.map((r) => {
+        const unit = r.units
+          ? `${r.units.block ? r.units.block + '-' : ''}${r.units.unit_number}`
+          : '—';
+        return `
+          <tr class="hover:bg-section-alt cursor-pointer transition-colors group" onclick="openRow('${r.id}')">
+            <td class="px-4 py-3">
+              <div class="font-medium text-text-primary text-sm">${r.full_name ?? '—'}</div>
+              <div class="text-xs text-text-secondary mt-0.5">${r.email ?? '—'}</div>
+            </td>
+            <td class="px-4 py-3 text-text-secondary text-sm hidden sm:table-cell">${unit}</td>
+            <td class="px-4 py-3 text-text-secondary text-sm hidden md:table-cell">${capitalize(r.occupancy_type ?? '')}</td>
+            <td class="px-4 py-3 text-text-secondary text-xs hidden lg:table-cell">${fmt(r.created_at)}</td>
+            <td class="px-4 py-3">${statusBadge(r.status)}</td>
+            <td class="px-4 py-3 text-right">
+              <button
+                class="text-xs text-primary-600 hover:text-primary-700 font-medium border border-primary-200 hover:border-primary-400 px-3 py-1.5 rounded-lg transition-colors group-hover:bg-primary-50"
+                onclick="event.stopPropagation(); openRow('${r.id}')">
+                Review
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openRow(id: string) {
+      const record = allRecords.find((r) => r.id === id);
+      if (record) openDrawer(record);
+    }
+
+    async function loadMore() {
+      const btn = document.getElementById('load-more-btn') as HTMLButtonElement | null;
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading…'; }
+      await loadRegistrations(currentTab, currentOffset, false);
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-chevron-down"></i> Load more'; }
+    }
+
+    // ── Tab switching ────────────────────────────────────────────────────────
+    function switchTab(tab: string) {
+      currentTab = tab;
+      currentOffset = 0;
+
+      const tabs = ['pending', 'all', 'approved', 'rejected', 'duplicate'];
+      tabs.forEach((t) => {
+        const el = document.getElementById(`tab-${t}`);
+        if (!el) return;
+        if (t === tab) {
+          el.classList.add('bg-white', 'text-text-primary', 'shadow-soft');
+          el.classList.remove('text-text-secondary');
+          el.setAttribute('aria-selected', 'true');
+        } else {
+          el.classList.remove('bg-white', 'text-text-primary', 'shadow-soft');
+          el.classList.add('text-text-secondary');
+          el.setAttribute('aria-selected', 'false');
+        }
+      });
+
+      loadRegistrations(tab, 0, true);
+    }
+
+    // ── Event wiring ─────────────────────────────────────────────────────────
+    document.getElementById('close-panel')?.addEventListener('click', closeDrawer);
+    document.getElementById('panel-backdrop')?.addEventListener('click', closeDrawer);
+
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeDrawer();
+    });
+
+    // Expose globals needed by inline onclick handlers
+    (window as any).switchTab = switchTab;
+    (window as any).openRow = openRow;
+    (window as any).loadMore = loadMore;
+    (window as any).viewDocument = viewDocument;
+
+    // ── Bootstrap ────────────────────────────────────────────────────────────
+    loadRegistrations('pending', 0, true);
+  </script>
+</PortalLayout>

@@ -37,7 +37,11 @@ export const POST: APIRoute = async ({ request }) => {
     );
 
     const body = await request.json() as Record<string, unknown>;
-    const { title, body: noticeBody, category, target_audience, is_pinned, requires_acknowledgement } = body;
+    const {
+      title, body: noticeBody, category, target_audience,
+      is_pinned, requires_acknowledgement,
+      status, scheduled_at, video_url, attachment_type,
+    } = body;
 
     if (!title || !category) {
       return new Response(JSON.stringify({ error: 'title and category are required' }), {
@@ -45,19 +49,25 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    const VALID_STATUS = ['draft', 'scheduled', 'published', 'archived'];
+    const noticeStatus = VALID_STATUS.includes(String(status)) ? String(status) : 'draft';
+
     const sb = getSupabaseServiceClient();
     const { data, error } = await sb
       .from('notices')
       .insert({
-        society_id: SOCIETY_ID,
-        title: sanitizePlainText(String(title)),
-        body: noticeBody ? sanitizeHTML(String(noticeBody)) : null,
+        society_id:                SOCIETY_ID,
+        title:                     sanitizePlainText(String(title)),
+        body:                      noticeBody ? sanitizeHTML(String(noticeBody)) : null,
         category,
-        target_audience: target_audience ?? 'all',
-        is_pinned: is_pinned ?? false,
-        requires_acknowledgement: requires_acknowledgement ?? false,
-        is_published: false,
-        created_by: user.id,
+        target_audience:           target_audience ?? 'all',
+        is_pinned:                 is_pinned ?? false,
+        requires_acknowledgement:  requires_acknowledgement ?? false,
+        status:                    noticeStatus,
+        scheduled_at:              noticeStatus === 'scheduled' && scheduled_at ? String(scheduled_at) : null,
+        video_url:                 video_url ? String(video_url).slice(0, 500) : null,
+        attachment_type:           attachment_type ?? null,
+        created_by:                user.id,
       })
       .select()
       .single();

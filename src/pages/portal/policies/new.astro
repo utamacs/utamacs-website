@@ -1,0 +1,191 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+if (!isPrivileged) return new Response('Forbidden', { status: 403 });
+---
+
+<PortalLayout title="New Policy" user={user} activeModule="policies">
+  <div class="mb-6">
+    <nav class="text-sm text-text-secondary mb-3">
+      <a href="/portal/policies" class="hover:text-primary-600">Policies</a>
+      <span class="mx-2">›</span><span class="text-text-primary">New Policy</span>
+    </nav>
+    <h1 class="text-2xl font-bold text-primary-600 font-poppins">Add a Policy</h1>
+  </div>
+
+  <div class="max-w-2xl">
+    <div id="error-banner" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+    <form id="policy-form" class="bg-white rounded-xl border border-border-light p-6 space-y-5">
+
+      <div>
+        <label for="title" class="block text-sm font-medium text-text-primary mb-1.5">Title <span class="text-red-500">*</span></label>
+        <input type="text" id="title" name="title" required maxlength="200"
+          placeholder="e.g. No-Pet Policy, Vehicle Parking Rules"
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+      </div>
+
+      <div>
+        <label for="description" class="block text-sm font-medium text-text-primary mb-1.5">Short Description</label>
+        <input type="text" id="description" name="description" maxlength="200"
+          placeholder="One-line summary for the policy list"
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+      </div>
+
+      <!-- Policy type -->
+      <div>
+        <label class="block text-sm font-medium text-text-primary mb-2">Policy Content Type <span class="text-red-500">*</span></label>
+        <div class="flex gap-3">
+          <label class="flex items-center gap-2 text-sm cursor-pointer px-4 py-2.5 border border-border-light rounded-xl hover:border-primary-600 transition-colors has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50">
+            <input type="radio" name="policy_type" value="text" checked class="text-primary-600" />Text
+          </label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer px-4 py-2.5 border border-border-light rounded-xl hover:border-primary-600 transition-colors has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50">
+            <input type="radio" name="policy_type" value="pdf" class="text-primary-600" />PDF
+          </label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer px-4 py-2.5 border border-border-light rounded-xl hover:border-primary-600 transition-colors has-[:checked]:border-primary-600 has-[:checked]:bg-primary-50">
+            <input type="radio" name="policy_type" value="video_url" class="text-primary-600" />Video
+          </label>
+        </div>
+      </div>
+
+      <!-- Text body -->
+      <div id="content-text">
+        <label for="body" class="block text-sm font-medium text-text-primary mb-1.5">Policy Content <span class="text-red-500">*</span></label>
+        <textarea id="body" name="body" rows="10"
+          placeholder="Write the policy text here. Supports HTML: <p>, <strong>, <em>, <ul>, <li>…"
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none font-mono"></textarea>
+      </div>
+
+      <!-- PDF note -->
+      <div id="content-pdf" class="hidden p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+        <i class="fas fa-info-circle mr-2" aria-hidden="true"></i>
+        Save the policy first, then upload the PDF document on the policy detail page.
+      </div>
+
+      <!-- Video URL -->
+      <div id="content-video" class="hidden">
+        <label for="video_url" class="block text-sm font-medium text-text-primary mb-1.5">Video URL <span class="text-red-500">*</span></label>
+        <input type="url" id="video_url" name="video_url" maxlength="500"
+          placeholder="https://youtube.com/watch?v=..."
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+      </div>
+
+      <!-- Meta -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="effective_date" class="block text-sm font-medium text-text-primary mb-1.5">Effective Date</label>
+          <input type="date" id="effective_date" name="effective_date"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label for="version" class="block text-sm font-medium text-text-primary mb-1.5">Version</label>
+          <input type="number" id="version" name="version" min="1" value="1"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+      </div>
+
+      <!-- Options -->
+      <div class="bg-gray-50 border border-border-light rounded-xl p-4 space-y-3">
+        <p class="text-sm font-medium text-text-primary">Options</p>
+        <label class="flex items-center gap-3 text-sm cursor-pointer">
+          <input type="checkbox" id="acknowledgement_required" name="acknowledgement_required" class="rounded border-border-light text-primary-600" />
+          <div>
+            <span class="font-medium">Require acknowledgement</span>
+            <p class="text-xs text-text-secondary">Members must read and check a confirmation box</p>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 text-sm cursor-pointer">
+          <input type="checkbox" id="gate_portal_access" name="gate_portal_access" class="rounded border-border-light text-primary-600" />
+          <div>
+            <span class="font-medium">Block portal access until acknowledged</span>
+            <p class="text-xs text-text-secondary">Members will see only this policy until they acknowledge it</p>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 text-sm cursor-pointer">
+          <input type="checkbox" id="publish_now" name="publish_now" checked class="rounded border-border-light text-primary-600" />
+          <span class="font-medium">Publish immediately</span>
+        </label>
+      </div>
+
+      <div class="flex items-center gap-3 pt-2">
+        <button type="submit" id="submit-btn" class="btn-primary flex items-center gap-2">
+          <i class="fas fa-shield-alt" aria-hidden="true"></i>
+          <span id="btn-text">Save Policy</span>
+          <span id="btn-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+        </button>
+        <a href="/portal/policies" class="btn-outline">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Type toggle
+    document.querySelectorAll('input[name="policy_type"]').forEach(r => {
+      r.addEventListener('change', () => {
+        const v = (document.querySelector('input[name="policy_type"]:checked') as HTMLInputElement).value;
+        document.getElementById('content-text')!.classList.toggle('hidden', v !== 'text');
+        document.getElementById('content-pdf')!.classList.toggle('hidden', v !== 'pdf');
+        document.getElementById('content-video')!.classList.toggle('hidden', v !== 'video_url');
+      });
+    });
+
+    // Set today's date
+    (document.getElementById('effective_date') as HTMLInputElement).value = new Date().toISOString().slice(0, 10);
+
+    // Submit
+    const form = document.getElementById('policy-form') as HTMLFormElement;
+    const errorBanner = document.getElementById('error-banner')!;
+    const btnText = document.getElementById('btn-text')!;
+    const btnSpinner = document.getElementById('btn-spinner')!;
+    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBanner.classList.add('hidden');
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      submitBtn.disabled = true;
+
+      const fd = new FormData(form);
+      const ptype = fd.get('policy_type') as string;
+      const publishNow = (document.getElementById('publish_now') as HTMLInputElement).checked;
+
+      const payload: Record<string, unknown> = {
+        title:                    fd.get('title'),
+        description:              fd.get('description') || undefined,
+        policy_type:              ptype,
+        effective_date:           fd.get('effective_date'),
+        version:                  parseInt(fd.get('version') as string || '1'),
+        acknowledgement_required: (document.getElementById('acknowledgement_required') as HTMLInputElement).checked,
+        gate_portal_access:       (document.getElementById('gate_portal_access') as HTMLInputElement).checked,
+        status:                   publishNow ? 'active' : 'draft',
+      };
+
+      if (ptype === 'text') payload.body = fd.get('body');
+      if (ptype === 'video_url') payload.video_url = fd.get('video_url');
+
+      const res = await fetch('/api/v1/policies', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        window.location.href = `/portal/policies/${data.id}`;
+      } else {
+        errorBanner.textContent = data.message ?? data.error ?? 'Failed to save policy.';
+        errorBanner.classList.remove('hidden');
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</PortalLayout>
