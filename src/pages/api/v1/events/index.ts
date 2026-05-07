@@ -5,6 +5,7 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { permissionService } from '@lib/services/index';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
+import { fanoutNotification } from '@lib/notifications';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -63,6 +64,19 @@ export const POST: APIRoute = async ({ request }) => {
       .single();
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
+
+    const startDate = new Date(String(starts_at)).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
+    fanoutNotification({
+      societyId: SOCIETY_ID,
+      excludeUserId: user.id,
+      preferenceKey: 'events',
+      title: `New event: ${sanitizePlainText(String(title))}`,
+      body: `${category ?? 'General'} event on ${startDate}${location ? ` at ${location}` : ''}`,
+      type: 'event',
+      referenceTable: 'events',
+      referenceId: data.id,
+    });
+
     return new Response(JSON.stringify(data), { status: 201, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
     return normalizeError(err, request.url);

@@ -5,6 +5,7 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { permissionService } from '@lib/services/index';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
+import { fanoutNotification } from '@lib/notifications';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -77,6 +78,17 @@ export const POST: APIRoute = async ({ request }) => {
       order_index: i + 1,
     }));
     await sb.from('poll_options').insert(optionRows);
+
+    fanoutNotification({
+      societyId: SOCIETY_ID,
+      excludeUserId: user.id,
+      preferenceKey: 'polls',
+      title: `New poll: ${sanitizePlainText(String(title))}`,
+      body: `Cast your vote — ${(options as string[]).slice(0, 3).map((o) => sanitizePlainText(String(o))).join(', ')}${(options as string[]).length > 3 ? '…' : ''}`,
+      type: 'poll',
+      referenceTable: 'polls',
+      referenceId: poll.id,
+    });
 
     return new Response(JSON.stringify(poll), { status: 201, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {

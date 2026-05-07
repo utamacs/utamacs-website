@@ -87,6 +87,7 @@ if (!user) return Astro.redirect('/portal/login');
       event: 'fa-calendar text-blue-500',
       notice: 'fa-bullhorn text-purple-500',
       poll: 'fa-poll text-teal-500',
+      community: 'fa-comments text-cyan-500',
       payment: 'fa-rupee-sign text-green-500',
       visitor: 'fa-user-check text-indigo-500',
       facility: 'fa-building text-pink-500',
@@ -100,6 +101,7 @@ if (!user) return Astro.redirect('/portal/login');
       notice: (id) => `/portal/notices/${id}`,
       poll: (id) => `/portal/polls/${id}`,
       facility: (id) => `/portal/facilities/${id}`,
+      community: (id) => `/portal/community/${id}`,
     };
 
     let currentFilter = 'all';
