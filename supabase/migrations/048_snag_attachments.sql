@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS snag_attachments (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   society_id    uuid NOT NULL REFERENCES societies(id) ON DELETE CASCADE,
-  snag_item_id  uuid NOT NULL REFERENCES snag_items(id) ON DELETE CASCADE,
+  snag_item_id  text NOT NULL REFERENCES snag_items(id) ON DELETE CASCADE,
   storage_key   text NOT NULL,   -- Supabase Storage key in complaint-attachments bucket (reuse bucket)
   mime_type     text NOT NULL CHECK (mime_type IN ('image/jpeg','image/png','image/webp','image/heic','video/mp4')),
   uploaded_by   uuid REFERENCES auth.users(id) ON DELETE SET NULL,
