@@ -410,7 +410,22 @@ const isAdmin = user.role === 'admin';
                 ${approvedDocs > 0 ? `<div class="text-center"><p class="text-xl font-bold text-green-600">${approvedDocs}</p><p class="text-xs text-text-secondary">Approved</p></div>` : ''}
               </div>
             </div>
-            ${s.quorum_met ? '<p class="text-xs text-green-600 mb-3"><i class="fas fa-check-circle mr-1"></i>Quorum met · ' + (s.attendees_count ?? 0) + ' attendees</p>' : ''}
+            <div class="quorum-meter mb-3" data-session="${s.id}" data-status="${s.status}">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="text-text-secondary">Quorum meter</span>
+                <span class="quorum-label text-text-secondary">Loading…</span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div class="quorum-bar h-2 rounded-full bg-primary-300 transition-all duration-500" style="width:0%"></div>
+              </div>
+              ${isExec && s.status !== 'held' ? `
+                <div class="flex items-center gap-2 mt-1.5">
+                  <input type="number" min="0" max="500" placeholder="Enter attendees" data-qinput="${s.id}"
+                    class="form-input py-1 text-xs" style="width:140px" value="${s.attendees_count ?? 0}" />
+                  <button onclick="updateAttendees('${s.id}', this)"
+                    class="text-xs text-primary-600 hover:underline font-medium">Update</button>
+                </div>` : (s.attendees_count ? `<p class="text-xs text-text-secondary mt-1">${s.attendees_count} attendees recorded</p>` : '')}
+            </div>
             <div class="flex gap-2 flex-wrap">
               <button onclick="filterDocsBySession('${s.id}')" class="text-xs text-primary-600 hover:underline">
                 View Documents
@@ -422,6 +437,41 @@ const isAdmin = user.role === 'admin';
       } catch {
         container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load sessions.</div>`;
       }
+
+      // Load quorum data for each visible session meter
+      document.querySelectorAll('.quorum-meter').forEach(async (el: Element) => {
+        const sessionId = (el as HTMLElement).dataset.session!;
+        const bar = el.querySelector('.quorum-bar') as HTMLElement | null;
+        const label = el.querySelector('.quorum-label') as HTMLElement | null;
+        if (!bar || !label) return;
+        try {
+          const res = await fetch(`/api/v1/agm/sessions/${sessionId}/quorum`, { credentials: 'include' });
+          if (!res.ok) { label.textContent = '—'; return; }
+          const q = await res.json();
+          const pct = q.progress_pct ?? 0;
+          bar.style.width = `${pct}%`;
+          bar.className = `quorum-bar h-2 rounded-full transition-all duration-500 ${q.quorum_met ? 'bg-secondary-500' : pct >= 75 ? 'bg-amber-400' : 'bg-primary-300'}`;
+          label.textContent = q.quorum_met
+            ? `✓ Quorum met (${q.attendees_count}/${q.quorum_threshold})`
+            : `${q.attendees_count}/${q.quorum_threshold} — ${q.remaining_needed} more needed`;
+          label.className = `quorum-label text-xs font-medium ${q.quorum_met ? 'text-secondary-500' : 'text-text-secondary'}`;
+        } catch { label.textContent = '—'; }
+      });
+    }
+
+    async function updateAttendees(sessionId: string, btn: HTMLElement) {
+      const input = document.querySelector(`[data-qinput="${sessionId}"]`) as HTMLInputElement | null;
+      if (!input) return;
+      const count = parseInt(input.value, 10);
+      if (isNaN(count) || count < 0) return;
+      btn.textContent = 'Saving…';
+      const res = await fetch(`/api/v1/agm/sessions/${sessionId}/quorum`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attendees_count: count }),
+      });
+      if (res.ok) { loadSessions(); }
+      else { btn.textContent = 'Error'; }
     }
 
     async function loadDocuments(sessionId = null) {
@@ -731,6 +781,7 @@ const isAdmin = user.role === 'admin';
     window.secondaryApprove = secondaryApprove;
     window.showHistory = showHistory;
     window.loadDocuments = loadDocuments;
+    window.updateAttendees = updateAttendees;
 
     // Initialize
     loadSessions();
