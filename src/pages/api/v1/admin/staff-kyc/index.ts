@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -18,8 +19,11 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     const sb = getSupabaseServiceClient();
 
+    const rules = await getRules(sb, SOCIETY_ID, ['STAFF_PASS_EXPIRY_WARNING_DAYS']);
+    const warningDays = ruleInt(rules, 'STAFF_PASS_EXPIRY_WARNING_DAYS', 30);
+
     const kycStatus = url.searchParams.get('kyc_status');
-    const passExpiring = url.searchParams.get('pass_expiring'); // 'true' to filter passes expiring in 30 days
+    const passExpiring = url.searchParams.get('pass_expiring');
     const type = url.searchParams.get('type') ?? 'staff'; // 'staff' | 'maid'
 
     if (type === 'maid') {
@@ -38,7 +42,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
       if (kycStatus) query = query.eq('kyc_status', kycStatus);
       if (passExpiring === 'true') {
-        const threshold = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        const threshold = new Date(Date.now() + warningDays * 24 * 60 * 60 * 1000).toISOString();
         query = query.lte('security_pass_expires_at', threshold).eq('security_pass_issued', true);
       }
 

@@ -1,0 +1,25 @@
+{
+  "cookies": [
+    {
+      "name": "sb-refresh-token",
+      "value": "tl6xv2ljfgjh",
+      "domain": "portal.utamacs.org",
+      "path": "/api/v1/auth/refresh",
+      "expires": 1778775985,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "sb-access-token",
+      "value": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImY1NDkxNGQ5LTQxOTEtNDg2MC1hOTVlLTViNDE5MDBmOWE4OCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2tpYXBpc2t6YXFmd21pd2Rram1oLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJjYTAyMWUzNy1mYWZlLTRhMDYtOTNiNy1mN2ZhNzliNjkwZTciLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzc4MTcyMDg0LCJpYXQiOjE3NzgxNzExODQsImVtYWlsIjoidGVzdC5tZW1iZXJAdXRhbWFjcy5vcmciLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc3ODE3MTE4NH1dLCJzZXNzaW9uX2lkIjoiZDY5ODNhNDktMDgyYS00ZGNlLTg0MTgtYTFkNzgxMDg5MDU3IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.ATyIC2Rs3pMbda0iAML3SbUDVFS1iQRf7mHRmMWbtoCkP-7lCN29zBkGV7HFQCXNGY1w_YkVzRI9Z_zz3-l8Jg",
+      "domain": "portal.utamacs.org",
+      "path": "/",
+      "expires": 1778775985,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

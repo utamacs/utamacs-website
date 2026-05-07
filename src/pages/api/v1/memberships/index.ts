@@ -4,6 +4,7 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -11,8 +12,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const VALID_STATUSES = ['applied','fees_pending','fees_confirmed','approved','suspended','transferred','deceased','rejected'] as const;
 const VALID_TYPES = ['original_owner','purchaser','successor','heir','joint_owner_nominee'] as const;
 
-// GET /api/v1/memberships — list memberships
-// Exec sees all; regular member sees only their own
+// GET /api/v1/memberships
 export const GET: APIRoute = async ({ request, url }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -36,15 +36,13 @@ export const GET: APIRoute = async ({ request, url }) => {
         membership_number, status, voting_eligible, voting_disqualified_reason,
         declaration_signed, declaration_signed_at,
         submitted_at, reviewed_by, reviewed_at, rejection_reason,
-        effective_to, termination_reason, created_at,
+        effective_to, termination_reason, linked_registration_id, created_at,
         units!memberships_unit_id_fkey(unit_number, block)
       `)
       .eq('society_id', SOCIETY_ID)
       .order('created_at', { ascending: false });
 
-    if (!isPrivileged) {
-      query = query.eq('profile_id', user.id);
-    }
+    if (!isPrivileged) query = query.eq('profile_id', user.id);
 
     if (status && VALID_STATUSES.includes(status as typeof VALID_STATUSES[number])) {
       query = query.eq('status', status);
@@ -63,7 +61,6 @@ export const GET: APIRoute = async ({ request, url }) => {
 };
 
 // POST /api/v1/memberships — submit membership application
-// Any authenticated portal member can apply; one-per-flat enforced at DB level
 export const POST: APIRoute = async ({ request }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -97,6 +94,11 @@ export const POST: APIRoute = async ({ request }) => {
 
     const sb = getSupabaseServiceClient();
 
+    // Read fee amounts from rules engine (Byelaw §4.1)
+    const rules = await getRules(sb, SOCIETY_ID, ['MEMBERSHIP_ADMISSION_FEE', 'MEMBERSHIP_SHARE_CAPITAL']);
+    const admissionFee = ruleInt(rules, 'MEMBERSHIP_ADMISSION_FEE', 1000);
+    const shareCapital = ruleInt(rules, 'MEMBERSHIP_SHARE_CAPITAL', 1000);
+
     // Verify unit belongs to this society
     const { data: unit } = await sb
       .from('units')
@@ -107,7 +109,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (!unit) return Response.json({ error: 'NOT_FOUND', message: 'Unit not found' }, { status: 404 });
 
-    // Check for existing active/pending membership (byelaw 4.4 one-per-flat)
+    // Check for existing active/pending membership (Byelaw §4.4 one-per-flat)
     const { data: existing } = await sb
       .from('memberships')
       .select('id, status, member_name')
@@ -118,9 +120,18 @@ export const POST: APIRoute = async ({ request }) => {
     if (existing) {
       return Response.json({
         error: 'CONFLICT',
-        message: `This flat already has an active/pending membership application (Byelaw 4.4). Member: ${existing.member_name}, Status: ${existing.status}`,
+        message: `This flat already has an active/pending membership (Byelaw §4.4 one-per-flat). Member: ${existing.member_name}, Status: ${existing.status}`,
       }, { status: 409 });
     }
+
+    // Check for a linked portal registration for this user/unit
+    const { data: existingReg } = await sb
+      .from('registration_requests')
+      .select('id')
+      .eq('society_id', SOCIETY_ID)
+      .eq('unit_id', unit_id)
+      .eq('status', 'pending')
+      .maybeSingle();
 
     const { data, error } = await sb
       .from('memberships')
@@ -136,20 +147,34 @@ export const POST: APIRoute = async ({ request }) => {
         registration_office: registration_office.slice(0, 200) || null,
         declaration_signed,
         declaration_signed_at: declaration_signed ? new Date().toISOString() : null,
+        admission_fee_amount: admissionFee,
+        share_capital_amount: shareCapital,
         status: 'applied',
         submitted_at: new Date().toISOString(),
+        linked_registration_id: existingReg?.id ?? null,
       })
       .select()
       .single();
 
     if (error) {
       if (error.code === '23505') {
-        return Response.json({ error: 'CONFLICT', message: 'This flat already has an active membership application (Byelaw 4.4 one-per-flat rule)' }, { status: 409 });
+        return Response.json({ error: 'CONFLICT', message: 'This flat already has an active membership application (Byelaw §4.4 one-per-flat rule)' }, { status: 409 });
       }
       throw Object.assign(new Error(error.message), { status: 500 });
     }
 
-    return Response.json(data, { status: 201 });
+    // If there's a linked registration_request, update its membership_id
+    if (existingReg?.id && data) {
+      await sb
+        .from('registration_requests')
+        .update({ membership_id: data.id })
+        .eq('id', existingReg.id);
+    }
+
+    return Response.json({
+      ...data,
+      _fees: { admission_fee: admissionFee, share_capital: shareCapital, total: admissionFee + shareCapital },
+    }, { status: 201 });
   } catch (err) {
     return normalizeError(err, request.url);
   }

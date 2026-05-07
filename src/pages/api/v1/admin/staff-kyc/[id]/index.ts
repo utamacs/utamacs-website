@@ -6,6 +6,7 @@ import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -114,19 +115,22 @@ export const PATCH: APIRoute = async ({ request, params, url }) => {
         updates.background_remarks = sanitizePlainText(String(body.background_remarks)).trim().slice(0, 500) || null;
       }
 
-      // Issue security pass (byelaw 13.3)
+      // Issue security pass (Byelaw §13.3)
       if (body.issue_pass === true) {
         if (!record.police_verified && !updates.police_verified) {
-          return Response.json({ error: 'VALIDATION', message: 'Police verification required before issuing security pass (Byelaw 13.3)' }, { status: 400 });
+          return Response.json({ error: 'VALIDATION', message: 'Police verification required before issuing security pass (Byelaw §13.3)' }, { status: 400 });
         }
         if (!record.two_photos_received && !updates.two_photos_received) {
-          return Response.json({ error: 'VALIDATION', message: '2 passport photos required before issuing security pass (Byelaw 13.3)' }, { status: 400 });
+          return Response.json({ error: 'VALIDATION', message: '2 passport photos required before issuing security pass (Byelaw §13.3)' }, { status: 400 });
         }
 
         const passNo = sanitizePlainText(String(body.security_pass_number ?? '')).trim();
+        const passRuleKey = type === 'maid' ? 'MAID_PASS_VALIDITY_DAYS' : 'STAFF_PASS_VALIDITY_DAYS';
+        const rulesData = await getRules(sb, SOCIETY_ID, [passRuleKey]);
+        const validityDays = ruleInt(rulesData, passRuleKey, 365);
         const expiresAt = body.security_pass_expires_at
           ? String(body.security_pass_expires_at)
-          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year default
+          : new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString();
 
         updates.security_pass_issued = true;
         updates.security_pass_issued_at = new Date().toISOString();

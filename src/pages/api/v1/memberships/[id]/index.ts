@@ -5,14 +5,11 @@ import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
+import { getRules, ruleStr } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Status transitions allowed per role:
-// Member can: applied→fees_pending (mark fees paid, pending exec confirmation)
-// Exec can: any → approved | rejected | suspended | transferred | deceased
-// Exec can: applied → fees_pending | fees_confirmed
 const EXEC_TRANSITIONS: Record<string, string[]> = {
   applied:         ['fees_pending', 'fees_confirmed', 'approved', 'rejected'],
   fees_pending:    ['fees_confirmed', 'applied', 'rejected'],
@@ -25,8 +22,6 @@ const EXEC_TRANSITIONS: Record<string, string[]> = {
 };
 
 // PATCH /api/v1/memberships/[id]
-// Exec: approve/reject/update status, issue share certificate, confirm fees
-// Member: update sale deed info before exec review
 export const PATCH: APIRoute = async ({ request, params }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -55,8 +50,8 @@ export const PATCH: APIRoute = async ({ request, params }) => {
 
     const body = await request.json() as Record<string, unknown>;
     const updates: Record<string, unknown> = {};
+    let approving = false;
 
-    // Status transition (exec only)
     if (body.status !== undefined && isPrivileged) {
       const newStatus = String(body.status);
       const allowed = EXEC_TRANSITIONS[membership.status] ?? [];
@@ -69,9 +64,14 @@ export const PATCH: APIRoute = async ({ request, params }) => {
       updates.status = newStatus;
 
       if (newStatus === 'approved') {
+        approving = true;
         updates.voting_eligible = (membership.admission_fee_paid && membership.share_capital_paid);
         updates.reviewed_by = user.id;
         updates.reviewed_at = new Date().toISOString();
+        if (!membership.admission_fee_paid || !membership.share_capital_paid) {
+          updates.voting_eligible = false;
+          updates.voting_disqualified_reason = 'Fees not fully confirmed — voting eligibility pending fee confirmation';
+        }
       }
       if (newStatus === 'rejected') {
         updates.voting_eligible = false;
@@ -83,19 +83,10 @@ export const PATCH: APIRoute = async ({ request, params }) => {
       }
       if (newStatus === 'suspended') {
         updates.voting_eligible = false;
-        const reason = sanitizePlainText(String(body.voting_disqualified_reason ?? '')).trim();
-        updates.voting_disqualified_reason = reason.slice(0, 300) || 'Membership suspended';
-      }
-      if (newStatus === 'approved' && !membership.voting_eligible) {
-        const disqReason = 'Fees not fully confirmed — voting eligibility pending fee confirmation';
-        if (!membership.admission_fee_paid || !membership.share_capital_paid) {
-          updates.voting_eligible = false;
-          updates.voting_disqualified_reason = disqReason;
-        }
+        updates.voting_disqualified_reason = sanitizePlainText(String(body.voting_disqualified_reason ?? '')).trim().slice(0, 300) || 'Membership suspended';
       }
     }
 
-    // Fee confirmations (exec only — byelaw 4.1)
     if (isPrivileged) {
       if (body.admission_fee_paid === true && !membership.admission_fee_paid) {
         updates.admission_fee_paid = true;
@@ -111,23 +102,21 @@ export const PATCH: APIRoute = async ({ request, params }) => {
       if (body.byelaw_copy_fee_paid === true) {
         updates.byelaw_copy_fee_paid = true;
       }
-
-      // Issue share certificate (byelaw 4.12 — signed by President + Secretary)
       if (body.share_certificate_number !== undefined) {
         const certNum = sanitizePlainText(String(body.share_certificate_number)).trim();
         if (!certNum) return Response.json({ error: 'VALIDATION', message: 'share_certificate_number cannot be empty' }, { status: 400 });
         if (membership.status !== 'approved' && updates.status !== 'approved') {
-          return Response.json({ error: 'VALIDATION', message: 'Share certificate can only be issued after membership is approved' }, { status: 400 });
+          return Response.json({ error: 'VALIDATION', message: 'Share certificate can only be issued after membership is approved (Byelaw §4.12)' }, { status: 400 });
         }
         updates.share_certificate_number = certNum.slice(0, 30);
         updates.share_certificate_issued_at = new Date().toISOString();
-        // Enable voting once cert issued and fees paid
-        if (membership.admission_fee_paid && membership.share_capital_paid) {
+        const feesConfirmed = (updates.admission_fee_paid ?? membership.admission_fee_paid) &&
+                              (updates.share_capital_paid ?? membership.share_capital_paid);
+        if (feesConfirmed) {
           updates.voting_eligible = true;
           updates.voting_disqualified_reason = null;
         }
       }
-
       if (body.membership_number !== undefined) {
         updates.membership_number = sanitizePlainText(String(body.membership_number)).trim().slice(0, 30) || null;
       }
@@ -142,6 +131,10 @@ export const PATCH: APIRoute = async ({ request, params }) => {
         if (!updates.voting_eligible && body.voting_disqualified_reason) {
           updates.voting_disqualified_reason = sanitizePlainText(String(body.voting_disqualified_reason)).trim().slice(0, 300);
         }
+      }
+      if (body.linked_registration_id !== undefined) {
+        const regId = String(body.linked_registration_id);
+        updates.linked_registration_id = UUID_RE.test(regId) ? regId : null;
       }
     }
 
@@ -181,6 +174,35 @@ export const PATCH: APIRoute = async ({ request, params }) => {
       throw Object.assign(new Error(updateErr.message), { status: 500 });
     }
 
+    // When membership is approved, check MEMBERSHIP_PORTAL_LINK_MODE and auto-approve
+    // linked portal registration if the mode allows it
+    if (approving && membership.linked_registration_id) {
+      const rules = await getRules(sb, SOCIETY_ID, ['MEMBERSHIP_PORTAL_LINK_MODE']);
+      const linkMode = ruleStr(rules, 'MEMBERSHIP_PORTAL_LINK_MODE', 'auto_approve');
+
+      if (linkMode === 'auto_approve') {
+        await sb
+          .from('registration_requests')
+          .update({
+            status: 'approved',
+            reviewed_by: user.id,
+            reviewed_at: new Date().toISOString(),
+            // Note: created_profile_id should already be set if the member has a portal account
+          })
+          .eq('id', membership.linked_registration_id)
+          .eq('status', 'pending'); // only if still pending
+
+        await writeAuditLog({
+          userId: user.id,
+          action: 'UPDATE',
+          resourceType: 'registration_request',
+          resourceId: membership.linked_registration_id,
+          oldValues: { status: 'pending' },
+          newValues: { status: 'approved', reason: `Auto-approved on byelaw membership approval (mode: ${linkMode})` },
+        });
+      }
+    }
+
     await writeAuditLog({
       userId: user.id,
       action: 'UPDATE',
@@ -196,7 +218,7 @@ export const PATCH: APIRoute = async ({ request, params }) => {
   }
 };
 
-// GET /api/v1/memberships/[id] — fetch single membership
+// GET /api/v1/memberships/[id]
 export const GET: APIRoute = async ({ request, params }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -214,9 +236,7 @@ export const GET: APIRoute = async ({ request, params }) => {
       .eq('id', id)
       .eq('society_id', SOCIETY_ID);
 
-    if (!isPrivileged) {
-      query = query.eq('profile_id', user.id);
-    }
+    if (!isPrivileged) query = query.eq('profile_id', user.id);
 
     const { data, error } = await query.single();
     if (error || !data) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
