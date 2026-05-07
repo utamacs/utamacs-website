@@ -30,7 +30,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     const { data, error } = await sb
       .from('notices')
-      .select('id, title, body, category, target_audience, is_pinned, requires_acknowledgement, published_at, expires_at, created_at')
+      .select('id, title, body, category, target_audience, is_pinned, requires_acknowledgement, published_at, expires_at, created_at, attachment_storage_key, attachment_type')
       .eq('society_id', SOCIETY_ID)
       .eq('is_published', true)
       .order('is_pinned', { ascending: false })

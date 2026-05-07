@@ -190,6 +190,9 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
           const trackBtn = isExec && n.requires_acknowledgement
             ? `<button onclick="openAckPanel('${n.id}', ${JSON.stringify(n.title)})" class="text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1 font-medium"><i class="fas fa-users text-[11px]"></i> Track</button>`
             : '';
+          const attachBtn = n.attachment_storage_key
+            ? `<button onclick="viewAttachment('${n.id}', this)" class="text-xs text-primary-600 hover:text-primary-800 flex items-center gap-1 font-medium"><i class="fas fa-paperclip text-[11px]"></i> Attachment</button>`
+            : '';
           return `
           <div class="bg-white rounded-xl border border-l-4 ${CATEGORY_COLORS[n.category] ?? 'border-gray-300'} p-5">
             <div class="flex items-start justify-between gap-4 mb-2">
@@ -199,7 +202,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
             ${n.body ? `<div class="prose prose-sm text-text-secondary max-w-none mt-3 line-clamp-3">${n.body}</div>` : ''}
             <div class="flex items-center justify-between mt-3 flex-wrap gap-2">
               <span class="text-xs text-text-secondary">${new Date(n.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-              <div class="flex items-center gap-3">${trackBtn}${ackAction}</div>
+              <div class="flex items-center gap-3">${attachBtn}${trackBtn}${ackAction}</div>
             </div>
           </div>
           `;
@@ -223,6 +226,23 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
         btn.innerHTML = '<i class="fas fa-pen"></i> Acknowledge';
       }
     }
+
+    async function viewAttachment(noticeId: string, btn: HTMLElement) {
+      btn.setAttribute('disabled', 'true');
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin text-[11px]"></i>';
+      try {
+        const res = await fetch(`/api/v1/notices/${noticeId}/attachment`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed');
+        const { url } = await res.json();
+        window.open(url, '_blank', 'noopener');
+      } catch {
+        showToast('Could not load attachment.', 'error');
+      } finally {
+        btn.removeAttribute('disabled');
+        btn.innerHTML = '<i class="fas fa-paperclip text-[11px]"></i> Attachment';
+      }
+    }
+    (window as any).viewAttachment = viewAttachment;
 
     // ── Acknowledgement tracking panel (exec only) ────────────────────────────
     if (isExec) {

@@ -101,7 +101,14 @@ export const GET: APIRoute = async ({ request }) => {
     results.scheduled_notices = { error: err instanceof Error ? err.message : String(err) };
   }
 
-  // ── 10. Event reminder notifications ──────────────────────────────────────
+  // ── 10. Complaint SLA escalation ─────────────────────────────────────────
+  try {
+    results.complaint_sla = await runComplaintSlaEscalation(sb, now, nowIso);
+  } catch (err) {
+    results.complaint_sla = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 11. Event reminder notifications ──────────────────────────────────────
   try {
     results.event_reminders = await runEventReminders(sb, now, nowIso);
   } catch (err) {
@@ -357,6 +364,67 @@ async function runScheduledNotices(sb: ReturnType<typeof getSupabaseServiceClien
   }
 
   return { published: ids.length };
+}
+
+async function runComplaintSlaEscalation(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Escalate complaints that have been Open or Assigned for more than 48 hours
+  // without a status change. Sends an in-app notification to executive members.
+  const cutoff48h = new Date(now.getTime() - 48 * 3_600_000).toISOString();
+
+  const { data: stale } = await sb
+    .from('complaints')
+    .select('id, title, status, raised_by, created_at')
+    .eq('society_id', SOCIETY_ID)
+    .in('status', ['Open', 'Assigned'])
+    .lt('created_at', cutoff48h)
+    .limit(20);
+
+  if (!stale?.length) return { escalated: 0 };
+
+  // Get exec members to notify
+  const { data: execs } = await sb
+    .from('profiles')
+    .select('id')
+    .eq('society_id', SOCIETY_ID)
+    .eq('is_active', true)
+    .in('portal_role', ['executive', 'secretary', 'president']);
+
+  const execIds = (execs ?? []).map((e: any) => e.id);
+  if (!execIds.length) return { escalated: 0 };
+
+  let escalated = 0;
+  for (const complaint of stale) {
+    const c = complaint as any;
+    // Dedup: skip if already escalated today
+    const { count } = await sb
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('society_id', SOCIETY_ID)
+      .eq('reference_id', c.id)
+      .eq('reference_table', 'complaints')
+      .eq('title', 'Complaint SLA overdue')
+      .gte('created_at', nowIso.slice(0, 10) + 'T00:00:00.000Z');
+    if (count && count > 0) continue;
+
+    const hoursOpen = Math.round((now.getTime() - new Date(c.created_at).getTime()) / 3_600_000);
+    try {
+      await sb.from('notifications').insert(
+        execIds.map((uid: string) => ({
+          society_id: SOCIETY_ID,
+          user_id: uid,
+          title: 'Complaint SLA overdue',
+          body: `"${c.title}" has been ${c.status} for ${hoursOpen}h with no update.`,
+          type: 'complaint',
+          reference_table: 'complaints',
+          reference_id: c.id,
+          is_read: false,
+        })),
+      );
+      escalated++;
+    } catch { /* non-fatal */ }
+  }
+
+  return { escalated };
 }
 
 async function runEventReminders(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {

@@ -10,6 +10,47 @@ const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000
 const BUCKET = 'notices';
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
+/** GET /api/v1/notices/:id/attachment — returns 1-hour signed URL for the notice attachment. */
+export const GET: APIRoute = async ({ request, params }) => {
+  try {
+    const user = await validateJWT(request);
+    const sb = getSupabaseServiceClient();
+
+    const { data: notice } = await sb
+      .from('notices')
+      .select('id, attachment_storage_key, attachment_type')
+      .eq('id', params.id!)
+      .eq('society_id', SOCIETY_ID)
+      .eq('is_published', true)
+      .single();
+
+    if (!notice || !(notice as any).attachment_storage_key) {
+      return Response.json({ error: 'No attachment found' }, { status: 404 });
+    }
+
+    const { data: signed } = await sb.storage
+      .from(BUCKET)
+      .createSignedUrl((notice as any).attachment_storage_key, 3600);
+
+    if (!signed?.signedUrl) {
+      return Response.json({ error: 'Could not generate download URL' }, { status: 500 });
+    }
+
+    await writeAuditLog({
+      societyId: SOCIETY_ID, userId: user.id,
+      action: 'EXPORT', resourceType: 'notices', resourceId: params.id!,
+      ip: extractClientIP(request),
+    });
+
+    return Response.json({
+      url: signed.signedUrl,
+      attachment_type: (notice as any).attachment_type,
+    });
+  } catch (err) {
+    return normalizeError(err, request.url);
+  }
+};
+
 const ALLOWED_MIME: Record<string, { ext: string; type: 'image' | 'pdf' }> = {
   'image/jpeg': { ext: 'jpg',  type: 'image' },
   'image/png':  { ext: 'png',  type: 'image' },
