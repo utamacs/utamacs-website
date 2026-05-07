@@ -91,16 +91,18 @@ export const PUT: APIRoute = async ({ request, params }) => {
     // Notify the complaint submitter about the status change (non-blocking)
     if (body.status && (before as any).raised_by && (before as any).raised_by !== user.id) {
       const notifBody = STATUS_LABELS[body.status] ?? `Status changed to ${body.status}.`;
-      _sb().from('notifications').insert({
-        user_id: (before as any).raised_by,
-        society_id: SOCIETY_ID,
-        title: `Complaint update: ${(before as any).title ?? 'your complaint'}`,
-        body: notifBody,
-        type: 'complaint',
-        reference_table: 'complaints',
-        reference_id: id,
-        is_read: false,
-      }).then(() => {}).catch(() => {});
+      Promise.resolve(
+        _sb().from('notifications').insert({
+          user_id: (before as any).raised_by,
+          society_id: SOCIETY_ID,
+          title: `Complaint update: ${(before as any).title ?? 'your complaint'}`,
+          body: notifBody,
+          type: 'complaint',
+          reference_table: 'complaints',
+          reference_id: id,
+          is_read: false,
+        }),
+      ).catch(() => {});
     }
 
     return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
