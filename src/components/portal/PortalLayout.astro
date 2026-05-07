@@ -250,17 +250,42 @@ if (isGuard) {
         </div>
       </div>
 
-      <!-- Navigation controls -->
-      <div class="flex items-center justify-end px-4 py-1.5 border-b border-border-light bg-gray-50/60">
-        <div class="flex gap-0.5">
-          <button id="collapse-all-btn" title="Collapse all groups" aria-label="Collapse all navigation groups"
-            class="w-6 h-6 flex items-center justify-center rounded text-text-secondary hover:text-primary-600 hover:bg-primary-50 transition-colors">
-            <i class="fas fa-angle-double-up text-[10px]" aria-hidden="true"></i>
-          </button>
-          <button id="expand-all-btn" title="Expand all groups" aria-label="Expand all navigation groups"
-            class="w-6 h-6 flex items-center justify-center rounded text-text-secondary hover:text-primary-600 hover:bg-primary-50 transition-colors">
-            <i class="fas fa-angle-double-down text-[10px]" aria-hidden="true"></i>
-          </button>
+      <!-- Nav search + controls -->
+      <div class="border-b border-border-light bg-gray-50/60">
+        <!-- Search input -->
+        <div class="px-3 pt-2 pb-1.5">
+          <div class="relative">
+            <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary text-[11px]" aria-hidden="true"></i>
+            <input
+              id="nav-search"
+              type="search"
+              placeholder="Search navigation…"
+              autocomplete="off"
+              aria-label="Search navigation items"
+              class="w-full pl-7 pr-7 py-1.5 text-xs rounded-md border border-border-light bg-white text-text-primary placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 transition-colors"
+            />
+            <button
+              id="nav-search-clear"
+              type="button"
+              aria-label="Clear search"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary hidden"
+            >
+              <i class="fas fa-times text-[11px]" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+        <!-- Collapse / expand controls -->
+        <div class="flex items-center justify-end px-4 pb-1.5">
+          <div class="flex gap-0.5">
+            <button id="collapse-all-btn" title="Collapse all groups" aria-label="Collapse all navigation groups"
+              class="w-6 h-6 flex items-center justify-center rounded text-text-secondary hover:text-primary-600 hover:bg-primary-50 transition-colors">
+              <i class="fas fa-angle-double-up text-[10px]" aria-hidden="true"></i>
+            </button>
+            <button id="expand-all-btn" title="Expand all groups" aria-label="Expand all navigation groups"
+              class="w-6 h-6 flex items-center justify-center rounded text-text-secondary hover:text-primary-600 hover:bg-primary-50 transition-colors">
+              <i class="fas fa-angle-double-down text-[10px]" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -353,6 +378,103 @@ if (isGuard) {
   </div>
 
   <script>
+    // ── Nav search ────────────────────────────────────────────────────────────
+    (function () {
+      const searchInput = document.getElementById('nav-search') as HTMLInputElement | null;
+      const clearBtn    = document.getElementById('nav-search-clear') as HTMLButtonElement | null;
+      const navEl       = document.getElementById('portal-nav') as HTMLElement | null;
+      if (!searchInput || !navEl) return;
+
+      // Dashboard link is the first child of the nav (before any groups)
+      const dashLink = navEl.querySelector<HTMLElement>('a.nav-link');
+
+      function filterNav(query: string) {
+        const q = query.trim().toLowerCase();
+        clearBtn?.classList.toggle('hidden', q === '');
+
+        // No query → restore everything to natural collapsed/expanded state
+        if (q === '') {
+          // Show dashboard
+          if (dashLink) dashLink.style.display = '';
+          // Let each group and its items go back to their sessionStorage-driven state
+          navEl!.querySelectorAll<HTMLElement>('[data-group-key]').forEach((group) => {
+            group.style.display = '';
+          });
+          navEl!.querySelectorAll<HTMLElement>('.nav-group-items').forEach((items) => {
+            // Restore the hidden class that the collapse logic controls — don't touch it
+            items.style.display = '';
+          });
+          navEl!.querySelectorAll<HTMLElement>('.nav-group-items a.nav-link').forEach((a) => {
+            a.style.display = '';
+          });
+          // Remove no-results placeholder if present
+          document.getElementById('nav-no-results')?.remove();
+          return;
+        }
+
+        // Hide dashboard unless it matches
+        if (dashLink) {
+          dashLink.style.display = dashLink.textContent!.toLowerCase().includes(q) ? '' : 'none';
+        }
+
+        let anyVisible = dashLink?.style.display !== 'none' && dashLink != null
+          ? dashLink.textContent!.toLowerCase().includes(q)
+          : false;
+
+        // For each group, show/hide individual links and hide the whole group if none match
+        navEl!.querySelectorAll<HTMLElement>('[data-group-key]').forEach((group) => {
+          const itemsEl = group.querySelector<HTMLElement>('.nav-group-items');
+          if (!itemsEl) return;
+
+          const links = [...itemsEl.querySelectorAll<HTMLElement>('a.nav-link')];
+          let groupHasMatch = false;
+
+          links.forEach((a) => {
+            const matches = a.textContent!.trim().toLowerCase().includes(q);
+            a.style.display = matches ? '' : 'none';
+            if (matches) groupHasMatch = true;
+          });
+
+          // Show group (always expanded while searching) or hide it entirely
+          group.style.display   = groupHasMatch ? '' : 'none';
+          itemsEl.style.display = groupHasMatch ? '' : 'none';
+          if (groupHasMatch) anyVisible = true;
+        });
+
+        // No-results state
+        const existing = document.getElementById('nav-no-results');
+        if (!anyVisible) {
+          if (!existing) {
+            const el = document.createElement('p');
+            el.id = 'nav-no-results';
+            el.className = 'text-xs text-text-secondary text-center py-6 px-3';
+            el.textContent = 'No results for "' + query.trim() + '"';
+            navEl!.appendChild(el);
+          } else {
+            existing.textContent = 'No results for "' + query.trim() + '"';
+          }
+        } else {
+          existing?.remove();
+        }
+      }
+
+      searchInput.addEventListener('input', () => filterNav(searchInput.value));
+      clearBtn?.addEventListener('click', () => {
+        searchInput.value = '';
+        filterNav('');
+        searchInput.focus();
+      });
+
+      // Keyboard shortcut: / focuses search when nav is visible
+      document.addEventListener('keydown', (e) => {
+        if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+      });
+    })();
+
     // ── Mobile sidebar toggle ─────────────────────────────────────────────────
     const toggle  = document.getElementById('sidebar-toggle');
     const sidebar = document.getElementById('sidebar');
