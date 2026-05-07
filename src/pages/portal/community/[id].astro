@@ -30,6 +30,7 @@ const { data: comments } = await sb
 const isOwner = (post as any).author_id === user.id;
 const isMod = ['executive', 'admin'].includes(user.role);
 const canDelete = isOwner || isMod;
+const canEdit = isOwner;
 const canComment = !['security_guard', 'vendor'].includes(user.role);
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -86,12 +87,20 @@ const p = post as any;
           <i class="fas fa-star"></i>
           <span id="helpful-count">–</span> Helpful
         </button>
-        {canDelete && (
-          <button onclick="deletePost()" class="ml-auto flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition-colors">
-            <i class="fas fa-trash" aria-hidden="true"></i>
-            {isMod && !isOwner ? 'Moderate' : 'Delete'}
-          </button>
-        )}
+        <div class="ml-auto flex items-center gap-3">
+          {canEdit && (
+            <button onclick="openEditModal()" class="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-800 transition-colors">
+              <i class="fas fa-edit" aria-hidden="true"></i>
+              Edit
+            </button>
+          )}
+          {canDelete && (
+            <button onclick="deletePost()" class="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition-colors">
+              <i class="fas fa-trash" aria-hidden="true"></i>
+              {isMod && !isOwner ? 'Moderate' : 'Delete'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
 
@@ -190,12 +199,87 @@ const p = post as any;
       if (!confirm('Are you sure you want to remove this post?')) return;
       const res = await fetch(`/api/v1/community/posts/${postId}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok || res.status === 204) window.location.href = '/portal/community';
-      else alert('Failed to remove post.');
+      else showToast('Failed to remove post.', 'error');
+    }
+
+    function openEditModal() {
+      const modal = document.getElementById('edit-modal');
+      const titleEl = document.getElementById('edit-title') as HTMLInputElement;
+      const bodyEl  = document.getElementById('edit-body') as HTMLTextAreaElement;
+      // Pre-fill with current values from the page
+      titleEl.value = document.querySelector('h1.text-2xl')?.textContent?.trim() ?? '';
+      bodyEl.value  = document.querySelector('.prose')?.textContent?.trim() ?? '';
+      modal?.classList.remove('hidden');
+    }
+
+    async function submitEdit() {
+      const btn     = document.getElementById('edit-submit-btn') as HTMLButtonElement;
+      const errEl   = document.getElementById('edit-error');
+      const title   = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
+      const body    = (document.getElementById('edit-body') as HTMLTextAreaElement).value.trim();
+      if (!title || !body) { if (errEl) { errEl.textContent = 'Title and body are required.'; errEl.classList.remove('hidden'); } return; }
+      btn.disabled = true; btn.textContent = 'Saving…';
+      if (errEl) errEl.classList.add('hidden');
+      const res = await fetch(`/api/v1/community/posts/${postId}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body }),
+      });
+      if (res.ok) {
+        showToast('Post updated.');
+        document.getElementById('edit-modal')?.classList.add('hidden');
+        window.location.reload();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        if (errEl) { errEl.textContent = d.message ?? 'Update failed.'; errEl.classList.remove('hidden'); }
+        btn.disabled = false; btn.textContent = 'Save changes';
+      }
+    }
+
+    function showToast(message: string, type = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
     }
 
     window.react = react;
     window.submitComment = submitComment;
     window.deletePost = deletePost;
+    window.openEditModal = openEditModal;
+    window.submitEdit = submitEdit;
     loadReactions();
   </script>
+
+  <!-- Edit Modal -->
+  {canEdit && (
+    <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-lg">
+        <div class="p-5 border-b border-border-light flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-text-primary">Edit Post</h2>
+          <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="form-label" for="edit-title">Title</label>
+            <input id="edit-title" type="text" maxlength="200" class="form-input" />
+          </div>
+          <div>
+            <label class="form-label" for="edit-body">Content</label>
+            <textarea id="edit-body" rows="6" maxlength="5000" class="form-input resize-none"></textarea>
+          </div>
+          <div id="edit-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+        </div>
+        <div class="p-5 pt-0 flex gap-3">
+          <button onclick="document.getElementById('edit-modal').classList.add('hidden')" class="flex-1 btn-outline text-sm">Cancel</button>
+          <button id="edit-submit-btn" onclick="submitEdit()" class="flex-1 btn-primary text-sm">Save changes</button>
+        </div>
+      </div>
+    </div>
+  )}
 </PortalLayout>

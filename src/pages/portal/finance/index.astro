@@ -145,10 +145,13 @@ const isExec = ['executive', 'admin'].includes(user.role);
     </div>
   )}
 
-  <!-- Main tabs (Dues / Expenses) — Expenses visible to exec only -->
+  <!-- Main tabs (Dues / Ledger / Expenses) — Expenses visible to exec only -->
   <div class="flex gap-2 mb-5 border-b border-border-light">
     <button id="tab-dues" class="main-fin-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px">
       <i class="fas fa-file-invoice-dollar mr-1.5 text-xs" aria-hidden="true"></i>Dues
+    </button>
+    <button id="tab-ledger" class="main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">
+      <i class="fas fa-book mr-1.5 text-xs" aria-hidden="true"></i>My Ledger
     </button>
     {isExec && (
       <button id="tab-expenses" class="main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">
@@ -163,6 +166,36 @@ const isExec = ['executive', 'admin'].includes(user.role);
       <div class="flex items-center justify-center h-32 text-text-secondary">
         <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
         Loading dues…
+      </div>
+    </div>
+  </div>
+
+  <!-- Ledger panel (all members) -->
+  <div id="panel-ledger" class="hidden">
+    <div id="ledger-summary" class="grid grid-cols-3 gap-4 mb-5">
+      <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+        <div class="text-xs text-text-secondary mb-1">Total Billed</div>
+        <div id="ledger-total-dues" class="text-xl font-bold text-text-primary">—</div>
+      </div>
+      <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+        <div class="text-xs text-text-secondary mb-1">Total Paid</div>
+        <div id="ledger-total-paid" class="text-xl font-bold text-secondary-500">—</div>
+      </div>
+      <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+        <div class="text-xs text-text-secondary mb-1">Outstanding</div>
+        <div id="ledger-outstanding" class="text-xl font-bold text-red-600">—</div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+      <div class="px-5 py-3 border-b border-border-light bg-gray-50 grid grid-cols-12 gap-2 text-xs font-medium text-text-secondary">
+        <div class="col-span-2">Date</div>
+        <div class="col-span-5">Description</div>
+        <div class="col-span-2 text-right">Debit (₹)</div>
+        <div class="col-span-2 text-right">Credit (₹)</div>
+        <div class="col-span-1 text-right">Balance</div>
+      </div>
+      <div id="ledger-rows">
+        <div class="text-center py-10 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>
       </div>
     </div>
   </div>
@@ -404,32 +437,71 @@ const isExec = ['executive', 'admin'].includes(user.role);
     window.handlePay = handlePay;
     window.generateGstInvoice = generateGstInvoice;
 
-    // ── Tab switching (Dues / Expenses) ────────────────────────────────────────
+    // ── Tab switching (Dues / Ledger / Expenses) ─────────────────────────────
     let expensesLoaded = false;
+    let ledgerLoaded   = false;
     const tabDues     = document.getElementById('tab-dues');
+    const tabLedger   = document.getElementById('tab-ledger');
     const tabExpenses = document.getElementById('tab-expenses');
     const panelDues   = document.getElementById('panel-dues');
+    const panelLedger = document.getElementById('panel-ledger');
     const panelExp    = document.getElementById('panel-expenses');
 
-    function activateTab(which: 'dues' | 'expenses') {
-      const active   = 'main-fin-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
-      const inactive = 'main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
-      if (which === 'dues') {
-        tabDues?.setAttribute('class', active);
-        tabExpenses?.setAttribute('class', inactive);
-        panelDues?.classList.remove('hidden');
-        panelExp?.classList.add('hidden');
-      } else {
-        tabExpenses?.setAttribute('class', active);
-        tabDues?.setAttribute('class', inactive);
-        panelExp?.classList.remove('hidden');
-        panelDues?.classList.add('hidden');
-        if (!expensesLoaded) { expensesLoaded = true; loadExpenses(); }
-      }
+    const ACTIVE_CLS   = 'main-fin-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+    const INACTIVE_CLS = 'main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
+
+    function activateTab(which: 'dues' | 'ledger' | 'expenses') {
+      [tabDues, tabLedger, tabExpenses].forEach(t => t?.setAttribute('class', INACTIVE_CLS));
+      [panelDues, panelLedger, panelExp].forEach(p => p?.classList.add('hidden'));
+      if (which === 'dues')     { tabDues?.setAttribute('class', ACTIVE_CLS);     panelDues?.classList.remove('hidden'); }
+      if (which === 'ledger')   { tabLedger?.setAttribute('class', ACTIVE_CLS);   panelLedger?.classList.remove('hidden'); if (!ledgerLoaded)   { ledgerLoaded   = true; loadLedger();   } }
+      if (which === 'expenses') { tabExpenses?.setAttribute('class', ACTIVE_CLS); panelExp?.classList.remove('hidden');    if (!expensesLoaded) { expensesLoaded = true; loadExpenses(); } }
     }
 
     tabDues?.addEventListener('click', () => activateTab('dues'));
+    tabLedger?.addEventListener('click', () => activateTab('ledger'));
     tabExpenses?.addEventListener('click', () => activateTab('expenses'));
+
+    // ── Member Ledger ─────────────────────────────────────────────────────────
+    async function loadLedger() {
+      const rowsEl = document.getElementById('ledger-rows');
+      if (!rowsEl) return;
+      try {
+        const res = await fetch('/api/v1/finance/ledger', { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load');
+        const { ledger, summary } = await res.json();
+
+        const fmt = (n: number) => `₹${Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        const balColor = (b: number) => b > 0 ? 'text-red-600' : b < 0 ? 'text-secondary-500' : 'text-text-secondary';
+
+        document.getElementById('ledger-total-dues')!.textContent  = fmt(summary.total_dues);
+        document.getElementById('ledger-total-paid')!.textContent  = fmt(summary.total_paid);
+        const outEl = document.getElementById('ledger-outstanding')!;
+        outEl.textContent = fmt(summary.outstanding);
+        outEl.className = `text-xl font-bold ${summary.outstanding > 0 ? 'text-red-600' : 'text-secondary-500'}`;
+
+        if (!ledger.length) {
+          rowsEl.innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">No transactions yet.</div>';
+          return;
+        }
+
+        rowsEl.innerHTML = ledger.map((e: any) => `
+          <div class="grid grid-cols-12 gap-2 px-5 py-3 border-b border-border-light last:border-0 hover:bg-gray-50 text-sm">
+            <div class="col-span-2 text-xs text-text-secondary">${e.date}</div>
+            <div class="col-span-5 text-text-primary">
+              ${e.label}
+              ${e.status && e.type === 'debit' ? `<span class="ml-1 text-xs px-1.5 py-0.5 rounded-full font-medium ${e.status === 'paid' ? 'bg-green-100 text-green-700' : e.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">${e.status}</span>` : ''}
+              ${e.reference ? `<div class="text-xs text-text-secondary mt-0.5">${e.reference}</div>` : ''}
+            </div>
+            <div class="col-span-2 text-right font-medium ${e.type === 'debit' ? 'text-red-600' : 'text-text-secondary'}">${e.type === 'debit' ? fmt(e.amount) : '—'}</div>
+            <div class="col-span-2 text-right font-medium ${e.type === 'credit' ? 'text-secondary-500' : 'text-text-secondary'}">${e.type === 'credit' ? fmt(e.amount) : '—'}</div>
+            <div class="col-span-1 text-right text-xs font-semibold ${balColor(e.running_balance)}">${fmt(e.running_balance)}</div>
+          </div>
+        `).join('');
+      } catch {
+        rowsEl.innerHTML = '<div class="text-center py-8 text-red-600 text-sm">Failed to load ledger.</div>';
+      }
+    }
 
     // ── Expenses ──────────────────────────────────────────────────────────────
     async function loadExpenses() {

@@ -333,9 +333,17 @@ if (isGuard) {
                           ? 'bg-primary-50 text-primary-600'
                           : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
                       }`}
+                      {...(item.activeKey === 'notifications' ? { id: 'notif-nav-link' } : {})}
                     >
                       <i class={`fas ${item.icon} w-4 text-center text-[13px]`} aria-hidden="true"></i>
                       {item.label}
+                      {item.activeKey === 'notifications' && (
+                        <span
+                          id="notif-badge"
+                          class="hidden ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none"
+                          aria-label="Unread notifications"
+                        ></span>
+                      )}
                     </a>
                   );
                 })}
@@ -656,6 +664,22 @@ if (isGuard) {
           });
         }, 250);
       });
+    })();
+
+    // ── Notification unread badge ─────────────────────────────────────────────
+    (async function () {
+      const badge = document.getElementById('notif-badge');
+      if (!badge) return;
+      try {
+        const res = await fetch('/api/v1/notifications?unread=true&limit=50', { credentials: 'include' });
+        if (!res.ok) return;
+        const items: unknown[] = await res.json();
+        const count = Array.isArray(items) ? items.length : 0;
+        if (count > 0) {
+          badge.textContent = count > 99 ? '99+' : String(count);
+          badge.classList.remove('hidden');
+        }
+      } catch { /* non-critical */ }
     })();
   </script>
 </body>

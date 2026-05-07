@@ -4,6 +4,8 @@ import PortalLayout from '@portal/PortalLayout.astro';
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
+
+const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
 ---
 
 <PortalLayout title="Notices" user={user} activeModule="notices">
@@ -75,7 +77,7 @@ if (!user) return Astro.redirect('/portal/login');
       <h1 class="text-2xl font-bold text-text-primary">Notices & Circulars</h1>
       <p class="text-sm text-text-secondary mt-1">Official communications from the management committee.</p>
     </div>
-    {['executive','admin'].includes(user.role) && (
+    {isExec && (
       <a href="/portal/notices/new" class="btn-primary text-sm flex items-center gap-2">
         <i class="fas fa-plus" aria-hidden="true"></i>
         New Notice
@@ -83,14 +85,26 @@ if (!user) return Astro.redirect('/portal/login');
     )}
   </div>
 
+  {isExec && (
+    <div class="flex gap-2 mb-5 border-b border-border-light">
+      <button id="tab-published" class="notice-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px">Published</button>
+      <button id="tab-scheduled" class="notice-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent flex items-center gap-1.5">
+        Scheduled
+        <span id="scheduled-count" class="hidden text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full"></span>
+      </button>
+    </div>
+  )}
+
   <div id="notices-list" class="space-y-4">
+  </div>
+  <div id="scheduled-list" class="hidden space-y-4">
     <div class="flex items-center justify-center h-32 text-text-secondary">
       <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
       Loading notices…
     </div>
   </div>
 
-  <script>
+  <script define:vars={{ isExec }}>
     const CATEGORY_COLORS: Record<string, string> = {
       Urgent: 'border-red-400 bg-red-50',
       Financial: 'border-amber-400 bg-amber-50',
@@ -174,5 +188,102 @@ if (!user) return Astro.redirect('/portal/login');
 
     (window as any).acknowledge = acknowledge;
     loadNotices();
+
+    // ── Scheduled notices tab (exec only) ─────────────────────────────────────
+    if (isExec) {
+      const tabPublished = document.getElementById('tab-published');
+      const tabScheduled = document.getElementById('tab-scheduled');
+      const publishedPanel = document.getElementById('notices-list');
+      const scheduledPanel = document.getElementById('scheduled-list');
+      const scheduledCount = document.getElementById('scheduled-count');
+
+      async function loadScheduled() {
+        if (!scheduledPanel) return;
+        scheduledPanel.innerHTML = '<div class="flex items-center justify-center h-24 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+        const res = await fetch('/api/v1/notices?status=scheduled', { credentials: 'include' });
+        const items = res.ok ? await res.json() : [];
+
+        if (scheduledCount) {
+          if (items.length > 0) {
+            scheduledCount.textContent = String(items.length);
+            scheduledCount.classList.remove('hidden');
+          } else {
+            scheduledCount.classList.add('hidden');
+          }
+        }
+
+        if (!items.length) {
+          scheduledPanel.innerHTML = '<div class="text-center py-12 text-text-secondary text-sm">No scheduled notices.</div>';
+          return;
+        }
+
+        scheduledPanel.innerHTML = items.map((n: any) => `
+          <div class="bg-white rounded-xl border border-amber-200 bg-amber-50/30 p-5 flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-clock text-amber-500 text-xs"></i>
+                <span class="text-xs font-medium text-amber-700">Scheduled for ${new Date(n.scheduled_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <h2 class="text-base font-semibold text-text-primary">${n.title}</h2>
+              <span class="text-xs text-text-secondary">${n.category}</span>
+            </div>
+            <button onclick="publishNow('${n.id}', this)" class="flex-shrink-0 text-xs bg-primary-600 text-white px-3 py-1.5 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-1.5">
+              <i class="fas fa-paper-plane text-xs"></i> Publish now
+            </button>
+          </div>
+        `).join('');
+      }
+
+      async function publishNow(noticeId: string, btn: HTMLElement) {
+        if (!confirm('Publish this notice immediately to all members?')) return;
+        btn.setAttribute('disabled', 'true');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i>';
+        const res = await fetch(`/api/v1/notices/${noticeId}/publish`, { method: 'POST', credentials: 'include' });
+        if (res.ok) {
+          showToast('Notice published successfully.');
+          loadScheduled();
+          loadNotices();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          showToast(d.message ?? 'Failed to publish.', 'error');
+          btn.removeAttribute('disabled');
+          btn.innerHTML = '<i class="fas fa-paper-plane text-xs"></i> Publish now';
+        }
+      }
+
+      function showToast(message: string, type = 'success') {
+        const toast = document.createElement('div');
+        const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+        toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+        setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+      }
+
+      (window as any).publishNow = publishNow;
+
+      tabPublished?.addEventListener('click', () => {
+        tabPublished.classList.add('text-primary-600', 'border-primary-600');
+        tabPublished.classList.remove('text-text-secondary', 'border-transparent');
+        tabScheduled?.classList.remove('text-primary-600', 'border-primary-600');
+        tabScheduled?.classList.add('text-text-secondary', 'border-transparent');
+        publishedPanel?.classList.remove('hidden');
+        scheduledPanel?.classList.add('hidden');
+      });
+
+      tabScheduled?.addEventListener('click', () => {
+        tabScheduled.classList.add('text-primary-600', 'border-primary-600');
+        tabScheduled.classList.remove('text-text-secondary', 'border-transparent');
+        tabPublished?.classList.remove('text-primary-600', 'border-primary-600');
+        tabPublished?.classList.add('text-text-secondary', 'border-transparent');
+        scheduledPanel?.classList.remove('hidden');
+        publishedPanel?.classList.add('hidden');
+        loadScheduled();
+      });
+
+      // Load count badge on page load (non-blocking)
+      loadScheduled().catch(() => {});
+    }
   </script>
 </PortalLayout>

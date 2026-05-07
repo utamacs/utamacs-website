@@ -8,10 +8,25 @@ import { sanitizeHTML, sanitizePlainText } from '@lib/utils/sanitize';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
-export const GET: APIRoute = async ({ request }) => {
+export const GET: APIRoute = async ({ request, url }) => {
   try {
     const user = await validateJWT(request);
     const sb = getSupabaseServiceClient();
+
+    const statusFilter = url.searchParams.get('status');
+    const isExec = ['executive', 'admin'].includes(user.role);
+
+    // Exec-only: view scheduled / draft notices pending publication
+    if (statusFilter === 'scheduled' && isExec) {
+      const { data, error } = await sb
+        .from('notices')
+        .select('id, title, category, status, scheduled_at, created_at, created_by')
+        .eq('society_id', SOCIETY_ID)
+        .eq('status', 'scheduled')
+        .order('scheduled_at', { ascending: true });
+      if (error) throw Object.assign(new Error(error.message), { status: 500 });
+      return new Response(JSON.stringify(data ?? []), { headers: { 'Content-Type': 'application/json' } });
+    }
 
     const { data, error } = await sb
       .from('notices')
