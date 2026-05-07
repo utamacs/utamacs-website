@@ -129,6 +129,13 @@ export const GET: APIRoute = async ({ request }) => {
     results.amc_reminders = { error: err instanceof Error ? err.message : String(err) };
   }
 
+  // ── 14. Daily notification digest emails ───────────────────────────────────
+  try {
+    results.digest_emails = await runDailyDigest(sb, now, nowIso);
+  } catch (err) {
+    results.digest_emails = { error: err instanceof Error ? err.message : String(err) };
+  }
+
   // ── Write master heartbeat ─────────────────────────────────────────────────
   try {
     await sb.from('cron_heartbeats').insert({
@@ -511,6 +518,93 @@ async function runEventReminders(sb: ReturnType<typeof getSupabaseServiceClient>
   for (const e of tomorrowEvents ?? []) await sendEventReminder(e as any, 'Tomorrow');
 
   return { reminders };
+}
+
+async function runDailyDigest(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Send one daily digest email per member if they have unread notifications from the past 24h
+  // and have email_digest_enabled = true in notification_preferences.
+  if (!RESEND_API_KEY) return 'SKIPPED_NO_RESEND_KEY';
+
+  const since24h = new Date(now.getTime() - 24 * 3_600_000).toISOString();
+  const todayPrefix = nowIso.slice(0, 10);
+
+  // Members with email digest opted in
+  const { data: prefs } = await sb
+    .from('notification_preferences')
+    .select('user_id')
+    .eq('email_enabled', true)
+    .eq('email_digest_enabled', true)
+    .limit(200);
+
+  if (!prefs?.length) return { sent: 0 };
+
+  let sent = 0;
+  for (const pref of prefs) {
+    try {
+      // Dedup: already sent a digest to this user today?
+      const { count: alreadySent } = await sb
+        .from('email_drafts')
+        .select('id', { count: 'exact', head: true })
+        .eq('recipient_type', 'MEMBER')
+        .eq('triggered_by', 'cron:master:daily-digest')
+        .like('subject', '%Daily Summary%')
+        .gte('created_at', `${todayPrefix}T00:00:00.000Z`);
+      if (alreadySent && alreadySent > 0) continue;
+
+      // Fetch this user's unread notifications from past 24h
+      const { data: notifs } = await sb
+        .from('notifications')
+        .select('type, title')
+        .eq('user_id', pref.user_id)
+        .eq('is_read', false)
+        .gte('created_at', since24h)
+        .eq('society_id', SOCIETY_ID)
+        .limit(50);
+
+      if (!notifs?.length) continue;
+
+      // Group by type
+      const grouped: Record<string, number> = {};
+      for (const n of notifs) {
+        const t = n.type ?? 'other';
+        grouped[t] = (grouped[t] ?? 0) + 1;
+      }
+
+      // Get user email
+      const { data: authUser } = await (sb as any).auth.admin.getUserById(pref.user_id);
+      const email = authUser?.user?.email;
+      const name = authUser?.user?.user_metadata?.full_name ?? 'Resident';
+      if (!email) continue;
+
+      const rows = Object.entries(grouped)
+        .map(([type, count]) => `<tr><td style="padding:4px 8px;text-transform:capitalize">${type.replace(/_/g,' ')}</td><td style="padding:4px 8px;font-weight:600">${count}</td></tr>`)
+        .join('');
+
+      const bodyHtml = `
+        <p>Hi ${name},</p>
+        <p>You have <strong>${notifs.length} unread notification${notifs.length > 1 ? 's' : ''}</strong> from the last 24 hours:</p>
+        <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:12px 0">
+          <thead><tr style="background:#F3F4F6"><th style="padding:4px 8px;text-align:left">Type</th><th style="padding:4px 8px;text-align:left">Count</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <p><a href="https://portal.utamacs.org/portal/notifications" style="color:#1E3A8A">View all notifications →</a></p>
+        <p style="color:#6B7280;font-size:12px">To stop receiving digest emails, update your notification preferences in the portal.</p>`;
+
+      await sb.from('email_drafts').insert({
+        society_id: SOCIETY_ID, tier: 1, status: 'DRAFT',
+        triggered_by: 'cron:master:daily-digest',
+        trigger_resource_type: 'notifications', trigger_resource_id: pref.user_id,
+        recipient_type: 'MEMBER', recipient_email: email, recipient_name: name,
+        subject: `UTA MACS Daily Summary — ${notifs.length} notification${notifs.length > 1 ? 's' : ''}`,
+        body_html: bodyHtml,
+        body_text: `You have ${notifs.length} unread notifications. Visit https://portal.utamacs.org/portal/notifications to view them.`,
+        suggested_sender_name: SENDER_NAME, suggested_sender_email: SENDER_EMAIL,
+      });
+      sent++;
+    } catch { /* non-fatal per user */ }
+  }
+
+  return { sent };
 }
 
 async function runAmcRenewalReminders(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
