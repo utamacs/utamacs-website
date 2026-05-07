@@ -46,6 +46,20 @@ if (!['executive','admin'].includes(user.role)) return Astro.redirect('/portal')
       </div>
     )}
 
+    <!-- Staff Account Lifecycle -->
+    <div class="bg-white rounded-xl border border-border-light p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+          <i class="fas fa-user-shield text-purple-600" aria-hidden="true"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-semibold text-text-primary">Staff Lifecycle</h2>
+          <p class="text-xs text-text-secondary">Onboard/offboard security guards & vendors</p>
+        </div>
+      </div>
+      <a href="/portal/admin/staff-lifecycle" class="btn-primary text-sm w-full text-center block">Manage Staff Accounts</a>
+    </div>
+
     <!-- Session Management -->
     <div class="bg-white rounded-xl border border-border-light p-5">
       <div class="flex items-center gap-3 mb-4">

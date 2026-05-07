@@ -1,0 +1,248 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest, requireFeature } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+requireFeature(user, 'users.deactivate');
+---
+
+<PortalLayout title="Staff Account Lifecycle" user={user} activeModule="admin">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/admin" class="hover:text-primary-600">Admin</a>
+        <span class="mx-2">›</span><span class="text-text-primary">Staff Lifecycle</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Staff Account Lifecycle</h1>
+      <p class="text-text-secondary text-sm mt-1">Formal onboarding and offboarding for security guards and vendor accounts.</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex gap-3 mb-5 flex-wrap">
+    <button data-status="" class="status-btn text-xs px-3 py-1.5 rounded-full font-medium border bg-primary-600 text-white border-primary-600">All</button>
+    <button data-status="active" class="status-btn text-xs px-3 py-1.5 rounded-full font-medium border bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600">Active</button>
+    <button data-status="inactive" class="status-btn text-xs px-3 py-1.5 rounded-full font-medium border bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600">Deactivated</button>
+    <div class="relative ml-auto">
+      <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-xs" aria-hidden="true"></i>
+      <input id="search-input" type="text" placeholder="Search…" class="form-input pl-8 py-1.5 text-sm" style="width:200px" />
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+    <div id="accounts-list">
+      <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Deactivation modal -->
+  <div id="deactivate-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog">
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+      <div class="px-6 py-4 border-b border-border-light flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-red-600">Deactivate Account</h3>
+        <button id="dm-close" class="text-text-secondary hover:text-text-primary p-2">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <p class="text-sm text-text-secondary">You are deactivating <strong id="dm-name" class="text-text-primary"></strong>. This will immediately revoke their portal access.</p>
+        <div id="dm-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div>
+          <label class="form-label" for="dm-reason">Reason <span class="text-red-500">*</span></label>
+          <select id="dm-reason-select" class="form-input bg-white mb-2">
+            <option value="">Select reason…</option>
+            <option value="Contract ended">Contract ended</option>
+            <option value="Resignation">Resignation</option>
+            <option value="Misconduct">Misconduct / Termination</option>
+            <option value="Role change">Role change (reassignment)</option>
+            <option value="Vendor contract closed">Vendor contract closed</option>
+            <option value="Other">Other</option>
+          </select>
+          <input id="dm-reason-other" type="text" maxlength="300" class="form-input hidden" placeholder="Specify reason…" />
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex gap-3">
+        <button id="dm-submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+          <i class="fas fa-user-times" aria-hidden="true"></i>
+          <span id="dm-submit-label">Deactivate Account</span>
+        </button>
+        <button id="dm-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStatus = '';
+    let searchQ = '';
+    let pendingUserId = '';
+    let pendingName = '';
+
+    function showToast(msg: string, type: 'success' | 'error' = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3500);
+    }
+
+    async function load() {
+      const container = document.getElementById('accounts-list')!;
+      container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+      const params = new URLSearchParams();
+      if (currentStatus) params.set('status', currentStatus);
+      const res = await fetch(`/api/v1/admin/staff-accounts?${params}`, { credentials: 'include' });
+      const accounts: any[] = res.ok ? await res.json() : [];
+
+      const filtered = accounts.filter(a => {
+        if (!searchQ) return true;
+        const hay = `${a.full_name} ${a.email ?? ''} ${a.role}`.toLowerCase();
+        return hay.includes(searchQ);
+      });
+
+      if (!filtered.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No staff accounts found.</div>';
+        return;
+      }
+
+      const ROLE_LABELS: Record<string, string> = { security_guard: 'Security Guard', vendor: 'Vendor' };
+      const ROLE_COLORS: Record<string, string> = {
+        security_guard: 'bg-blue-100 text-blue-700',
+        vendor: 'bg-purple-100 text-purple-700',
+      };
+
+      container.innerHTML = filtered.map(a => {
+        const roleBadge = `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[a.role] ?? 'bg-gray-100 text-gray-700'}">${ROLE_LABELS[a.role] ?? a.role}</span>`;
+        const statusBadge = a.is_active
+          ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>'
+          : '<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Deactivated</span>';
+
+        const grantedDate = new Date(a.granted_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        const deactivatedInfo = !a.is_active && a.deactivated_at
+          ? `<div class="text-xs text-red-600 mt-0.5">Deactivated ${new Date(a.deactivated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} — ${a.deactivation_reason ?? ''}</div>`
+          : '';
+
+        const actionBtn = a.is_active
+          ? `<button onclick="openDeactivate('${a.user_id}', '${(a.full_name).replace(/'/g, "\\'")}')"
+               class="btn-ghost text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 flex items-center gap-1">
+               <i class="fas fa-user-times text-xs"></i> Deactivate
+             </button>`
+          : `<button onclick="reactivate('${a.user_id}', '${(a.full_name).replace(/'/g, "\\'")}')"
+               class="btn-ghost text-xs px-3 py-1.5 text-secondary-500 hover:bg-green-50 flex items-center gap-1">
+               <i class="fas fa-user-check text-xs"></i> Reactivate
+             </button>`;
+
+        return `
+          <div class="flex items-start gap-4 px-5 py-4 border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors">
+            <div class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-sm
+              ${a.is_active ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-400'}">
+              ${(a.full_name || '?')[0].toUpperCase()}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm font-medium text-text-primary">${a.full_name}</span>
+                ${roleBadge}
+                ${statusBadge}
+              </div>
+              <div class="text-xs text-text-secondary mt-0.5">${a.email ?? '—'}${a.unit_number ? ` · ${a.unit_number}` : ''} · Since ${grantedDate}</div>
+              ${deactivatedInfo}
+            </div>
+            <div class="flex-shrink-0">${actionBtn}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openDeactivate(userId: string, name: string) {
+      pendingUserId = userId;
+      pendingName = name;
+      document.getElementById('dm-name')!.textContent = name;
+      (document.getElementById('dm-reason-select') as HTMLSelectElement).value = '';
+      (document.getElementById('dm-reason-other') as HTMLInputElement).value = '';
+      document.getElementById('dm-reason-other')!.classList.add('hidden');
+      document.getElementById('dm-error')!.classList.add('hidden');
+      document.getElementById('deactivate-modal')!.classList.remove('hidden');
+    }
+
+    async function reactivate(userId: string, name: string) {
+      if (!confirm(`Reactivate ${name}? They will be able to log in again.`)) return;
+      const res = await fetch('/api/v1/admin/staff-accounts', {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, action: 'reactivate' }),
+      });
+      if (res.ok) { showToast(`${name} reactivated.`); load(); }
+      else { showToast('Failed to reactivate account.', 'error'); }
+    }
+
+    // Deactivation modal
+    document.getElementById('dm-close')!.addEventListener('click', () => document.getElementById('deactivate-modal')!.classList.add('hidden'));
+    document.getElementById('dm-cancel')!.addEventListener('click', () => document.getElementById('deactivate-modal')!.classList.add('hidden'));
+
+    (document.getElementById('dm-reason-select') as HTMLSelectElement).addEventListener('change', (e) => {
+      const val = (e.target as HTMLSelectElement).value;
+      const other = document.getElementById('dm-reason-other')!;
+      if (val === 'Other') { other.classList.remove('hidden'); } else { other.classList.add('hidden'); }
+    });
+
+    document.getElementById('dm-submit')!.addEventListener('click', async () => {
+      const errEl = document.getElementById('dm-error')!;
+      const btn = document.getElementById('dm-submit') as HTMLButtonElement;
+      const lbl = document.getElementById('dm-submit-label')!;
+      errEl.classList.add('hidden');
+
+      const selectVal = (document.getElementById('dm-reason-select') as HTMLSelectElement).value;
+      const otherVal = (document.getElementById('dm-reason-other') as HTMLInputElement).value.trim();
+      const reason = selectVal === 'Other' ? otherVal : selectVal;
+
+      if (!reason) { errEl.textContent = 'Please select a reason.'; errEl.classList.remove('hidden'); return; }
+
+      btn.disabled = true; lbl.textContent = 'Deactivating…';
+
+      const res = await fetch('/api/v1/admin/staff-accounts', {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: pendingUserId, action: 'deactivate', reason }),
+      });
+
+      if (res.ok) {
+        document.getElementById('deactivate-modal')!.classList.add('hidden');
+        showToast(`${pendingName} has been deactivated.`);
+        load();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        errEl.textContent = data.message ?? 'Failed to deactivate account.';
+        errEl.classList.remove('hidden');
+      }
+
+      btn.disabled = false; lbl.textContent = 'Deactivate Account';
+    });
+
+    // Status filter tabs
+    document.querySelectorAll('.status-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.status-btn').forEach(b => {
+          b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
+          b.classList.add('bg-white', 'text-text-secondary', 'border-border-light');
+        });
+        btn.classList.add('bg-primary-600', 'text-white', 'border-primary-600');
+        btn.classList.remove('bg-white', 'text-text-secondary', 'border-border-light');
+        currentStatus = (btn as HTMLElement).dataset.status!;
+        load();
+      });
+    });
+
+    document.getElementById('search-input')!.addEventListener('input', (e) => {
+      searchQ = (e.target as HTMLInputElement).value.toLowerCase();
+      load();
+    });
+
+    (window as any).openDeactivate = openDeactivate;
+    (window as any).reactivate = reactivate;
+    load();
+  </script>
+</PortalLayout>
