@@ -41,6 +41,9 @@ const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: st
   { moduleKey: 'water_tankers',    displayName: 'Water Management',       icon: 'fa-tint' },
   { moduleKey: 'security_patrol',  displayName: 'Security Patrol Log',    icon: 'fa-shield-alt' },
   { moduleKey: 'tenant_kyc',       displayName: 'Tenant KYC',             icon: 'fa-id-card' },
+  { moduleKey: 'memberships',      displayName: 'Membership Registry',    icon: 'fa-id-card' },
+  { moduleKey: 'staff_kyc',        displayName: 'Staff & Maid KYC',       icon: 'fa-user-check' },
+  { moduleKey: 'register',         displayName: 'Society Membership',     icon: 'fa-certificate' },
 ];
 
 const MODULE_PATHS: Record<string, string> = {
@@ -69,6 +72,9 @@ const MODULE_PATHS: Record<string, string> = {
   water_tankers:    '/portal/water-tankers',
   security_patrol:  '/portal/security-patrol',
   tenant_kyc:       '/portal/tenant-kyc',
+  memberships:      '/portal/admin/memberships',
+  staff_kyc:        '/portal/admin/staff-kyc',
+  register:         '/portal/register/membership',
 };
 
 let allModules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = FALLBACK_MODULES;

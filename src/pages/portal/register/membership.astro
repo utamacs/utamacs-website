@@ -1,0 +1,449 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const sb = getSupabaseServiceClient();
+
+// Fetch units for the selector
+const { data: units } = await sb
+  .from('units')
+  .select('id, unit_number, block')
+  .eq('society_id', SOCIETY_ID)
+  .order('block')
+  .order('unit_number');
+
+// Fetch any existing membership for this user
+const { data: myMembership } = await sb
+  .from('memberships')
+  .select(`
+    id, member_name, member_type, status, voting_eligible, voting_disqualified_reason,
+    membership_number, share_certificate_number, share_certificate_issued_at,
+    admission_fee_paid, admission_fee_paid_at, admission_fee_receipt_no,
+    share_capital_paid, share_capital_paid_at, byelaw_copy_fee_paid,
+    sale_deed_key, sale_deed_number, sale_deed_date,
+    declaration_signed, declaration_signed_at,
+    submitted_at, reviewed_at, rejection_reason, created_at,
+    units!memberships_unit_id_fkey(unit_number, block)
+  `)
+  .eq('profile_id', user.id)
+  .eq('society_id', SOCIETY_ID)
+  .maybeSingle();
+
+const statusLabels: Record<string, string> = {
+  applied: 'Application Submitted',
+  fees_pending: 'Awaiting Fee Confirmation',
+  fees_confirmed: 'Fees Confirmed',
+  approved: 'Membership Approved',
+  suspended: 'Membership Suspended',
+  transferred: 'Membership Transferred',
+  deceased: 'Inactive',
+  rejected: 'Application Rejected',
+};
+const statusColors: Record<string, string> = {
+  applied: 'bg-blue-100 text-blue-700',
+  fees_pending: 'bg-amber-100 text-amber-700',
+  fees_confirmed: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-green-100 text-green-700',
+  suspended: 'bg-red-100 text-red-700',
+  rejected: 'bg-red-100 text-red-700',
+  transferred: 'bg-gray-100 text-gray-600',
+  deceased: 'bg-gray-100 text-gray-600',
+};
+---
+<PortalLayout title="Society Membership" user={user} activeModule="register">
+  <div class="max-w-3xl mx-auto">
+
+    <!-- Page header -->
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-primary-600 font-poppins">Society Membership</h1>
+        <p class="text-text-secondary text-sm mt-1">
+          Formal cooperative society membership as per Byelaw Chapter 4
+        </p>
+      </div>
+    </div>
+
+    <!-- Info banner about byelaw requirements -->
+    {!myMembership && (
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+        <h3 class="font-semibold text-blue-800 mb-2">
+          <i class="fas fa-info-circle mr-2" aria-hidden="true"></i>Byelaw Membership Requirements
+        </h3>
+        <ul class="text-sm text-blue-700 space-y-1">
+          <li><i class="fas fa-check mr-2 text-blue-500"></i>Admission Fee: ₹1,000 (non-refundable) — Byelaw 4.1</li>
+          <li><i class="fas fa-check mr-2 text-blue-500"></i>Share Capital: ₹1,000 (1 share of ₹1,000 face value) — Byelaw 4.5</li>
+          <li><i class="fas fa-check mr-2 text-blue-500"></i>Sale deed or valid proof of ownership required — Byelaw 4.1, 4.2</li>
+          <li><i class="fas fa-check mr-2 text-blue-500"></i>Joint owners: only first-named person registers as member — Byelaw 4.4</li>
+          <li><i class="fas fa-check mr-2 text-blue-500"></i>One registered member per flat — Byelaw 4.4</li>
+        </ul>
+      </div>
+    )}
+
+    <!-- Existing membership status -->
+    {myMembership ? (
+      <div class="card-premium p-6 mb-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-text-primary">{myMembership.member_name}</h2>
+            <p class="text-sm text-text-secondary">
+              Flat {(myMembership as any).units?.unit_number}, {(myMembership as any).units?.block}
+              {myMembership.membership_number && <> · Member No: <strong>{myMembership.membership_number}</strong></>}
+            </p>
+          </div>
+          <span class={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusColors[myMembership.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            {statusLabels[myMembership.status] ?? myMembership.status}
+          </span>
+        </div>
+
+        <!-- Fee status grid -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="bg-section-alt rounded-lg p-3">
+            <p class="text-xs text-text-secondary mb-1">Admission Fee (₹1,000)</p>
+            {myMembership.admission_fee_paid ? (
+              <p class="text-sm font-medium text-secondary-500">
+                <i class="fas fa-check-circle mr-1"></i>Paid
+                {myMembership.admission_fee_receipt_no && <span class="text-text-secondary"> · {myMembership.admission_fee_receipt_no}</span>}
+              </p>
+            ) : (
+              <p class="text-sm font-medium text-amber-600"><i class="fas fa-clock mr-1"></i>Pending</p>
+            )}
+          </div>
+          <div class="bg-section-alt rounded-lg p-3">
+            <p class="text-xs text-text-secondary mb-1">Share Capital (₹1,000)</p>
+            {myMembership.share_capital_paid ? (
+              <p class="text-sm font-medium text-secondary-500"><i class="fas fa-check-circle mr-1"></i>Paid</p>
+            ) : (
+              <p class="text-sm font-medium text-amber-600"><i class="fas fa-clock mr-1"></i>Pending</p>
+            )}
+          </div>
+        </div>
+
+        <!-- Voting eligibility -->
+        <div class={`rounded-lg p-3 mb-4 ${myMembership.voting_eligible ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
+          <p class="text-sm font-medium">
+            <i class={`fas ${myMembership.voting_eligible ? 'fa-vote-yea text-secondary-500' : 'fa-ban text-amber-600'} mr-2`}></i>
+            {myMembership.voting_eligible
+              ? 'Eligible to vote and contest elections (Byelaw 4.16)'
+              : `Not yet eligible to vote${myMembership.voting_disqualified_reason ? ': ' + myMembership.voting_disqualified_reason : ''}`}
+          </p>
+        </div>
+
+        <!-- Share certificate -->
+        {myMembership.share_certificate_number && (
+          <div class="bg-primary-50 border border-primary-100 rounded-lg p-3 mb-4">
+            <p class="text-xs text-text-secondary mb-1">Share Certificate</p>
+            <p class="text-sm font-semibold text-primary-600">{myMembership.share_certificate_number}</p>
+            {myMembership.share_certificate_issued_at && (
+              <p class="text-xs text-text-secondary">
+                Issued: {new Date(myMembership.share_certificate_issued_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            )}
+          </div>
+        )}
+
+        <!-- Sale deed upload (only if not yet uploaded) -->
+        {!myMembership.sale_deed_key && myMembership.status === 'applied' && (
+          <div class="border-t border-border-light pt-4 mt-4">
+            <p class="text-sm font-medium text-text-primary mb-3">
+              <i class="fas fa-upload mr-2 text-primary-600"></i>Upload Sale Deed / Ownership Proof
+            </p>
+            <div id="sale-deed-upload-area">
+              <input type="file" id="sale-deed-file" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
+              <label for="sale-deed-file" class="btn-outline cursor-pointer text-sm inline-block">
+                <i class="fas fa-file-upload mr-2"></i>Choose File (PDF/JPG/PNG, max 10 MB)
+              </label>
+              <button id="upload-deed-btn" class="btn-primary ml-3 text-sm hidden">
+                <i class="fas fa-cloud-upload-alt mr-2"></i>Upload
+              </button>
+            </div>
+            <p id="deed-file-name" class="text-xs text-text-secondary mt-2 hidden"></p>
+          </div>
+        )}
+        {myMembership.sale_deed_key && (
+          <div class="border-t border-border-light pt-4 mt-4 flex items-center justify-between">
+            <p class="text-sm text-secondary-500"><i class="fas fa-file-pdf mr-2"></i>Sale deed uploaded</p>
+            <button class="text-sm text-primary-600 hover:underline" onclick={`viewSaleDeed('${myMembership.id}')`}>
+              View <i class="fas fa-external-link-alt ml-1"></i>
+            </button>
+          </div>
+        )}
+
+        {myMembership.rejection_reason && (
+          <div class="border-t border-border-light pt-4 mt-4">
+            <p class="text-sm font-medium text-red-600 mb-1"><i class="fas fa-times-circle mr-2"></i>Rejection Reason</p>
+            <p class="text-sm text-text-secondary">{myMembership.rejection_reason}</p>
+          </div>
+        )}
+      </div>
+
+      <!-- Timeline -->
+      <div class="card-premium p-6">
+        <h3 class="text-sm font-semibold text-text-primary mb-4">Application Timeline</h3>
+        <div class="space-y-3">
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-secondary-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <i class="fas fa-check text-white text-xs"></i>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-text-primary">Application Submitted</p>
+              <p class="text-xs text-text-secondary">{new Date(myMembership.submitted_at ?? myMembership.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+          </div>
+          {myMembership.admission_fee_paid && (
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-secondary-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fas fa-check text-white text-xs"></i>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-text-primary">Admission Fee Confirmed</p>
+                <p class="text-xs text-text-secondary">{new Date(myMembership.admission_fee_paid_at!).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              </div>
+            </div>
+          )}
+          {myMembership.status === 'approved' && (
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-secondary-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fas fa-check text-white text-xs"></i>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-text-primary">Membership Approved by Board</p>
+                {myMembership.reviewed_at && <p class="text-xs text-text-secondary">{new Date(myMembership.reviewed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>}
+              </div>
+            </div>
+          )}
+          {myMembership.share_certificate_number && (
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-secondary-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fas fa-certificate text-white text-xs"></i>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-text-primary">Share Certificate Issued</p>
+                <p class="text-xs text-text-secondary">{myMembership.share_certificate_number}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    ) : (
+      <!-- Application Form -->
+      <div class="card-premium p-6">
+        <h2 class="text-lg font-semibold text-text-primary mb-6">Apply for Society Membership</h2>
+        <form id="membership-form" class="space-y-5">
+
+          <div>
+            <label class="form-label" for="member-name">Full Name (as on sale deed) <span class="text-red-500">*</span></label>
+            <input type="text" id="member-name" name="member_name" class="form-input"
+              placeholder="As registered on your sale deed" required maxlength="100">
+          </div>
+
+          <div>
+            <label class="form-label" for="unit-select">Flat / Unit <span class="text-red-500">*</span></label>
+            <select id="unit-select" name="unit_id" class="form-input" required>
+              <option value="">— Select your flat —</option>
+              {(units ?? []).map(u => (
+                <option value={u.id}>{u.block} — {u.unit_number}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label" for="member-type">Membership Type</label>
+            <select id="member-type" name="member_type" class="form-input">
+              <option value="original_owner">Original Owner (purchased directly from builder)</option>
+              <option value="purchaser">Purchaser (resale flat)</option>
+              <option value="successor">Successor (gift/transfer)</option>
+              <option value="heir">Heir (inherited flat)</option>
+              <option value="joint_owner_nominee">Joint Owner Nominee (first-named with NOC from co-owners)</option>
+            </select>
+            <p class="text-xs text-text-secondary mt-1">Per Byelaw 4.4, only the first-named owner on the sale deed is eligible</p>
+          </div>
+
+          <div id="joint-owners-section" class="hidden">
+            <label class="form-label">Co-Owner Names (for NOC reference)</label>
+            <textarea name="joint_owners_text" rows="2" class="form-input"
+              placeholder="List co-owner names, one per line"></textarea>
+            <p class="text-xs text-text-secondary mt-1">Co-owners must provide No Objection to nominate the first-named owner</p>
+          </div>
+
+          <div class="border-t border-border-light pt-5">
+            <h3 class="text-sm font-semibold text-text-primary mb-4">Sale Deed / Ownership Proof</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="form-label" for="deed-number">Sale Deed / Registration No.</label>
+                <input type="text" id="deed-number" name="sale_deed_number" class="form-input"
+                  placeholder="e.g., 12345/2024" maxlength="100">
+              </div>
+              <div>
+                <label class="form-label" for="deed-date">Sale Deed Date</label>
+                <input type="date" id="deed-date" name="sale_deed_date" class="form-input">
+              </div>
+            </div>
+            <div class="mt-4">
+              <label class="form-label" for="reg-office">Sub-Registrar Office</label>
+              <input type="text" id="reg-office" name="registration_office" class="form-input"
+                placeholder="e.g., Shankarpally SRO" maxlength="200">
+            </div>
+          </div>
+
+          <!-- Fees notice -->
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <h4 class="text-sm font-semibold text-amber-800 mb-2">
+              <i class="fas fa-rupee-sign mr-2"></i>Fees Payable to Society (Byelaw 4.1)
+            </h4>
+            <div class="space-y-1 text-sm text-amber-700">
+              <div class="flex justify-between"><span>Admission/Entrance Fee (non-refundable)</span><strong>₹1,000</strong></div>
+              <div class="flex justify-between"><span>Share Capital (1 share × ₹1,000)</span><strong>₹1,000</strong></div>
+              <div class="flex justify-between border-t border-amber-300 pt-1 mt-1"><span>Total</span><strong>₹2,000</strong></div>
+            </div>
+            <p class="text-xs text-amber-600 mt-2">Pay directly to the society. The Management Committee will confirm receipt and update your status.</p>
+          </div>
+
+          <!-- Declaration -->
+          <div class="bg-section-alt rounded-xl p-4">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" id="declaration" name="declaration_signed" required
+                class="mt-0.5 w-4 h-4 text-primary-600 rounded">
+              <span class="text-sm text-text-primary">
+                I hereby declare that I am the flat owner as per the registered sale deed, I agree to abide by the
+                <strong>Byelaws of URBAN TRILLA MACS</strong> (Byelaw 4.7), and I confirm that I am the first-named
+                owner eligible to hold membership (Byelaw 4.4). I understand that the admission fee of ₹1,000 is
+                non-refundable and I shall purchase one share of ₹1,000 as required by Byelaw 4.5.
+              </span>
+            </label>
+          </div>
+
+          <p id="form-error" class="form-error hidden"></p>
+
+          <button type="submit" id="submit-btn" class="btn-primary w-full">
+            <i class="fas fa-paper-plane mr-2"></i>Submit Membership Application
+          </button>
+        </form>
+      </div>
+    )}
+  </div>
+</PortalLayout>
+
+<script define:vars={{ existingId: myMembership?.id ?? null }}>
+  // Joint owners section toggle
+  const memberType = document.getElementById('member-type');
+  const jointSection = document.getElementById('joint-owners-section');
+  if (memberType && jointSection) {
+    memberType.addEventListener('change', () => {
+      jointSection.classList.toggle('hidden', memberType.value !== 'joint_owner_nominee');
+    });
+  }
+
+  // Sale deed file upload (for existing application)
+  const fileInput = document.getElementById('sale-deed-file');
+  const uploadBtn = document.getElementById('upload-deed-btn');
+  const fileNameEl = document.getElementById('deed-file-name');
+
+  if (fileInput) {
+    fileInput.addEventListener('change', () => {
+      const f = (fileInput as HTMLInputElement).files?.[0];
+      if (f) {
+        uploadBtn?.classList.remove('hidden');
+        if (fileNameEl) {
+          fileNameEl.textContent = f.name;
+          fileNameEl.classList.remove('hidden');
+        }
+      }
+    });
+  }
+
+  if (uploadBtn && existingId) {
+    uploadBtn.addEventListener('click', async () => {
+      const f = (fileInput as HTMLInputElement)?.files?.[0];
+      if (!f) return;
+      uploadBtn.textContent = 'Uploading…';
+      (uploadBtn as HTMLButtonElement).disabled = true;
+      const fd = new FormData();
+      fd.append('file', f);
+      const res = await fetch(`/api/v1/memberships/${existingId}/sale-deed`, { method: 'POST', body: fd });
+      if (res.ok) {
+        showToast('Sale deed uploaded successfully');
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        const err = await res.json();
+        showToast(err.message ?? 'Upload failed', 'error');
+        (uploadBtn as HTMLButtonElement).disabled = false;
+        uploadBtn.textContent = 'Upload';
+      }
+    });
+  }
+
+  // View sale deed
+  window.viewSaleDeed = async (id: string) => {
+    const res = await fetch(`/api/v1/memberships/${id}/sale-deed`);
+    if (res.ok) {
+      const { signed_url } = await res.json();
+      window.open(signed_url, '_blank');
+    } else {
+      showToast('Could not load document', 'error');
+    }
+  };
+
+  // Application form submission
+  const form = document.getElementById('membership-form') as HTMLFormElement;
+  const formError = document.getElementById('form-error');
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      formError?.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting…';
+
+      const fd = new FormData(form);
+      const jointText = (fd.get('joint_owners_text') as string ?? '').trim();
+      const jointOwnerNames = jointText ? jointText.split('\n').map(s => s.trim()).filter(Boolean) : [];
+
+      const body = {
+        member_name: fd.get('member_name'),
+        unit_id: fd.get('unit_id'),
+        member_type: fd.get('member_type'),
+        joint_owner_names: jointOwnerNames,
+        sale_deed_number: fd.get('sale_deed_number') || null,
+        sale_deed_date: fd.get('sale_deed_date') || null,
+        registration_office: fd.get('registration_office') || null,
+        declaration_signed: fd.get('declaration_signed') === 'on',
+      };
+
+      const res = await fetch('/api/v1/memberships', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        showToast('Application submitted successfully!');
+        setTimeout(() => location.reload(), 1200);
+      } else {
+        const err = await res.json();
+        if (formError) {
+          formError.textContent = err.message ?? 'Submission failed. Please try again.';
+          formError.classList.remove('hidden');
+        }
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Submit Membership Application';
+      }
+    });
+  }
+
+  function showToast(message: string, type = 'success') {
+    const toast = document.createElement('div');
+    const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+    toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+    setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+  }
+</script>
