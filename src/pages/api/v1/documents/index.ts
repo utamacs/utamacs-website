@@ -46,6 +46,7 @@ export const GET: APIRoute = async ({ request, url }) => {
       .select('id, title, description, category, file_name, mime_type, file_size_bytes, version, is_public, requires_role, storage_key, folder_id, tags, is_archived, download_count, created_by, created_at')
       .eq('society_id', SOCIETY_ID)
       .eq('is_archived', archived)
+      .is('parent_id', null)
       .order('category')
       .order('title');
 
