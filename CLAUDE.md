@@ -372,7 +372,7 @@ UTAMACS is committed to India's Digital Personal Data Protection Act 2023. Every
 src/
   pages/
     portal/           ← Portal pages (Astro, SSR)
-      admin/          ← Admin-only pages (audit, assets, rules, rbac, staff, tds, etc.)
+      admin/          ← Admin-only pages (audit, assets, rules, rbac, staff, tds, memberships, staff-kyc, etc.)
       agm/            ← AGM & Governance
       analytics/      ← Reports Hub
       community/      ← Community Board + Marketplace
@@ -380,26 +380,32 @@ src/
       documents/      ← Document library
       events/         ← Events & RSVP
       facilities/     ← Facility booking
+      feedback/       ← Resident feedback
       finance/        ← Finance & Dues
-      hoto/           ← HOTO Tracker
+      gallery/        ← Photo Gallery
+      hoto/           ← HOTO Tracker (10 pages — handover, admin, finance sub-sections)
       letters/        ← Official Letters
-      maids/          ← Domestic Help Registry   [to be built]
+      maids/          ← Domestic Help Registry
       members/        ← Member directory
       notices/        ← Notices & Announcements
       notifications/  ← Notification centre
       parking/        ← Parking management
-      policies/       ← Policy acknowledgements  [to be built]
+      policies/       ← Policy acknowledgements & compliance gate
       polls/          ← Polls & Voting
-      feedback/       ← Resident feedback        [to be built]
-      gallery/        ← Photo Gallery            [to be built]
-      register/       ← Self-registration        [to be built]
+      register/       ← Society membership application (Byelaw §4)
+      security-patrol/ ← Security patrol log
       snags/          ← Snag / Defect tracking
+      tenant-kyc/     ← Tenant KYC & verification
       vendors/        ← Vendors & Work Orders
       visitors/       ← Visitor Management
+      water-tankers/  ← Water tanker management
     api/v1/           ← API routes (TypeScript)
   components/
     portal/           ← Portal components (PortalLayout, Dashboard components)
   lib/
+    constants.ts      ← Architectural constants only (UUID_RE, MIME types, upload limits)
+    utils/
+      getRules.ts     ← Rules engine accessor (ruleInt, ruleStr, ruleBool)
     services/
       interfaces/     ← IAuthService, IStorageService, etc.
       providers/
@@ -416,6 +422,37 @@ tailwind.config.cjs
 astro.config.mjs          ← Public site config (output: static)
 astro.portal.config.mjs   ← Portal config (output: hybrid, Vercel)
 ```
+
+### Module status (all built and registered)
+| module_key | Display Name | Nav Order | Notes |
+|---|---|---|---|
+| `members` | Member Directory | 1 | |
+| `complaints` | Complaints | 2 | SLA tracking, attachments |
+| `notices` | Notices & Circulars | 3 | |
+| `events` | Events | 4 | Waitlist; paid events & QR attendance disabled by default |
+| `polls` | Polls & Voting | 5 | Anonymous voting, result export |
+| `finance` | Finance & Dues | 6 | Invoicing, GST, TDS, reminders |
+| `facility_booking` | Facility Booking | 7 | |
+| `visitor_mgmt` | Visitor Management | 8 | **Disabled by default** — requires QR/OTP infrastructure |
+| `vendors` | Vendors & Work Orders | 9 | Procurement, AMC |
+| `community` | Community Board | 10 | + Marketplace |
+| `documents` | Documents | 11 | Versioned document library |
+| `analytics` | Analytics & Reports | 12 | |
+| `notifications` | Notifications | 13 | Email+realtime on; SMS/WhatsApp/push disabled pending TRAI DLT |
+| `letters` | Official Letters | 14 | Templates, letterhead |
+| `agm` | AGM & Governance | 15 | Sessions, attendance, quorum, minutes |
+| `parking` | Parking Management | 16 | Slot allocation, RC/insurance |
+| `maids` | Domestic Help Registry | 17 | Approvals, attendance, KYC pass |
+| `gallery` | Photo Gallery | 18 | Albums, photos |
+| `policies` | Policies & Compliance | 19 | Compliance gate for portal access |
+| `register` | Society Membership | 20 | Byelaw §4 membership application |
+| `hoto` | HOTO Tracker | 21 | Handover-takeover, finance sub-module |
+| `snags` | Snag List | 22 | Defect tracking integrated with HOTO |
+| `tenant_kyc` | Tenant KYC | 23 | Tenant verification, re-KYC expiry |
+| `water_tankers` | Water Management | 24 | Tanker bookings |
+| `security_patrol` | Security Patrol Log | 25 | Guard shift logs |
+| `memberships` | Membership Registry | 95 | Admin tool — byelaw membership lifecycle |
+| `staff_kyc` | Staff & Maid KYC | 96 | Admin tool — KYC pass issuance |
 
 ---
 
