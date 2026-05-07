@@ -4,6 +4,7 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import Anthropic from '@anthropic-ai/sdk';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -24,7 +25,9 @@ export const GET: APIRoute = async ({ request }) => {
     }
 
     const sb = getSupabaseServiceClient();
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const rules = await getRules(sb, SOCIETY_ID, ['ANALYTICS_LOOKBACK_DAYS']);
+    const lookbackDays = ruleInt(rules, 'ANALYTICS_LOOKBACK_DAYS', 30);
+    const thirtyDaysAgo = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
 
     const [complaintsRes, assetsRes, duesRes] = await Promise.all([
       sb

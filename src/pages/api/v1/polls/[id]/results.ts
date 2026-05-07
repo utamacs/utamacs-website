@@ -3,9 +3,9 @@ import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** GET /api/v1/polls/:id/results — returns per-option vote counts after voting or poll close. */
 export const GET: APIRoute = async ({ request, params }) => {
@@ -43,9 +43,23 @@ export const GET: APIRoute = async ({ request, params }) => {
       .maybeSingle();
 
     const isClosed = poll.ends_at && new Date(poll.ends_at) < new Date();
+    const visibility = (poll as any).result_visibility ?? 'after_vote';
 
-    if (!userVote && !isClosed) {
-      return new Response(JSON.stringify({ has_voted: false, results_available: false, voted_option_id: null }), {
+    // Enforce result_visibility:
+    //   always      → always show results
+    //   after_vote  → show only after user has voted
+    //   after_close → show only after poll is closed
+    const canSeeResults =
+      visibility === 'always' ||
+      (visibility === 'after_vote' && !!userVote) ||
+      (visibility === 'after_close' && isClosed);
+
+    if (!canSeeResults) {
+      const reason =
+        visibility === 'after_close'
+          ? 'Results will be visible after the poll closes.'
+          : 'Cast your vote to see the results.';
+      return new Response(JSON.stringify({ has_voted: !!userVote, results_available: false, voted_option_id: null, reason }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }

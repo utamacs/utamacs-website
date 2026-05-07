@@ -83,6 +83,23 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
     <div class="text-center py-10 text-text-secondary text-sm">Loading…</div>
   </div>
 
+  <!-- Version history drawer -->
+  <div id="history-drawer" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-primary-600">Version History</h2>
+        <p id="history-doc-title" class="text-xs text-text-secondary mt-0.5"></p>
+      </div>
+      <button id="close-history" class="text-text-secondary hover:text-text-primary p-1" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div id="history-list" class="p-4 space-y-3">
+      <div class="text-sm text-text-secondary text-center py-8">Loading…</div>
+    </div>
+  </div>
+  <div id="history-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+
   <!-- Upload modal (exec/admin only) -->
   {canUpload && (
     <div id="upload-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -147,6 +164,47 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
             <span id="upload-submit-label">Upload Document</span>
           </button>
           <button id="modal-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- New version modal (exec/admin only) -->
+  {canUpload && (
+    <div id="nv-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-border-light flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-primary-600">Upload New Version</h3>
+            <p id="nv-doc-name" class="text-xs text-text-secondary mt-0.5 truncate"></p>
+          </div>
+          <button id="nv-close" class="text-text-secondary hover:text-text-primary p-2" aria-label="Close">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div id="nv-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+          <div>
+            <label class="form-label" for="nv-file">Replacement file <span class="text-red-500">*</span></label>
+            <div id="nv-drop-zone"
+              class="border-2 border-dashed border-border-light rounded-xl p-5 text-center text-sm text-text-secondary hover:border-primary-400 hover:bg-primary-50/30 transition-colors cursor-pointer">
+              <i class="fas fa-code-branch text-2xl text-primary-300 mb-2 block" aria-hidden="true"></i>
+              <span id="nv-drop-label">Drop replacement file here or <span class="text-primary-600 font-medium">click to select</span></span>
+              <div class="text-xs mt-1 text-text-secondary">Same formats as upload — max 20 MB</div>
+            </div>
+            <input type="file" id="nv-file" accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png" class="hidden" />
+          </div>
+          <div>
+            <label class="form-label" for="nv-notes">Change notes</label>
+            <input id="nv-notes" type="text" maxlength="300" class="form-input" placeholder="e.g. Updated clause 4.2 and appendix B" />
+          </div>
+        </div>
+        <div class="px-6 pb-6 flex gap-3">
+          <button id="nv-submit" class="btn-primary flex-1 flex items-center justify-center gap-2 text-sm">
+            <i class="fas fa-code-branch" aria-hidden="true"></i>
+            <span id="nv-submit-label">Save New Version</span>
+          </button>
+          <button id="nv-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
         </div>
       </div>
     </div>
@@ -220,16 +278,25 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
                 <div class="flex items-center gap-4 px-5 py-4 border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors">
                   <i class="fas ${icon} text-xl w-6 text-center flex-shrink-0" aria-hidden="true"></i>
                   <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium text-text-primary truncate">${d.title}</div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium text-text-primary truncate">${d.title}</span>
+                      ${(d.version ?? 1) > 1 ? `<span class="text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded font-medium flex-shrink-0">v${d.version}</span>` : ''}
+                    </div>
                     <div class="text-xs text-text-secondary mt-0.5">
                       ${d.file_name ? `${d.file_name} · ` : ''}${formatSize(d.file_size_bytes)}
-                      ${(d.version ?? 1) > 1 ? ` · v${d.version}` : ''}
                       · ${new Date(d.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </div>
                     ${d.description ? `<div class="text-xs text-text-secondary mt-0.5 truncate">${d.description}</div>` : ''}
                   </div>
-                  <div class="flex items-center gap-2 flex-shrink-0">
-                    ${d.requires_role === 'executive' ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Exec only</span>' : ''}
+                  <div class="flex items-center gap-1 flex-shrink-0">
+                    ${d.requires_role === 'executive' ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium mr-1">Exec only</span>' : ''}
+                    ${(d.version ?? 1) > 1
+                      ? `<button onclick="openHistory('${d.id}', '${d.title.replace(/'/g, "\\'")}')"
+                           class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-primary-600" title="Version history">
+                           <i class="fas fa-history text-xs" aria-hidden="true"></i>
+                         </button>`
+                      : ''
+                    }
                     ${d.download_url
                       ? `<a href="${d.download_url}" target="_blank" rel="noopener"
                            class="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1 text-primary-600">
@@ -238,7 +305,11 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
                       : ''
                     }
                     ${canUpload
-                      ? `<button onclick="archiveDoc('${d.id}')"
+                      ? `<button onclick="openNewVersion('${d.id}', '${d.title.replace(/'/g, "\\'")}')"
+                           class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-primary-600" title="Upload new version">
+                           <i class="fas fa-code-branch text-xs" aria-hidden="true"></i>
+                         </button>
+                         <button onclick="archiveDoc('${d.id}')"
                            class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-red-600" title="Archive">
                            <i class="fas fa-archive text-xs" aria-hidden="true"></i>
                          </button>`
@@ -260,7 +331,126 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       else { showToast('Failed to archive document.', 'error'); }
     }
 
+    // ── Version history drawer ────────────────────────────────────────────────
+    const historyDrawer   = document.getElementById('history-drawer')!;
+    const historyBackdrop = document.getElementById('history-backdrop')!;
+    const historyList     = document.getElementById('history-list')!;
+    const historyTitle    = document.getElementById('history-doc-title')!;
+
+    function closeHistory() {
+      historyDrawer.classList.add('translate-x-full');
+      historyBackdrop.classList.add('hidden');
+    }
+    document.getElementById('close-history')!.addEventListener('click', closeHistory);
+    historyBackdrop.addEventListener('click', closeHistory);
+
+    async function openHistory(docId: string, title: string) {
+      historyTitle.textContent = title;
+      historyList.innerHTML = '<div class="text-sm text-text-secondary text-center py-8">Loading…</div>';
+      historyDrawer.classList.remove('translate-x-full');
+      historyBackdrop.classList.remove('hidden');
+
+      const res = await fetch(`/api/v1/documents/${docId}/history`, { credentials: 'include' });
+      const versions: any[] = res.ok ? await res.json() : [];
+
+      if (!versions.length) {
+        historyList.innerHTML = '<div class="text-sm text-text-secondary text-center py-8">No version history found.</div>';
+        return;
+      }
+
+      historyList.innerHTML = versions.map(v => `
+        <div class="bg-white rounded-xl border border-border-light p-4 flex items-start gap-3">
+          <div class="flex-shrink-0 mt-0.5">
+            ${v.is_current
+              ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary-500 text-white">Current</span>'
+              : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-text-secondary">v${v.version}</span>`
+            }
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs text-text-secondary">${v.file_name ?? '—'} · ${formatSize(v.file_size_bytes)}</div>
+            <div class="text-xs text-text-secondary mt-0.5">${new Date(v.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+          ${v.download_url
+            ? `<a href="${v.download_url}" target="_blank" rel="noopener" class="btn-ghost text-xs px-2 py-1.5 text-primary-600 flex-shrink-0">
+                 <i class="fas fa-download text-xs" aria-hidden="true"></i>
+               </a>`
+            : ''
+          }
+        </div>
+      `).join('');
+    }
+
+    // ── New version upload ────────────────────────────────────────────────────
+    let newVersionDocId = '';
+
+    function openNewVersion(docId: string, title: string) {
+      newVersionDocId = docId;
+      (document.getElementById('nv-doc-name') as HTMLElement).textContent = title;
+      (document.getElementById('nv-file') as HTMLInputElement).value = '';
+      (document.getElementById('nv-drop-label') as HTMLElement).innerHTML = 'Drop replacement file here or <span class="text-primary-600 font-medium">click to select</span>';
+      (document.getElementById('nv-notes') as HTMLInputElement).value = '';
+      (document.getElementById('nv-error') as HTMLElement).classList.add('hidden');
+      document.getElementById('nv-modal')!.classList.remove('hidden');
+    }
+
+    // ── New version modal wiring ──────────────────────────────────────────────
+    if (canUpload) {
+      const nvModal    = document.getElementById('nv-modal')!;
+      const nvFileInp  = document.getElementById('nv-file') as HTMLInputElement;
+      const nvDropZone = document.getElementById('nv-drop-zone')!;
+      const nvDropLbl  = document.getElementById('nv-drop-label')!;
+      const nvErrEl    = document.getElementById('nv-error')!;
+      const nvSubmit   = document.getElementById('nv-submit') as HTMLButtonElement;
+      const nvLbl      = document.getElementById('nv-submit-label')!;
+
+      function closeNvModal() { nvModal.classList.add('hidden'); newVersionDocId = ''; }
+      document.getElementById('nv-close')!.addEventListener('click', closeNvModal);
+      document.getElementById('nv-cancel')!.addEventListener('click', closeNvModal);
+      nvModal.addEventListener('click', (e) => { if (e.target === nvModal) closeNvModal(); });
+
+      nvDropZone.addEventListener('click', () => nvFileInp.click());
+      nvDropZone.addEventListener('dragover', (e) => { e.preventDefault(); nvDropZone.classList.add('border-primary-400', 'bg-primary-50/50'); });
+      nvDropZone.addEventListener('dragleave', () => nvDropZone.classList.remove('border-primary-400', 'bg-primary-50/50'));
+      nvDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        nvDropZone.classList.remove('border-primary-400', 'bg-primary-50/50');
+        const f = e.dataTransfer?.files[0];
+        if (f) { nvFileInp.files = e.dataTransfer!.files; nvDropLbl.textContent = f.name; }
+      });
+      nvFileInp.addEventListener('change', () => { if (nvFileInp.files?.[0]) nvDropLbl.textContent = nvFileInp.files[0].name; });
+
+      nvSubmit.addEventListener('click', async () => {
+        nvErrEl.classList.add('hidden');
+        const file = nvFileInp.files?.[0];
+        if (!file) { nvErrEl.textContent = 'Please select a replacement file.'; nvErrEl.classList.remove('hidden'); return; }
+
+        nvSubmit.disabled = true;
+        nvLbl.textContent = 'Saving…';
+
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('notes', (document.getElementById('nv-notes') as HTMLInputElement).value.trim());
+
+        try {
+          const res = await fetch(`/api/v1/documents/${newVersionDocId}`, { method: 'PUT', credentials: 'include', body: fd });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message ?? data.error ?? 'Upload failed');
+          showToast(`Version ${data.version} saved.`);
+          closeNvModal();
+          loadDocuments();
+        } catch (err: any) {
+          nvErrEl.textContent = err.message;
+          nvErrEl.classList.remove('hidden');
+        } finally {
+          nvSubmit.disabled = false;
+          nvLbl.textContent = 'Save New Version';
+        }
+      });
+    }
+
     (window as any).archiveDoc = archiveDoc;
+    (window as any).openHistory = openHistory;
+    (window as any).openNewVersion = openNewVersion;
 
     // Category filter
     document.getElementById('category-filters')!.addEventListener('click', (e) => {

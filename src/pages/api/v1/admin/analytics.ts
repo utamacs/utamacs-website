@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -17,6 +18,14 @@ export const GET: APIRoute = async ({ request }) => {
 
     const sb = getSupabaseServiceClient();
 
+    const rules = await getRules(sb, SOCIETY_ID, ['ANALYTICS_LOOKBACK_DAYS']);
+    const lookbackDays = ruleInt(rules, 'ANALYTICS_LOOKBACK_DAYS', 30);
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    sixMonthsAgo.setDate(1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
     const [
       complaintsRes,
       duesRes,
@@ -24,19 +33,31 @@ export const GET: APIRoute = async ({ request }) => {
       visitorsRes,
       membersRes,
       pollsRes,
+      expensesRes,
+      recentDuesRes,
+      occupancyRes,
     ] = await Promise.all([
       sb.from('complaints').select('status, priority, created_at').eq('society_id', SOCIETY_ID),
       sb.from('maintenance_dues').select('status, total_amount, base_amount').eq('society_id', SOCIETY_ID),
       sb.from('events').select('id, title, starts_at, is_published').eq('society_id', SOCIETY_ID).eq('is_published', true).order('starts_at', { ascending: false }).limit(10),
-      sb.from('visitor_logs').select('entry_type, entry_time, exit_time').eq('society_id', SOCIETY_ID).gte('entry_time', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+      sb.from('visitor_logs').select('entry_type, entry_time, exit_time').eq('society_id', SOCIETY_ID).gte('entry_time', new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString()),
       sb.from('profiles').select('residency_type, is_active').eq('society_id', SOCIETY_ID).eq('is_active', true),
       sb.from('polls').select('id, status, ends_at').eq('society_id', SOCIETY_ID),
+      // Monthly expenses for P&L
+      sb.from('expenses').select('amount, net_payable, created_at').eq('society_id', SOCIETY_ID).gte('created_at', sixMonthsAgo.toISOString()),
+      // Recent dues for monthly collection efficiency
+      sb.from('maintenance_dues').select('status, total_amount, base_amount, due_date, paid_at').eq('society_id', SOCIETY_ID).gte('created_at', sixMonthsAgo.toISOString()),
+      // Occupancy breakdown from unit_occupancy field (added in migration 052)
+      sb.from('profiles').select('unit_occupancy').eq('society_id', SOCIETY_ID).eq('is_active', true).not('unit_number', 'is', null),
     ]);
 
     const complaints = complaintsRes.data ?? [];
     const dues = duesRes.data ?? [];
     const visitors = visitorsRes.data ?? [];
     const members = membersRes.data ?? [];
+    const expenses = expensesRes.data ?? [];
+    const recentDues = recentDuesRes.data ?? [];
+    const occupancyProfiles = occupancyRes.data ?? [];
 
     // Complaint breakdown by status
     const complaintsByStatus = complaints.reduce((acc: Record<string, number>, c: any) => {
@@ -79,6 +100,61 @@ export const GET: APIRoute = async ({ request }) => {
       if (d in visitorTrend) visitorTrend[d]++;
     });
 
+    // ── Occupancy breakdown ──────────────────────────────────────────────────
+    const occupancy = occupancyProfiles.reduce((acc: Record<string, number>, p: any) => {
+      const key = p.unit_occupancy ?? 'unknown';
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+    const occupancyTotal = occupancyProfiles.length;
+
+    // ── Monthly P&L (last 6 months) ──────────────────────────────────────────
+    const monthlyPL: Record<string, { income: number; expenses: number }> = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlyPL[key] = { income: 0, expenses: 0 };
+    }
+
+    expenses.forEach((e: any) => {
+      const key = new Date(e.created_at).toISOString().slice(0, 7);
+      if (key in monthlyPL) monthlyPL[key].expenses += Number(e.net_payable ?? e.amount ?? 0);
+    });
+
+    recentDues.forEach((d: any) => {
+      if (d.status === 'paid') {
+        const key = (d.paid_at ?? d.due_date ?? '').slice(0, 7);
+        if (key in monthlyPL) monthlyPL[key].income += Number(d.total_amount ?? d.base_amount ?? 0);
+      }
+    });
+
+    const monthlyPLArray = Object.entries(monthlyPL).map(([month, vals]) => ({
+      month,
+      income: Math.round(vals.income),
+      expenses: Math.round(vals.expenses),
+      net: Math.round(vals.income - vals.expenses),
+    }));
+
+    // ── Monthly collection efficiency ─────────────────────────────────────────
+    const monthlyCollection: Record<string, { total: number; paid: number }> = {};
+    for (const k of Object.keys(monthlyPL)) monthlyCollection[k] = { total: 0, paid: 0 };
+
+    recentDues.forEach((d: any) => {
+      const key = (d.due_date ?? '').slice(0, 7);
+      if (key in monthlyCollection) {
+        monthlyCollection[key].total += Number(d.total_amount ?? d.base_amount ?? 0);
+        if (d.status === 'paid') monthlyCollection[key].paid += Number(d.total_amount ?? d.base_amount ?? 0);
+      }
+    });
+
+    const collectionEfficiency = Object.entries(monthlyCollection).map(([month, v]) => ({
+      month,
+      total: Math.round(v.total),
+      paid: Math.round(v.paid),
+      rate: v.total > 0 ? Math.round((v.paid / v.total) * 100) : 0,
+    }));
+
     return new Response(JSON.stringify({
       complaints: {
         total: complaints.length,
@@ -106,6 +182,15 @@ export const GET: APIRoute = async ({ request }) => {
         owners: members.filter((m: any) => m.residency_type === 'owner').length,
         tenants: members.filter((m: any) => m.residency_type === 'tenant').length,
       },
+      occupancy: {
+        total: occupancyTotal,
+        by_type: occupancy,
+        owner_occupied: occupancy['owner_occupied'] ?? 0,
+        rented: occupancy['rented'] ?? 0,
+        vacant: occupancy['vacant'] ?? 0,
+      },
+      monthly_pl: monthlyPLArray,
+      collection_efficiency: collectionEfficiency,
     }), { headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
     return normalizeError(err, request.url);

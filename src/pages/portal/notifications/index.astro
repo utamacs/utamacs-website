@@ -26,10 +26,17 @@ if (!user) return Astro.redirect('/portal/login');
 
   <!-- Feed panel -->
   <div id="panel-feed">
-    <!-- Filter tabs -->
-    <div class="flex gap-2 mb-5">
+    <!-- Status filters -->
+    <div class="flex gap-2 mb-3 flex-wrap">
       <button data-filter="all" class="filter-tab text-xs px-3 py-1.5 rounded-full font-medium border bg-primary-600 text-white border-primary-600">All</button>
       <button data-filter="unread" class="filter-tab text-xs px-3 py-1.5 rounded-full font-medium border bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600">Unread</button>
+    </div>
+    <!-- Type filters -->
+    <div class="flex gap-2 mb-5 flex-wrap">
+      <button data-type="" class="type-tab text-xs px-3 py-1 rounded-full font-medium bg-gray-100 text-text-secondary hover:bg-primary-50 hover:text-primary-600">All types</button>
+      {['complaint','notice','event','poll','payment','community','visitor','facility','amc','feedback'].map(t => (
+        <button data-type={t} class="type-tab text-xs px-3 py-1 rounded-full font-medium bg-gray-100 text-text-secondary hover:bg-primary-50 hover:text-primary-600 capitalize">{t.replace('_',' ')}</button>
+      ))}
     </div>
 
     <div class="bg-white rounded-xl border border-border-light overflow-hidden">
@@ -105,11 +112,13 @@ if (!user) return Astro.redirect('/portal/login');
     };
 
     let currentFilter = 'all';
+    let currentType = '';
 
     async function loadNotifications() {
       const container = document.getElementById('notifications-list')!;
       const params = new URLSearchParams({ limit: '30' });
       if (currentFilter === 'unread') params.set('unread', 'true');
+      if (currentType) params.set('type', currentType);
 
       const res = await fetch(`/api/v1/notifications?${params}`, { credentials: 'include' });
       const items = res.ok ? await res.json() : [];
@@ -190,6 +199,17 @@ if (!user) return Astro.redirect('/portal/login');
       });
     });
 
+    document.querySelectorAll('.type-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.type-tab').forEach(b => {
+          b.className = 'type-tab text-xs px-3 py-1 rounded-full font-medium bg-gray-100 text-text-secondary hover:bg-primary-50 hover:text-primary-600 capitalize';
+        });
+        btn.className = 'type-tab text-xs px-3 py-1 rounded-full font-medium bg-primary-600 text-white capitalize';
+        currentType = (btn as HTMLElement).dataset.type!;
+        loadNotifications();
+      });
+    });
+
     // ── Main tab switching ────────────────────────────────────────────────────
     document.getElementById('tab-feed')!.addEventListener('click', () => {
       document.getElementById('panel-feed')!.classList.remove('hidden');
@@ -226,10 +246,11 @@ if (!user) return Astro.redirect('/portal/login');
     ];
 
     const CHANNEL_PREFS: [string, string, string][] = [
-      ['email_enabled',    'Email',    'fa-envelope'],
-      ['sms_enabled',      'SMS',      'fa-sms'],
-      ['push_enabled',     'Push',     'fa-mobile-alt'],
-      ['whatsapp_enabled', 'WhatsApp', 'fa-whatsapp'],
+      ['email_enabled',         'Email notifications',   'fa-envelope'],
+      ['email_digest_enabled',  'Daily digest email',    'fa-calendar-check'],
+      ['sms_enabled',           'SMS',                   'fa-sms'],
+      ['push_enabled',          'Push',                  'fa-mobile-alt'],
+      ['whatsapp_enabled',      'WhatsApp',              'fa-whatsapp'],
     ];
 
     function toggleSwitch(key: string, checked: boolean) {

@@ -1,0 +1,185 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+if (!user.isAdmin) return new Response('Forbidden', { status: 403 });
+---
+
+<PortalLayout title="Session Management" user={user} activeModule="admin">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Session Management</h1>
+      <p class="text-text-secondary text-sm mt-1">View active portal sessions and force sign-out users. DPDPA compliance tool.</p>
+    </div>
+    <button id="refresh-btn" class="btn-outline text-sm flex items-center gap-2">
+      <i class="fas fa-sync-alt" aria-hidden="true"></i> Refresh
+    </button>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-primary-600" id="stat-total">—</div>
+      <div class="text-xs text-text-secondary mt-1">Total Users</div>
+    </div>
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-secondary-500" id="stat-active">—</div>
+      <div class="text-xs text-text-secondary mt-1">Active (1h)</div>
+    </div>
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-primary-600" id="stat-admins">—</div>
+      <div class="text-xs text-text-secondary mt-1">Admins</div>
+    </div>
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-amber-500" id="stat-never">—</div>
+      <div class="text-xs text-text-secondary mt-1">Never Signed In</div>
+    </div>
+  </div>
+
+  <!-- Search + filter -->
+  <div class="flex gap-3 mb-4 flex-wrap">
+    <div class="relative flex-1 min-w-48">
+      <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-xs" aria-hidden="true"></i>
+      <input id="search-input" type="text" placeholder="Search by name, email or unit…" class="form-input pl-8 py-2 text-sm w-full" />
+    </div>
+    <select id="role-filter" class="form-input bg-white py-2 text-sm" style="width:160px">
+      <option value="">All roles</option>
+      <option value="member">Member</option>
+      <option value="executive">Executive</option>
+      <option value="secretary">Secretary</option>
+      <option value="president">President</option>
+    </select>
+    <select id="status-filter" class="form-input bg-white py-2 text-sm" style="width:160px">
+      <option value="">All sessions</option>
+      <option value="active">Active (last 1h)</option>
+      <option value="inactive">Inactive</option>
+      <option value="never">Never signed in</option>
+    </select>
+  </div>
+
+  <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+    <div id="sessions-list">
+      <div class="text-sm text-text-secondary text-center py-10">Loading sessions…</div>
+    </div>
+  </div>
+
+  <script>
+    let allSessions: any[] = [];
+
+    async function loadSessions() {
+      document.getElementById('sessions-list')!.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+      const res = await fetch('/api/v1/admin/sessions', { credentials: 'include' });
+      allSessions = res.ok ? await res.json() : [];
+      updateStats();
+      render();
+    }
+
+    function updateStats() {
+      document.getElementById('stat-total')!.textContent = String(allSessions.length);
+      document.getElementById('stat-active')!.textContent = String(allSessions.filter(s => s.is_active).length);
+      document.getElementById('stat-admins')!.textContent = String(allSessions.filter(s => s.is_admin).length);
+      document.getElementById('stat-never')!.textContent = String(allSessions.filter(s => !s.last_sign_in_at).length);
+    }
+
+    function render() {
+      const q = (document.getElementById('search-input') as HTMLInputElement).value.toLowerCase();
+      const role = (document.getElementById('role-filter') as HTMLSelectElement).value;
+      const status = (document.getElementById('status-filter') as HTMLSelectElement).value;
+
+      let items = allSessions.filter(s => {
+        if (q) {
+          const hay = `${s.email} ${s.full_name ?? ''} ${s.unit_number ?? ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        if (role && s.portal_role !== role) return false;
+        if (status === 'active' && !s.is_active) return false;
+        if (status === 'inactive' && (s.is_active || !s.last_sign_in_at)) return false;
+        if (status === 'never' && s.last_sign_in_at) return false;
+        return true;
+      });
+
+      const container = document.getElementById('sessions-list')!;
+      if (!items.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No sessions match your filters.</div>';
+        return;
+      }
+
+      container.innerHTML = items.map(s => {
+        const lastSeen = s.last_sign_in_at
+          ? new Date(s.last_sign_in_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : 'Never';
+
+        const statusDot = s.is_active
+          ? '<span class="w-2 h-2 rounded-full bg-secondary-500 inline-block mr-1.5" title="Active in last hour"></span>'
+          : '<span class="w-2 h-2 rounded-full bg-gray-300 inline-block mr-1.5" title="Inactive"></span>';
+
+        const roleBadge = s.is_admin
+          ? '<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Admin</span>'
+          : s.portal_role === 'executive' || s.portal_role === 'secretary' || s.portal_role === 'president'
+            ? `<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium capitalize">${s.portal_role}</span>`
+            : '<span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded-full">Member</span>';
+
+        return `
+          <div class="flex items-center gap-4 px-5 py-4 border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors">
+            <div class="w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 font-semibold text-primary-600 text-sm">
+              ${(s.full_name ?? s.email ?? '?')[0].toUpperCase()}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm font-medium text-text-primary">${s.full_name ?? '—'}</span>
+                ${roleBadge}
+                ${s.unit_number ? `<span class="text-xs text-text-secondary">${s.unit_number}</span>` : ''}
+              </div>
+              <div class="text-xs text-text-secondary mt-0.5">${s.email ?? '—'}</div>
+            </div>
+            <div class="flex-shrink-0 text-right">
+              <div class="flex items-center justify-end text-xs text-text-secondary">
+                ${statusDot}${s.is_active ? '<span class="text-secondary-500 font-medium">Active now</span>' : lastSeen}
+              </div>
+              <div class="text-xs text-text-secondary mt-0.5">Joined ${new Date(s.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</div>
+            </div>
+            <button onclick="forceSignOut('${s.id}', '${(s.full_name ?? s.email ?? 'this user').replace(/'/g, "\\'")}')"
+              class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-red-600 flex-shrink-0" title="Force sign-out">
+              <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function forceSignOut(userId: string, name: string) {
+      if (!confirm(`Force sign out ${name}? They will need to log in again.`)) return;
+      const res = await fetch(`/api/v1/admin/sessions?user_id=${userId}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) {
+        showToast(`${name} has been signed out.`);
+        allSessions = allSessions.map(s => s.id === userId ? { ...s, is_active: false } : s);
+        updateStats();
+        render();
+      } else {
+        showToast('Failed to sign out user.', 'error');
+      }
+    }
+
+    function showToast(message: string, type: 'success' | 'error' = 'success') {
+      const toast = document.createElement('div');
+      const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    document.getElementById('refresh-btn')!.addEventListener('click', loadSessions);
+    document.getElementById('search-input')!.addEventListener('input', render);
+    document.getElementById('role-filter')!.addEventListener('change', render);
+    document.getElementById('status-filter')!.addEventListener('change', render);
+
+    (window as any).forceSignOut = forceSignOut;
+    loadSessions();
+  </script>
+</PortalLayout>

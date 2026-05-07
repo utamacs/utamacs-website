@@ -5,6 +5,16 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { permissionService } from '@lib/services/index';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getSupabaseServiceClient as _sb } from '@lib/services/providers/supabase/SupabaseDB';
+
+const STATUS_LABELS: Record<string, string> = {
+  Assigned:          'Your complaint has been assigned to a team member.',
+  In_Progress:       'Work has started on your complaint.',
+  Waiting_for_User:  'The committee needs more information from you.',
+  Resolved:          'Your complaint has been resolved.',
+  Closed:            'Your complaint has been closed.',
+  Reopened:          'Your complaint has been reopened.',
+};
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -77,6 +87,23 @@ export const PUT: APIRoute = async ({ request, params }) => {
       newValues: data,
       ip: extractClientIP(request),
     });
+
+    // Notify the complaint submitter about the status change (non-blocking)
+    if (body.status && (before as any).raised_by && (before as any).raised_by !== user.id) {
+      const notifBody = STATUS_LABELS[body.status] ?? `Status changed to ${body.status}.`;
+      Promise.resolve(
+        _sb().from('notifications').insert({
+          user_id: (before as any).raised_by,
+          society_id: SOCIETY_ID,
+          title: `Complaint update: ${(before as any).title ?? 'your complaint'}`,
+          body: notifBody,
+          type: 'complaint',
+          reference_table: 'complaints',
+          reference_id: id,
+          is_read: false,
+        }),
+      ).catch(() => {});
+    }
 
     return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
   } catch (err) {

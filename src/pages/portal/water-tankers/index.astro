@@ -1,0 +1,306 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+---
+
+<PortalLayout title="Water Management" user={user} activeModule="water_tankers">
+  <div class="mb-6 flex items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Water Management</h1>
+      <p class="text-text-secondary text-sm mt-1">Track tanker deliveries, usage, and monthly costs.</p>
+    </div>
+    {isPrivileged && (
+      <button id="log-btn" class="btn-primary text-sm flex items-center gap-2">
+        <i class="fas fa-plus" aria-hidden="true"></i> Log Delivery
+      </button>
+    )}
+  </div>
+
+  <!-- Summary stats -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-primary-600" id="stat-month-kl">—</div>
+      <div class="text-xs text-text-secondary mt-1">KL this month</div>
+    </div>
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-primary-600" id="stat-month-deliveries">—</div>
+      <div class="text-xs text-text-secondary mt-1">Deliveries this month</div>
+    </div>
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-amber-500" id="stat-month-cost">—</div>
+      <div class="text-xs text-text-secondary mt-1">Spend this month</div>
+    </div>
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-secondary-500" id="stat-ytd-kl">—</div>
+      <div class="text-xs text-text-secondary mt-1">KL this year</div>
+    </div>
+  </div>
+
+  <!-- Month picker + list -->
+  <div class="flex items-center gap-3 mb-4">
+    <label class="text-sm text-text-secondary">Month:</label>
+    <input id="month-picker" type="month" class="form-input py-1.5 text-sm" style="width:160px"
+      value={new Date().toISOString().slice(0, 7)} />
+  </div>
+
+  <div class="bg-white rounded-xl border border-border-light overflow-hidden mb-6">
+    <div id="deliveries-list">
+      <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Monthly trend -->
+  <div class="card-premium p-5">
+    <h2 class="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
+      <i class="fas fa-chart-bar text-primary-300 text-sm" aria-hidden="true"></i>
+      Last 12 Months — KL Delivered
+    </h2>
+    <div id="monthly-chart" class="space-y-2">
+      <div class="text-sm text-text-secondary text-center py-6">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Log delivery modal -->
+  {isPrivileged && (
+    <div id="log-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-border-light flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-primary-600">Log Tanker Delivery</h3>
+          <button id="log-close" class="text-text-secondary hover:text-text-primary p-2">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div id="log-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="lf-date">Delivery date <span class="text-red-500">*</span></label>
+              <input id="lf-date" type="date" class="form-input" required />
+            </div>
+            <div>
+              <label class="form-label" for="lf-supplier">Supplier <span class="text-red-500">*</span></label>
+              <input id="lf-supplier" type="text" maxlength="200" class="form-input" placeholder="e.g. Raju Tankers" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="lf-capacity">Capacity / tanker (KL) <span class="text-red-500">*</span></label>
+              <input id="lf-capacity" type="number" step="0.5" min="1" max="30" class="form-input" placeholder="e.g. 12" />
+            </div>
+            <div>
+              <label class="form-label" for="lf-count">No. of tankers <span class="text-red-500">*</span></label>
+              <input id="lf-count" type="number" min="1" max="20" value="1" class="form-input" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="lf-cost-per-kl">Cost / KL (₹)</label>
+              <input id="lf-cost-per-kl" type="number" step="0.01" min="0" class="form-input" placeholder="e.g. 150" />
+            </div>
+            <div>
+              <label class="form-label" for="lf-total-cost">Total cost (₹)</label>
+              <input id="lf-total-cost" type="number" step="0.01" min="0" class="form-input" placeholder="Auto-calculated" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="lf-payment">Payment mode</label>
+              <select id="lf-payment" class="form-input bg-white">
+                <option value="">Select</option>
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="credit">Credit</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="lf-invoice">Invoice #</label>
+              <input id="lf-invoice" type="text" maxlength="100" class="form-input" placeholder="Optional" />
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="lf-notes">Notes</label>
+            <textarea id="lf-notes" rows="2" maxlength="1000" class="form-input resize-none" placeholder="Any additional details"></textarea>
+          </div>
+        </div>
+        <div class="px-6 pb-6 flex gap-3">
+          <button id="log-submit" class="btn-primary flex-1 flex items-center justify-center gap-2 text-sm">
+            <i class="fas fa-save" aria-hidden="true"></i>
+            <span id="log-submit-label">Save Delivery</span>
+          </button>
+          <button id="log-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ isPrivileged }}>
+    function showToast(msg: string, type: 'success' | 'error' = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3500);
+    }
+
+    function fmt(n: number | null | undefined, decimals = 0) {
+      if (n == null) return '—';
+      return n.toLocaleString('en-IN', { maximumFractionDigits: decimals });
+    }
+    function fmtCurrency(n: number | null | undefined) {
+      if (n == null) return '—';
+      return '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    }
+
+    async function loadDeliveries() {
+      const month = (document.getElementById('month-picker') as HTMLInputElement).value;
+      const res = await fetch(`/api/v1/water-tankers?month=${month}`, { credentials: 'include' });
+      const items: any[] = res.ok ? await res.json() : [];
+      const container = document.getElementById('deliveries-list')!;
+
+      // Update month stats
+      const totalKl = items.reduce((s, d) => s + (d.total_kl ?? 0), 0);
+      const totalCost = items.reduce((s, d) => s + (d.total_cost ?? 0), 0);
+      document.getElementById('stat-month-kl')!.textContent = fmt(totalKl, 1);
+      document.getElementById('stat-month-deliveries')!.textContent = String(items.length);
+      document.getElementById('stat-month-cost')!.textContent = fmtCurrency(totalCost || null);
+
+      if (!items.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No deliveries recorded this month.</div>';
+        return;
+      }
+
+      const PAYMENT_LABELS: Record<string, string> = { cash: 'Cash', upi: 'UPI', bank_transfer: 'Bank Transfer', credit: 'Credit', other: 'Other' };
+
+      container.innerHTML = `
+        <div class="grid grid-cols-5 text-xs font-medium text-text-secondary px-5 py-3 border-b border-border-light bg-gray-50">
+          <span>Date</span><span>Supplier</span><span class="text-right">Tankers</span><span class="text-right">Total KL</span><span class="text-right">Cost</span>
+        </div>
+        ${items.map(d => `
+          <div class="grid grid-cols-5 text-sm px-5 py-3.5 border-b border-border-light last:border-b-0 hover:bg-gray-50">
+            <span class="text-text-secondary">${new Date(d.delivery_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+            <span class="text-text-primary font-medium truncate">${d.supplier_name}</span>
+            <span class="text-right text-text-secondary">${d.tanker_count} × ${d.tanker_capacity_kl} KL</span>
+            <span class="text-right font-medium text-primary-600">${fmt(d.total_kl, 1)} KL</span>
+            <span class="text-right text-text-secondary">${fmtCurrency(d.total_cost)}${d.payment_mode ? ` <span class="text-xs">(${PAYMENT_LABELS[d.payment_mode] ?? d.payment_mode})</span>` : ''}</span>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    async function loadSummary() {
+      const res = await fetch('/api/v1/water-tankers?summary=true', { credentials: 'include' });
+      const months: any[] = res.ok ? await res.json() : [];
+      const container = document.getElementById('monthly-chart')!;
+      if (!months.length) { container.innerHTML = '<div class="text-sm text-text-secondary text-center py-6">No data yet.</div>'; return; }
+
+      const maxKl = Math.max(...months.map(m => m.total_kl ?? 0), 1);
+      const currentYear = new Date().getFullYear().toString();
+      const ytdKl = months.filter(m => (m.month ?? '').startsWith(currentYear)).reduce((s, m) => s + (m.total_kl ?? 0), 0);
+      document.getElementById('stat-ytd-kl')!.textContent = fmt(ytdKl, 1);
+
+      container.innerHTML = months.map(m => {
+        const monthLabel = new Date(m.month + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+        const pct = maxKl > 0 ? Math.round(((m.total_kl ?? 0) / maxKl) * 100) : 0;
+        return `
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-text-secondary w-12 text-right flex-shrink-0">${monthLabel}</span>
+            <div class="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+              <div class="h-4 rounded-full bg-primary-400 transition-all" style="width:${pct}%"></div>
+            </div>
+            <span class="text-xs text-text-secondary w-20 flex-shrink-0">${fmt(m.total_kl, 1)} KL</span>
+            <span class="text-xs text-text-secondary w-20 flex-shrink-0 text-right">${fmtCurrency(m.total_cost)}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('month-picker')!.addEventListener('change', loadDeliveries);
+
+    // Modal
+    if (isPrivileged) {
+      const modal = document.getElementById('log-modal')!;
+      const errEl = document.getElementById('log-error')!;
+      const submitBtn = document.getElementById('log-submit') as HTMLButtonElement;
+      const submitLbl = document.getElementById('log-submit-label')!;
+
+      function openModal() {
+        modal.classList.remove('hidden');
+        errEl.classList.add('hidden');
+        (document.getElementById('lf-date') as HTMLInputElement).value = new Date().toISOString().slice(0, 10);
+      }
+      function closeModal() { modal.classList.add('hidden'); }
+
+      document.getElementById('log-btn')!.addEventListener('click', openModal);
+      document.getElementById('log-close')!.addEventListener('click', closeModal);
+      document.getElementById('log-cancel')!.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+      // Auto-calculate total cost
+      function recalcTotal() {
+        const cap = parseFloat((document.getElementById('lf-capacity') as HTMLInputElement).value) || 0;
+        const count = parseInt((document.getElementById('lf-count') as HTMLInputElement).value) || 1;
+        const cpk = parseFloat((document.getElementById('lf-cost-per-kl') as HTMLInputElement).value) || 0;
+        if (cpk > 0) (document.getElementById('lf-total-cost') as HTMLInputElement).value = String((cap * count * cpk).toFixed(2));
+      }
+      document.getElementById('lf-capacity')!.addEventListener('input', recalcTotal);
+      document.getElementById('lf-count')!.addEventListener('input', recalcTotal);
+      document.getElementById('lf-cost-per-kl')!.addEventListener('input', recalcTotal);
+
+      submitBtn.addEventListener('click', async () => {
+        errEl.classList.add('hidden');
+        const delivery_date = (document.getElementById('lf-date') as HTMLInputElement).value;
+        const supplier_name = (document.getElementById('lf-supplier') as HTMLInputElement).value.trim();
+        const tanker_capacity_kl = parseFloat((document.getElementById('lf-capacity') as HTMLInputElement).value);
+        const tanker_count = parseInt((document.getElementById('lf-count') as HTMLInputElement).value);
+
+        if (!delivery_date || !supplier_name || !tanker_capacity_kl || !tanker_count) {
+          errEl.textContent = 'Date, supplier, capacity and tanker count are required.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+
+        submitBtn.disabled = true; submitLbl.textContent = 'Saving…';
+
+        const body: Record<string, unknown> = {
+          delivery_date, supplier_name, tanker_capacity_kl, tanker_count,
+          cost_per_kl: parseFloat((document.getElementById('lf-cost-per-kl') as HTMLInputElement).value) || undefined,
+          total_cost: parseFloat((document.getElementById('lf-total-cost') as HTMLInputElement).value) || undefined,
+          payment_mode: (document.getElementById('lf-payment') as HTMLSelectElement).value || undefined,
+          invoice_number: (document.getElementById('lf-invoice') as HTMLInputElement).value.trim() || undefined,
+          notes: (document.getElementById('lf-notes') as HTMLTextAreaElement).value.trim() || undefined,
+        };
+
+        const res = await fetch('/api/v1/water-tankers', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errEl.textContent = data.message ?? data.error ?? 'Save failed';
+          errEl.classList.remove('hidden');
+        } else {
+          showToast('Delivery logged successfully.');
+          closeModal();
+          loadDeliveries();
+          loadSummary();
+        }
+        submitBtn.disabled = false; submitLbl.textContent = 'Save Delivery';
+      });
+    }
+
+    loadDeliveries();
+    loadSummary();
+  </script>
+</PortalLayout>

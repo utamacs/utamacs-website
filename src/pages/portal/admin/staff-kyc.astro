@@ -1,0 +1,519 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive','secretary','president'].includes(user.portalRole ?? '') || user.isAdmin;
+if (!isPrivileged) return new Response('Forbidden', { status: 403 });
+
+const sb = getSupabaseServiceClient();
+
+const [{ data: staffMembers }, { data: maids }] = await Promise.all([
+  sb.from('staff_members')
+    .select(`
+      id, name, role, phone, joining_date, is_active,
+      photo_key, id_doc_key, aadhaar_last4, id_proof_type,
+      police_verified, police_verification_date, police_verification_ref, police_station,
+      two_photos_received, security_pass_issued, security_pass_issued_at,
+      security_pass_number, security_pass_expires_at, kyc_status, background_remarks
+    `)
+    .eq('society_id', SOCIETY_ID)
+    .order('name'),
+  sb.from('maids')
+    .select(`
+      id, full_name, phone, work_type, is_active,
+      photo_key, id_doc_key, id_type, police_verified, verification_date,
+      security_pass_issued, security_pass_issued_at, security_pass_number,
+      security_pass_expires_at, two_photos_received, kyc_status
+    `)
+    .eq('society_id', SOCIETY_ID)
+    .order('full_name'),
+]);
+
+const staff = staffMembers ?? [];
+const maidList = maids ?? [];
+const now = new Date();
+
+function kycColor(status: string) {
+  return {
+    pending: 'bg-gray-100 text-gray-600',
+    documents_submitted: 'bg-blue-100 text-blue-700',
+    police_verified: 'bg-yellow-100 text-yellow-700',
+    pass_issued: 'bg-green-100 text-green-700',
+    pass_expired: 'bg-red-100 text-red-700',
+  }[status] ?? 'bg-gray-100 text-gray-600';
+}
+
+function kycLabel(status: string) {
+  return {
+    pending: 'KYC Pending',
+    documents_submitted: 'Docs Submitted',
+    police_verified: 'Police Verified',
+    pass_issued: 'Pass Issued',
+    pass_expired: 'Pass Expired',
+  }[status] ?? status;
+}
+
+function isExpiringSoon(expiresAt: string | null) {
+  if (!expiresAt) return false;
+  return new Date(expiresAt) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+}
+---
+<PortalLayout title="Staff & Maid KYC" user={user} activeModule="admin">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Staff & Maid KYC</h1>
+      <p class="text-text-secondary text-sm mt-1">
+        Security passes per Byelaw Ch.13 — Aadhaar + 2 photos + police verification required
+      </p>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="card-stats">
+      <div class="number">{staff.filter(s => s.is_active).length}</div>
+      <div class="label">Active Staff</div>
+    </div>
+    <div class="card-stats">
+      <div class="number text-secondary-500">{staff.filter(s => s.security_pass_issued).length}</div>
+      <div class="label">Staff Passes Issued</div>
+    </div>
+    <div class="card-stats">
+      <div class="number">{maidList.filter(m => m.is_active).length}</div>
+      <div class="label">Active Maids</div>
+    </div>
+    <div class="card-stats">
+      <div class="number text-amber-600">
+        {[...staff, ...maidList].filter(r => isExpiringSoon((r as any).security_pass_expires_at)).length}
+      </div>
+      <div class="label">Passes Expiring Soon</div>
+    </div>
+  </div>
+
+  <!-- Tabs: Staff / Maids -->
+  <div class="flex gap-2 mb-6">
+    <button class="type-tab active px-4 py-2 rounded-lg text-sm font-medium" data-type="staff">
+      <i class="fas fa-user-shield mr-2"></i>Society Staff ({staff.length})
+    </button>
+    <button class="type-tab px-4 py-2 rounded-lg text-sm font-medium" data-type="maid">
+      <i class="fas fa-broom mr-2"></i>Maids / Domestic Help ({maidList.length})
+    </button>
+  </div>
+
+  <!-- Staff table -->
+  <div id="staff-section">
+    {staff.length === 0 ? (
+      <div class="text-center py-16">
+        <i class="fas fa-user-shield text-5xl text-primary-200 mb-4"></i>
+        <h3 class="text-lg font-semibold text-text-primary mb-2">No staff members found</h3>
+        <p class="text-text-secondary text-sm">Add staff members via the Staff Management page</p>
+      </div>
+    ) : (
+      <div class="card-premium overflow-hidden">
+        <table class="w-full">
+          <thead class="bg-section-alt border-b border-border-light">
+            <tr>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">Staff Member</th>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">KYC Status</th>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">Documents</th>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">Security Pass</th>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {staff.map(s => (
+              <tr class="border-b border-border-light hover:bg-section-alt/50">
+                <td class="p-3">
+                  <p class="font-medium text-text-primary text-sm">{s.name}</p>
+                  <p class="text-xs text-text-secondary capitalize">{s.role?.replace(/_/g,' ')}</p>
+                  {s.phone && <p class="text-xs text-text-secondary">{s.phone}</p>}
+                  {!s.is_active && <span class="text-xs text-red-500">Inactive</span>}
+                </td>
+                <td class="p-3">
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${kycColor(s.kyc_status ?? 'pending')}`}>
+                    {kycLabel(s.kyc_status ?? 'pending')}
+                  </span>
+                  {s.aadhaar_last4 && <p class="text-xs text-text-secondary mt-1">Aadhaar: ×××× {s.aadhaar_last4}</p>}
+                </td>
+                <td class="p-3">
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-1 text-xs">
+                      <i class={`fas fa-circle text-xs ${s.photo_key ? 'text-secondary-500' : 'text-gray-300'}`}></i>
+                      Photo
+                    </div>
+                    <div class="flex items-center gap-1 text-xs">
+                      <i class={`fas fa-circle text-xs ${s.id_doc_key ? 'text-secondary-500' : 'text-gray-300'}`}></i>
+                      ID Document
+                    </div>
+                    <div class="flex items-center gap-1 text-xs">
+                      <i class={`fas fa-circle text-xs ${s.two_photos_received ? 'text-secondary-500' : 'text-gray-300'}`}></i>
+                      2 Photos Received
+                    </div>
+                    <div class="flex items-center gap-1 text-xs">
+                      <i class={`fas fa-circle text-xs ${s.police_verified ? 'text-secondary-500' : 'text-gray-300'}`}></i>
+                      Police Verified
+                      {s.police_verification_date && <span class="text-text-secondary">({new Date(s.police_verification_date).toLocaleDateString('en-IN')})</span>}
+                    </div>
+                  </div>
+                </td>
+                <td class="p-3">
+                  {s.security_pass_issued ? (
+                    <div>
+                      <p class="text-xs font-medium text-secondary-500">{s.security_pass_number}</p>
+                      {s.security_pass_expires_at && (
+                        <p class={`text-xs ${isExpiringSoon(s.security_pass_expires_at) ? 'text-red-600 font-medium' : 'text-text-secondary'}`}>
+                          {isExpiringSoon(s.security_pass_expires_at) ? '⚠ ' : ''}Exp: {new Date(s.security_pass_expires_at).toLocaleDateString('en-IN')}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <span class="text-xs text-amber-600"><i class="fas fa-clock mr-1"></i>Not issued</span>
+                  )}
+                </td>
+                <td class="p-3">
+                  <button class="btn-ghost text-xs px-2 py-1"
+                    onclick={`openKycPanel('${s.id}','staff',${JSON.stringify(JSON.stringify(s))})`}>
+                    <i class="fas fa-edit mr-1"></i>Manage KYC
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+
+  <!-- Maid table -->
+  <div id="maid-section" class="hidden">
+    {maidList.length === 0 ? (
+      <div class="text-center py-16">
+        <i class="fas fa-broom text-5xl text-primary-200 mb-4"></i>
+        <h3 class="text-lg font-semibold text-text-primary mb-2">No maids registered</h3>
+        <p class="text-text-secondary text-sm">Register maids via the Maid Registry</p>
+      </div>
+    ) : (
+      <div class="card-premium overflow-hidden">
+        <table class="w-full">
+          <thead class="bg-section-alt border-b border-border-light">
+            <tr>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">Name</th>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">KYC Status</th>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">Documents</th>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">Security Pass</th>
+              <th class="text-left text-xs font-semibold text-text-secondary p-3 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {maidList.map(m => (
+              <tr class="border-b border-border-light hover:bg-section-alt/50">
+                <td class="p-3">
+                  <p class="font-medium text-text-primary text-sm">{m.full_name}</p>
+                  <p class="text-xs text-text-secondary capitalize">{m.work_type?.replace(/_/g,' ')}</p>
+                  {!m.is_active && <span class="text-xs text-red-500">Inactive</span>}
+                </td>
+                <td class="p-3">
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${kycColor(m.kyc_status ?? 'pending')}`}>
+                    {kycLabel(m.kyc_status ?? 'pending')}
+                  </span>
+                </td>
+                <td class="p-3">
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-1 text-xs">
+                      <i class={`fas fa-circle text-xs ${m.photo_key ? 'text-secondary-500' : 'text-gray-300'}`}></i>
+                      Photo
+                    </div>
+                    <div class="flex items-center gap-1 text-xs">
+                      <i class={`fas fa-circle text-xs ${m.id_doc_key ? 'text-secondary-500' : 'text-gray-300'}`}></i>
+                      ID Document
+                    </div>
+                    <div class="flex items-center gap-1 text-xs">
+                      <i class={`fas fa-circle text-xs ${m.two_photos_received ? 'text-secondary-500' : 'text-gray-300'}`}></i>
+                      2 Photos Received
+                    </div>
+                    <div class="flex items-center gap-1 text-xs">
+                      <i class={`fas fa-circle text-xs ${m.police_verified ? 'text-secondary-500' : 'text-gray-300'}`}></i>
+                      Police Verified
+                      {m.verification_date && <span class="text-text-secondary">({new Date(m.verification_date).toLocaleDateString('en-IN')})</span>}
+                    </div>
+                  </div>
+                </td>
+                <td class="p-3">
+                  {m.security_pass_issued ? (
+                    <div>
+                      <p class="text-xs font-medium text-secondary-500">{m.security_pass_number}</p>
+                      {m.security_pass_expires_at && (
+                        <p class={`text-xs ${isExpiringSoon(m.security_pass_expires_at) ? 'text-red-600 font-medium' : 'text-text-secondary'}`}>
+                          {isExpiringSoon(m.security_pass_expires_at) ? '⚠ ' : ''}Exp: {new Date(m.security_pass_expires_at).toLocaleDateString('en-IN')}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <span class="text-xs text-amber-600"><i class="fas fa-clock mr-1"></i>Not issued</span>
+                  )}
+                </td>
+                <td class="p-3">
+                  <button class="btn-ghost text-xs px-2 py-1"
+                    onclick={`openKycPanel('${m.id}','maid',${JSON.stringify(JSON.stringify(m))})`}>
+                    <i class="fas fa-edit mr-1"></i>Manage KYC
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+
+  <!-- Detail panel -->
+  <div id="kyc-panel" class="fixed inset-y-0 right-0 w-full sm:w-96 lg:w-[480px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-primary-600" id="kyc-panel-title">KYC Management</h2>
+      <button id="close-kyc-panel" aria-label="Close">
+        <i class="fas fa-times text-xl text-text-secondary hover:text-text-primary"></i>
+      </button>
+    </div>
+    <div class="p-4" id="kyc-panel-body"></div>
+  </div>
+  <div id="kyc-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+</PortalLayout>
+
+<style>
+  .type-tab {
+    @apply border border-border-light text-text-secondary bg-white hover:bg-section-alt transition-colors;
+  }
+  .type-tab.active {
+    @apply bg-primary-600 text-white border-primary-600;
+  }
+</style>
+
+<script>
+  // Tab switching
+  document.querySelectorAll('.type-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.type-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const type = (btn as HTMLElement).dataset.type;
+      document.getElementById('staff-section')!.classList.toggle('hidden', type !== 'staff');
+      document.getElementById('maid-section')!.classList.toggle('hidden', type !== 'maid');
+    });
+  });
+
+  // KYC Panel
+  const panel = document.getElementById('kyc-panel')!;
+  const backdrop = document.getElementById('kyc-backdrop')!;
+  const panelBody = document.getElementById('kyc-panel-body')!;
+  const panelTitle = document.getElementById('kyc-panel-title')!;
+
+  function closePanel() {
+    panel.classList.add('translate-x-full');
+    backdrop.classList.add('hidden');
+  }
+  document.getElementById('close-kyc-panel')?.addEventListener('click', closePanel);
+  backdrop.addEventListener('click', closePanel);
+
+  let currentId = '';
+  let currentType = '';
+
+  window.openKycPanel = (id: string, type: string, recordStr: string) => {
+    currentId = id;
+    currentType = type;
+    const r = JSON.parse(recordStr);
+    const name = type === 'maid' ? r.full_name : r.name;
+    panelTitle.textContent = `${name} — KYC`;
+
+    panelBody.innerHTML = `
+      <div class="space-y-4">
+        <!-- Document upload -->
+        <div>
+          <p class="text-sm font-semibold text-text-primary mb-3">
+            <i class="fas fa-upload mr-2 text-primary-600"></i>Upload Documents (Byelaw 13.3)
+          </p>
+          <div class="space-y-2">
+            <div>
+              <label class="form-label text-xs">Photo</label>
+              <div class="flex gap-2">
+                <input type="file" id="photo-file" accept="image/*,.pdf" class="form-input text-xs py-1">
+                <button class="btn-secondary text-xs px-3" onclick="uploadDoc('photo')">Upload</button>
+              </div>
+              ${r.photo_key ? '<p class="text-xs text-secondary-500 mt-1"><i class="fas fa-check mr-1"></i>Photo uploaded</p>' : ''}
+            </div>
+            <div>
+              <label class="form-label text-xs">ID Document (Aadhaar / Voter ID / etc.)</label>
+              <div class="flex gap-2">
+                <input type="file" id="id-doc-file" accept="image/*,.pdf" class="form-input text-xs py-1">
+                <button class="btn-secondary text-xs px-3" onclick="uploadDoc('id_doc')">Upload</button>
+              </div>
+              ${r.id_doc_key ? '<p class="text-xs text-secondary-500 mt-1"><i class="fas fa-check mr-1"></i>ID document uploaded</p>' : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick checkboxes -->
+        <div class="bg-section-alt rounded-xl p-3 space-y-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="photos-chk" ${r.two_photos_received ? 'checked' : ''}
+              class="w-4 h-4 text-primary-600 rounded" onchange="updateChecks()">
+            <span class="text-sm">2 passport-size photos received</span>
+          </label>
+        </div>
+
+        ${type === 'staff' ? `
+        <div>
+          <label class="form-label text-xs">Aadhaar Last 4 Digits</label>
+          <input type="text" id="aadhaar-last4" maxlength="4" pattern="[0-9]{4}"
+            value="${r.aadhaar_last4 ?? ''}" placeholder="e.g. 5678"
+            class="form-input text-sm w-24">
+          <button class="btn-ghost text-xs ml-2" onclick="saveAadhaar()">Save</button>
+        </div>` : ''}
+
+        <!-- Police Verification -->
+        <div class="border border-border-light rounded-xl p-4">
+          <p class="text-sm font-semibold mb-3">
+            <i class="fas fa-shield-alt mr-2 text-primary-600"></i>Police Verification (Byelaw 13.3)
+          </p>
+          ${r.police_verified
+            ? `<p class="text-sm text-secondary-500"><i class="fas fa-check-circle mr-1"></i>Verified
+               ${r.police_verification_date ?? r.verification_date ? `on ${new Date(r.police_verification_date ?? r.verification_date).toLocaleDateString('en-IN')}` : ''}
+               ${r.police_station ? `at ${r.police_station}` : ''}</p>`
+            : `<div class="space-y-2">
+                <div>
+                  <label class="form-label text-xs">Police Station</label>
+                  <input type="text" id="police-station" placeholder="e.g. Shankarpally PS" class="form-input text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="form-label text-xs">Verification Date</label>
+                    <input type="date" id="police-date" class="form-input text-sm">
+                  </div>
+                  <div>
+                    <label class="form-label text-xs">Reference No.</label>
+                    <input type="text" id="police-ref" placeholder="Ref #" class="form-input text-sm">
+                  </div>
+                </div>
+                <button class="btn-primary text-sm w-full" onclick="recordPoliceVerification()">
+                  <i class="fas fa-shield-alt mr-2"></i>Record Police Verification
+                </button>
+              </div>`}
+        </div>
+
+        <!-- Security Pass -->
+        <div class="border border-border-light rounded-xl p-4">
+          <p class="text-sm font-semibold mb-3">
+            <i class="fas fa-id-badge mr-2 text-primary-600"></i>Security Pass (Byelaw 13.3)
+          </p>
+          ${r.security_pass_issued
+            ? `<div>
+                <p class="text-sm font-medium text-secondary-500">Pass: ${r.security_pass_number}</p>
+                ${r.security_pass_expires_at ? `<p class="text-xs text-text-secondary">Expires: ${new Date(r.security_pass_expires_at).toLocaleDateString('en-IN')}</p>` : ''}
+                <div class="mt-3">
+                  <label class="form-label text-xs">Renew Expiry Date</label>
+                  <div class="flex gap-2">
+                    <input type="date" id="renew-date" class="form-input text-sm">
+                    <button class="btn-secondary text-xs px-3" onclick="renewPass()">Renew</button>
+                  </div>
+                </div>
+              </div>`
+            : `<div class="space-y-2">
+                <p class="text-xs text-text-secondary">Requirements: police verified + 2 photos received</p>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="form-label text-xs">Pass Number</label>
+                    <input type="text" id="pass-number" placeholder="PASS-001" class="form-input text-sm">
+                  </div>
+                  <div>
+                    <label class="form-label text-xs">Expires</label>
+                    <input type="date" id="pass-expiry" class="form-input text-sm">
+                  </div>
+                </div>
+                <button class="btn-primary text-sm w-full" onclick="issuePass()">
+                  <i class="fas fa-id-badge mr-2"></i>Issue Security Pass
+                </button>
+              </div>`}
+        </div>
+
+        ${r.background_remarks && type === 'staff' ? `
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <p class="text-xs font-medium text-amber-700">Background Remarks: ${r.background_remarks}</p>
+          </div>` : ''}
+      </div>`;
+
+    panel.classList.remove('translate-x-full');
+    backdrop.classList.remove('hidden');
+  };
+
+  async function kycPatch(body: Record<string, unknown>) {
+    const res = await fetch(`/api/v1/admin/staff-kyc/${currentId}?type=${currentType}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      showToast('Updated');
+      setTimeout(() => location.reload(), 800);
+    } else {
+      const err = await res.json();
+      showToast(err.message ?? 'Update failed', 'error');
+    }
+  }
+
+  window.uploadDoc = async (docType: string) => {
+    const inputId = docType === 'photo' ? 'photo-file' : 'id-doc-file';
+    const file = (document.getElementById(inputId) as HTMLInputElement)?.files?.[0];
+    if (!file) { showToast('Select a file first', 'error'); return; }
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('doc_type', docType);
+    const res = await fetch(`/api/v1/admin/staff-kyc/${currentId}?type=${currentType}`, {
+      method: 'PATCH', body: fd,
+    });
+    if (res.ok) { showToast('Document uploaded'); setTimeout(() => location.reload(), 800); }
+    else { const e = await res.json(); showToast(e.message ?? 'Upload failed', 'error'); }
+  };
+
+  window.updateChecks = () => {
+    const twoPhotos = (document.getElementById('photos-chk') as HTMLInputElement)?.checked;
+    kycPatch({ two_photos_received: twoPhotos });
+  };
+
+  window.saveAadhaar = () => {
+    const val = (document.getElementById('aadhaar-last4') as HTMLInputElement)?.value?.trim();
+    if (!val || val.length !== 4) { showToast('Enter 4 digits', 'error'); return; }
+    kycPatch({ aadhaar_last4: val });
+  };
+
+  window.recordPoliceVerification = () => {
+    const station = (document.getElementById('police-station') as HTMLInputElement)?.value?.trim();
+    const date = (document.getElementById('police-date') as HTMLInputElement)?.value;
+    const ref = (document.getElementById('police-ref') as HTMLInputElement)?.value?.trim();
+    kycPatch({ police_verified: true, police_station: station, police_verification_date: date, police_verification_ref: ref });
+  };
+
+  window.issuePass = () => {
+    const passNum = (document.getElementById('pass-number') as HTMLInputElement)?.value?.trim();
+    const expiry = (document.getElementById('pass-expiry') as HTMLInputElement)?.value;
+    kycPatch({ issue_pass: true, security_pass_number: passNum, security_pass_expires_at: expiry ? new Date(expiry).toISOString() : null });
+  };
+
+  window.renewPass = () => {
+    const date = (document.getElementById('renew-date') as HTMLInputElement)?.value;
+    if (!date) { showToast('Select renewal date', 'error'); return; }
+    kycPatch({ renew_pass: true, security_pass_expires_at: new Date(date).toISOString() });
+  };
+
+  function showToast(message: string, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+    setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+  }
+</script>

@@ -1,0 +1,415 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+
+// Fetch units for the add form
+const sb = getSupabaseServiceClient();
+const { data: units } = isPrivileged
+  ? await sb.from('units').select('id, unit_number, block').eq('society_id', SOCIETY_ID).order('unit_number')
+  : { data: [] };
+---
+
+<PortalLayout title="Tenant KYC" user={user} activeModule="tenant_kyc">
+  <div class="mb-6 flex items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Tenant KYC</h1>
+      <p class="text-text-secondary text-sm mt-1">Tenant verification records and police clearance status.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      {isPrivileged && (
+        <button id="add-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-plus" aria-hidden="true"></i> Add Tenant KYC
+        </button>
+      )}
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-primary-600" id="stat-total">—</div>
+      <div class="text-xs text-text-secondary mt-1">Total Records</div>
+    </div>
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-amber-500" id="stat-pending">—</div>
+      <div class="text-xs text-text-secondary mt-1">Pending / In Progress</div>
+    </div>
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-secondary-500" id="stat-verified">—</div>
+      <div class="text-xs text-text-secondary mt-1">Police Verified</div>
+    </div>
+    <div class="card-premium p-4 text-center">
+      <div class="text-2xl font-bold text-primary-600" id="stat-completed">—</div>
+      <div class="text-xs text-text-secondary mt-1">Completed</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  {isPrivileged && (
+    <div class="flex gap-2 mb-5 flex-wrap">
+      {['All', 'Pending', 'Submitted', 'Police Verified', 'Completed', 'Expired'].map(s => (
+        <button data-status={s === 'All' ? '' : s.toLowerCase().replace(' ', '_')}
+          class={`status-btn text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${s === 'All' ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600'}`}>
+          {s}
+        </button>
+      ))}
+    </div>
+  )}
+
+  <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+    <div id="kyc-list">
+      <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Detail / update drawer -->
+  <div id="detail-drawer" class="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-primary-600">KYC Record</h2>
+      <button id="close-drawer" class="text-text-secondary hover:text-text-primary p-1">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div id="drawer-content" class="p-4"></div>
+  </div>
+  <div id="drawer-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+
+  <!-- Add KYC modal -->
+  {isPrivileged && (
+    <div id="add-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-border-light flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-primary-600">Add Tenant KYC Record</h3>
+          <button id="am-close" class="text-text-secondary hover:text-text-primary p-2">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div id="am-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="am-unit">Unit <span class="text-red-500">*</span></label>
+              <select id="am-unit" class="form-input bg-white">
+                <option value="">Select unit</option>
+                {(units ?? []).map((u: any) => (
+                  <option value={u.id}>{u.block ? `${u.block}-` : ''}{u.unit_number}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="am-name">Tenant name <span class="text-red-500">*</span></label>
+              <input id="am-name" type="text" maxlength="200" class="form-input" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="am-dob">Date of birth</label>
+              <input id="am-dob" type="date" class="form-input" />
+            </div>
+            <div>
+              <label class="form-label" for="am-aadhaar">Aadhaar last 4</label>
+              <input id="am-aadhaar" type="text" maxlength="4" pattern="[0-9]{4}" placeholder="XXXX" class="form-input" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="am-start">Tenancy start <span class="text-red-500">*</span></label>
+              <input id="am-start" type="date" class="form-input" />
+            </div>
+            <div>
+              <label class="form-label" for="am-end">Tenancy end</label>
+              <input id="am-end" type="date" class="form-input" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="am-rent">Monthly rent (₹)</label>
+              <input id="am-rent" type="number" min="0" step="100" class="form-input" />
+            </div>
+            <div>
+              <label class="form-label" for="am-pan">PAN number</label>
+              <input id="am-pan" type="text" maxlength="10" placeholder="ABCDE1234F" class="form-input uppercase" />
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="am-notes">Notes</label>
+            <textarea id="am-notes" rows="2" maxlength="1000" class="form-input resize-none"></textarea>
+          </div>
+        </div>
+        <div class="px-6 pb-6 flex gap-3">
+          <button id="am-submit" class="btn-primary flex-1 flex items-center justify-center gap-2 text-sm">
+            <i class="fas fa-save" aria-hidden="true"></i>
+            <span id="am-submit-label">Save KYC Record</span>
+          </button>
+          <button id="am-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <script define:vars={{ isPrivileged }}>
+    let statusFilter = '';
+
+    const STATUS_COLORS: Record<string, string> = {
+      pending:        'bg-gray-100 text-gray-700',
+      submitted:      'bg-blue-100 text-blue-700',
+      police_verified:'bg-amber-100 text-amber-700',
+      completed:      'bg-green-100 text-green-700',
+      expired:        'bg-red-100 text-red-600',
+    };
+    const STATUS_LABELS: Record<string, string> = {
+      pending: 'Pending', submitted: 'Submitted', police_verified: 'Police Verified', completed: 'Completed', expired: 'Expired',
+    };
+
+    function showToast(msg: string, type: 'success' | 'error' = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3500);
+    }
+
+    async function load() {
+      const container = document.getElementById('kyc-list')!;
+      container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+      const params = new URLSearchParams();
+      if (statusFilter) params.set('status', statusFilter);
+      const res = await fetch(`/api/v1/tenant-kyc?${params}`, { credentials: 'include' });
+      const records: any[] = res.ok ? await res.json() : [];
+
+      // Stats
+      document.getElementById('stat-total')!.textContent = String(records.length);
+      document.getElementById('stat-pending')!.textContent = String(records.filter(r => ['pending','submitted'].includes(r.status)).length);
+      document.getElementById('stat-verified')!.textContent = String(records.filter(r => r.status === 'police_verified').length);
+      document.getElementById('stat-completed')!.textContent = String(records.filter(r => r.status === 'completed').length);
+
+      if (!records.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No KYC records found.</div>';
+        return;
+      }
+
+      container.innerHTML = records.map(r => {
+        const unitLabel = r.units ? `${r.units.block ? r.units.block + '-' : ''}${r.units.unit_number}` : '—';
+        const badge = `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[r.status] ?? 'bg-gray-100 text-gray-700'}">${STATUS_LABELS[r.status] ?? r.status}</span>`;
+        const policeIcon = r.police_verified
+          ? '<span class="text-xs text-secondary-500 font-medium"><i class="fas fa-shield-alt mr-1" aria-hidden="true"></i>Verified</span>'
+          : '';
+        const tenancyPeriod = `${new Date(r.tenancy_start_date + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}${r.tenancy_end_date ? ' – ' + new Date(r.tenancy_end_date + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : ' →'}`;
+
+        return `
+          <div class="flex items-center gap-4 px-5 py-4 border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer"
+               onclick="openDrawer('${r.id}')">
+            <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center font-semibold text-primary-600 text-sm flex-shrink-0">
+              ${r.full_name[0].toUpperCase()}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm font-medium text-text-primary">${r.full_name}</span>
+                ${badge}
+                ${policeIcon}
+              </div>
+              <div class="text-xs text-text-secondary mt-0.5">
+                Unit ${unitLabel} · ${tenancyPeriod}
+                ${r.aadhaar_last4 ? ` · Aadhaar ****${r.aadhaar_last4}` : ''}
+              </div>
+            </div>
+            <i class="fas fa-chevron-right text-text-secondary text-xs flex-shrink-0" aria-hidden="true"></i>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function openDrawer(id: string) {
+      const res = await fetch(`/api/v1/tenant-kyc?status=`, { credentials: 'include' });
+      const all: any[] = res.ok ? await res.json() : [];
+      const r = all.find(x => x.id === id);
+      if (!r) return;
+
+      const drawer = document.getElementById('detail-drawer')!;
+      const backdrop = document.getElementById('drawer-backdrop')!;
+      const content = document.getElementById('drawer-content')!;
+      drawer.classList.remove('translate-x-full');
+      backdrop.classList.remove('hidden');
+
+      const unitLabel = r.units ? `${r.units.block ? r.units.block + '-' : ''}${r.units.unit_number}` : '—';
+      const badge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[r.status] ?? 'bg-gray-100'}">${STATUS_LABELS[r.status] ?? r.status}</span>`;
+      const nextStatuses: Record<string, string[]> = {
+        pending: ['submitted', 'expired'],
+        submitted: ['police_verified', 'pending', 'expired'],
+        police_verified: ['completed', 'expired'],
+        completed: ['expired'],
+        expired: [],
+      };
+      const transitions = nextStatuses[r.status] ?? [];
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex items-center gap-3 pb-4 border-b border-border-light">
+            <div class="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center font-semibold text-primary-600 text-lg">${r.full_name[0].toUpperCase()}</div>
+            <div>
+              <div class="font-semibold text-text-primary">${r.full_name}</div>
+              <div class="text-xs text-text-secondary">Unit ${unitLabel}</div>
+            </div>
+            <div class="ml-auto">${badge}</div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div><div class="text-xs text-text-secondary">Tenancy Start</div><div class="font-medium">${new Date(r.tenancy_start_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
+            ${r.tenancy_end_date ? `<div><div class="text-xs text-text-secondary">Tenancy End</div><div class="font-medium">${new Date(r.tenancy_end_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>` : ''}
+            ${r.monthly_rent ? `<div><div class="text-xs text-text-secondary">Monthly Rent</div><div class="font-medium">₹${Number(r.monthly_rent).toLocaleString('en-IN')}</div></div>` : ''}
+            ${r.aadhaar_last4 ? `<div><div class="text-xs text-text-secondary">Aadhaar</div><div class="font-medium font-mono">XXXX XXXX ${r.aadhaar_last4}</div></div>` : ''}
+            ${r.pan_number ? `<div><div class="text-xs text-text-secondary">PAN</div><div class="font-medium font-mono">${r.pan_number}</div></div>` : ''}
+          </div>
+          <div class="p-3 rounded-xl border ${r.police_verified ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-border-light'}">
+            <div class="flex items-center gap-2 mb-1">
+              <i class="fas ${r.police_verified ? 'fa-shield-alt text-secondary-500' : 'fa-shield text-gray-400'} text-sm" aria-hidden="true"></i>
+              <span class="text-sm font-medium ${r.police_verified ? 'text-secondary-500' : 'text-text-secondary'}">Police Verification</span>
+            </div>
+            ${r.police_verified
+              ? `<div class="text-xs text-text-secondary">${r.police_station ?? ''} · ${r.verification_date ? new Date(r.verification_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} ${r.verification_ref ? `· Ref: ${r.verification_ref}` : ''}</div>`
+              : '<div class="text-xs text-text-secondary">Not yet verified</div>'
+            }
+          </div>
+          ${r.owner_consent ? `<div class="text-xs text-secondary-500"><i class="fas fa-check-circle mr-1" aria-hidden="true"></i>Owner consent recorded ${r.owner_consent_at ? 'on ' + new Date(r.owner_consent_at).toLocaleDateString('en-IN') : ''}</div>` : ''}
+          ${r.notes ? `<div class="text-xs text-text-secondary italic p-3 bg-gray-50 rounded-xl">${r.notes}</div>` : ''}
+          ${isPrivileged && transitions.length ? `
+            <div class="pt-4 border-t border-border-light">
+              <div class="text-xs text-text-secondary mb-2 font-medium">Update Status</div>
+              <div class="flex gap-2 flex-wrap">
+                ${transitions.map(s => `
+                  <button onclick="updateStatus('${r.id}', '${s}')"
+                    class="text-xs px-3 py-1.5 rounded-lg font-medium border ${STATUS_COLORS[s] ?? 'bg-gray-100'} hover:opacity-80 transition-opacity">
+                    → ${STATUS_LABELS[s] ?? s}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          ${isPrivileged && !r.police_verified ? `
+            <div class="pt-3 border-t border-border-light space-y-3">
+              <div class="text-xs text-text-secondary font-medium">Record Police Verification</div>
+              <div class="grid grid-cols-2 gap-2">
+                <input id="dv-station" type="text" placeholder="Police station" class="form-input text-xs py-2" />
+                <input id="dv-date" type="date" class="form-input text-xs py-2" />
+              </div>
+              <input id="dv-ref" type="text" placeholder="Reference / acknowledgement #" class="form-input text-xs py-2 w-full" />
+              <button onclick="recordPoliceVerification('${r.id}')"
+                class="btn-secondary text-xs px-4 py-2 w-full flex items-center justify-center gap-2">
+                <i class="fas fa-shield-alt" aria-hidden="true"></i> Mark Police Verified
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    async function updateStatus(id: string, status: string) {
+      const res = await fetch(`/api/v1/tenant-kyc/${id}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) { showToast('Status updated.'); closeDrawer(); load(); }
+      else { showToast('Failed to update status.', 'error'); }
+    }
+
+    async function recordPoliceVerification(id: string) {
+      const station = (document.getElementById('dv-station') as HTMLInputElement)?.value.trim();
+      const date    = (document.getElementById('dv-date') as HTMLInputElement)?.value;
+      const ref     = (document.getElementById('dv-ref') as HTMLInputElement)?.value.trim();
+      if (!station || !date) { showToast('Police station and date are required.', 'error'); return; }
+      const res = await fetch(`/api/v1/tenant-kyc/${id}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ police_verified: true, police_station: station, verification_date: date, verification_ref: ref || undefined, status: 'police_verified' }),
+      });
+      if (res.ok) { showToast('Police verification recorded.'); closeDrawer(); load(); }
+      else { showToast('Failed to record verification.', 'error'); }
+    }
+
+    function closeDrawer() {
+      document.getElementById('detail-drawer')!.classList.add('translate-x-full');
+      document.getElementById('drawer-backdrop')!.classList.add('hidden');
+    }
+    document.getElementById('close-drawer')!.addEventListener('click', closeDrawer);
+    document.getElementById('drawer-backdrop')!.addEventListener('click', closeDrawer);
+
+    // Status filter tabs
+    document.querySelectorAll('.status-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.status-btn').forEach(b => {
+          b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
+          b.classList.add('bg-white', 'text-text-secondary', 'border-border-light');
+        });
+        btn.classList.add('bg-primary-600', 'text-white', 'border-primary-600');
+        btn.classList.remove('bg-white', 'text-text-secondary', 'border-border-light');
+        statusFilter = (btn as HTMLElement).dataset.status!;
+        load();
+      });
+    });
+
+    // Add KYC modal
+    if (isPrivileged) {
+      const modal = document.getElementById('add-modal')!;
+      const errEl = document.getElementById('am-error')!;
+      const submitBtn = document.getElementById('am-submit') as HTMLButtonElement;
+      const submitLbl = document.getElementById('am-submit-label')!;
+
+      function openModal() {
+        modal.classList.remove('hidden');
+        errEl.classList.add('hidden');
+        (document.getElementById('am-start') as HTMLInputElement).value = new Date().toISOString().slice(0, 10);
+      }
+      function closeModal() { modal.classList.add('hidden'); }
+
+      document.getElementById('add-btn')!.addEventListener('click', openModal);
+      document.getElementById('am-close')!.addEventListener('click', closeModal);
+      document.getElementById('am-cancel')!.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+      submitBtn.addEventListener('click', async () => {
+        errEl.classList.add('hidden');
+        const unit_id = (document.getElementById('am-unit') as HTMLSelectElement).value;
+        const full_name = (document.getElementById('am-name') as HTMLInputElement).value.trim();
+        const tenancy_start_date = (document.getElementById('am-start') as HTMLInputElement).value;
+        if (!unit_id || !full_name || !tenancy_start_date) {
+          errEl.textContent = 'Unit, tenant name and start date are required.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        submitBtn.disabled = true; submitLbl.textContent = 'Saving…';
+        const body: Record<string, unknown> = {
+          unit_id, full_name, tenancy_start_date,
+          date_of_birth: (document.getElementById('am-dob') as HTMLInputElement).value || undefined,
+          aadhaar_last4: (document.getElementById('am-aadhaar') as HTMLInputElement).value || undefined,
+          tenancy_end_date: (document.getElementById('am-end') as HTMLInputElement).value || undefined,
+          monthly_rent: parseFloat((document.getElementById('am-rent') as HTMLInputElement).value) || undefined,
+          pan_number: (document.getElementById('am-pan') as HTMLInputElement).value.toUpperCase().trim() || undefined,
+          notes: (document.getElementById('am-notes') as HTMLTextAreaElement).value.trim() || undefined,
+        };
+        const res = await fetch('/api/v1/tenant-kyc', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.message ?? data.error ?? 'Save failed'; errEl.classList.remove('hidden'); }
+        else { showToast('KYC record created.'); closeModal(); load(); }
+        submitBtn.disabled = false; submitLbl.textContent = 'Save KYC Record';
+      });
+    }
+
+    (window as any).openDrawer = openDrawer;
+    (window as any).updateStatus = updateStatus;
+    (window as any).recordPoliceVerification = recordPoliceVerification;
+    load();
+  </script>
+</PortalLayout>

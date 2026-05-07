@@ -41,10 +41,41 @@ export const POST: APIRoute = async ({ request, params }) => {
       .select('id')
       .eq('poll_id', params.id!)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       return new Response(JSON.stringify({ error: 'You have already voted in this poll' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Enforce one_vote_per_unit: check if any unit-mate has already voted
+    if (poll.one_vote_per_unit) {
+      const { data: profile } = await sb
+        .from('profiles')
+        .select('unit_id')
+        .eq('id', user.id)
+        .single();
+      if (profile?.unit_id) {
+        // Fetch all user IDs sharing the same unit, then check for existing votes
+        const { data: unitMembers } = await sb
+          .from('profiles')
+          .select('id')
+          .eq('unit_id', profile.unit_id);
+        const unitMemberIds = (unitMembers ?? []).map((m: any) => m.id);
+        if (unitMemberIds.length > 0) {
+          const { data: unitVote } = await sb
+            .from('poll_votes')
+            .select('id')
+            .eq('poll_id', params.id!)
+            .in('user_id', unitMemberIds)
+            .limit(1)
+            .maybeSingle();
+          if (unitVote) {
+            return new Response(JSON.stringify({ error: 'A member of your unit has already voted in this poll' }), {
+              status: 409, headers: { 'Content-Type': 'application/json' },
+            });
+          }
+        }
+      }
     }
 
     const { data, error } = await sb

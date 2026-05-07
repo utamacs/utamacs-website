@@ -149,9 +149,18 @@ if (!user) return Astro.redirect('/portal/login');
       const hasVoted = results?.has_voted;
       const resultsAvailable = results?.results_available;
 
-      const optionsHTML = hasVoted && resultsAvailable
-        ? renderResultBars(options, results)
-        : renderVoteButtons(options, p.id, isOpen);
+      // Show results if available; if voted but results blocked, show a placeholder
+      let optionsHTML;
+      if (resultsAvailable) {
+        optionsHTML = hasVoted
+          ? renderResultBars(options, results)
+          : renderResultBars(options, results); // 'always' visibility — show to all
+      } else if (hasVoted) {
+        // voted but result_visibility = 'after_close' and poll still open
+        optionsHTML = `<p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-2"><i class="fas fa-clock"></i>${results?.reason ?? 'Results will be visible after the poll closes.'}</p>`;
+      } else {
+        optionsHTML = renderVoteButtons(options, p.id, isOpen);
+      }
 
       return `
         <div class="bg-white rounded-xl border border-border-light p-5" id="poll-${p.id}">
@@ -171,7 +180,7 @@ if (!user) return Astro.redirect('/portal/login');
           <div class="poll-options" id="poll-options-${p.id}">
             ${optionsHTML}
           </div>
-          ${hasVoted && resultsAvailable
+          ${resultsAvailable
             ? `<p class="text-xs text-text-secondary mt-3 text-center">${results.total_votes} vote${results.total_votes !== 1 ? 's' : ''} total</p>`
             : ''}
           ${hasVoted && !isOpen

@@ -38,6 +38,12 @@ const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: st
   { moduleKey: 'maids',            displayName: 'Domestic Help Registry', icon: 'fa-user-friends' },
   { moduleKey: 'gallery',          displayName: 'Photo Gallery',          icon: 'fa-images' },
   { moduleKey: 'feedback',         displayName: 'Resident Feedback',      icon: 'fa-star' },
+  { moduleKey: 'water_tankers',    displayName: 'Water Management',       icon: 'fa-tint' },
+  { moduleKey: 'security_patrol',  displayName: 'Security Patrol Log',    icon: 'fa-shield-alt' },
+  { moduleKey: 'tenant_kyc',       displayName: 'Tenant KYC',             icon: 'fa-id-card' },
+  { moduleKey: 'memberships',      displayName: 'Membership Registry',    icon: 'fa-id-card' },
+  { moduleKey: 'staff_kyc',        displayName: 'Staff & Maid KYC',       icon: 'fa-user-check' },
+  { moduleKey: 'register',         displayName: 'Society Membership',     icon: 'fa-certificate' },
 ];
 
 const MODULE_PATHS: Record<string, string> = {
@@ -63,6 +69,12 @@ const MODULE_PATHS: Record<string, string> = {
   maids:            '/portal/maids',
   gallery:          '/portal/gallery',
   feedback:         '/portal/feedback',
+  water_tankers:    '/portal/water-tankers',
+  security_patrol:  '/portal/security-patrol',
+  tenant_kyc:       '/portal/tenant-kyc',
+  memberships:      '/portal/admin/memberships',
+  staff_kyc:        '/portal/admin/staff-kyc',
+  register:         '/portal/register/membership',
 };
 
 let allModules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = FALLBACK_MODULES;
@@ -333,9 +345,17 @@ if (isGuard) {
                           ? 'bg-primary-50 text-primary-600'
                           : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
                       }`}
+                      {...(item.activeKey === 'notifications' ? { id: 'notif-nav-link' } : {})}
                     >
                       <i class={`fas ${item.icon} w-4 text-center text-[13px]`} aria-hidden="true"></i>
                       {item.label}
+                      {item.activeKey === 'notifications' && (
+                        <span
+                          id="notif-badge"
+                          class="hidden ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none"
+                          aria-label="Unread notifications"
+                        ></span>
+                      )}
                     </a>
                   );
                 })}
@@ -656,6 +676,22 @@ if (isGuard) {
           });
         }, 250);
       });
+    })();
+
+    // ── Notification unread badge ─────────────────────────────────────────────
+    (async function () {
+      const badge = document.getElementById('notif-badge');
+      if (!badge) return;
+      try {
+        const res = await fetch('/api/v1/notifications?unread=true&limit=50', { credentials: 'include' });
+        if (!res.ok) return;
+        const items: unknown[] = await res.json();
+        const count = Array.isArray(items) ? items.length : 0;
+        if (count > 0) {
+          badge.textContent = count > 99 ? '99+' : String(count);
+          badge.classList.remove('hidden');
+        }
+      } catch { /* non-critical */ }
     })();
   </script>
 </body>

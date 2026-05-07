@@ -101,6 +101,41 @@ export const GET: APIRoute = async ({ request }) => {
     results.scheduled_notices = { error: err instanceof Error ? err.message : String(err) };
   }
 
+  // ── 10. Complaint SLA escalation ─────────────────────────────────────────
+  try {
+    results.complaint_sla = await runComplaintSlaEscalation(sb, now, nowIso);
+  } catch (err) {
+    results.complaint_sla = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 11. Event reminder notifications ──────────────────────────────────────
+  try {
+    results.event_reminders = await runEventReminders(sb, now, nowIso);
+  } catch (err) {
+    results.event_reminders = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 12. Feedback SLA escalation (exec response overdue > 7 days) ──────────
+  try {
+    results.feedback_sla = await runFeedbackSlaEscalation(sb, now, nowIso);
+  } catch (err) {
+    results.feedback_sla = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 13. AMC renewal reminders (30 days before end_date) ──────────────────
+  try {
+    results.amc_reminders = await runAmcRenewalReminders(sb, now, nowIso);
+  } catch (err) {
+    results.amc_reminders = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 14. Daily notification digest emails ───────────────────────────────────
+  try {
+    results.digest_emails = await runDailyDigest(sb, now, nowIso);
+  } catch (err) {
+    results.digest_emails = { error: err instanceof Error ? err.message : String(err) };
+  }
+
   // ── Write master heartbeat ─────────────────────────────────────────────────
   try {
     await sb.from('cron_heartbeats').insert({
@@ -350,6 +385,348 @@ async function runScheduledNotices(sb: ReturnType<typeof getSupabaseServiceClien
   }
 
   return { published: ids.length };
+}
+
+async function runComplaintSlaEscalation(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Escalate complaints that have been Open or Assigned for more than 48 hours
+  // without a status change. Sends an in-app notification to executive members.
+  const cutoff48h = new Date(now.getTime() - 48 * 3_600_000).toISOString();
+
+  const { data: stale } = await sb
+    .from('complaints')
+    .select('id, title, status, raised_by, created_at')
+    .eq('society_id', SOCIETY_ID)
+    .in('status', ['Open', 'Assigned'])
+    .lt('created_at', cutoff48h)
+    .limit(20);
+
+  if (!stale?.length) return { escalated: 0 };
+
+  // Get exec members to notify
+  const { data: execs } = await sb
+    .from('profiles')
+    .select('id')
+    .eq('society_id', SOCIETY_ID)
+    .eq('is_active', true)
+    .in('portal_role', ['executive', 'secretary', 'president']);
+
+  const execIds = (execs ?? []).map((e: any) => e.id);
+  if (!execIds.length) return { escalated: 0 };
+
+  let escalated = 0;
+  for (const complaint of stale) {
+    const c = complaint as any;
+    // Dedup: skip if already escalated today
+    const { count } = await sb
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('society_id', SOCIETY_ID)
+      .eq('reference_id', c.id)
+      .eq('reference_table', 'complaints')
+      .eq('title', 'Complaint SLA overdue')
+      .gte('created_at', nowIso.slice(0, 10) + 'T00:00:00.000Z');
+    if (count && count > 0) continue;
+
+    const hoursOpen = Math.round((now.getTime() - new Date(c.created_at).getTime()) / 3_600_000);
+    try {
+      await sb.from('notifications').insert(
+        execIds.map((uid: string) => ({
+          society_id: SOCIETY_ID,
+          user_id: uid,
+          title: 'Complaint SLA overdue',
+          body: `"${c.title}" has been ${c.status} for ${hoursOpen}h with no update.`,
+          type: 'complaint',
+          reference_table: 'complaints',
+          reference_id: c.id,
+          is_read: false,
+        })),
+      );
+      escalated++;
+    } catch { /* non-fatal */ }
+  }
+
+  return { escalated };
+}
+
+async function runEventReminders(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Daily cron fires at 07:00 IST. We send two reminder types:
+  //   "Tomorrow" reminder — events starting in the next 20–32h window
+  //   "Today"    reminder — events starting in the next 0–20h window (same day)
+  const windowStart = new Date(now);
+  const windowTomorrow = new Date(now.getTime() + 20 * 3_600_000);
+  const windowEnd     = new Date(now.getTime() + 32 * 3_600_000);
+
+  const [{ data: todayEvents }, { data: tomorrowEvents }] = await Promise.all([
+    sb.from('events')
+      .select('id, title, starts_at')
+      .eq('society_id', SOCIETY_ID)
+      .eq('is_published', true)
+      .gte('starts_at', nowIso)
+      .lt('starts_at', windowTomorrow.toISOString())
+      .limit(20),
+    sb.from('events')
+      .select('id, title, starts_at')
+      .eq('society_id', SOCIETY_ID)
+      .eq('is_published', true)
+      .gte('starts_at', windowTomorrow.toISOString())
+      .lte('starts_at', windowEnd.toISOString())
+      .limit(20),
+  ]);
+
+  let reminders = 0;
+
+  const sendEventReminder = async (event: any, label: string) => {
+    // Dedup: skip if we already sent a reminder for this event today
+    const { count } = await sb.from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('society_id', SOCIETY_ID)
+      .eq('reference_id', event.id)
+      .eq('reference_table', 'events')
+      .eq('type', 'event')
+      .gte('created_at', windowStart.toISOString().slice(0, 10) + 'T00:00:00.000Z');
+    if (count && count > 0) return; // already reminded today
+
+    // Get all registered users for this event
+    const { data: regs } = await sb.from('event_registrations')
+      .select('user_id')
+      .eq('event_id', event.id)
+      .in('status', ['registered', 'waitlisted']);
+
+    if (!regs?.length) return;
+
+    const startsAt = new Date(event.starts_at);
+    const timeStr = startsAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+
+    try {
+      await sb.from('notifications').insert(
+        regs.map((r: any) => ({
+          society_id: SOCIETY_ID,
+          user_id: r.user_id,
+          title: `Reminder: ${event.title}`,
+          body: `${label} at ${timeStr} IST. Don't forget to attend!`,
+          type: 'event',
+          reference_table: 'events',
+          reference_id: event.id,
+          is_read: false,
+        })),
+      );
+      reminders += regs.length;
+    } catch { /* non-fatal */ }
+  };
+
+  for (const e of todayEvents ?? []) await sendEventReminder(e as any, 'Today');
+  for (const e of tomorrowEvents ?? []) await sendEventReminder(e as any, 'Tomorrow');
+
+  return { reminders };
+}
+
+async function runDailyDigest(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Send one daily digest email per member if they have unread notifications from the past 24h
+  // and have email_digest_enabled = true in notification_preferences.
+  if (!RESEND_API_KEY) return 'SKIPPED_NO_RESEND_KEY';
+
+  const since24h = new Date(now.getTime() - 24 * 3_600_000).toISOString();
+  const todayPrefix = nowIso.slice(0, 10);
+
+  // Members with email digest opted in
+  const { data: prefs } = await sb
+    .from('notification_preferences')
+    .select('user_id')
+    .eq('email_enabled', true)
+    .eq('email_digest_enabled', true)
+    .limit(200);
+
+  if (!prefs?.length) return { sent: 0 };
+
+  let sent = 0;
+  for (const pref of prefs) {
+    try {
+      // Dedup: already sent a digest to this user today?
+      const { count: alreadySent } = await sb
+        .from('email_drafts')
+        .select('id', { count: 'exact', head: true })
+        .eq('recipient_type', 'MEMBER')
+        .eq('triggered_by', 'cron:master:daily-digest')
+        .like('subject', '%Daily Summary%')
+        .gte('created_at', `${todayPrefix}T00:00:00.000Z`);
+      if (alreadySent && alreadySent > 0) continue;
+
+      // Fetch this user's unread notifications from past 24h
+      const { data: notifs } = await sb
+        .from('notifications')
+        .select('type, title')
+        .eq('user_id', pref.user_id)
+        .eq('is_read', false)
+        .gte('created_at', since24h)
+        .eq('society_id', SOCIETY_ID)
+        .limit(50);
+
+      if (!notifs?.length) continue;
+
+      // Group by type
+      const grouped: Record<string, number> = {};
+      for (const n of notifs) {
+        const t = n.type ?? 'other';
+        grouped[t] = (grouped[t] ?? 0) + 1;
+      }
+
+      // Get user email
+      const { data: authUser } = await (sb as any).auth.admin.getUserById(pref.user_id);
+      const email = authUser?.user?.email;
+      const name = authUser?.user?.user_metadata?.full_name ?? 'Resident';
+      if (!email) continue;
+
+      const rows = Object.entries(grouped)
+        .map(([type, count]) => `<tr><td style="padding:4px 8px;text-transform:capitalize">${type.replace(/_/g,' ')}</td><td style="padding:4px 8px;font-weight:600">${count}</td></tr>`)
+        .join('');
+
+      const bodyHtml = `
+        <p>Hi ${name},</p>
+        <p>You have <strong>${notifs.length} unread notification${notifs.length > 1 ? 's' : ''}</strong> from the last 24 hours:</p>
+        <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:12px 0">
+          <thead><tr style="background:#F3F4F6"><th style="padding:4px 8px;text-align:left">Type</th><th style="padding:4px 8px;text-align:left">Count</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <p><a href="https://portal.utamacs.org/portal/notifications" style="color:#1E3A8A">View all notifications →</a></p>
+        <p style="color:#6B7280;font-size:12px">To stop receiving digest emails, update your notification preferences in the portal.</p>`;
+
+      await sb.from('email_drafts').insert({
+        society_id: SOCIETY_ID, tier: 1, status: 'DRAFT',
+        triggered_by: 'cron:master:daily-digest',
+        trigger_resource_type: 'notifications', trigger_resource_id: pref.user_id,
+        recipient_type: 'MEMBER', recipient_email: email, recipient_name: name,
+        subject: `UTA MACS Daily Summary — ${notifs.length} notification${notifs.length > 1 ? 's' : ''}`,
+        body_html: bodyHtml,
+        body_text: `You have ${notifs.length} unread notifications. Visit https://portal.utamacs.org/portal/notifications to view them.`,
+        suggested_sender_name: SENDER_NAME, suggested_sender_email: SENDER_EMAIL,
+      });
+      sent++;
+    } catch { /* non-fatal per user */ }
+  }
+
+  return { sent };
+}
+
+async function runAmcRenewalReminders(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Send exec notifications for AMC contracts expiring within 30 days.
+  // One reminder per contract per day (dedup on reference_id).
+  const in30Days = new Date(now);
+  in30Days.setDate(in30Days.getDate() + 30);
+
+  const { data: expiring } = await sb
+    .from('amc_contracts')
+    .select('id, equipment_name, end_date')
+    .eq('society_id', SOCIETY_ID)
+    .eq('is_active', true)
+    .gte('end_date', now.toISOString().slice(0, 10))   // not yet expired
+    .lte('end_date', in30Days.toISOString().slice(0, 10))
+    .limit(20);
+
+  if (!expiring?.length) return { reminded: 0 };
+
+  const { data: execProfiles } = await sb
+    .from('profiles')
+    .select('id')
+    .eq('society_id', SOCIETY_ID)
+    .in('portal_role', ['executive', 'secretary', 'president'])
+    .eq('is_active', true);
+
+  const execIds = (execProfiles ?? []).map((p: any) => p.id);
+  if (!execIds.length) return { reminded: 0 };
+
+  let reminded = 0;
+  for (const contract of expiring) {
+    // Dedup: skip if already reminded today
+    const { count } = await sb
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('society_id', SOCIETY_ID)
+      .eq('reference_id', contract.id)
+      .eq('type', 'amc')
+      .eq('title', 'AMC renewal due')
+      .gte('created_at', nowIso.slice(0, 10) + 'T00:00:00.000Z');
+    if (count && count > 0) continue;
+
+    const daysLeft = Math.ceil((new Date(contract.end_date).getTime() - now.getTime()) / 86400000);
+    try {
+      await sb.from('notifications').insert(
+        execIds.map((uid: string) => ({
+          society_id: SOCIETY_ID,
+          user_id: uid,
+          title: 'AMC renewal due',
+          body: `"${contract.equipment_name}" AMC expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''} (${contract.end_date}). Renew to avoid service gap.`,
+          type: 'amc',
+          reference_table: 'amc_contracts',
+          reference_id: contract.id,
+          is_read: false,
+        })),
+      );
+      reminded++;
+    } catch { /* non-fatal */ }
+  }
+
+  return { reminded };
+}
+
+async function runFeedbackSlaEscalation(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, nowIso: string) {
+  // Escalate feedback items that have had no exec response for >7 days.
+  // Feedback table: id, title, status, is_anonymous, submitted_by, created_at, response_at (nullable)
+  const SLA_HOURS = 7 * 24; // 7 days
+  const cutoff = new Date(now.getTime() - SLA_HOURS * 3_600_000).toISOString();
+
+  const { data: stale } = await sb
+    .from('feedbacks')
+    .select('id, subject, status')
+    .eq('society_id', SOCIETY_ID)
+    .in('status', ['open', 'acknowledged', 'in_progress'])
+    .lt('created_at', cutoff)
+    .is('responded_at', null)
+    .limit(30);
+
+  if (!stale?.length) return { escalated: 0 };
+
+  // Get exec/secretary/president IDs for notification
+  const { data: execProfiles } = await sb
+    .from('profiles')
+    .select('id')
+    .eq('society_id', SOCIETY_ID)
+    .in('portal_role', ['executive', 'secretary', 'president'])
+    .eq('is_active', true);
+
+  const execIds = (execProfiles ?? []).map((p: any) => p.id);
+  if (!execIds.length) return { escalated: 0 };
+
+  let escalated = 0;
+  for (const f of stale) {
+    // Dedup: only escalate once per feedback item per day
+    const { count } = await sb
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('society_id', SOCIETY_ID)
+      .eq('reference_id', f.id)
+      .eq('type', 'feedback')
+      .eq('title', 'Feedback awaiting response')
+      .gte('created_at', nowIso.slice(0, 10) + 'T00:00:00.000Z');
+    if (count && count > 0) continue;
+
+    try {
+      await sb.from('notifications').insert(
+        execIds.map((uid: string) => ({
+          society_id: SOCIETY_ID,
+          user_id: uid,
+          title: 'Feedback awaiting response',
+          body: `Resident feedback "${f.subject ?? 'Untitled'}" has had no response for over 7 days.`,
+          type: 'feedback',
+          reference_table: 'feedback',
+          reference_id: f.id,
+          is_read: false,
+        })),
+      );
+      escalated++;
+    } catch { /* non-fatal */ }
+  }
+
+  return { escalated };
 }
 
 // ── Shared helpers ───────────────────────────────────────────────────────────

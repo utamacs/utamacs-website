@@ -7,6 +7,7 @@ import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -29,7 +30,6 @@ const ALLOWED_MIME: Record<string, string> = {
 };
 const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const GET: APIRoute = async ({ request, url }) => {
   try {
@@ -46,6 +46,7 @@ export const GET: APIRoute = async ({ request, url }) => {
       .select('id, title, description, category, file_name, mime_type, file_size_bytes, version, is_public, requires_role, storage_key, folder_id, tags, is_archived, download_count, created_by, created_at')
       .eq('society_id', SOCIETY_ID)
       .eq('is_archived', archived)
+      .is('parent_id', null)
       .order('category')
       .order('title');
 
