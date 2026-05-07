@@ -2,14 +2,35 @@ node_modules/
 dist/
 .astro/
 .DS_Store
-.env
-.env.local
-.env.test
 *.log
 .claude/settings.local.json
 
+# ─── Environment / Secrets — NEVER commit real credentials ──────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.cert
+*.crt
+*_rsa
+*_dsa
+*_ecdsa
+*_ed25519
+.npmrc
+.netrc
+secrets/
+credentials/
+**/credentials.json
+**/service-account*.json
+**/serviceAccount*.json
+
 # ─── Playwright ─────────────────────────────────────────────────────────────
-tests/.auth/          # saved login sessions — contain real tokens, never commit
+# tests/.auth contains Supabase session tokens — NEVER commit
+tests/.auth/
 playwright-report/
 test-results/
 
