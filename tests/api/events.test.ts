@@ -18,14 +18,7 @@ describe('Events API', () => {
     const res = await apiFetch('/events', {
       method: 'POST',
       role: 'member',
-      body: JSON.stringify({
-        title: 'API Test Event',
-        event_date: '2026-12-31',
-        event_time: '18:00',
-        venue: 'Clubhouse',
-        capacity: 50,
-        is_public: true,
-      }),
+      body: JSON.stringify({ title: 'Test', starts_at: '2026-12-31T18:00:00Z', ends_at: '2026-12-31T20:00:00Z' }),
     });
     expect(res.status).toBe(403);
   });
@@ -36,11 +29,10 @@ describe('Events API', () => {
       role: 'exec',
       body: JSON.stringify({
         title: 'API Test Event',
-        event_date: '2026-12-31',
-        event_time: '18:00',
-        venue: 'Clubhouse',
+        starts_at: '2026-12-31T18:00:00Z',
+        ends_at: '2026-12-31T20:00:00Z',
+        location: 'Clubhouse',
         capacity: 50,
-        is_public: true,
       }),
     });
     expect(res.status).toBe(201);

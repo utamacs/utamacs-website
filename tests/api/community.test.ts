@@ -20,8 +20,9 @@ describe('Community API', () => {
         method: 'POST',
         role: 'member',
         body: JSON.stringify({
-          body: 'Test post from Vitest API test',
-          category: 'general',
+          title: 'API Test Post',
+          body: 'Test post from Vitest API test suite. This content is for testing only.',
+          category: 'General',
         }),
       });
       expect(res.status).toBe(201);
@@ -32,6 +33,15 @@ describe('Community API', () => {
         method: 'POST',
         role: 'member',
         body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('POST /community/posts missing title → 400', async () => {
+      const res = await apiFetch('/community/posts', {
+        method: 'POST',
+        role: 'member',
+        body: JSON.stringify({ body: 'Content without a title', category: 'general' }),
       });
       expect(res.status).toBe(400);
     });

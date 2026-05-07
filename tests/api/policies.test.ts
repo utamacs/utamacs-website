@@ -16,12 +16,7 @@ describe('Policies API', () => {
     const res = await apiFetch('/policies', {
       method: 'POST',
       role: 'member',
-      body: JSON.stringify({
-        title: 'API Test Policy',
-        body: 'Policy content for testing that is long enough',
-        category: 'general',
-        effective_date: '2026-01-01',
-      }),
+      body: JSON.stringify({ title: 'Test', policy_type: 'text' }),
     });
     expect(res.status).toBe(403);
   });
@@ -32,11 +27,21 @@ describe('Policies API', () => {
       role: 'exec',
       body: JSON.stringify({
         title: 'API Test Policy',
-        body: 'Policy content for testing that is long enough',
-        category: 'general',
+        policy_type: 'text',
+        body: 'This is the policy content created by the automated API test suite.',
         effective_date: '2026-01-01',
+        acknowledgement_required: false,
       }),
     });
     expect(res.status).toBe(201);
+  });
+
+  it('POST /policies with exec auth + missing policy_type → 400', async () => {
+    const res = await apiFetch('/policies', {
+      method: 'POST',
+      role: 'exec',
+      body: JSON.stringify({ title: 'Bad policy' }),
+    });
+    expect(res.status).toBe(400);
   });
 });

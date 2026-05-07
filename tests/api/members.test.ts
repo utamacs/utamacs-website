@@ -24,8 +24,15 @@ describe('Members API', () => {
     expect(res.status).toBe(403);
   });
 
-  it('GET /members/export with exec auth → 200', async () => {
+  // export requires users.view_directory — exec role does not have this by default
+  // (only secretary and president have it); exec gets 403 too
+  it('GET /members/export with exec auth → 403 (needs users.view_directory, assigned to secretary+)', async () => {
     const res = await apiFetch('/members/export', { role: 'exec' });
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /members/export with admin auth → 200', async () => {
+    const res = await apiFetch('/members/export', { role: 'admin' });
     expect(res.status).toBe(200);
   });
 });

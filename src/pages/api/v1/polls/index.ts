@@ -38,8 +38,14 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     const { title, description, poll_type, options, is_anonymous, one_vote_per_unit, starts_at, ends_at } = body;
 
+    const VALID_POLL_TYPES = ['single_choice', 'multiple_choice', 'yes_no', 'rating'];
     if (!title || !poll_type || !Array.isArray(options) || options.length < 2) {
       return new Response(JSON.stringify({ error: 'title, poll_type and at least 2 options are required' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (!VALID_POLL_TYPES.includes(String(poll_type))) {
+      return new Response(JSON.stringify({ error: `poll_type must be one of: ${VALID_POLL_TYPES.join(', ')}` }), {
         status: 400, headers: { 'Content-Type': 'application/json' },
       });
     }

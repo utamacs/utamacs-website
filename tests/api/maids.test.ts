@@ -7,20 +7,22 @@ describe('Maids API', () => {
     expect(res.status).toBe(401);
   });
 
-  it('GET /maids with member auth → 200', async () => {
+  // member has maids.approve but NOT maids.view — list requires maids.view
+  it('GET /maids with member auth → 403 (needs maids.view, member only has maids.approve)', async () => {
     const res = await apiFetch('/maids', { role: 'member' });
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /maids with exec auth → 200', async () => {
+    const res = await apiFetch('/maids', { role: 'exec' });
     expect(res.status).toBe(200);
   });
 
-  it('POST /maids with member auth → 403', async () => {
+  it('POST /maids with member auth → 403 (needs maids.manage)', async () => {
     const res = await apiFetch('/maids', {
       method: 'POST',
       role: 'member',
-      body: JSON.stringify({
-        full_name: 'API Test Helper',
-        work_type: 'cleaning',
-        is_active: true,
-      }),
+      body: JSON.stringify({ full_name: 'API Test Helper', work_type: 'cleaning', is_active: true }),
     });
     expect(res.status).toBe(403);
   });
@@ -29,17 +31,19 @@ describe('Maids API', () => {
     const res = await apiFetch('/maids', {
       method: 'POST',
       role: 'exec',
-      body: JSON.stringify({
-        full_name: 'API Test Helper',
-        work_type: 'cleaning',
-        is_active: true,
-      }),
+      body: JSON.stringify({ full_name: 'API Test Helper', work_type: 'cleaning', is_active: true }),
     });
     expect(res.status).toBe(201);
   });
 
-  it('GET /maids/approvals with member auth → 200', async () => {
+  // approvals list also requires maids.view (not just maids.approve)
+  it('GET /maids/approvals with member auth → 403 (needs maids.view)', async () => {
     const res = await apiFetch('/maids/approvals', { role: 'member' });
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /maids/approvals with exec auth → 200', async () => {
+    const res = await apiFetch('/maids/approvals', { role: 'exec' });
     expect(res.status).toBe(200);
   });
 });
