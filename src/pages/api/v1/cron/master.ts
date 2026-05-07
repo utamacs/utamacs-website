@@ -7,6 +7,7 @@ import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { loadRules, r, RULE } from '@lib/rules';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
+import { fanoutNotification } from '@lib/notifications';
 
 const SOCIETY_ID    = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const CRON_SECRET   = import.meta.env.CRON_SECRET;
@@ -91,6 +92,13 @@ export const GET: APIRoute = async ({ request }) => {
     results.auto_send = await runAutoSendTier1(sb);
   } catch (err) {
     results.auto_send = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 9. Publish scheduled notices whose scheduled_at has passed ─────────────
+  try {
+    results.scheduled_notices = await runScheduledNotices(sb, nowIso);
+  } catch (err) {
+    results.scheduled_notices = { error: err instanceof Error ? err.message : String(err) };
   }
 
   // ── Write master heartbeat ─────────────────────────────────────────────────
@@ -308,6 +316,40 @@ async function runAutoSendTier1(sb: ReturnType<typeof getSupabaseServiceClient>)
     } catch { /* skip and retry tomorrow */ }
   }
   return { sent };
+}
+
+async function runScheduledNotices(sb: ReturnType<typeof getSupabaseServiceClient>, nowIso: string) {
+  const { data: due } = await sb
+    .from('notices')
+    .select('id, title, category')
+    .eq('society_id', SOCIETY_ID)
+    .eq('status', 'scheduled')
+    .lte('scheduled_at', nowIso)
+    .limit(20);
+
+  if (!due?.length) return { published: 0 };
+
+  const ids = due.map((n: any) => n.id);
+  await sb
+    .from('notices')
+    .update({ status: 'published', is_published: true, published_at: nowIso })
+    .in('id', ids)
+    .eq('society_id', SOCIETY_ID);
+
+  for (const notice of due) {
+    const n = notice as any;
+    fanoutNotification({
+      societyId: SOCIETY_ID,
+      preferenceKey: 'notices',
+      title: `Notice: ${n.title}`,
+      body: n.category,
+      type: 'notice',
+      referenceTable: 'notices',
+      referenceId: n.id,
+    });
+  }
+
+  return { published: ids.length };
 }
 
 // ── Shared helpers ───────────────────────────────────────────────────────────

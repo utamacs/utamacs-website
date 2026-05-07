@@ -5,6 +5,7 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText, sanitizeHTML } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { fanoutNotification } from '@lib/notifications';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -24,7 +25,7 @@ export const GET: APIRoute = async ({ request, url }) => {
       .select(`
         id, title, body, category, is_pinned, created_at, updated_at,
         author_id, profiles(full_name, avatar_storage_key), units(unit_number),
-        post_reactions(reaction_type)
+        post_reactions(reaction_type), post_comments(id)
       `)
       .eq('society_id', SOCIETY_ID)
       .eq('is_published', true)
@@ -44,7 +45,9 @@ export const GET: APIRoute = async ({ request, url }) => {
       ...p,
       like_count: (p.post_reactions ?? []).filter((r: any) => r.reaction_type === 'like').length,
       helpful_count: (p.post_reactions ?? []).filter((r: any) => r.reaction_type === 'helpful').length,
+      comment_count: (p.post_comments ?? []).length,
       post_reactions: undefined,
+      post_comments: undefined,
     }));
 
     return new Response(JSON.stringify(posts), { headers: { 'Content-Type': 'application/json' } });
@@ -103,6 +106,17 @@ export const POST: APIRoute = async ({ request }) => {
       societyId: SOCIETY_ID, userId: user.id,
       action: 'CREATE', resourceType: 'community_posts', resourceId: data.id,
       ip: extractClientIP(request), newValues: { category: data.category },
+    });
+
+    fanoutNotification({
+      societyId: SOCIETY_ID,
+      excludeUserId: user.id,
+      preferenceKey: 'community',
+      title: `New post: ${sanitizePlainText(body.title!)}`,
+      body: `${body.category} · ${sanitizePlainText(body.body!).replace(/<[^>]*>/g, '').slice(0, 80)}${(body.body?.length ?? 0) > 80 ? '…' : ''}`,
+      type: 'community',
+      referenceTable: 'community_posts',
+      referenceId: data.id,
     });
 
     return new Response(JSON.stringify(data), { status: 201, headers: { 'Content-Type': 'application/json' } });
