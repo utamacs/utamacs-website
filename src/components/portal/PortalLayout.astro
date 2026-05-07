@@ -38,6 +38,8 @@ const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: st
   { moduleKey: 'maids',            displayName: 'Domestic Help Registry', icon: 'fa-user-friends' },
   { moduleKey: 'gallery',          displayName: 'Photo Gallery',          icon: 'fa-images' },
   { moduleKey: 'feedback',         displayName: 'Resident Feedback',      icon: 'fa-star' },
+  { moduleKey: 'water_tankers',    displayName: 'Water Management',       icon: 'fa-tint' },
+  { moduleKey: 'security_patrol',  displayName: 'Security Patrol Log',    icon: 'fa-shield-alt' },
 ];
 
 const MODULE_PATHS: Record<string, string> = {
@@ -63,6 +65,8 @@ const MODULE_PATHS: Record<string, string> = {
   maids:            '/portal/maids',
   gallery:          '/portal/gallery',
   feedback:         '/portal/feedback',
+  water_tankers:    '/portal/water-tankers',
+  security_patrol:  '/portal/security-patrol',
 };
 
 let allModules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = FALLBACK_MODULES;
