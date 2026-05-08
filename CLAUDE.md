@@ -169,23 +169,30 @@ Files are committed to the private `GITHUB_DOCS_REPO` by `commitDocument()`. Git
 
 ```typescript
 import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
-// 1. Read + validate file from multipart/form-data
+// 1. Read file from multipart/form-data
 const file = formData.get('file') as File;
 const bytes = await file.arrayBuffer();
 const buffer = Buffer.from(bytes);
+
+// 2. Validate MIME type (security — do not make MIME lists configurable)
 const ALLOWED_MIME: Record<string, string> = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' };
 if (!ALLOWED_MIME[file.type]) return Response.json({ error: 'VALIDATION', message: 'File type not allowed' }, { status: 400 });
-if (buffer.length > 5 * 1024 * 1024) return Response.json({ error: 'VALIDATION', message: 'Exceeds 5 MB limit' }, { status: 400 });
 
-// 2. Build canonical path using docPath helpers
+// 3. Read upload size limit from rules engine
+const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_{MODULE}_MB']);
+const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_{MODULE}_MB', 5) * 1024 * 1024;
+if (buffer.length > maxBytes) return Response.json({ error: 'VALIDATION', message: `Exceeds ${ruleInt(rules, 'UPLOAD_LIMIT_{MODULE}_MB', 5)} MB limit` }, { status: 400 });
+
+// 4. Build canonical path using docPath helpers
 const ext = ALLOWED_MIME[file.type];
 const githubPath = docPath.memberDoc(unitId, 'sale-deed', ext); // pick the right helper
 
-// 3. Commit to GitHub private repo
+// 5. Commit to GitHub private repo
 const result = await commitDocument(githubPath, buffer, `docs: ${module}/${id} uploaded by ${user.id}`);
 
-// 4. Store the GitHub path in DB (never the raw bytes)
+// 6. Store the GitHub path in DB (never the raw bytes)
 await sb.from('table').update({ storage_key: result.githubPath }).eq('id', id);
 ```
 
@@ -195,6 +202,27 @@ await sb.from('table').update({ storage_key: result.githubPath }).eq('id', id);
 const url = await getDocumentDownloadUrl(record.storage_key);
 return Response.json({ url });
 ```
+
+**Upload limit rule codes** (all configurable via `/portal/admin/rules`):
+
+| Rule code | Default | Module |
+|---|---|---|
+| `UPLOAD_LIMIT_NOTICES_MB` | 10 | Notices |
+| `UPLOAD_LIMIT_POLICIES_MB` | 20 | Policies |
+| `UPLOAD_LIMIT_COMPLAINTS_MB` | 50 | Complaints |
+| `UPLOAD_LIMIT_GALLERY_MB` | 10 | Gallery |
+| `UPLOAD_LIMIT_COMMUNITY_MB` | 5 | Community |
+| `COMMUNITY_POST_MAX_IMAGES` | 5 | Community (count, not size) |
+| `UPLOAD_LIMIT_MAIDS_MB` | 5 | Maids |
+| `UPLOAD_LIMIT_AVATARS_MB` | 2 | Members / Profile |
+| `UPLOAD_LIMIT_MEMBERSHIPS_MB` | 10 | Memberships |
+| `UPLOAD_LIMIT_EVENTS_MB` | 5 | Events |
+| `UPLOAD_LIMIT_VENDORS_MB` | 10 | Vendors |
+| `UPLOAD_LIMIT_PARKING_MB` | 5 | Parking |
+| `UPLOAD_LIMIT_SNAGS_MB` | 50 | Snags |
+| `UPLOAD_LIMIT_HOTO_MB` | 5 | HOTO |
+| `UPLOAD_LIMIT_DOCUMENTS_MB` | 20 | Documents |
+| `UPLOAD_LIMIT_STAFF_KYC_MB` | 5 | Staff KYC |
 
 ### 4B. Canonical Path Builders (`docPath` in `src/lib/utils/githubDocStore.ts`)
 
@@ -239,10 +267,11 @@ The utility falls back to `GITHUB_LETTERS_REPO` / `GITHUB_LETTERS_TOKEN` if `GIT
 ### 4D. .gitignore Safety Net
 `uploads/`, `tmp/`, `temp/`, `public/uploads/`, `src/uploads/`, `docs/uploads/` are gitignored. If any code attempts to write a user file to disk, it will not reach git. Fix the code, not the gitignore.
 
-### 4E. What NOT to use
-- `SupabaseStorageService` — do NOT use for any new upload; existing calls are being migrated
-- Supabase Storage buckets — not provisioned; do not create or reference them
-- `sb.storage.from(bucket).upload(...)` — do not call Supabase storage API directly
+### 4F. What NOT to use
+- `SupabaseStorageService` — do NOT use; all uploads go through `githubDocStore.ts`
+- Supabase Storage — not used for file uploads; do not create buckets or call `sb.storage`
+- Hardcoded `MAX_BYTES = N * 1024 * 1024` — use `ruleInt(rules, 'UPLOAD_LIMIT_X_MB', N) * 1024 * 1024`
+- `UPLOAD_LIMITS_BYTES` from `constants.ts` — removed; limits are in the rules engine now
 
 ---
 

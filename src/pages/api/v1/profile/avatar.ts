@@ -5,9 +5,9 @@ import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/gith
 import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const MAX_BYTES  = 2 * 1024 * 1024; // 2 MB
 
 const ALLOWED_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -23,6 +23,10 @@ export const POST: APIRoute = async ({ request }) => {
     const user = await resolveFromRequest(request, SOCIETY_ID);
     if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
 
+    const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_AVATARS_MB']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_AVATARS_MB', 2) * 1024 * 1024;
+
     let formData: FormData;
     try { formData = await request.formData(); }
     catch { return Response.json({ error: 'VALIDATION_ERROR', message: 'Expected multipart/form-data' }, { status: 400 }); }
@@ -36,13 +40,12 @@ export const POST: APIRoute = async ({ request }) => {
       return Response.json({ error: 'VALIDATION_ERROR', message: 'Only JPEG, PNG, or WebP allowed' }, { status: 400 });
 
     const bytes = await file.arrayBuffer();
-    if (bytes.byteLength > MAX_BYTES)
-      return Response.json({ error: 'VALIDATION_ERROR', message: 'Photo must be under 2 MB' }, { status: 400 });
+    if (bytes.byteLength > maxBytes)
+      return Response.json({ error: 'VALIDATION_ERROR', message: `Photo must be under ${ruleInt(rules, 'UPLOAD_LIMIT_AVATARS_MB', 2)} MB` }, { status: 400 });
 
     const githubPath = docPath.avatar(user.id, ext);
     const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: avatar for profile ${user.id}`);
 
-    const sb = getSupabaseServiceClient();
     const avatar_url = await getDocumentDownloadUrl(result.githubPath);
 
     // Persist url to profile

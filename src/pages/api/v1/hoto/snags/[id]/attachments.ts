@@ -6,6 +6,7 @@ import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { commitDocument, getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { UUID_RE } from '@lib/constants';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -16,7 +17,6 @@ const ALLOWED_MIME: Record<string, string> = {
   'image/heic':  'heic',
   'video/mp4':   'mp4',
 };
-const MAX_BYTES = 50 * 1024 * 1024; // 50 MB (matches complaint-attachments bucket)
 
 // GET /api/v1/hoto/snags/:id/attachments
 export const GET: APIRoute = async ({ request, params }) => {
@@ -63,6 +63,8 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (!snagItemId) return Response.json({ error: 'VALIDATION', message: 'Snag id required' }, { status: 400 });
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_SNAGS_MB']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_SNAGS_MB', 50) * 1024 * 1024;
 
     // Verify snag belongs to society
     const { data: snag } = await sb
@@ -85,7 +87,7 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    if (buffer.length > MAX_BYTES) return Response.json({ error: 'VALIDATION', message: 'File exceeds 50 MB limit' }, { status: 400 });
+    if (buffer.length > maxBytes) return Response.json({ error: 'VALIDATION', message: `File exceeds ${ruleInt(rules, 'UPLOAD_LIMIT_SNAGS_MB', 50)} MB limit` }, { status: 400 });
 
     const key = `snags/${snagItemId}/${Date.now()}-attachment.${ext}`;
     const result = await commitDocument(key, buffer, `docs: snag ${snagItemId} attachment`);

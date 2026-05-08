@@ -6,6 +6,7 @@ import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog } from '@lib/middleware/auditLogger';
 import { UUID_RE } from '@lib/constants';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const ALLOWED_MIME: Record<string, string> = {
@@ -13,7 +14,6 @@ const ALLOWED_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
 };
-const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // POST /api/v1/memberships/[id]/sale-deed — upload sale deed document
 // Member uploads for their own application; exec can upload for any
@@ -26,6 +26,9 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (!UUID_RE.test(id)) return Response.json({ error: 'VALIDATION', message: 'Invalid id' }, { status: 400 });
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_MEMBERSHIPS_MB']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_MEMBERSHIPS_MB', 10) * 1024 * 1024;
+
     const isPrivileged = ['executive','secretary','president'].includes(user.portalRole ?? '') || user.isAdmin;
 
     const { data: membership, error: fetchErr } = await sb
@@ -51,8 +54,8 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    if (buffer.length > MAX_BYTES) {
-      return Response.json({ error: 'VALIDATION', message: 'File exceeds 10 MB limit' }, { status: 400 });
+    if (buffer.length > maxBytes) {
+      return Response.json({ error: 'VALIDATION', message: `File exceeds ${ruleInt(rules, 'UPLOAD_LIMIT_MEMBERSHIPS_MB', 10)} MB limit` }, { status: 400 });
     }
 
     const ext = ALLOWED_MIME[file.type];

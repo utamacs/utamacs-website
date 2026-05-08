@@ -5,6 +5,7 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -13,11 +14,14 @@ const ALLOWED_MIME: Record<string, string> = {
   'image/png':  'png',
   'image/webp': 'webp',
 };
-const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 
 export const POST: APIRoute = async ({ request }) => {
   try {
     const user = await validateJWT(request);
+
+    const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_AVATARS_MB']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_AVATARS_MB', 2) * 1024 * 1024;
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -28,12 +32,10 @@ export const POST: APIRoute = async ({ request }) => {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    if (buffer.length > MAX_BYTES) return Response.json({ error: 'VALIDATION', message: 'Avatar must be ≤2 MB' }, { status: 400 });
+    if (buffer.length > maxBytes) return Response.json({ error: 'VALIDATION', message: `Avatar must be ≤${ruleInt(rules, 'UPLOAD_LIMIT_AVATARS_MB', 2)} MB` }, { status: 400 });
 
     const githubPath = docPath.avatar(user.id, ext);
     const result = await commitDocument(githubPath, buffer, `docs: avatar for member ${user.id}`);
-
-    const sb = getSupabaseServiceClient();
     const { error } = await sb
       .from('profiles')
       .update({ avatar_key: result.githubPath, updated_at: new Date().toISOString() })
