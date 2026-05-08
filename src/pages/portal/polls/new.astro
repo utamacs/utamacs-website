@@ -3,7 +3,9 @@ export const prerender = false;
 import PortalLayout from '@portal/PortalLayout.astro';
 
 const user = Astro.locals.user;
-if (!user || !['executive','admin'].includes(user.role)) return Astro.redirect('/portal/polls');
+const isPrivileged = user && (['executive', 'admin'].includes(user.role) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin);
+if (!isPrivileged) return Astro.redirect('/portal/polls');
 ---
 
 <PortalLayout title="Create Poll" user={user} activeModule="polls">

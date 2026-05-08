@@ -4,7 +4,9 @@ import PortalLayout from '@portal/PortalLayout.astro';
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
-if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal');
+const isPrivileged = ['executive', 'admin'].includes(user.role) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+if (!isPrivileged) return Astro.redirect('/portal');
 ---
 
 <PortalLayout title="TDS Tracking" user={user} activeModule="admin_tds">
