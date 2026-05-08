@@ -5,11 +5,9 @@ import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/gith
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const MAX_BYTES  = 5 * 1024 * 1024; // 5 MB per image
-const MAX_IMAGES = 5;
-
 const ALLOWED_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png':  'png',
@@ -25,6 +23,10 @@ export const POST: APIRoute = async ({ request, params }) => {
     const postId = params.id!;
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_COMMUNITY_MB', 'COMMUNITY_POST_MAX_IMAGES']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_COMMUNITY_MB', 5) * 1024 * 1024;
+    const maxImages = ruleInt(rules, 'COMMUNITY_POST_MAX_IMAGES', 5);
+
     const { data: post, error: pErr } = await sb
       .from('community_posts')
       .select('id, society_id, author_id, images')
@@ -36,8 +38,8 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (post.author_id !== user.id) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
 
     const existingCount = (post.images ?? []).length;
-    if (existingCount >= MAX_IMAGES)
-      return Response.json({ error: 'VALIDATION_ERROR', message: `Maximum ${MAX_IMAGES} images per post` }, { status: 400 });
+    if (existingCount >= maxImages)
+      return Response.json({ error: 'VALIDATION_ERROR', message: `Maximum ${maxImages} images per post` }, { status: 400 });
 
     let formData: FormData;
     try { formData = await request.formData(); }
@@ -46,7 +48,7 @@ export const POST: APIRoute = async ({ request, params }) => {
     const files = formData.getAll('images') as File[];
     if (!files.length) return Response.json({ error: 'VALIDATION_ERROR', message: 'No images provided' }, { status: 400 });
 
-    const remaining = MAX_IMAGES - existingCount;
+    const remaining = maxImages - existingCount;
     if (files.length > remaining)
       return Response.json({ error: 'VALIDATION_ERROR', message: `Can only add ${remaining} more image(s)` }, { status: 400 });
 
@@ -57,7 +59,7 @@ export const POST: APIRoute = async ({ request, params }) => {
       const ext = ALLOWED_MIME[file.type];
       if (!ext) return Response.json({ error: 'VALIDATION_ERROR', message: `File type ${file.type} not allowed. Only images.` }, { status: 400 });
       const bytes = await file.arrayBuffer();
-      if (bytes.byteLength > MAX_BYTES) return Response.json({ error: 'VALIDATION_ERROR', message: `${file.name} exceeds 5 MB limit` }, { status: 400 });
+      if (bytes.byteLength > maxBytes) return Response.json({ error: 'VALIDATION_ERROR', message: `${file.name} exceeds ${ruleInt(rules, 'UPLOAD_LIMIT_COMMUNITY_MB', 5)} MB limit` }, { status: 400 });
 
       const githubPath = docPath.communityImage(postId, ext);
       const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: community post ${postId} image`);

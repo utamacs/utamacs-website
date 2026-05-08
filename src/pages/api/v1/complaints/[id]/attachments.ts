@@ -5,9 +5,9 @@ import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/gith
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const MAX_BYTES  = 5 * 1024 * 1024; // 5 MB per file
 const MAX_FILES  = 5;
 
 const ALLOWED_MIME: Record<string, string> = {
@@ -26,6 +26,9 @@ export const POST: APIRoute = async ({ request, params }) => {
     const complaintId = params.id!;
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_COMPLAINTS_MB']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_COMPLAINTS_MB', 50) * 1024 * 1024;
+
     const { data: complaint, error: cErr } = await sb
       .from('complaints')
       .select('id, society_id, raised_by, status')
@@ -53,7 +56,7 @@ export const POST: APIRoute = async ({ request, params }) => {
       const ext = ALLOWED_MIME[file.type];
       if (!ext) return Response.json({ error: 'VALIDATION_ERROR', message: `File type ${file.type} not allowed. Only images and PDF.` }, { status: 400 });
       const bytes = await file.arrayBuffer();
-      if (bytes.byteLength > MAX_BYTES) return Response.json({ error: 'VALIDATION_ERROR', message: `File ${file.name} exceeds 5 MB limit` }, { status: 400 });
+      if (bytes.byteLength > maxBytes) return Response.json({ error: 'VALIDATION_ERROR', message: `File ${file.name} exceeds ${ruleInt(rules, 'UPLOAD_LIMIT_COMPLAINTS_MB', 50)} MB limit` }, { status: 400 });
 
       const githubPath = docPath.complaintAttachment(complaintId, ext);
       const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: complaint ${complaintId} attachment`);

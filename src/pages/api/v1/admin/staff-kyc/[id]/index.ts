@@ -48,9 +48,12 @@ export const PATCH: APIRoute = async ({ request, params, url }) => {
       if (!file) return Response.json({ error: 'VALIDATION', message: 'file field required' }, { status: 400 });
       if (!ALLOWED_MIME[file.type]) return Response.json({ error: 'VALIDATION', message: 'Only PDF, JPEG, PNG allowed' }, { status: 400 });
 
+      const staffKycRules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_STAFF_KYC_MB']);
+      const staffKycMaxBytes = ruleInt(staffKycRules, 'UPLOAD_LIMIT_STAFF_KYC_MB', 5) * 1024 * 1024;
+
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
-      if (buffer.length > 5 * 1024 * 1024) return Response.json({ error: 'VALIDATION', message: 'File exceeds 5 MB limit' }, { status: 400 });
+      if (buffer.length > staffKycMaxBytes) return Response.json({ error: 'VALIDATION', message: `File exceeds ${ruleInt(staffKycRules, 'UPLOAD_LIMIT_STAFF_KYC_MB', 5)} MB limit` }, { status: 400 });
 
       const ext = ALLOWED_MIME[file.type];
       const githubPath = docType === 'photo'

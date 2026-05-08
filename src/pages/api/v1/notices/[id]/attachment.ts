@@ -5,9 +5,9 @@ import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/gith
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /** GET /api/v1/notices/:id/attachment — returns 1-hour signed URL for the notice attachment. */
 export const GET: APIRoute = async ({ request, params }) => {
@@ -61,6 +61,8 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     const noticeId = params.id!;
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_NOTICES_MB']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_NOTICES_MB', 10) * 1024 * 1024;
 
     const { data: notice, error: nErr } = await sb
       .from('notices')
@@ -83,8 +85,8 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (!meta) return Response.json({ error: 'VALIDATION_ERROR', message: 'Only JPEG, PNG, WebP, or PDF allowed' }, { status: 400 });
 
     const bytes = await file.arrayBuffer();
-    if (bytes.byteLength > MAX_BYTES)
-      return Response.json({ error: 'VALIDATION_ERROR', message: 'File must be under 10 MB' }, { status: 400 });
+    if (bytes.byteLength > maxBytes)
+      return Response.json({ error: 'VALIDATION_ERROR', message: `File must be under ${ruleInt(rules, 'UPLOAD_LIMIT_NOTICES_MB', 10)} MB` }, { status: 400 });
 
     const githubPath = docPath.notice(noticeId, 'attachment', meta.ext);
     const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: notice ${noticeId} attachment`);

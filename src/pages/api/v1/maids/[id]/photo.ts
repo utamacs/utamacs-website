@@ -6,10 +6,10 @@ import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { UUID_RE } from '@lib/constants';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const ALLOWED_MIME: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
-const MAX_SIZE = 5 * 1024 * 1024;
 
 export const POST: APIRoute = async ({ request, params }) => {
   try {
@@ -22,6 +22,9 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (!UUID_RE.test(maidId)) return Response.json({ error: 'INVALID_ID' }, { status: 400 });
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_MAIDS_MB']);
+    const maxSize = ruleInt(rules, 'UPLOAD_LIMIT_MAIDS_MB', 5) * 1024 * 1024;
+
     const { data: maid } = await sb.from('maids').select('id').eq('id', maidId).eq('society_id', SOCIETY_ID).single();
     if (!maid) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
 
@@ -34,7 +37,7 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    if (buffer.length > MAX_SIZE) return Response.json({ error: 'TOO_LARGE', message: 'Photo must be under 5 MB.' }, { status: 400 });
+    if (buffer.length > maxSize) return Response.json({ error: 'TOO_LARGE', message: `Photo must be under ${ruleInt(rules, 'UPLOAD_LIMIT_MAIDS_MB', 5)} MB.` }, { status: 400 });
 
     const githubPath = docPath.maidKycPhoto(maidId, ext);
     const result = await commitDocument(githubPath, buffer, `docs: maid ${maidId} photo`);

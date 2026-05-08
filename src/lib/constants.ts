@@ -27,33 +27,12 @@ export const SIGNED_URL_EXPIRY_SECS = 3600;
 export const SENSITIVE_DOC_URL_EXPIRY_SECS = 900;
 
 // ── File Upload Limits ────────────────────────────────────────────────────────
-// Per-bucket limits as defined in CLAUDE.md §4C. Not configurable via rules
-// because changing them requires Supabase bucket policy changes too.
+// Per-module limits live in the rules engine (UPLOAD_LIMIT_*_MB rules),
+// configurable via /portal/admin/rules without code deployment.
+// Only the absolute fallback lives here for use before rules are loaded.
 
-export const UPLOAD_LIMITS_BYTES: Record<string, number> = {
-  'notice-attachments':  10 * 1024 * 1024,
-  'policy-documents':    20 * 1024 * 1024,
-  'complaint-attachments': 50 * 1024 * 1024,
-  'facility-photos':      5 * 1024 * 1024,
-  'gallery-photos':      10 * 1024 * 1024,
-  'community-images':     5 * 1024 * 1024,
-  'marketplace-images':   5 * 1024 * 1024,
-  'maid-documents':       5 * 1024 * 1024,
-  'member-documents':    10 * 1024 * 1024,
-  'event-banners':        5 * 1024 * 1024,
-  'onboarding-docs':     10 * 1024 * 1024,
-  'invoice-pdfs':         1 * 1024 * 1024,
-  'receipt-pdfs':         1 * 1024 * 1024,
-  'society-assets':       2 * 1024 * 1024,
-  'avatars':              2 * 1024 * 1024,
-  'poll-exports':         1 * 1024 * 1024,
-  'parking-docs':         5 * 1024 * 1024,
-  DEFAULT:                5 * 1024 * 1024,
-};
-
-export function getUploadLimitBytes(bucket: string): number {
-  return UPLOAD_LIMITS_BYTES[bucket] ?? UPLOAD_LIMITS_BYTES.DEFAULT;
-}
+/** Fallback upload limit when rules engine is unavailable. Not used in normal flow. */
+export const DEFAULT_UPLOAD_LIMIT_MB = 5;
 
 // ── Allowed MIME types ────────────────────────────────────────────────────────
 

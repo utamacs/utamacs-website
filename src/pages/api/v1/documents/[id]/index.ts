@@ -7,6 +7,7 @@ import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { commitDocument, getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
 import { UUID_RE } from '@lib/constants';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -19,7 +20,6 @@ const ALLOWED_MIME: Record<string, string> = {
   'application/vnd.ms-excel': 'xls',
   'text/csv': 'csv',
 };
-const MAX_BYTES = 20 * 1024 * 1024;
 
 // PUT /api/v1/documents/:id — upload a new version of an existing document
 export const PUT: APIRoute = async ({ request, params }) => {
@@ -32,6 +32,8 @@ export const PUT: APIRoute = async ({ request, params }) => {
     if (!UUID_RE.test(id)) return Response.json({ error: 'VALIDATION', message: 'Invalid document id' }, { status: 400 });
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_DOCUMENTS_MB']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_DOCUMENTS_MB', 20) * 1024 * 1024;
 
     // Fetch the root document (must be parent_id IS NULL — can't version a version)
     const { data: doc, error: fetchErr } = await sb
@@ -56,7 +58,7 @@ export const PUT: APIRoute = async ({ request, params }) => {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    if (buffer.length > MAX_BYTES) return Response.json({ error: 'VALIDATION', message: 'File exceeds 20 MB limit' }, { status: 400 });
+    if (buffer.length > maxBytes) return Response.json({ error: 'VALIDATION', message: `File exceeds ${ruleInt(rules, 'UPLOAD_LIMIT_DOCUMENTS_MB', 20)} MB limit` }, { status: 400 });
 
     const newVersion = (doc.version ?? 1) + 1;
     const newKey = `members/${SOCIETY_ID}/${Date.now()}-${crypto.randomUUID()}.${ext}`;

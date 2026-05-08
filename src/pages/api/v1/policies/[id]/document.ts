@@ -5,9 +5,9 @@ import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/gith
 import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 // POST — upload PDF document for a policy (policies.manage required)
 export const POST: APIRoute = async ({ request, params }) => {
@@ -17,6 +17,9 @@ export const POST: APIRoute = async ({ request, params }) => {
     requireFeature(user, 'policies.manage');
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_POLICIES_MB']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_POLICIES_MB', 20) * 1024 * 1024;
+
     const { data: policy, error: pErr } = await sb
       .from('policies')
       .select('id, policy_type')
@@ -35,7 +38,7 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (file.type !== 'application/pdf') return Response.json({ error: 'VALIDATION_ERROR', message: 'Only PDF files allowed' }, { status: 400 });
 
     const bytes = await file.arrayBuffer();
-    if (bytes.byteLength > MAX_BYTES) return Response.json({ error: 'VALIDATION_ERROR', message: 'PDF must be under 20 MB' }, { status: 400 });
+    if (bytes.byteLength > maxBytes) return Response.json({ error: 'VALIDATION_ERROR', message: `PDF must be under ${ruleInt(rules, 'UPLOAD_LIMIT_POLICIES_MB', 20)} MB` }, { status: 400 });
 
     // Use slug derived from policy id for the filename component
     const githubPath = docPath.policy(params.id!, 1, params.id!, 'pdf');

@@ -7,12 +7,12 @@ import { sanitizePlainText } from '@lib/utils/sanitize';
 import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { UUID_RE } from '@lib/constants';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const ALLOWED_MIME: Record<string, string> = {
   'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic',
 };
-const MAX_SIZE = 10 * 1024 * 1024;
 const MAX_PHOTOS_PER_UPLOAD = 10;
 
 // GET — list photos in an album with download URLs
@@ -60,6 +60,9 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (!UUID_RE.test(albumId)) return Response.json({ error: 'INVALID_ID' }, { status: 400 });
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_GALLERY_MB']);
+    const maxSize = ruleInt(rules, 'UPLOAD_LIMIT_GALLERY_MB', 10) * 1024 * 1024;
+
     const { data: album } = await sb
       .from('gallery_albums')
       .select('id, cover_key')
@@ -83,7 +86,7 @@ export const POST: APIRoute = async ({ request, params }) => {
 
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
-      if (buffer.length > MAX_SIZE) continue; // skip oversized
+      if (buffer.length > maxSize) continue; // skip oversized
 
       const photoId = crypto.randomUUID();
       const githubPath = docPath.galleryPhoto(albumId, photoId, ext);

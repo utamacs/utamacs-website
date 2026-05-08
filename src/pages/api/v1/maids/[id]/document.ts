@@ -8,9 +8,10 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
+import { getRules, ruleInt } from '@lib/utils/getRules';
+
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const BUCKET = 'maid-documents';
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 const ALLOWED_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -66,6 +67,9 @@ export const POST: APIRoute = async ({ request, params }) => {
     }
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_MAIDS_MB']);
+    const maxBytes = ruleInt(rules, 'UPLOAD_LIMIT_MAIDS_MB', 5) * 1024 * 1024;
+
     const { data: maid } = await sb
       .from('maids')
       .select('id')
@@ -90,8 +94,8 @@ export const POST: APIRoute = async ({ request, params }) => {
     }
 
     const bytes = await file.arrayBuffer();
-    if (bytes.byteLength > MAX_BYTES) {
-      return Response.json({ error: 'VALIDATION_ERROR', message: 'File must be under 5 MB' }, { status: 400 });
+    if (bytes.byteLength > maxBytes) {
+      return Response.json({ error: 'VALIDATION_ERROR', message: `File must be under ${ruleInt(rules, 'UPLOAD_LIMIT_MAIDS_MB', 5)} MB` }, { status: 400 });
     }
 
     const storageKey = `${SOCIETY_ID}/${params.id!}/verification.${ext}`;

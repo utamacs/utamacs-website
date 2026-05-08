@@ -6,6 +6,7 @@ import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { UUID_RE } from '@lib/constants';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -14,7 +15,6 @@ const ALLOWED_MIME: Record<string, string> = {
   'image/png': 'png',
   'image/webp': 'webp',
 };
-const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
 // POST (exec only) — upload banner image for an event
 export const POST: APIRoute = async ({ request, params }) => {
@@ -30,6 +30,8 @@ export const POST: APIRoute = async ({ request, params }) => {
     }
 
     const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_EVENTS_MB']);
+    const maxSize = ruleInt(rules, 'UPLOAD_LIMIT_EVENTS_MB', 5) * 1024 * 1024;
 
     const { data: event } = await sb
       .from('events')
@@ -60,9 +62,9 @@ export const POST: APIRoute = async ({ request, params }) => {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    if (buffer.length > MAX_SIZE) {
+    if (buffer.length > maxSize) {
       return Response.json(
-        { error: 'FILE_TOO_LARGE', message: 'File exceeds the 5 MB limit.' },
+        { error: 'FILE_TOO_LARGE', message: `File exceeds the ${ruleInt(rules, 'UPLOAD_LIMIT_EVENTS_MB', 5)} MB limit.` },
         { status: 400 },
       );
     }

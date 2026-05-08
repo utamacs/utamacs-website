@@ -5,13 +5,12 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID    = import.meta.env.PUBLIC_SOCIETY_ID     ?? '00000000-0000-0000-0000-000000000001';
 const GITHUB_REPO   = import.meta.env.GITHUB_HOTO_REPO      ?? '';
 const GITHUB_TOKEN  = import.meta.env.GITHUB_HOTO_TOKEN     ?? import.meta.env.GITHUB_LETTERS_TOKEN ?? '';
 const GITHUB_BRANCH = import.meta.env.GITHUB_HOTO_BRANCH    ?? 'main';
-
-const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 const ALLOWED_MIME: Record<string, string> = {
   'application/pdf': 'pdf',
@@ -121,18 +120,20 @@ export const POST: APIRoute = async ({ request }) => {
       }, { status: 400 });
     }
 
+    const sb = getSupabaseServiceClient();
+    const rules = await getRules(sb, SOCIETY_ID, ['UPLOAD_LIMIT_HOTO_MB']);
+    const maxFileBytes = ruleInt(rules, 'UPLOAD_LIMIT_HOTO_MB', 5) * 1024 * 1024;
+
     const bytes = await file.arrayBuffer();
-    if (bytes.byteLength > MAX_FILE_BYTES) {
+    if (bytes.byteLength > maxFileBytes) {
       return Response.json({
         error: 'VALIDATION_ERROR',
-        message: `File exceeds 5MB limit (got ${(bytes.byteLength / 1024 / 1024).toFixed(1)}MB)`,
+        message: `File exceeds ${ruleInt(rules, 'UPLOAD_LIMIT_HOTO_MB', 5)} MB limit (got ${(bytes.byteLength / 1024 / 1024).toFixed(1)}MB)`,
       }, { status: 400 });
     }
 
     const hashHex = createHash('sha256').update(Buffer.from(bytes)).digest('hex');
     const contentBase64 = Buffer.from(bytes).toString('base64');
-
-    const sb = getSupabaseServiceClient();
 
     // Verify item exists in this society
     const { data: hotoItem } = await sb
