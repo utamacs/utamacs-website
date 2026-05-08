@@ -1,13 +1,12 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const BUCKET     = 'complaints';
 const MAX_BYTES  = 5 * 1024 * 1024; // 5 MB per file
 const MAX_FILES  = 5;
 
@@ -47,7 +46,6 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (!files.length) return Response.json({ error: 'VALIDATION_ERROR', message: 'No files provided' }, { status: 400 });
     if (files.length > MAX_FILES) return Response.json({ error: 'VALIDATION_ERROR', message: `Max ${MAX_FILES} files per upload` }, { status: 400 });
 
-    const storage = new SupabaseStorageService();
     const saved: { storage_key: string; file_name: string; mime_type: string; file_size_bytes: number }[] = [];
 
     for (const file of files) {
@@ -57,9 +55,9 @@ export const POST: APIRoute = async ({ request, params }) => {
       const bytes = await file.arrayBuffer();
       if (bytes.byteLength > MAX_BYTES) return Response.json({ error: 'VALIDATION_ERROR', message: `File ${file.name} exceeds 5 MB limit` }, { status: 400 });
 
-      const storageKey = `${SOCIETY_ID}/${complaintId}/${crypto.randomUUID()}.${ext}`;
-      await storage.upload(BUCKET, storageKey, Buffer.from(bytes), file.type);
-      saved.push({ storage_key: storageKey, file_name: file.name, mime_type: file.type, file_size_bytes: bytes.byteLength });
+      const githubPath = docPath.complaintAttachment(complaintId, ext);
+      const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: complaint ${complaintId} attachment`);
+      saved.push({ storage_key: result.githubPath, file_name: file.name, mime_type: file.type, file_size_bytes: bytes.byteLength });
     }
 
     const { data: rows, error: insErr } = await sb
@@ -90,7 +88,7 @@ export const POST: APIRoute = async ({ request, params }) => {
   }
 };
 
-// GET — list attachments for a complaint (returns signed URLs, valid 1 hour)
+// GET — list attachments for a complaint (returns download URLs, valid ~1 hour)
 export const GET: APIRoute = async ({ request, params }) => {
   try {
     const user = await validateJWT(request);
@@ -115,10 +113,9 @@ export const GET: APIRoute = async ({ request, params }) => {
       .eq('complaint_id', complaintId)
       .order('created_at');
 
-    const storage = new SupabaseStorageService();
     const result = await Promise.all(
       (attachments ?? []).map(async (a) => {
-        const url = await storage.getSignedUrl(BUCKET, a.storage_key, 3600);
+        const url = await getDocumentDownloadUrl(a.storage_key);
         return { id: a.id, file_name: a.file_name, mime_type: a.mime_type, file_size_bytes: a.file_size_bytes, url };
       })
     );

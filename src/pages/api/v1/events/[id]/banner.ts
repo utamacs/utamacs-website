@@ -1,10 +1,10 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
 import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
@@ -31,7 +31,6 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     const sb = getSupabaseServiceClient();
 
-    // Verify event exists and belongs to this society
     const { data: event } = await sb
       .from('events')
       .select('id, banner_key')
@@ -68,34 +67,26 @@ export const POST: APIRoute = async ({ request, params }) => {
       );
     }
 
-    const storageKey = `events/${SOCIETY_ID}/${eventId}/${crypto.randomUUID()}.${ext}`;
-    const storage = new SupabaseStorageService();
-    const { storageKey: uploadedKey } = await storage.upload('event-banners', storageKey, buffer, file.type);
+    const githubPath = docPath.eventBanner(eventId, ext);
+    const result = await commitDocument(githubPath, buffer, `docs: event ${eventId} banner`);
 
-    // Delete old banner if one existed
-    if (event.banner_key) {
-      try { await storage.delete('event-banners', event.banner_key); } catch { /* non-fatal */ }
-    }
-
-    // Persist the new banner_key on the event row
     const { error: updateError } = await sb
       .from('events')
-      .update({ banner_key: uploadedKey })
+      .update({ banner_key: result.githubPath })
       .eq('id', eventId);
 
     if (updateError) throw Object.assign(new Error(updateError.message), { status: 500 });
 
-    // Return a signed URL valid for 1 hour
-    const signedUrl = await storage.getSignedUrl('event-banners', uploadedKey, 3600);
+    const url = await getDocumentDownloadUrl(result.githubPath);
 
     await writeAuditLog({
       societyId: SOCIETY_ID, userId: user.id,
       action: 'UPDATE', resourceType: 'events', resourceId: eventId,
       ip: extractClientIP(request),
-      newValues: { banner_key: uploadedKey },
+      newValues: { banner_key: result.githubPath },
     });
 
-    return Response.json({ banner_key: uploadedKey, url: signedUrl }, { status: 200 });
+    return Response.json({ banner_key: result.githubPath, url }, { status: 200 });
   } catch (err) {
     return normalizeError(err, request.url);
   }

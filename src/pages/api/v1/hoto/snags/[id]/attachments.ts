@@ -3,7 +3,7 @@ import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { UUID_RE } from '@lib/constants';
 
@@ -38,11 +38,10 @@ export const GET: APIRoute = async ({ request, params }) => {
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
-    const storage = new SupabaseStorageService();
     const withUrls = await Promise.all(
       (data ?? []).map(async (a: any) => {
         let signed_url: string | null = null;
-        try { signed_url = await storage.getSignedUrl('complaint-attachments', a.storage_key, 3600); } catch { /* skip */ }
+        try { signed_url = await getDocumentDownloadUrl(a.storage_key); } catch { /* skip */ }
         return { ...a, signed_url };
       })
     );
@@ -88,16 +87,15 @@ export const POST: APIRoute = async ({ request, params }) => {
     const buffer = Buffer.from(bytes);
     if (buffer.length > MAX_BYTES) return Response.json({ error: 'VALIDATION', message: 'File exceeds 50 MB limit' }, { status: 400 });
 
-    const key = `snags/${SOCIETY_ID}/${snagItemId}/${crypto.randomUUID()}.${ext}`;
-    const storage = new SupabaseStorageService();
-    await storage.upload('complaint-attachments', key, buffer, file.type);
+    const key = `snags/${snagItemId}/${Date.now()}-attachment.${ext}`;
+    const result = await commitDocument(key, buffer, `docs: snag ${snagItemId} attachment`);
 
     const { data, error } = await sb
       .from('snag_attachments')
       .insert({
         society_id:   SOCIETY_ID,
         snag_item_id: snagItemId,
-        storage_key:  key,
+        storage_key:  result.githubPath,
         mime_type:    file.type,
         uploaded_by:  user.id,
         caption,
@@ -107,7 +105,8 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
-    const signed_url = await storage.getSignedUrl('complaint-attachments', key, 3600);
+    let signed_url: string | null = null;
+    try { signed_url = await getDocumentDownloadUrl(result.githubPath); } catch { /* non-fatal */ }
 
     await writeAuditLog({
       userId: user.id, societyId: SOCIETY_ID,

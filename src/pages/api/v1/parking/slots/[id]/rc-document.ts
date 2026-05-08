@@ -3,7 +3,7 @@ import type { APIRoute } from 'astro';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { UUID_RE } from '@lib/constants';
 
@@ -29,7 +29,7 @@ export const POST: APIRoute = async ({ request, params }) => {
     const sb = getSupabaseServiceClient();
     const { data: slot } = await sb
       .from('parking_slots')
-      .select('id, slot_number')
+      .select('id, slot_number, unit_id')
       .eq('id', slotId)
       .eq('society_id', SOCIETY_ID)
       .single();
@@ -50,11 +50,11 @@ export const POST: APIRoute = async ({ request, params }) => {
       return Response.json({ error: 'TOO_LARGE', message: 'File must be under 5 MB.' }, { status: 400 });
     }
 
-    const key = `parking/${SOCIETY_ID}/${slotId}/${crypto.randomUUID()}.${ext}`;
-    const storage = new SupabaseStorageService();
-    const { storageKey } = await storage.upload('parking-docs', key, buffer, file.type);
+    const unitId = (slot as any).unit_id ?? slotId;
+    const githubPath = docPath.parking(unitId, slotId, 'rc', ext);
+    const result = await commitDocument(githubPath, buffer, `docs: parking slot ${slotId} RC document`);
 
-    await sb.from('parking_slots').update({ rc_doc_key: storageKey }).eq('id', slotId);
+    await sb.from('parking_slots').update({ rc_doc_key: result.githubPath }).eq('id', slotId);
 
     await writeAuditLog({
       userId: user.id,
@@ -63,11 +63,11 @@ export const POST: APIRoute = async ({ request, params }) => {
       resourceType: 'parking_slot',
       resourceId: slotId,
       ip: extractClientIP(request),
-      newValues: { rc_doc_key: storageKey },
+      newValues: { rc_doc_key: result.githubPath },
     });
 
-    const signedUrl = await storage.getSignedUrl('parking-docs', storageKey, 3600);
-    return Response.json({ storage_key: storageKey, signed_url: signedUrl }, { status: 200 });
+    const signed_url = await getDocumentDownloadUrl(result.githubPath);
+    return Response.json({ storage_key: result.githubPath, signed_url }, { status: 200 });
   } catch (err) {
     return normalizeError(err, request.url);
   }

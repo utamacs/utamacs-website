@@ -1,13 +1,12 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const BUCKET = 'policy-documents';
 const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 // POST — upload PDF document for a policy (policies.manage required)
@@ -38,19 +37,19 @@ export const POST: APIRoute = async ({ request, params }) => {
     const bytes = await file.arrayBuffer();
     if (bytes.byteLength > MAX_BYTES) return Response.json({ error: 'VALIDATION_ERROR', message: 'PDF must be under 20 MB' }, { status: 400 });
 
-    const storageKey = `${SOCIETY_ID}/${params.id!}.pdf`;
-    await sb.storage.from(BUCKET).upload(storageKey, Buffer.from(bytes), { contentType: 'application/pdf', upsert: true });
+    // Use slug derived from policy id for the filename component
+    const githubPath = docPath.policy(params.id!, 1, params.id!, 'pdf');
+    const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: policy ${params.id!} document upload`);
 
     const { error: updErr } = await sb
       .from('policies')
-      .update({ document_key: storageKey, policy_type: 'pdf', updated_at: new Date().toISOString() })
+      .update({ document_key: result.githubPath, policy_type: 'pdf', updated_at: new Date().toISOString() })
       .eq('id', params.id!)
       .eq('society_id', SOCIETY_ID);
 
     if (updErr) throw Object.assign(new Error(updErr.message), { status: 500 });
 
-    const storage = new SupabaseStorageService();
-    const signed_url = await storage.getSignedUrl(BUCKET, storageKey, 3600);
+    const signed_url = await getDocumentDownloadUrl(result.githubPath);
 
     await writeAuditLog({
       societyId: SOCIETY_ID, userId: user.id,
@@ -59,7 +58,7 @@ export const POST: APIRoute = async ({ request, params }) => {
       newValues: { document_uploaded: true },
     });
 
-    return Response.json({ document_key: storageKey, signed_url }, { status: 200 });
+    return Response.json({ document_key: result.githubPath, signed_url }, { status: 200 });
   } catch (err) {
     return normalizeError(err, request.url);
   }

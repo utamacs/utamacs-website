@@ -1,14 +1,13 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog } from '@lib/middleware/auditLogger';
 import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const BUCKET = 'member-documents';
 const ALLOWED_MIME: Record<string, string> = {
   'application/pdf': 'pdf',
   'image/jpeg': 'jpg',
@@ -31,7 +30,7 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     const { data: membership, error: fetchErr } = await sb
       .from('memberships')
-      .select('id, profile_id, status, sale_deed_key')
+      .select('id, profile_id, status, sale_deed_key, unit_id')
       .eq('id', id)
       .eq('society_id', SOCIETY_ID)
       .single();
@@ -57,14 +56,13 @@ export const POST: APIRoute = async ({ request, params }) => {
     }
 
     const ext = ALLOWED_MIME[file.type];
-    const key = `sale-deeds/${SOCIETY_ID}/${id}.${ext}`;
-
-    const storageService = new SupabaseStorageService();
-    await storageService.upload(BUCKET, key, buffer, file.type);
+    const unitId = (membership as any).unit_id ?? id;
+    const githubPath = docPath.memberDoc(unitId, 'sale-deed', ext);
+    const result = await commitDocument(githubPath, buffer, `docs: membership ${id} sale deed`);
 
     const { data: updated, error: updateErr } = await sb
       .from('memberships')
-      .update({ sale_deed_key: key, status: membership.status === 'applied' ? 'fees_pending' : membership.status })
+      .update({ sale_deed_key: result.githubPath, status: membership.status === 'applied' ? 'fees_pending' : membership.status })
       .eq('id', id)
       .select('id, sale_deed_key, status')
       .single();
@@ -77,16 +75,16 @@ export const POST: APIRoute = async ({ request, params }) => {
       resourceType: 'membership_sale_deed',
       resourceId: id,
       oldValues: { sale_deed_key: membership.sale_deed_key },
-      newValues: { sale_deed_key: key },
+      newValues: { sale_deed_key: result.githubPath },
     });
 
-    return Response.json({ id, sale_deed_key: key, status: updated?.status });
+    return Response.json({ id, sale_deed_key: result.githubPath, status: updated?.status });
   } catch (err) {
     return normalizeError(err, request.url);
   }
 };
 
-// GET /api/v1/memberships/[id]/sale-deed — get signed URL for sale deed
+// GET /api/v1/memberships/[id]/sale-deed — get download URL for sale deed
 export const GET: APIRoute = async ({ request, params }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -113,8 +111,7 @@ export const GET: APIRoute = async ({ request, params }) => {
       return Response.json({ error: 'NOT_FOUND', message: 'No sale deed uploaded yet' }, { status: 404 });
     }
 
-    const storageService = new SupabaseStorageService();
-    const signedUrl = await storageService.getSignedUrl(BUCKET, membership.sale_deed_key, 3600);
+    const signedUrl = await getDocumentDownloadUrl(membership.sale_deed_key);
 
     await writeAuditLog({
       userId: user.id,

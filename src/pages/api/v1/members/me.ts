@@ -4,7 +4,7 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
@@ -32,8 +32,7 @@ export const GET: APIRoute = async ({ request }) => {
     let avatar_url: string | null = null;
     if ((data as any).avatar_key) {
       try {
-        const storage = new SupabaseStorageService();
-        avatar_url = await storage.getSignedUrl('avatars', (data as any).avatar_key, 3600);
+        avatar_url = await getDocumentDownloadUrl((data as any).avatar_key);
       } catch { /* non-fatal */ }
     }
 

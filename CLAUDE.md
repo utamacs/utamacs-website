@@ -29,7 +29,7 @@
 - **Astro 4** with `output: 'hybrid'` (SSR + static prerender)
 - **React 18** for interactive dashboard components only
 - **Tailwind CSS v3** via `@astrojs/tailwind`
-- **Supabase** for auth, database, and file storage
+- **Supabase** for auth and database only (NOT file storage — see §4)
 - **pdfmake** for server-side PDF generation (invoice, receipt, poll export)
 - **Vercel** adapter — every portal page has `export const prerender = false`
 
@@ -161,70 +161,88 @@ function showToast(message, type = 'success') {
 
 ## 4. File Upload & Storage — CRITICAL RULE
 
-**RULE: User-uploaded files MUST NEVER be written to the local filesystem or committed to this git repository.**
+**RULE: ALL user-uploaded files — documents AND media (images, banners, avatars) — go to the private GitHub repository via API. Supabase Storage is NOT used for file uploads.**
 
-### 4A. Standard Upload Path (all new modules)
-All uploads go through `SupabaseStorageService` at `src/lib/services/providers/supabase/SupabaseStorageService.ts`.
+Files are committed to the private `GITHUB_DOCS_REPO` by `commitDocument()`. GitHub's API returns an AWS pre-signed `download_url` (~1-hour validity) that is functionally equivalent to a Supabase signed URL. The DB column stores the GitHub file path; the API generates a fresh download URL on each request.
 
-**Server-side API route pattern:**
+### 4A. Standard Upload Pattern (all modules)
+
 ```typescript
-// 1. Read file from multipart/form-data
-const file = formData.get('file') as File
-const bytes = await file.arrayBuffer()
-const buffer = Buffer.from(bytes)
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 
-// 2. Validate: MIME type, file size, filename
-const ALLOWED_MIME = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' }
-if (!ALLOWED_MIME[file.type]) return error(400, 'File type not allowed')
-if (buffer.length > 5 * 1024 * 1024) return error(400, 'Exceeds 5MB limit')
+// 1. Read + validate file from multipart/form-data
+const file = formData.get('file') as File;
+const bytes = await file.arrayBuffer();
+const buffer = Buffer.from(bytes);
+const ALLOWED_MIME: Record<string, string> = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' };
+if (!ALLOWED_MIME[file.type]) return Response.json({ error: 'VALIDATION', message: 'File type not allowed' }, { status: 400 });
+if (buffer.length > 5 * 1024 * 1024) return Response.json({ error: 'VALIDATION', message: 'Exceeds 5 MB limit' }, { status: 400 });
 
-// 3. Build storage key: {module}/{society_id}/{uuid}.{ext}
-const ext = ALLOWED_MIME[file.type]
-const key = `{module}/${societyId}/${crypto.randomUUID()}.${ext}`
+// 2. Build canonical path using docPath helpers
+const ext = ALLOWED_MIME[file.type];
+const githubPath = docPath.memberDoc(unitId, 'sale-deed', ext); // pick the right helper
 
-// 4. Upload to Supabase Storage — NEVER to filesystem
-const storageService = new SupabaseStorageService()
-const { storageKey } = await storageService.upload('{bucket-name}', key, buffer, file.type)
+// 3. Commit to GitHub private repo
+const result = await commitDocument(githubPath, buffer, `docs: ${module}/${id} uploaded by ${user.id}`);
 
-// 5. Save storageKey to database column (never the raw file bytes)
-await db.from('table').insert({ ..., document_key: storageKey })
+// 4. Store the GitHub path in DB (never the raw bytes)
+await sb.from('table').update({ storage_key: result.githubPath }).eq('id', id);
 ```
 
-**Client-side retrieval pattern:**
+**Retrieval pattern:**
 ```typescript
-// Generate a signed URL (1-hour expiry) — never expose the raw storage key
-const signedUrl = await storageService.getSignedUrl('{bucket}', record.document_key, 3600)
-// Return signedUrl to client; client opens in new tab or <img src>
+// Generate a pre-signed download URL (~1 hour) — same model as Supabase signed URLs
+const url = await getDocumentDownloadUrl(record.storage_key);
+return Response.json({ url });
 ```
 
-### 4B. The HOTO GitHub Exception
-The HOTO governance upload (`src/pages/api/v1/hoto/upload/index.ts`) commits documents to a **separate governance repository** via the GitHub API. This is intentional and specific to HOTO. It does NOT write to this repo's working tree. Do not replicate this pattern in any other module.
+### 4B. Canonical Path Builders (`docPath` in `src/lib/utils/githubDocStore.ts`)
 
-### 4C. Storage Buckets (create in Supabase dashboard)
-Each module has a dedicated private bucket. Files are served via signed URLs only.
-
-| Bucket Name | Module | Max File Size |
+| Helper | Path template | Use for |
 |---|---|---|
-| `notice-attachments` | Notices | 10 MB |
-| `policy-documents` | Policies | 20 MB |
-| `complaint-attachments` | Complaints | 50 MB (videos) |
-| `facility-photos` | Facilities | 5 MB |
-| `gallery-photos` | Photo Gallery | 10 MB |
-| `community-images` | Community Board | 5 MB |
-| `marketplace-images` | Marketplace | 5 MB |
-| `maid-documents` | Maid Registry | 5 MB |
-| `member-documents` | Member profiles, leases | 10 MB |
-| `event-banners` | Events | 5 MB |
-| `onboarding-docs` | Registration | 10 MB |
-| `invoice-pdfs` | Finance | 1 MB |
-| `receipt-pdfs` | Finance | 1 MB |
-| `society-assets` | Public (logo) | 2 MB |
-| `avatars` | Profile photos | 2 MB |
-| `poll-exports` | Poll result PDFs | 1 MB |
-| `parking-docs` | RC/insurance | 5 MB |
+| `memberDoc(unitId, docType, ext)` | `members/{unitId}/{ts}-{docType}.{ext}` | Member docs, sale deeds, leases |
+| `staffKycPhoto(staffId, ext)` | `staff-kyc/{staffId}/photo.{ext}` | Staff photos |
+| `staffKycIdDoc(staffId, ext)` | `staff-kyc/{staffId}/id-doc.{ext}` | Staff ID documents |
+| `maidKycPhoto(maidId, ext)` | `maids/{maidId}/photo.{ext}` | Maid photos |
+| `maidKycIdDoc(maidId, ext)` | `maids/{maidId}/id-doc.{ext}` | Maid ID documents |
+| `tenantKyc(tenantId, docType, ext)` | `tenant-kyc/{tenantId}/{ts}-{docType}.{ext}` | Tenant KYC |
+| `registration(profileId, docType, ext)` | `registration/{profileId}/{ts}-{docType}.{ext}` | Membership application |
+| `policy(policyId, version, slug, ext)` | `policies/{policyId}/v{n}-{slug}.{ext}` | Policy PDFs (versioned) |
+| `notice(noticeId, filename, ext)` | `notices/{YYYY}/{noticeId}/{ts}-{filename}.{ext}` | Notice attachments |
+| `parking(unitId, slotId, docType, ext)` | `parking/{unitId}/{slotId}-{docType}.{ext}` | RC / insurance |
+| `pollExport(pollId)` | `polls/exports/{YYYY}/{pollId}.pdf` | Poll result PDFs |
+| `vendorInvoice(vendorId, workOrderId, ext)` | `vendors/{vendorId}/invoices/{workOrderId}.{ext}` | Vendor invoices |
+| `financeInvoice(invoiceId, ext)` | `finance/invoices/{YYYY}/{invoiceId}.{ext}` | Finance invoices |
+| `financeReceipt(receiptId, ext)` | `finance/receipts/{YYYY}/{receiptId}.{ext}` | Finance receipts |
+| `avatar(profileId, ext)` | `media/avatars/{profileId}.{ext}` | Profile / member photos |
+| `galleryPhoto(albumId, photoId, ext)` | `media/gallery/{albumId}/{photoId}.{ext}` | Gallery photos |
+| `eventBanner(eventId, ext)` | `media/events/{eventId}/banner.{ext}` | Event banners |
+| `communityImage(postId, ext)` | `media/community/{postId}/{ts}.{ext}` | Community board images |
+| `marketplaceImage(listingId, ext)` | `media/marketplace/{listingId}/{ts}.{ext}` | Marketplace images |
+| `facilityImage(facilityId, ext)` | `media/facilities/{facilityId}/{ts}.{ext}` | Facility photos |
+| `complaintAttachment(complaintId, ext)` | `media/complaints/{complaintId}/{ts}.{ext}` | Complaint media |
+| `societyLogo(ext)` | `media/society/logo.{ext}` | Society logo |
+
+For snag attachments (no helper): build inline as `` `snags/${snagId}/${Date.now()}-attachment.${ext}` ``
+For general documents library: build inline as `` `members/${SOCIETY_ID}/${Date.now()}-${crypto.randomUUID()}.${ext}` ``
+
+### 4C. Environment Variables
+
+```
+GITHUB_DOCS_REPO=utamacs/utamacs-docs     # owner/repo of the private document store
+GITHUB_DOCS_TOKEN=ghp_...                  # PAT with repo write scope
+GITHUB_DOCS_BRANCH=main                    # branch (default: main)
+```
+
+The utility falls back to `GITHUB_LETTERS_REPO` / `GITHUB_LETTERS_TOKEN` if `GITHUB_DOCS_*` are not set.
 
 ### 4D. .gitignore Safety Net
 `uploads/`, `tmp/`, `temp/`, `public/uploads/`, `src/uploads/`, `docs/uploads/` are gitignored. If any code attempts to write a user file to disk, it will not reach git. Fix the code, not the gitignore.
+
+### 4E. What NOT to use
+- `SupabaseStorageService` — do NOT use for any new upload; existing calls are being migrated
+- Supabase Storage buckets — not provisioned; do not create or reference them
+- `sb.storage.from(bucket).upload(...)` — do not call Supabase storage API directly
 
 ---
 

@@ -1,12 +1,12 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const BUCKET = 'work-order-invoices';
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /** GET — returns 1-hour signed URL for the invoice attached to this work order */
@@ -38,13 +38,7 @@ export const GET: APIRoute = async ({ request, params }) => {
       return Response.json({ error: 'No invoice uploaded yet' }, { status: 404 });
     }
 
-    const { data: signed } = await sb.storage
-      .from(BUCKET)
-      .createSignedUrl((wo as any).invoice_storage_key, 3600);
-
-    if (!signed?.signedUrl) {
-      return Response.json({ error: 'Could not generate download URL' }, { status: 500 });
-    }
+    const url = await getDocumentDownloadUrl((wo as any).invoice_storage_key);
 
     await writeAuditLog({
       societyId: SOCIETY_ID, userId: user.id,
@@ -52,7 +46,7 @@ export const GET: APIRoute = async ({ request, params }) => {
       ip: extractClientIP(request),
     });
 
-    return Response.json({ url: signed.signedUrl });
+    return Response.json({ url });
   } catch (err) {
     return normalizeError(err, request.url);
   }
@@ -105,17 +99,12 @@ export const POST: APIRoute = async ({ request, params }) => {
       return Response.json({ error: 'VALIDATION_ERROR', message: 'File must be under 10 MB' }, { status: 400 });
     }
 
-    const storageKey = `${SOCIETY_ID}/${params.id!}/invoice.pdf`;
-    await sb.storage.from(BUCKET).upload(storageKey, Buffer.from(bytes), {
-      contentType: 'application/pdf',
-      upsert: true,
-    });
-
-    const { data: signed } = await sb.storage.from(BUCKET).createSignedUrl(storageKey, 3600);
+    const githubPath = docPath.vendorInvoice(wo.vendor_id, params.id!, 'pdf');
+    const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: work-order ${params.id!} invoice`);
 
     const { error: updErr } = await sb
       .from('work_orders')
-      .update({ invoice_storage_key: storageKey })
+      .update({ invoice_storage_key: result.githubPath })
       .eq('id', params.id!)
       .eq('society_id', SOCIETY_ID);
 
@@ -125,10 +114,11 @@ export const POST: APIRoute = async ({ request, params }) => {
       societyId: SOCIETY_ID, userId: user.id,
       action: 'UPDATE', resourceType: 'work_orders', resourceId: params.id!,
       ip: extractClientIP(request),
-      newValues: { invoice_storage_key: storageKey },
+      newValues: { invoice_storage_key: result.githubPath },
     });
 
-    return Response.json({ storage_key: storageKey, url: signed?.signedUrl }, { status: 201 });
+    const url = await getDocumentDownloadUrl(result.githubPath);
+    return Response.json({ storage_key: result.githubPath, url }, { status: 201 });
   } catch (err) {
     return normalizeError(err, request.url);
   }

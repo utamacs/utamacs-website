@@ -3,7 +3,7 @@ import type { APIRoute } from 'astro';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { UUID_RE } from '@lib/constants';
 
@@ -36,21 +36,20 @@ export const POST: APIRoute = async ({ request, params }) => {
     const buffer = Buffer.from(bytes);
     if (buffer.length > MAX_SIZE) return Response.json({ error: 'TOO_LARGE', message: 'Photo must be under 5 MB.' }, { status: 400 });
 
-    const key = `maids/${SOCIETY_ID}/${maidId}/photo-${crypto.randomUUID()}.${ext}`;
-    const storage = new SupabaseStorageService();
-    const { storageKey } = await storage.upload('maid-documents', key, buffer, file.type);
+    const githubPath = docPath.maidKycPhoto(maidId, ext);
+    const result = await commitDocument(githubPath, buffer, `docs: maid ${maidId} photo`);
 
-    await sb.from('maids').update({ photo_key: storageKey }).eq('id', maidId);
+    await sb.from('maids').update({ photo_key: result.githubPath }).eq('id', maidId);
 
     await writeAuditLog({
       userId: user.id, societyId: SOCIETY_ID,
       action: 'UPDATE', resourceType: 'maid', resourceId: maidId,
       ip: extractClientIP(request),
-      newValues: { photo_key: storageKey },
+      newValues: { photo_key: result.githubPath },
     });
 
-    const signedUrl = await storage.getSignedUrl('maid-documents', storageKey, 3600);
-    return Response.json({ storage_key: storageKey, signed_url: signedUrl }, { status: 200 });
+    const signed_url = await getDocumentDownloadUrl(result.githubPath);
+    return Response.json({ storage_key: result.githubPath, signed_url }, { status: 200 });
   } catch (err) {
     return normalizeError(err, request.url);
   }

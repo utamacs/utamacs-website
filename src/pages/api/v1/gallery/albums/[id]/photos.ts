@@ -4,7 +4,7 @@ import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { UUID_RE } from '@lib/constants';
 
@@ -15,7 +15,7 @@ const ALLOWED_MIME: Record<string, string> = {
 const MAX_SIZE = 10 * 1024 * 1024;
 const MAX_PHOTOS_PER_UPLOAD = 10;
 
-// GET — list photos in an album with signed URLs
+// GET — list photos in an album with download URLs
 export const GET: APIRoute = async ({ request, params }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -35,11 +35,10 @@ export const GET: APIRoute = async ({ request, params }) => {
 
     if (error) throw error;
 
-    const storage = new SupabaseStorageService();
     const photos = await Promise.all(
       ((data ?? []) as any[]).map(async (p) => {
         let url: string | null = null;
-        try { url = await storage.getSignedUrl('gallery-photos', p.storage_key, 3600); } catch { /* non-fatal */ }
+        try { url = await getDocumentDownloadUrl(p.storage_key); } catch { /* non-fatal */ }
         return { ...p, url };
       })
     );
@@ -76,7 +75,6 @@ export const POST: APIRoute = async ({ request, params }) => {
       return Response.json({ error: 'TOO_MANY', message: `Max ${MAX_PHOTOS_PER_UPLOAD} files per upload.` }, { status: 400 });
     }
 
-    const storage = new SupabaseStorageService();
     const results: { id: string; storage_key: string; url: string | null }[] = [];
 
     for (const file of files) {
@@ -87,8 +85,9 @@ export const POST: APIRoute = async ({ request, params }) => {
       const buffer = Buffer.from(bytes);
       if (buffer.length > MAX_SIZE) continue; // skip oversized
 
-      const key = `gallery/${SOCIETY_ID}/${albumId}/${crypto.randomUUID()}.${ext}`;
-      const { storageKey } = await storage.upload('gallery-photos', key, buffer, file.type);
+      const photoId = crypto.randomUUID();
+      const githubPath = docPath.galleryPhoto(albumId, photoId, ext);
+      const result = await commitDocument(githubPath, buffer, `docs: gallery album ${albumId} photo`);
 
       const caption = formData.get('caption') as string | null;
       const { data: photo } = await sb
@@ -96,7 +95,7 @@ export const POST: APIRoute = async ({ request, params }) => {
         .insert({
           society_id: SOCIETY_ID,
           album_id: albumId,
-          storage_key: storageKey,
+          storage_key: result.githubPath,
           caption: caption ? sanitizePlainText(caption).slice(0, 300) : null,
           uploaded_by: user.id,
         })
@@ -104,13 +103,13 @@ export const POST: APIRoute = async ({ request, params }) => {
         .single();
 
       let url: string | null = null;
-      try { url = await storage.getSignedUrl('gallery-photos', storageKey, 3600); } catch { /* non-fatal */ }
+      try { url = await getDocumentDownloadUrl(result.githubPath); } catch { /* non-fatal */ }
 
-      results.push({ id: (photo as any).id, storage_key: storageKey, url });
+      results.push({ id: (photo as any).id, storage_key: result.githubPath, url });
 
       // Set first upload as cover if album has no cover
       if (!(album as any).cover_key && results.length === 1) {
-        await sb.from('gallery_albums').update({ cover_key: storageKey }).eq('id', albumId);
+        await sb.from('gallery_albums').update({ cover_key: result.githubPath }).eq('id', albumId);
       }
     }
 

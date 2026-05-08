@@ -4,7 +4,7 @@ import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { sanitizePlainText } from '@lib/utils/sanitize';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
@@ -25,12 +25,11 @@ export const GET: APIRoute = async ({ request }) => {
 
     if (error) throw error;
 
-    const storage = new SupabaseStorageService();
     const albums = await Promise.all(
       ((data ?? []) as any[]).map(async (a) => {
         let cover_url: string | null = null;
         if (a.cover_key) {
-          try { cover_url = await storage.getSignedUrl('gallery-photos', a.cover_key, 3600); } catch { /* non-fatal */ }
+          try { cover_url = await getDocumentDownloadUrl(a.cover_key); } catch { /* non-fatal */ }
         }
         return { ...a, cover_url };
       })

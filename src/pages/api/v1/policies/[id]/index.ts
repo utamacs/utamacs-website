@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
 import { resolveFromRequest, requireFeature, hasFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
@@ -27,12 +27,11 @@ export const GET: APIRoute = async ({ request, params }) => {
     if (error || !data) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
     if (data.status !== 'active' && !isPrivileged) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
 
-    // Generate signed URL for PDF (1-hour expiry per DPDPA)
+    // Generate download URL for PDF (short-lived per DPDPA)
     let document_url: string | null = null;
     if (data.document_key) {
       try {
-        const storage = new SupabaseStorageService();
-        document_url = await storage.getSignedUrl('policy-documents', data.document_key, 3600);
+        document_url = await getDocumentDownloadUrl(data.document_key);
       } catch { /* non-fatal */ }
     }
 
