@@ -1,13 +1,12 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const BUCKET = 'notices';
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /** GET /api/v1/notices/:id/attachment — returns 1-hour signed URL for the notice attachment. */
@@ -28,13 +27,7 @@ export const GET: APIRoute = async ({ request, params }) => {
       return Response.json({ error: 'No attachment found' }, { status: 404 });
     }
 
-    const { data: signed } = await sb.storage
-      .from(BUCKET)
-      .createSignedUrl((notice as any).attachment_storage_key, 3600);
-
-    if (!signed?.signedUrl) {
-      return Response.json({ error: 'Could not generate download URL' }, { status: 500 });
-    }
+    const url = await getDocumentDownloadUrl((notice as any).attachment_storage_key);
 
     await writeAuditLog({
       societyId: SOCIETY_ID, userId: user.id,
@@ -43,7 +36,7 @@ export const GET: APIRoute = async ({ request, params }) => {
     });
 
     return Response.json({
-      url: signed.signedUrl,
+      url,
       attachment_type: (notice as any).attachment_type,
     });
   } catch (err) {
@@ -93,16 +86,13 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (bytes.byteLength > MAX_BYTES)
       return Response.json({ error: 'VALIDATION_ERROR', message: 'File must be under 10 MB' }, { status: 400 });
 
-    const storageKey = `${SOCIETY_ID}/${noticeId}.${meta.ext}`;
-    const storage = new SupabaseStorageService();
-    await sb.storage.from(BUCKET).upload(storageKey, Buffer.from(bytes), { contentType: file.type, upsert: true });
-
-    const { signedUrl } = (await sb.storage.from(BUCKET).createSignedUrl(storageKey, 3600)).data ?? {};
+    const githubPath = docPath.notice(noticeId, 'attachment', meta.ext);
+    const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: notice ${noticeId} attachment`);
 
     const { error: updErr } = await sb
       .from('notices')
       .update({
-        attachment_storage_key: storageKey,
+        attachment_storage_key: result.githubPath,
         attachment_type: meta.type,
         updated_at: new Date().toISOString(),
       })
@@ -111,6 +101,8 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     if (updErr) throw Object.assign(new Error(updErr.message), { status: 500 });
 
+    const url = await getDocumentDownloadUrl(result.githubPath);
+
     await writeAuditLog({
       societyId: SOCIETY_ID, userId: user.id,
       action: 'UPDATE', resourceType: 'notices', resourceId: noticeId,
@@ -118,7 +110,7 @@ export const POST: APIRoute = async ({ request, params }) => {
       newValues: { attachment_type: meta.type },
     });
 
-    return Response.json({ storage_key: storageKey, attachment_type: meta.type, url: signedUrl }, { status: 200 });
+    return Response.json({ storage_key: result.githubPath, attachment_type: meta.type, url }, { status: 200 });
   } catch (err) {
     return normalizeError(err, request.url);
   }

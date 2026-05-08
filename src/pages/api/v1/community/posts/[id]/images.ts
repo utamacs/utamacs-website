@@ -1,13 +1,12 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const BUCKET     = 'community';
 const MAX_BYTES  = 5 * 1024 * 1024; // 5 MB per image
 const MAX_IMAGES = 5;
 
@@ -51,7 +50,6 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (files.length > remaining)
       return Response.json({ error: 'VALIDATION_ERROR', message: `Can only add ${remaining} more image(s)` }, { status: 400 });
 
-    const storage = new SupabaseStorageService();
     const newKeys: string[] = [];
 
     for (const file of files) {
@@ -61,9 +59,9 @@ export const POST: APIRoute = async ({ request, params }) => {
       const bytes = await file.arrayBuffer();
       if (bytes.byteLength > MAX_BYTES) return Response.json({ error: 'VALIDATION_ERROR', message: `${file.name} exceeds 5 MB limit` }, { status: 400 });
 
-      const key = `${SOCIETY_ID}/${postId}/${crypto.randomUUID()}.${ext}`;
-      await storage.upload(BUCKET, key, Buffer.from(bytes), file.type);
-      newKeys.push(key);
+      const githubPath = docPath.communityImage(postId, ext);
+      const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: community post ${postId} image`);
+      newKeys.push(result.githubPath);
     }
 
     const updatedImages = [...(post.images ?? []), ...newKeys];
@@ -82,9 +80,9 @@ export const POST: APIRoute = async ({ request, params }) => {
       newValues: { images_added: newKeys.length },
     });
 
-    // Return signed URLs for the newly uploaded images
+    // Return download URLs for the newly uploaded images
     const urls = await Promise.all(
-      newKeys.map(k => storage.getSignedUrl(BUCKET, k, 3600))
+      newKeys.map(k => getDocumentDownloadUrl(k))
     );
 
     return Response.json({ keys: newKeys, urls }, { status: 201 });

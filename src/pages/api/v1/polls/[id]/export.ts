@@ -3,7 +3,7 @@ import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import PdfPrinter from 'pdfmake';
 import { UUID_RE } from '@lib/constants';
@@ -12,7 +12,7 @@ const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000
 
 
 // GET /api/v1/polls/:id/export
-// Returns a signed URL to a generated PDF of poll results (polls.manage feature required)
+// Returns a download URL to a generated PDF of poll results (polls.manage feature required)
 export const GET: APIRoute = async ({ request, params }) => {
   try {
     const user = await resolveFromRequest(request, SOCIETY_ID);
@@ -142,17 +142,15 @@ export const GET: APIRoute = async ({ request, params }) => {
     });
 
     const pdfBuffer = Buffer.concat(chunks);
-    const key = `poll-exports/${SOCIETY_ID}/${pollId}/${crypto.randomUUID()}.pdf`;
-
-    const storage = new SupabaseStorageService();
-    await storage.upload('poll-exports', key, pdfBuffer, 'application/pdf');
-    const signed_url = await storage.getSignedUrl('poll-exports', key, 3600);
+    const githubPath = docPath.pollExport(pollId);
+    const result = await commitDocument(githubPath, pdfBuffer, `docs: poll ${pollId} results export`);
+    const signed_url = await getDocumentDownloadUrl(result.githubPath);
 
     await writeAuditLog({
       userId: user.id, societyId: SOCIETY_ID,
       action: 'EXPORT', resourceType: 'poll_results', resourceId: pollId,
       ip: extractClientIP(request),
-      newValues: { export_key: key },
+      newValues: { export_key: result.githubPath },
     });
 
     return Response.json({ signed_url, total_votes: totalVotes, expires_in: 3600 });

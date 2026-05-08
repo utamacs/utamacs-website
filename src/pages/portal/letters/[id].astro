@@ -5,7 +5,9 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
-if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal/letters');
+const canSeeLetters = ['executive', 'admin'].includes(user.role) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+if (!canSeeLetters) return Astro.redirect('/portal/letters');
 
 const { id } = Astro.params;
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';

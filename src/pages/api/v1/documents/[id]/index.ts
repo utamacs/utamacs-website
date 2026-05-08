@@ -5,7 +5,7 @@ import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
 import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
@@ -59,10 +59,8 @@ export const PUT: APIRoute = async ({ request, params }) => {
     if (buffer.length > MAX_BYTES) return Response.json({ error: 'VALIDATION', message: 'File exceeds 20 MB limit' }, { status: 400 });
 
     const newVersion = (doc.version ?? 1) + 1;
-    const newKey = `documents/${SOCIETY_ID}/${crypto.randomUUID()}.${ext}`;
-
-    const storage = new SupabaseStorageService();
-    await storage.upload('policy-documents', newKey, buffer, file.type);
+    const newKey = `members/${SOCIETY_ID}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const result = await commitDocument(newKey, buffer, `docs: document ${id} version ${newVersion}`);
 
     // Archive the old storage_key into a version-history record
     const { error: insertErr } = await sb
@@ -90,7 +88,7 @@ export const PUT: APIRoute = async ({ request, params }) => {
     const { data: updated, error: updateErr } = await sb
       .from('documents')
       .update({
-        storage_key: newKey,
+        storage_key: result.githubPath,
         file_name: file.name,
         mime_type: file.type,
         file_size_bytes: buffer.length,
@@ -110,7 +108,7 @@ export const PUT: APIRoute = async ({ request, params }) => {
       newValues: { version: newVersion, file_name: file.name },
     });
 
-    const download_url = await storage.getSignedUrl('policy-documents', newKey, 3600);
+    const download_url = await getDocumentDownloadUrl(result.githubPath);
     return Response.json({ ...updated, download_url });
   } catch (err) {
     return normalizeError(err, request.url);

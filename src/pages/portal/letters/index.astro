@@ -4,7 +4,11 @@ import PortalLayout from '@portal/PortalLayout.astro';
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
-if (!['executive', 'admin'].includes(user.role)) return Astro.redirect('/portal');
+const canSeeLetters =
+  ['executive', 'admin'].includes(user.role) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') ||
+  user.isAdmin;
+if (!canSeeLetters) return Astro.redirect('/portal');
 ---
 
 <PortalLayout title="Letters" user={user} activeModule="letters">

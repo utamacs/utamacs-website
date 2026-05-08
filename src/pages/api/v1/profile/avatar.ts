@@ -1,13 +1,12 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { resolveFromRequest } from '@lib/permissions';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl, docPath } from '@lib/utils/githubDocStore';
+import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const BUCKET     = 'avatars';
 const MAX_BYTES  = 2 * 1024 * 1024; // 2 MB
 
 const ALLOWED_MIME: Record<string, string> = {
@@ -40,33 +39,16 @@ export const POST: APIRoute = async ({ request }) => {
     if (bytes.byteLength > MAX_BYTES)
       return Response.json({ error: 'VALIDATION_ERROR', message: 'Photo must be under 2 MB' }, { status: 400 });
 
-    // Storage key: avatars/{society_id}/{user_id}.{ext}
-    // Using user_id (not random uuid) so re-uploads replace the old file
-    const storageKey = `${SOCIETY_ID}/${user.id}.${ext}`;
-    const storage = new SupabaseStorageService();
+    const githubPath = docPath.avatar(user.id, ext);
+    const result = await commitDocument(githubPath, Buffer.from(bytes), `docs: avatar for profile ${user.id}`);
 
-    // Delete previous avatar if it exists (different extension)
     const sb = getSupabaseServiceClient();
-    const { data: existing } = await sb
-      .from('profiles')
-      .select('avatar_url')
-      .eq('id', user.id)
-      .single();
-
-    // Upload new avatar — upsert by reusing same key path
-    await sb.storage.from(BUCKET).upload(storageKey, Buffer.from(bytes), {
-      contentType: file.type,
-      upsert: true,          // overwrite if same key exists
-    });
-
-    // Build public URL (avatars bucket is public — non-sensitive profile photo)
-    const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
-    const avatar_url  = `${supabaseUrl}/storage/v1/object/public/${BUCKET}/${storageKey}`;
+    const avatar_url = await getDocumentDownloadUrl(result.githubPath);
 
     // Persist url to profile
     const { error: updateErr } = await sb
       .from('profiles')
-      .update({ avatar_url, updated_at: new Date().toISOString() })
+      .update({ avatar_url: result.githubPath, updated_at: new Date().toISOString() })
       .eq('id', user.id)
       .eq('society_id', SOCIETY_ID);
 

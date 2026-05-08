@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, docPath } from '@lib/utils/githubDocStore';
 import { resolveFromRequest } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog } from '@lib/middleware/auditLogger';
@@ -10,7 +10,6 @@ import { getRules, ruleInt } from '@lib/utils/getRules';
 import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const BUCKET = 'member-documents';
 const ALLOWED_MIME: Record<string, string> = {
   'application/pdf': 'pdf',
   'image/jpeg': 'jpg',
@@ -54,16 +53,16 @@ export const PATCH: APIRoute = async ({ request, params, url }) => {
       if (buffer.length > 5 * 1024 * 1024) return Response.json({ error: 'VALIDATION', message: 'File exceeds 5 MB limit' }, { status: 400 });
 
       const ext = ALLOWED_MIME[file.type];
-      const prefix = type === 'maid' ? 'maid-kyc' : 'staff-kyc';
-      const key = `${prefix}/${SOCIETY_ID}/${id}-${docType}.${ext}`;
+      const githubPath = docType === 'photo'
+        ? (type === 'maid' ? docPath.maidKycPhoto(id, ext) : docPath.staffKycPhoto(id, ext))
+        : (type === 'maid' ? docPath.maidKycIdDoc(id, ext) : docPath.staffKycIdDoc(id, ext));
 
-      const storageService = new SupabaseStorageService();
-      await storageService.upload(BUCKET, key, buffer, file.type);
+      await commitDocument(githubPath, buffer, `docs: staff-kyc/${type}/${id} ${docType} uploaded by ${user.id}`);
 
       if (docType === 'photo') {
-        updates.photo_key = key;
+        updates.photo_key = githubPath;
       } else {
-        updates.id_doc_key = key;
+        updates.id_doc_key = githubPath;
       }
 
       // Check if both docs now present → advance to documents_submitted
@@ -75,11 +74,12 @@ export const PATCH: APIRoute = async ({ request, params, url }) => {
 
       await writeAuditLog({
         userId: user.id,
+        societyId: SOCIETY_ID,
         action: 'UPDATE',
         resourceType: `${type}_kyc_document`,
         resourceId: id,
         oldValues: { [docType === 'photo' ? 'photo_key' : 'id_doc_key']: null },
-        newValues: { key },
+        newValues: { github_path: githubPath },
       });
     } else {
       // JSON update

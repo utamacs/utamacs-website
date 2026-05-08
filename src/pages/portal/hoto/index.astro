@@ -57,11 +57,16 @@ const isAdmin = user.isAdmin;
             <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Handover complete</p>
           </div>
         </div>
-        <!-- Exception row -->
+        <!-- Exception rows -->
         <div class="flex items-center gap-2 text-xs text-red-600">
           <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
           <span class="font-medium">Send Back</span>
           <span class="text-red-500">— Secretary or President can return to Docs Pending if evidence is incomplete</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-times-circle text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Rejected</span>
+          <span class="text-red-500">— Secretary or President can permanently reject an item; no further action possible</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">

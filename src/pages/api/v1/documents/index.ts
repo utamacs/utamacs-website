@@ -6,7 +6,7 @@ import { resolveFromRequest, requireFeature } from '@lib/permissions';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { commitDocument, getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
 import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
@@ -70,13 +70,12 @@ export const GET: APIRoute = async ({ request, url }) => {
     const { data, error } = await query;
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
-    // Generate signed URLs in parallel (1h expiry)
-    const storage = new SupabaseStorageService();
+    // Generate download URLs in parallel
     const withUrls = await Promise.all(
       (data ?? []).map(async (doc: any) => {
         let download_url: string | null = null;
         try {
-          download_url = await storage.getSignedUrl('policy-documents', doc.storage_key, 3600);
+          download_url = await getDocumentDownloadUrl(doc.storage_key);
         } catch { /* skip — key may not exist yet */ }
         const { storage_key: _sk, ...rest } = doc;
         return { ...rest, download_url };
@@ -128,9 +127,8 @@ export const POST: APIRoute = async ({ request }) => {
       return Response.json({ error: 'VALIDATION', message: 'File exceeds 20 MB limit' }, { status: 400 });
     }
 
-    const key = `documents/${SOCIETY_ID}/${crypto.randomUUID()}.${ext}`;
-    const storage = new SupabaseStorageService();
-    await storage.upload('policy-documents', key, buffer, file.type);
+    const key = `members/${SOCIETY_ID}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const result = await commitDocument(key, buffer, `docs: document library upload "${title}"`);
 
     const sb = getSupabaseServiceClient();
     const { data, error } = await sb
@@ -140,7 +138,7 @@ export const POST: APIRoute = async ({ request }) => {
         title,
         description,
         category,
-        storage_key:   key,
+        storage_key:   result.githubPath,
         file_name:     file.name,
         mime_type:     file.type,
         file_size_bytes: buffer.length,
@@ -162,7 +160,7 @@ export const POST: APIRoute = async ({ request }) => {
       ip: extractClientIP(request), newValues: { category, title, file_name: file.name },
     });
 
-    const download_url = await storage.getSignedUrl('policy-documents', key, 3600);
+    const download_url = await getDocumentDownloadUrl(result.githubPath);
     return Response.json({ ...data, download_url }, { status: 201 });
   } catch (err) {
     return normalizeError(err, request.url);

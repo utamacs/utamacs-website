@@ -4,7 +4,9 @@ import PortalLayout from '@portal/PortalLayout.astro';
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
-if (!['executive', 'admin'].includes(user.role)) return new Response('Forbidden', { status: 403 });
+const isPrivileged = ['executive', 'admin'].includes(user.role) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+if (!isPrivileged) return new Response('Forbidden', { status: 403 });
 ---
 
 <PortalLayout title="Registration Requests" user={user} activeModule="admin_registrations">

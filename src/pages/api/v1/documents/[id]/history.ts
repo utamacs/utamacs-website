@@ -3,7 +3,7 @@ import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
-import { SupabaseStorageService } from '@lib/services/providers/supabase/SupabaseStorageService';
+import { getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
 import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
@@ -35,8 +35,6 @@ export const GET: APIRoute = async ({ request, params }) => {
       .eq('society_id', SOCIETY_ID)
       .order('version', { ascending: false });
 
-    const storage = new SupabaseStorageService();
-
     // Current version = root record (has latest storage_key)
     const currentEntry = {
       id: root.id,
@@ -49,14 +47,14 @@ export const GET: APIRoute = async ({ request, params }) => {
       download_url: null as string | null,
     };
     try {
-      currentEntry.download_url = await storage.getSignedUrl('policy-documents', root.storage_key, 3600);
+      currentEntry.download_url = await getDocumentDownloadUrl(root.storage_key);
     } catch { /* storage key may be missing */ }
 
     // Previous versions (archived copies, sorted desc by version number)
     const historyEntries = await Promise.all(
       (versions ?? []).map(async (v: any) => {
         let download_url: string | null = null;
-        try { download_url = await storage.getSignedUrl('policy-documents', v.storage_key, 3600); } catch { /* skip */ }
+        try { download_url = await getDocumentDownloadUrl(v.storage_key); } catch { /* skip */ }
         const { storage_key: _sk, ...rest } = v;
         return { ...rest, is_current: false, download_url };
       })
