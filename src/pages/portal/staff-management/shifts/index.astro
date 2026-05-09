@@ -1,0 +1,157 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isExec = ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+if (!isExec) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+const { data: shifts } = await sb
+  .from('staff_shifts')
+  .select('id, name, department, start_time, end_time, days_of_week, grace_mins, is_active')
+  .eq('society_id', SOCIETY_ID)
+  .order('department')
+  .order('start_time');
+
+const DAY_LABELS = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const DEPT_LABELS: Record<string, string> = {
+  security: 'Security', housekeeping: 'Housekeeping', gardening: 'Gardening',
+  maintenance: 'Maintenance', admin: 'Administration', multi: 'Multi',
+};
+
+const deptGroups: Record<string, typeof shifts> = {};
+for (const s of shifts ?? []) {
+  if (!deptGroups[s.department]) deptGroups[s.department] = [];
+  deptGroups[s.department]!.push(s);
+}
+---
+
+<PortalLayout title="Shift Configuration" user={user} activeModule="staff_management">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <nav class="text-sm text-text-secondary mb-1">
+        <a href="/portal/staff-management" class="hover:text-primary-600">Staff Management</a>
+        <span class="mx-2">›</span><span class="text-text-primary">Shifts</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Shift Configuration</h1>
+      <p class="text-text-secondary text-sm mt-1">Define shift templates per department</p>
+    </div>
+    <button id="add-shift-btn" class="btn-primary text-sm">
+      <i class="fas fa-plus mr-1.5" aria-hidden="true"></i>Add Shift
+    </button>
+  </div>
+
+  {Object.entries(deptGroups).map(([dept, deptShifts]) => (
+    <div class="mb-6">
+      <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">
+        {DEPT_LABELS[dept] ?? dept}
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {(deptShifts ?? []).map(shift => (
+          <div class={`card-premium p-4 ${!shift.is_active ? 'opacity-60' : ''}`}>
+            <div class="flex items-start justify-between mb-2">
+              <span class="font-semibold text-text-primary text-sm">{shift.name}</span>
+              <span class={`text-xs px-2 py-0.5 rounded-full ${shift.is_active ? 'bg-secondary-500/10 text-secondary-500' : 'bg-gray-100 text-gray-500'}`}>
+                {shift.is_active ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            <div class="space-y-1.5 text-sm">
+              <div class="flex items-center gap-2 text-text-secondary">
+                <i class="fas fa-clock w-4 text-center text-primary-400" aria-hidden="true"></i>
+                <span>{shift.start_time.slice(0,5)} – {shift.end_time.slice(0,5)}</span>
+              </div>
+              <div class="flex items-center gap-2 text-text-secondary">
+                <i class="fas fa-calendar-week w-4 text-center text-primary-400" aria-hidden="true"></i>
+                <span class="text-xs">{(shift.days_of_week ?? []).map((d: number) => DAY_LABELS[d] ?? '').join(', ')}</span>
+              </div>
+              <div class="flex items-center gap-2 text-text-secondary">
+                <i class="fas fa-hourglass-start w-4 text-center text-primary-400" aria-hidden="true"></i>
+                <span>{shift.grace_mins}m grace period</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ))}
+
+  <!-- Add Shift Drawer -->
+  <div id="add-shift-panel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-primary-600">Add Shift</h2>
+      <button id="close-shift-panel" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="p-4">
+      <div id="shift-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+      <form id="add-shift-form" class="space-y-4">
+        <div>
+          <label class="form-label">Shift Name <span class="text-red-500">*</span></label>
+          <input name="name" type="text" required maxlength="100" class="form-input" placeholder="e.g. Morning Security" />
+        </div>
+        <div>
+          <label class="form-label">Department <span class="text-red-500">*</span></label>
+          <select name="department" required class="form-input bg-white">
+            {Object.entries(DEPT_LABELS).map(([k, v]) => <option value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label">Start Time <span class="text-red-500">*</span></label>
+            <input name="start_time" type="time" required class="form-input" />
+          </div>
+          <div>
+            <label class="form-label">End Time <span class="text-red-500">*</span></label>
+            <input name="end_time" type="time" required class="form-input" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Active Days <span class="text-red-500">*</span></label>
+          <div class="flex flex-wrap gap-2 mt-1">
+            {DAY_LABELS.slice(1).map((d, i) => (
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" name="days_of_week" value={i + 1} checked class="w-3.5 h-3.5 accent-primary-600" />
+                <span class="text-sm text-text-primary">{d}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Grace Period (minutes)</label>
+          <input name="grace_mins" type="number" min="0" max="60" value="10" class="form-input" />
+        </div>
+        <button type="submit" class="btn-primary w-full">Add Shift</button>
+      </form>
+    </div>
+  </div>
+  <div id="shift-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+</PortalLayout>
+
+<script>
+const panel = document.getElementById('add-shift-panel')!;
+const backdrop = document.getElementById('shift-backdrop')!;
+const open = () => { panel.classList.remove('translate-x-full'); backdrop.classList.remove('hidden'); };
+const close = () => { panel.classList.add('translate-x-full'); backdrop.classList.add('hidden'); };
+document.getElementById('add-shift-btn')?.addEventListener('click', open);
+document.getElementById('close-shift-panel')?.addEventListener('click', close);
+backdrop.addEventListener('click', close);
+
+document.getElementById('add-shift-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target as HTMLFormElement);
+  const days = fd.getAll('days_of_week').map(Number);
+  const body = { ...Object.fromEntries(fd.entries()), days_of_week: days };
+  const errEl = document.getElementById('shift-error')!;
+  errEl.classList.add('hidden');
+  const res = await fetch('/api/v1/staff/shifts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (res.ok) { window.location.reload(); }
+  else { const d = await res.json().catch(() => ({})); errEl.textContent = d.message ?? 'Failed.'; errEl.classList.remove('hidden'); }
+});
+</script>

@@ -1,0 +1,201 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isStaffRole = ['staff', 'supervisor', 'afm'].includes(user.portalRole);
+const isExec = ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+if (!isStaffRole && !isExec) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+const today = new Date().toISOString().split('T')[0];
+
+let tasks: { id: string; title: string; title_hi: string | null; title_te: string | null; status: string; priority: string; due_date: string; due_time: string | null; requires_photo: boolean; completion_note: string | null; completed_at: string | null }[] = [];
+
+if (isStaffRole) {
+  const { data: sm } = await sb.from('staff_members').select('id, language_preference').eq('user_id', user.id).eq('society_id', SOCIETY_ID).single();
+  if (sm) {
+    const { data } = await sb.from('staff_task_assignments')
+      .select('id, title, title_hi, title_te, status, priority, due_date, due_time, requires_photo, completion_note, completed_at')
+      .eq('assigned_to', sm.id)
+      .gte('due_date', new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0])
+      .order('due_date', { ascending: false })
+      .order('priority', { ascending: false });
+    tasks = data ?? [];
+  }
+}
+
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: 'bg-red-50 border-red-200 text-red-700',
+  high:   'bg-amber-50 border-amber-200 text-amber-700',
+  normal: 'bg-blue-50 border-blue-200 text-blue-700',
+  low:    'bg-gray-50 border-gray-200 text-gray-600',
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  pending:     'bg-amber-50 text-amber-700',
+  in_progress: 'bg-blue-50 text-blue-700',
+  completed:   'bg-secondary-500/10 text-secondary-500',
+  overdue:     'bg-red-50 text-red-600',
+  skipped:     'bg-gray-100 text-gray-500',
+};
+
+const todayTasks = tasks.filter(t => t.due_date === today);
+const otherTasks = tasks.filter(t => t.due_date !== today);
+---
+
+<PortalLayout title="My Tasks" user={user} activeModule="staff_tasks">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">My Tasks</h1>
+      <p class="text-text-secondary text-sm mt-1">
+        {todayTasks.filter(t => t.status === 'pending').length} pending · {todayTasks.filter(t => t.status === 'completed').length} done today
+      </p>
+    </div>
+  </div>
+
+  <!-- Today's tasks -->
+  {todayTasks.length > 0 && (
+    <div class="mb-6">
+      <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">Today</h2>
+      <div class="space-y-3">
+        {todayTasks.map(task => (
+          <div class={`card-premium p-4 border-l-4 ${PRIORITY_COLORS[task.priority] ?? 'border-border-light'} task-item`} data-task-id={task.id}>
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-text-primary">{task.title}</div>
+                {task.due_time && (
+                  <div class="text-xs text-text-secondary mt-0.5">
+                    <i class="fas fa-clock mr-1" aria-hidden="true"></i>Due by {task.due_time.slice(0, 5)}
+                  </div>
+                )}
+                {task.requires_photo && (
+                  <div class="text-xs text-primary-500 mt-0.5">
+                    <i class="fas fa-camera mr-1" aria-hidden="true"></i>Photo proof required
+                  </div>
+                )}
+              </div>
+              <div class="flex flex-col items-end gap-2 flex-shrink-0">
+                <span class={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_BADGE[task.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {task.status.replace('_', ' ')}
+                </span>
+                {(task.status === 'pending' || task.status === 'in_progress') && (
+                  <button
+                    class="complete-task-btn text-xs bg-secondary-500 text-white px-2.5 py-1 rounded-lg hover:bg-green-600 transition-colors"
+                    data-task-id={task.id}
+                    data-requires-photo={task.requires_photo ? 'true' : 'false'}
+                  >
+                    Mark Done
+                  </button>
+                )}
+              </div>
+            </div>
+            {task.completion_note && (
+              <div class="mt-2 text-xs text-text-secondary bg-gray-50 rounded p-2">
+                <i class="fas fa-sticky-note mr-1" aria-hidden="true"></i>{task.completion_note}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {todayTasks.length === 0 && (
+    <div class="text-center py-10 mb-6">
+      <i class="fas fa-check-circle text-5xl text-secondary-500/40 mb-3" aria-hidden="true"></i>
+      <h3 class="text-base font-semibold text-text-primary mb-1">No tasks for today</h3>
+      <p class="text-sm text-text-secondary">Check back with your supervisor if you expected tasks.</p>
+    </div>
+  )}
+
+  <!-- Previous tasks -->
+  {otherTasks.length > 0 && (
+    <div>
+      <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">Last 7 Days</h2>
+      <div class="space-y-2">
+        {otherTasks.map(task => (
+          <div class="card-premium p-3 flex items-center gap-3">
+            <i class={`fas fa-circle text-[8px] ${task.status === 'completed' ? 'text-secondary-500' : task.status === 'overdue' ? 'text-red-500' : 'text-gray-300'}`} aria-hidden="true"></i>
+            <span class="flex-1 text-sm text-text-primary truncate">{task.title}</span>
+            <span class="text-xs text-text-secondary">{new Date(task.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+            <span class={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_BADGE[task.status] ?? 'bg-gray-100 text-gray-600'}`}>
+              {task.status.replace('_', ' ')}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  <!-- Complete task modal -->
+  <div id="complete-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-end sm:items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+      <div class="p-5 border-b border-border-light flex items-center justify-between">
+        <h3 class="font-semibold text-text-primary">Mark Task Complete</h3>
+        <button id="close-complete-modal" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="p-5">
+        <div id="complete-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+        <form id="complete-form" class="space-y-4">
+          <input type="hidden" id="complete-task-id" name="task_id" />
+          <div>
+            <label class="form-label">Completion Note (optional)</label>
+            <textarea name="completion_note" rows={2} class="form-input" placeholder="Any notes about this task…"></textarea>
+          </div>
+          <div id="photo-upload-section" class="hidden">
+            <label class="form-label">Proof Photo <span class="text-red-500">*</span></label>
+            <input type="file" name="proof_photo" accept="image/jpeg,image/png" class="form-input" />
+          </div>
+          <button type="submit" class="btn-primary w-full">
+            <i class="fas fa-check mr-2" aria-hidden="true"></i>Mark as Complete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</PortalLayout>
+
+<script>
+const modal = document.getElementById('complete-modal')!;
+const taskIdInput = document.getElementById('complete-task-id') as HTMLInputElement;
+const photoSection = document.getElementById('photo-upload-section')!;
+
+document.querySelectorAll('.complete-task-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const taskId = (btn as HTMLElement).dataset.taskId!;
+    const requiresPhoto = (btn as HTMLElement).dataset.requiresPhoto === 'true';
+    taskIdInput.value = taskId;
+    photoSection.classList.toggle('hidden', !requiresPhoto);
+    modal.classList.remove('hidden');
+  });
+});
+
+document.getElementById('close-complete-modal')?.addEventListener('click', () => modal.classList.add('hidden'));
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+
+document.getElementById('complete-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target as HTMLFormElement;
+  const fd = new FormData(form);
+  const errEl = document.getElementById('complete-error')!;
+  errEl.classList.add('hidden');
+
+  const res = await fetch('/api/v1/staff/tasks/complete', {
+    method: 'POST',
+    body: fd,
+  });
+
+  if (res.ok) { window.location.reload(); }
+  else {
+    const d = await res.json().catch(() => ({}));
+    errEl.textContent = d.message ?? 'Failed to mark task complete.';
+    errEl.classList.remove('hidden');
+  }
+});
+</script>

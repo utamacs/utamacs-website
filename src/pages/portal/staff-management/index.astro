@@ -1,0 +1,315 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+const isStaffRole = ['staff', 'supervisor', 'afm'].includes(user.portalRole);
+const isExec = ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+
+if (!isStaffRole && !isExec) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+const today = new Date().toISOString().split('T')[0];
+
+// ── Staff-role view: own today's record ──────────────────────────────────────
+let myAttendance: { check_in: string | null; check_out: string | null; status: string } | null = null;
+let myTasksToday: { id: string; title: string; status: string; priority: string; due_time: string | null }[] = [];
+let myStaffRecord: { id: string; name: string; department: string | null; designation: string | null } | null = null;
+
+if (isStaffRole) {
+  const { data: sm } = await sb.from('staff_members')
+    .select('id, name, department, designation')
+    .eq('user_id', user.id)
+    .eq('society_id', SOCIETY_ID)
+    .single();
+  myStaffRecord = sm;
+
+  if (sm) {
+    const { data: att } = await sb.from('staff_attendance')
+      .select('check_in, check_out, status')
+      .eq('staff_id', sm.id)
+      .eq('date', today)
+      .maybeSingle();
+    myAttendance = att ?? null;
+
+    const { data: tasks } = await sb.from('staff_task_assignments')
+      .select('id, title, status, priority, due_time')
+      .eq('assigned_to', sm.id)
+      .eq('due_date', today)
+      .order('priority', { ascending: false });
+    myTasksToday = tasks ?? [];
+  }
+}
+
+// ── Exec view: society-wide KPIs ─────────────────────────────────────────────
+let kpi: { total: number; present: number; absent: number; pending_tasks: number; overdue_tasks: number; open_proposals: number } = {
+  total: 0, present: 0, absent: 0, pending_tasks: 0, overdue_tasks: 0, open_proposals: 0,
+};
+
+if (isExec) {
+  const [{ count: total }, { count: present }, { count: absent }, { count: pending }, { count: overdue }, { count: proposals }] = await Promise.all([
+    sb.from('staff_members').select('*', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).eq('is_active', true),
+    sb.from('staff_attendance').select('*', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).eq('date', today).eq('status', 'present'),
+    sb.from('staff_attendance').select('*', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).eq('date', today).eq('status', 'absent'),
+    sb.from('staff_task_assignments').select('*', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).eq('status', 'pending').eq('due_date', today),
+    sb.from('staff_task_assignments').select('*', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).eq('status', 'overdue'),
+    sb.from('staff_activity_proposals').select('*', { count: 'exact', head: true }).eq('society_id', SOCIETY_ID).eq('status', 'pending'),
+  ]);
+  kpi = {
+    total:          total ?? 0,
+    present:        present ?? 0,
+    absent:         absent ?? 0,
+    pending_tasks:  pending ?? 0,
+    overdue_tasks:  overdue ?? 0,
+    open_proposals: proposals ?? 0,
+  };
+}
+
+const checkedIn = !!myAttendance?.check_in;
+const checkedOut = !!myAttendance?.check_out;
+const pendingTasks = myTasksToday.filter(t => t.status === 'pending').length;
+---
+
+<PortalLayout title="Staff Management" user={user} activeModule={isStaffRole ? 'staff_dashboard' : 'staff_management'}>
+
+  <!-- Page header -->
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">
+        {isStaffRole ? `Welcome, ${myStaffRecord?.name ?? user.email}` : 'Staff Management'}
+      </h1>
+      <p class="text-text-secondary text-sm mt-1">
+        {isStaffRole
+          ? `${myStaffRecord?.department ?? ''} · ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`
+          : `Live overview · ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`}
+      </p>
+    </div>
+    {isExec && (
+      <div class="flex gap-2">
+        <a href="/portal/staff-management/staff" class="btn-primary text-sm">
+          <i class="fas fa-users mr-1.5" aria-hidden="true"></i>Manage Staff
+        </a>
+        <a href="/portal/staff-management/reports" class="btn-outline text-sm">
+          <i class="fas fa-chart-bar mr-1.5" aria-hidden="true"></i>Reports
+        </a>
+      </div>
+    )}
+  </div>
+
+  {isStaffRole && (
+    <>
+      <!-- Staff self-service: check-in/out card -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+        <div class="card-premium p-6">
+          <h2 class="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+            <i class="fas fa-clock text-primary-600" aria-hidden="true"></i>
+            Today's Attendance
+          </h2>
+          {!myStaffRecord ? (
+            <p class="text-text-secondary text-sm">Your staff profile is not linked to this portal account. Contact your supervisor.</p>
+          ) : (
+            <div class="space-y-3">
+              <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm text-text-secondary">Check-in</span>
+                <span class={`text-sm font-semibold ${checkedIn ? 'text-secondary-500' : 'text-text-secondary'}`}>
+                  {checkedIn ? new Date(myAttendance!.check_in!).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                </span>
+              </div>
+              <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm text-text-secondary">Check-out</span>
+                <span class={`text-sm font-semibold ${checkedOut ? 'text-secondary-500' : 'text-text-secondary'}`}>
+                  {checkedOut ? new Date(myAttendance!.check_out!).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                </span>
+              </div>
+              {!checkedIn && (
+                <button id="checkin-btn" class="btn-primary w-full text-sm">
+                  <i class="fas fa-sign-in-alt mr-2" aria-hidden="true"></i>Check In Now
+                </button>
+              )}
+              {checkedIn && !checkedOut && (
+                <button id="checkout-btn" class="btn-secondary w-full text-sm">
+                  <i class="fas fa-sign-out-alt mr-2" aria-hidden="true"></i>Check Out
+                </button>
+              )}
+              {checkedIn && checkedOut && (
+                <div class="flex items-center gap-2 p-3 bg-secondary-500/10 rounded-lg">
+                  <i class="fas fa-check-circle text-secondary-500" aria-hidden="true"></i>
+                  <span class="text-sm text-secondary-500 font-medium">Shift complete for today</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <!-- Today's tasks summary -->
+        <div class="card-premium p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-text-primary flex items-center gap-2">
+              <i class="fas fa-check-square text-primary-600" aria-hidden="true"></i>
+              Today's Tasks
+            </h2>
+            <a href="/portal/staff-management/tasks" class="text-xs text-primary-600 hover:underline">View all →</a>
+          </div>
+          {myTasksToday.length === 0 ? (
+            <div class="text-center py-6">
+              <i class="fas fa-check-circle text-4xl text-secondary-500/40 mb-2" aria-hidden="true"></i>
+              <p class="text-sm text-text-secondary">No tasks assigned for today</p>
+            </div>
+          ) : (
+            <div class="space-y-2">
+              {myTasksToday.slice(0, 5).map(task => (
+                <div class="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 hover:bg-primary-50 transition-colors">
+                  <i class={`fas fa-circle text-[8px] ${task.priority === 'urgent' ? 'text-red-500' : task.priority === 'high' ? 'text-accent-500' : 'text-primary-300'}`} aria-hidden="true"></i>
+                  <span class="text-sm text-text-primary flex-1 truncate">{task.title}</span>
+                  <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    task.status === 'completed' ? 'bg-secondary-500/10 text-secondary-500' :
+                    task.status === 'overdue' ? 'bg-red-50 text-red-600' :
+                    'bg-primary-50 text-primary-600'
+                  }`}>{task.status}</span>
+                </div>
+              ))}
+              {pendingTasks > 0 && (
+                <p class="text-xs text-accent-500 font-medium pt-1">
+                  <i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>{pendingTasks} task{pendingTasks > 1 ? 's' : ''} pending
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )}
+
+  {isExec && (
+    <>
+      <!-- KPI cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+        {[
+          { label: 'Total Active Staff',  value: kpi.total,          icon: 'fa-users',            color: 'text-primary-600',   bg: 'bg-primary-50'    },
+          { label: 'Present Today',       value: kpi.present,        icon: 'fa-check-circle',     color: 'text-secondary-500', bg: 'bg-secondary-500/10' },
+          { label: 'Absent Today',        value: kpi.absent,         icon: 'fa-times-circle',     color: 'text-red-600',       bg: 'bg-red-50'        },
+          { label: 'Tasks Today',         value: kpi.pending_tasks,  icon: 'fa-tasks',            color: 'text-primary-600',   bg: 'bg-primary-50'    },
+          { label: 'Overdue Tasks',       value: kpi.overdue_tasks,  icon: 'fa-exclamation-circle',color: 'text-accent-500',   bg: 'bg-amber-50'      },
+          { label: 'Proposals Pending',   value: kpi.open_proposals, icon: 'fa-inbox',            color: 'text-primary-600',   bg: 'bg-primary-50'    },
+        ].map(k => (
+          <div class="card-premium p-4">
+            <div class={`w-10 h-10 ${k.bg} rounded-xl flex items-center justify-center mb-3`}>
+              <i class={`fas ${k.icon} ${k.color}`} aria-hidden="true"></i>
+            </div>
+            <div class={`text-2xl font-bold ${k.color}`}>{k.value}</div>
+            <div class="text-xs text-text-secondary mt-0.5">{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Attendance ring + quick links -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <!-- Attendance ring -->
+        <div class="card-premium p-6 flex flex-col items-center">
+          <h2 class="text-base font-semibold text-text-primary mb-4 self-start">Attendance Today</h2>
+          <div class="relative w-36 h-36 mb-4">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#E5E7EB" stroke-width="14"/>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#10B981" stroke-width="14"
+                stroke-dasharray={`${kpi.total > 0 ? (kpi.present / kpi.total * 314).toFixed(1) : 0} 314`}
+                stroke-linecap="round"/>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="text-2xl font-bold text-primary-600">{kpi.total > 0 ? Math.round(kpi.present / kpi.total * 100) : 0}%</span>
+              <span class="text-xs text-text-secondary">present</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 w-full text-sm">
+            <div class="text-center p-2 bg-secondary-500/10 rounded-lg">
+              <div class="font-bold text-secondary-500">{kpi.present}</div>
+              <div class="text-xs text-text-secondary">Present</div>
+            </div>
+            <div class="text-center p-2 bg-red-50 rounded-lg">
+              <div class="font-bold text-red-600">{kpi.absent}</div>
+              <div class="text-xs text-text-secondary">Absent</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick actions -->
+        <div class="card-premium p-6">
+          <h2 class="text-base font-semibold text-text-primary mb-4">Quick Actions</h2>
+          <div class="space-y-2">
+            {[
+              { label: 'Staff Directory',       href: '/portal/staff-management/staff',       icon: 'fa-users'          },
+              { label: 'Attendance Log',         href: '/portal/staff-management/attendance',  icon: 'fa-clock'          },
+              { label: 'Activity Templates',     href: '/portal/staff-management/activities',  icon: 'fa-list-alt'       },
+              { label: 'Proposals Queue',        href: '/portal/staff-management/proposals',   icon: 'fa-inbox',  badge: kpi.open_proposals > 0 ? String(kpi.open_proposals) : '' },
+              { label: 'Shift Configuration',    href: '/portal/staff-management/shifts',      icon: 'fa-calendar-alt'  },
+              { label: 'Agency Management',      href: '/portal/staff-management/agencies',    icon: 'fa-building'       },
+            ].map(item => (
+              <a href={item.href} class="flex items-center gap-3 p-2.5 rounded-lg hover:bg-primary-50 text-sm text-text-secondary hover:text-primary-600 transition-colors group">
+                <i class={`fas ${item.icon} w-4 text-center text-primary-400 group-hover:text-primary-600`} aria-hidden="true"></i>
+                <span class="flex-1">{item.label}</span>
+                {item.badge && (
+                  <span class="bg-accent-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{item.badge}</span>
+                )}
+                <i class="fas fa-chevron-right text-[10px] opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true"></i>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <!-- Alerts -->
+        <div class="card-premium p-6">
+          <h2 class="text-base font-semibold text-text-primary mb-4">Alerts</h2>
+          <div class="space-y-3" id="alerts-panel">
+            {kpi.overdue_tasks > 0 && (
+              <div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <i class="fas fa-exclamation-triangle text-accent-500 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+                <div>
+                  <div class="text-sm font-medium text-amber-800">{kpi.overdue_tasks} overdue task{kpi.overdue_tasks > 1 ? 's' : ''}</div>
+                  <a href="/portal/staff-management/reports" class="text-xs text-accent-500 hover:underline">View report →</a>
+                </div>
+              </div>
+            )}
+            {kpi.open_proposals > 0 && (
+              <div class="flex items-start gap-3 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                <i class="fas fa-inbox text-primary-600 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+                <div>
+                  <div class="text-sm font-medium text-primary-800">{kpi.open_proposals} proposal{kpi.open_proposals > 1 ? 's' : ''} awaiting review</div>
+                  <a href="/portal/staff-management/proposals" class="text-xs text-primary-600 hover:underline">Review now →</a>
+                </div>
+              </div>
+            )}
+            {kpi.overdue_tasks === 0 && kpi.open_proposals === 0 && (
+              <div class="text-center py-6">
+                <i class="fas fa-check-circle text-4xl text-secondary-500/40 mb-2" aria-hidden="true"></i>
+                <p class="text-sm text-text-secondary">No active alerts</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  )}
+
+</PortalLayout>
+
+<script>
+async function doCheckin(action: 'checkin' | 'checkout') {
+  const res = await fetch('/api/v1/staff/attendance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  });
+  if (res.ok) {
+    window.location.reload();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    alert(data.message ?? 'Could not record attendance. Please try again.');
+  }
+}
+
+document.getElementById('checkin-btn')?.addEventListener('click', () => doCheckin('checkin'));
+document.getElementById('checkout-btn')?.addEventListener('click', () => doCheckin('checkout'));
+</script>

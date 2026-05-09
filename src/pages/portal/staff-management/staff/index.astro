@@ -1,0 +1,280 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isExec = ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+const isAfm = user.portalRole === 'afm';
+if (!isExec && !isAfm) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+const { data: staffList } = await sb
+  .from('staff_members')
+  .select('id, name, role, department, designation, agency_id, joining_date, is_active, portal_role, whatsapp_number, shift_id')
+  .eq('society_id', SOCIETY_ID)
+  .order('department', { ascending: true })
+  .order('name', { ascending: true });
+
+const { data: agencies } = await sb
+  .from('staff_agencies')
+  .select('id, name')
+  .eq('society_id', SOCIETY_ID)
+  .eq('is_active', true);
+
+const agencyMap = Object.fromEntries((agencies ?? []).map(a => [a.id, a.name]));
+
+const deptGroups: Record<string, typeof staffList> = {};
+for (const s of staffList ?? []) {
+  const dept = s.department ?? 'other';
+  if (!deptGroups[dept]) deptGroups[dept] = [];
+  deptGroups[dept]!.push(s);
+}
+
+const DEPT_LABELS: Record<string, string> = {
+  security: 'Security',
+  housekeeping: 'Housekeeping',
+  gardening: 'Gardening',
+  maintenance: 'Maintenance',
+  admin: 'Administration',
+  multi: 'Multi-Department',
+  other: 'Other',
+};
+
+const DEPT_ICONS: Record<string, string> = {
+  security: 'fa-shield-alt',
+  housekeeping: 'fa-broom',
+  gardening: 'fa-seedling',
+  maintenance: 'fa-wrench',
+  admin: 'fa-user-tie',
+  multi: 'fa-users',
+  other: 'fa-user',
+};
+---
+
+<PortalLayout title="Staff Directory" user={user} activeModule="staff_management">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <nav class="text-sm text-text-secondary mb-1">
+        <a href="/portal/staff-management" class="hover:text-primary-600">Staff Management</a>
+        <span class="mx-2">›</span><span class="text-text-primary">Staff Directory</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Staff Directory</h1>
+      <p class="text-text-secondary text-sm mt-1">{(staffList ?? []).filter(s => s.is_active).length} active staff members</p>
+    </div>
+    {isExec && (
+      <div class="flex gap-2">
+        <button id="add-staff-btn" class="btn-primary text-sm">
+          <i class="fas fa-plus mr-1.5" aria-hidden="true"></i>Add Staff Member
+        </button>
+        <a href="/portal/staff-management/agencies" class="btn-outline text-sm">
+          <i class="fas fa-building mr-1.5" aria-hidden="true"></i>Agencies
+        </a>
+      </div>
+    )}
+  </div>
+
+  <!-- Filters -->
+  <div class="card-premium p-4 mb-5 flex flex-wrap gap-3">
+    <div class="relative flex-1 min-w-48">
+      <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
+      <input id="search-input" type="search" placeholder="Search by name…" class="form-input pl-9 py-2 text-sm" />
+    </div>
+    <select id="dept-filter" class="form-input py-2 text-sm w-40 bg-white">
+      <option value="">All Departments</option>
+      {Object.entries(DEPT_LABELS).map(([k, v]) => <option value={k}>{v}</option>)}
+    </select>
+    <select id="status-filter" class="form-input py-2 text-sm w-32 bg-white">
+      <option value="">All Status</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <!-- Staff grouped by department -->
+  {Object.entries(deptGroups).map(([dept, members]) => (
+    <div class="mb-6" data-dept={dept}>
+      <div class="flex items-center gap-2 mb-3">
+        <i class={`fas ${DEPT_ICONS[dept] ?? 'fa-users'} text-primary-400`} aria-hidden="true"></i>
+        <h2 class="text-base font-semibold text-text-primary">{DEPT_LABELS[dept] ?? dept}</h2>
+        <span class="text-xs bg-primary-50 text-primary-600 px-2 py-0.5 rounded-full font-medium">
+          {members!.filter(m => m.is_active).length} active
+        </span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {(members ?? []).map(s => (
+          <a href={`/portal/staff-management/staff/${s.id}`}
+             class={`card-premium p-4 flex items-start gap-3 hover:shadow-medium transition-all staff-card ${!s.is_active ? 'opacity-60' : ''}`}
+             data-name={s.name.toLowerCase()} data-dept={s.department} data-active={s.is_active ? 'active' : 'inactive'}>
+            <div class="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-user text-primary-600 text-sm" aria-hidden="true"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold text-text-primary text-sm truncate">{s.name}</div>
+              <div class="text-xs text-text-secondary truncate">{s.designation ?? s.role.replace('_', ' ')}</div>
+              {s.agency_id && (
+                <div class="text-xs text-primary-500 mt-0.5 truncate">
+                  <i class="fas fa-building mr-1" aria-hidden="true"></i>{agencyMap[s.agency_id] ?? 'Agency'}
+                </div>
+              )}
+              <div class="flex items-center gap-1.5 mt-1.5">
+                {!s.is_active && (
+                  <span class="text-xs bg-gray-100 text-text-secondary px-1.5 py-0.5 rounded-full">Inactive</span>
+                )}
+                {s.portal_role && (
+                  <span class="text-xs bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded-full capitalize">{s.portal_role}</span>
+                )}
+                {s.whatsapp_number && (
+                  <i class="fab fa-whatsapp text-green-500 text-xs" title="WhatsApp enabled" aria-label="WhatsApp enabled"></i>
+                )}
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  ))}
+
+  {(staffList ?? []).length === 0 && (
+    <div class="text-center py-16">
+      <i class="fas fa-users text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+      <h3 class="text-lg font-semibold text-text-primary mb-2">No staff members yet</h3>
+      <p class="text-text-secondary text-sm mb-4">Add your first staff member to get started.</p>
+      {isExec && <button id="add-staff-empty-btn" class="btn-primary text-sm">Add Staff Member</button>}
+    </div>
+  )}
+
+  <!-- Add staff drawer -->
+  <div id="add-staff-panel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-primary-600">Add Staff Member</h2>
+      <button id="close-add-panel" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="p-4">
+      <div id="add-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+      <form id="add-staff-form" class="space-y-4">
+        <div>
+          <label class="form-label">Full Name <span class="text-red-500">*</span></label>
+          <input name="name" type="text" required maxlength="100" class="form-input" placeholder="e.g. Raju Kumar" />
+        </div>
+        <div>
+          <label class="form-label">Department <span class="text-red-500">*</span></label>
+          <select name="department" required class="form-input bg-white">
+            <option value="">Select department</option>
+            {Object.entries(DEPT_LABELS).filter(([k]) => k !== 'other').map(([k, v]) => <option value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Designation</label>
+          <input name="designation" type="text" maxlength="100" class="form-input" placeholder="e.g. Head Security Guard" />
+        </div>
+        <div>
+          <label class="form-label">Phone Number</label>
+          <input name="phone" type="tel" maxlength="15" class="form-input" placeholder="+91XXXXXXXXXX" />
+        </div>
+        <div>
+          <label class="form-label">WhatsApp Number</label>
+          <input name="whatsapp_number" type="tel" maxlength="15" class="form-input" placeholder="+91XXXXXXXXXX (if different)" />
+        </div>
+        <div>
+          <label class="form-label">Employment Type <span class="text-red-500">*</span></label>
+          <select name="employment_type" required class="form-input bg-white">
+            <option value="agency">Agency</option>
+            <option value="direct">Direct</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Agency</label>
+          <select name="agency_id" class="form-input bg-white">
+            <option value="">None / Direct</option>
+            {(agencies ?? []).map(a => <option value={a.id}>{a.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Joining Date</label>
+          <input name="joining_date" type="date" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label">Language Preference</label>
+          <select name="language_preference" class="form-input bg-white">
+            <option value="en">English</option>
+            <option value="hi">हिन्दी (Hindi)</option>
+            <option value="te">తెలుగు (Telugu)</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-primary w-full">
+          <i class="fas fa-plus mr-2" aria-hidden="true"></i>Add Staff Member
+        </button>
+      </form>
+    </div>
+  </div>
+  <div id="add-panel-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+</PortalLayout>
+
+<script>
+const panel = document.getElementById('add-staff-panel')!;
+const backdrop = document.getElementById('add-panel-backdrop')!;
+
+function openPanel() {
+  panel.classList.remove('translate-x-full');
+  backdrop.classList.remove('hidden');
+}
+function closePanel() {
+  panel.classList.add('translate-x-full');
+  backdrop.classList.add('hidden');
+}
+
+document.getElementById('add-staff-btn')?.addEventListener('click', openPanel);
+document.getElementById('add-staff-empty-btn')?.addEventListener('click', openPanel);
+document.getElementById('close-add-panel')?.addEventListener('click', closePanel);
+backdrop.addEventListener('click', closePanel);
+
+// Search + filter
+const searchInput = document.getElementById('search-input') as HTMLInputElement;
+const deptFilter  = document.getElementById('dept-filter') as HTMLSelectElement;
+const statusFilter = document.getElementById('status-filter') as HTMLSelectElement;
+
+function applyFilters() {
+  const q = searchInput.value.toLowerCase();
+  const dept = deptFilter.value;
+  const status = statusFilter.value;
+  document.querySelectorAll<HTMLElement>('.staff-card').forEach(card => {
+    const nameMatch   = !q || card.dataset.name?.includes(q);
+    const deptMatch   = !dept || card.dataset.dept === dept;
+    const statusMatch = !status || card.dataset.active === status;
+    card.closest<HTMLElement>('a')!.style.display = (nameMatch && deptMatch && statusMatch) ? '' : 'none';
+  });
+}
+searchInput.addEventListener('input', applyFilters);
+deptFilter.addEventListener('change', applyFilters);
+statusFilter.addEventListener('change', applyFilters);
+
+// Add staff form
+document.getElementById('add-staff-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target as HTMLFormElement;
+  const fd = new FormData(form);
+  const body = Object.fromEntries(fd.entries());
+  const errEl = document.getElementById('add-error')!;
+  errEl.classList.add('hidden');
+
+  const res = await fetch('/api/v1/staff/members', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (res.ok) {
+    window.location.reload();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    errEl.textContent = data.message ?? 'Failed to add staff member.';
+    errEl.classList.remove('hidden');
+  }
+});
+</script>

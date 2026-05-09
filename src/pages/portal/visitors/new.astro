@@ -9,126 +9,243 @@ if (!user || user.role === 'security_guard') return Astro.redirect('/portal/visi
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 const sb = getSupabaseServiceClient();
 const { data: units } = await sb.from('units').select('id, unit_number, block').eq('society_id', SOCIETY_ID).order('unit_number');
+
+// Pre-fill unit from user's profile
+const { data: profile } = await sb.from('profiles').select('unit_id').eq('id', user.id).single();
+const myUnitId = profile?.unit_id ?? null;
+
+const now = new Date();
+// Default: valid from now, until tomorrow same time
+const defaultFrom = now.toISOString().slice(0, 16);
+const defaultUntil = new Date(now.getTime() + 24 * 3600000).toISOString().slice(0, 16);
 ---
 
-<PortalLayout title="Pre-Approve Visitor" user={user} activeModule="visitor_mgmt">
+<PortalLayout title="Create Visitor Pass" user={user} activeModule="visitor_mgmt">
   <div class="mb-6">
-    <nav class="text-sm text-text-secondary mb-3">
+    <nav class="text-sm text-text-secondary mb-2">
       <a href="/portal/visitors" class="hover:text-primary-600">Visitors</a>
-      <span class="mx-2">›</span><span class="text-text-primary">Pre-Approve</span>
+      <span class="mx-2">›</span><span class="text-text-primary">Create Pass</span>
     </nav>
-    <h1 class="text-2xl font-bold text-text-primary">Pre-Approve a Visitor</h1>
-    <p class="text-sm text-text-secondary mt-1">Generate a QR code for your expected visitor. Security will scan it at the gate.</p>
+    <h1 class="text-2xl font-bold text-primary-600 font-poppins">Create Visitor Pass</h1>
+    <p class="text-text-secondary text-sm mt-1">Generate a time-bound QR + entry code to share with your visitor.</p>
   </div>
 
   <div class="max-w-lg">
     <div id="error-banner" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
-    <div id="success-panel" class="hidden mb-4 p-5 bg-green-50 border border-green-200 rounded-xl">
-      <div class="flex items-center gap-2 text-green-700 font-semibold mb-2">
-        <i class="fas fa-check-circle" aria-hidden="true"></i>
-        Pre-approval created!
-      </div>
-      <p class="text-sm text-green-700">Your visitor has been pre-approved. Share the approval details with your visitor.</p>
-    </div>
 
-    <form id="preapproval-form" class="bg-white rounded-xl border border-border-light p-6 space-y-5">
-      <div>
-        <label for="visitor_name" class="block text-sm font-medium text-text-primary mb-1.5">Visitor Name <span class="text-red-500">*</span></label>
-        <input type="text" id="visitor_name" name="visitor_name" required maxlength="100"
-          placeholder="Full name of visitor"
-          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-      </div>
+    <form id="pass-form" class="space-y-5">
 
-      <div>
-        <label for="visitor_phone" class="block text-sm font-medium text-text-primary mb-1.5">Visitor Phone</label>
-        <input type="tel" id="visitor_phone" name="visitor_phone" maxlength="15"
-          placeholder="10-digit mobile number"
-          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-        <p class="text-xs text-text-secondary mt-1">Stored as a one-way hash — not retrievable (DPDPA compliance).</p>
-      </div>
-
-      <div>
-        <label for="unit_id" class="block text-sm font-medium text-text-primary mb-1.5">Your Unit <span class="text-red-500">*</span></label>
-        <select id="unit_id" name="unit_id" required
-          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
-          <option value="">Select your flat</option>
-          {(units ?? []).map((u: {id: string; unit_number: string; block: string | null}) => (
-            <option value={u.id}>{u.unit_number}{u.block ? ` – Block ${u.block}` : ''}</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label for="purpose" class="block text-sm font-medium text-text-primary mb-1.5">Purpose of Visit</label>
-        <input type="text" id="purpose" name="purpose" maxlength="200"
-          placeholder="e.g. House guest, Plumber, Delivery"
-          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-      </div>
-
-      <div class="grid grid-cols-2 gap-4">
+      <!-- Visitor details -->
+      <div class="card-premium p-5 space-y-4">
+        <h2 class="font-semibold text-text-primary flex items-center gap-2">
+          <i class="fas fa-user text-primary-400" aria-hidden="true"></i>
+          Visitor Details
+        </h2>
         <div>
-          <label for="expected_date" class="block text-sm font-medium text-text-primary mb-1.5">Expected Date <span class="text-red-500">*</span></label>
-          <input type="date" id="expected_date" name="expected_date" required
-            min={new Date().toISOString().split('T')[0]}
-            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <label for="visitor_name" class="form-label">Visitor Name <span class="text-red-500">*</span></label>
+          <input type="text" id="visitor_name" name="visitor_name" required maxlength="100"
+            placeholder="Full name of your visitor"
+            class="form-input" />
         </div>
         <div>
-          <label for="expected_time_from" class="block text-sm font-medium text-text-primary mb-1.5">Expected From</label>
-          <input type="time" id="expected_time_from" name="expected_time_from"
-            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <label for="purpose" class="form-label">Purpose of Visit</label>
+          <input type="text" id="purpose" name="purpose" maxlength="200"
+            placeholder="e.g. House guest, Plumber, Delivery"
+            class="form-input" />
+        </div>
+        <div>
+          <label for="vehicle_number" class="form-label">Vehicle Number (optional)</label>
+          <input type="text" id="vehicle_number" name="vehicle_number" maxlength="20"
+            placeholder="e.g. TS 09 FG 1234"
+            class="form-input uppercase" />
+        </div>
+        <div>
+          <label for="guard_note" class="form-label">Note for Guard (optional)</label>
+          <input type="text" id="guard_note" name="guard_note" maxlength="300"
+            placeholder="e.g. Allow access to rooftop terrace"
+            class="form-input" />
         </div>
       </div>
 
-      <div class="flex items-center gap-3 pt-2">
-        <button type="submit" id="submit-btn" class="btn-primary flex items-center gap-2">
-          <i class="fas fa-qrcode" aria-hidden="true"></i>
-          <span id="btn-text">Generate Pre-Approval</span>
-          <span id="btn-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+      <!-- Your flat -->
+      <div class="card-premium p-5 space-y-4">
+        <h2 class="font-semibold text-text-primary flex items-center gap-2">
+          <i class="fas fa-home text-primary-400" aria-hidden="true"></i>
+          Your Flat
+        </h2>
+        <div>
+          <label for="unit_id" class="form-label">Flat <span class="text-red-500">*</span></label>
+          <select id="unit_id" name="unit_id" required class="form-input bg-white">
+            <option value="">Select your flat</option>
+            {(units ?? []).map((u: { id: string; unit_number: string; block: string | null }) => (
+              <option value={u.id} selected={u.id === myUnitId}>
+                {u.unit_number}{u.block ? ` – Block ${u.block}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <!-- Time window -->
+      <div class="card-premium p-5 space-y-4">
+        <h2 class="font-semibold text-text-primary flex items-center gap-2">
+          <i class="fas fa-clock text-primary-400" aria-hidden="true"></i>
+          Pass Validity
+        </h2>
+
+        <!-- Quick presets -->
+        <div>
+          <label class="form-label">Quick Presets</label>
+          <div class="grid grid-cols-4 gap-2 mt-1">
+            {[
+              { label: '2 hours',  hours: 2  },
+              { label: '6 hours',  hours: 6  },
+              { label: '24 hours', hours: 24 },
+              { label: 'Custom',   hours: 0  },
+            ].map(p => (
+              <button
+                type="button"
+                class="preset-btn border border-border-light rounded-xl py-2 text-sm font-medium text-text-secondary hover:bg-primary-50 hover:text-primary-600 hover:border-primary-300 transition-colors"
+                data-hours={p.hours}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div id="custom-time-fields" class="grid grid-cols-1 gap-3">
+          <div>
+            <label for="valid_from" class="form-label">Valid From <span class="text-red-500">*</span></label>
+            <input type="datetime-local" id="valid_from" name="valid_from" required
+              value={defaultFrom}
+              class="form-input" />
+          </div>
+          <div>
+            <label for="valid_until" class="form-label">Valid Until <span class="text-red-500">*</span></label>
+            <input type="datetime-local" id="valid_until" name="valid_until" required
+              value={defaultUntil}
+              class="form-input" />
+          </div>
+        </div>
+
+        <!-- Multi-entry toggle -->
+        <div>
+          <label for="max_uses" class="form-label">Entry Type</label>
+          <select id="max_uses" name="max_uses" class="form-input bg-white">
+            <option value="1">Single entry (one-time QR)</option>
+            <option value="5">Up to 5 entries</option>
+            <option value="999">Unlimited entries within window</option>
+          </select>
+          <p class="text-xs text-text-secondary mt-1">
+            One-time passes are marked used after first scan. Use multi-entry for vendors with multiple trips.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="submit" id="submit-btn" class="btn-primary flex-1 flex items-center justify-center gap-2">
+          <i class="fas fa-qrcode" id="btn-icon" aria-hidden="true"></i>
+          <span id="btn-text">Generate Pass</span>
         </button>
         <a href="/portal/visitors" class="btn-outline">Cancel</a>
       </div>
     </form>
   </div>
-
-  <script>
-    const form = document.getElementById('preapproval-form') as HTMLFormElement;
-    const errorBanner = document.getElementById('error-banner')!;
-    const successPanel = document.getElementById('success-panel')!;
-    const btnText = document.getElementById('btn-text')!;
-    const btnSpinner = document.getElementById('btn-spinner')!;
-    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      errorBanner.classList.add('hidden');
-      btnText.classList.add('hidden');
-      btnSpinner.classList.remove('hidden');
-      submitBtn.disabled = true;
-
-      const fd = new FormData(form);
-      const res = await fetch('/api/v1/visitors/pre-approvals', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({
-          visitor_name: fd.get('visitor_name'),
-          visitor_phone: fd.get('visitor_phone') || null,
-          unit_id: fd.get('unit_id'),
-          purpose: fd.get('purpose') || null,
-          expected_date: fd.get('expected_date'),
-          expected_time_from: fd.get('expected_time_from') ? `${fd.get('expected_date')}T${fd.get('expected_time_from')}:00+05:30` : null,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        form.classList.add('hidden');
-        successPanel.classList.remove('hidden');
-      } else {
-        errorBanner.textContent = data.detail ?? data.error ?? 'Failed to create pre-approval.';
-        errorBanner.classList.remove('hidden');
-        btnText.classList.remove('hidden');
-        btnSpinner.classList.add('hidden');
-        submitBtn.disabled = false;
-      }
-    });
-  </script>
 </PortalLayout>
+
+<script>
+const form = document.getElementById('pass-form') as HTMLFormElement;
+const errorBanner = document.getElementById('error-banner')!;
+const validFrom  = document.getElementById('valid_from') as HTMLInputElement;
+const validUntil = document.getElementById('valid_until') as HTMLInputElement;
+const submitBtn  = document.getElementById('submit-btn') as HTMLButtonElement;
+const btnText    = document.getElementById('btn-text')!;
+const btnIcon    = document.getElementById('btn-icon')!;
+
+// Preset buttons
+document.querySelectorAll<HTMLButtonElement>('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('bg-primary-50', 'text-primary-600', 'border-primary-300'));
+    btn.classList.add('bg-primary-50', 'text-primary-600', 'border-primary-300');
+
+    const hours = Number(btn.dataset.hours);
+    if (hours > 0) {
+      const from = new Date();
+      const until = new Date(from.getTime() + hours * 3600000);
+      // datetime-local format: YYYY-MM-DDTHH:mm
+      const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      validFrom.value  = toLocal(from);
+      validUntil.value = toLocal(until);
+    }
+    // For "Custom" (hours=0) just leave the fields as-is for manual edit
+  });
+});
+
+// Select 24h preset by default
+document.querySelector<HTMLButtonElement>('[data-hours="24"]')?.click();
+
+// Vehicle number uppercase
+document.getElementById('vehicle_number')?.addEventListener('input', (e) => {
+  (e.target as HTMLInputElement).value = (e.target as HTMLInputElement).value.toUpperCase();
+});
+
+// Form submit
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorBanner.classList.add('hidden');
+  submitBtn.disabled = true;
+  btnText.textContent = 'Generating…';
+  btnIcon.className = 'fas fa-spinner fa-spin';
+
+  const fd = new FormData(form);
+
+  // Convert local datetime-local values to ISO (they come as YYYY-MM-DDTHH:mm, assume IST +05:30)
+  const fromRaw = fd.get('valid_from') as string;
+  const untilRaw = fd.get('valid_until') as string;
+
+  // Convert to proper ISO with timezone offset
+  const toISO = (local: string) => {
+    const d = new Date(local);
+    return d.toISOString();
+  };
+
+  const body = {
+    visitor_name:   (fd.get('visitor_name') as string).trim(),
+    purpose:        (fd.get('purpose') as string)?.trim() || null,
+    unit_id:        fd.get('unit_id') as string,
+    valid_from:     toISO(fromRaw),
+    valid_until:    toISO(untilRaw),
+    max_uses:       Number(fd.get('max_uses') ?? 1),
+    vehicle_number: (fd.get('vehicle_number') as string)?.trim() || null,
+    guard_note:     (fd.get('guard_note') as string)?.trim() || null,
+  };
+
+  try {
+    const res = await fetch('/api/v1/visitors/passes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.pass_token) {
+      // Redirect to the shareable pass page
+      window.location.href = `/portal/visitors/pass/${data.pass_token}`;
+    } else {
+      errorBanner.textContent = data.message ?? data.error ?? 'Failed to create pass. Please try again.';
+      errorBanner.classList.remove('hidden');
+      submitBtn.disabled = false;
+      btnText.textContent = 'Generate Pass';
+      btnIcon.className = 'fas fa-qrcode';
+    }
+  } catch {
+    errorBanner.textContent = 'Network error. Please check your connection and try again.';
+    errorBanner.classList.remove('hidden');
+    submitBtn.disabled = false;
+    btnText.textContent = 'Generate Pass';
+    btnIcon.className = 'fas fa-qrcode';
+  }
+});
+</script>

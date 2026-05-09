@@ -1,0 +1,256 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const canView = ['supervisor', 'afm'].includes(user.portalRole) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+if (!canView) return Astro.redirect('/portal');
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect('/portal/staff-management/staff');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+const { data: staff, error } = await sb
+  .from('staff_members')
+  .select('id, name, role, department, designation, agency_id, employment_type, joining_date, is_active, portal_role, language_preference, whatsapp_number, date_of_birth, emergency_contact, created_at')
+  .eq('id', id)
+  .eq('society_id', SOCIETY_ID)
+  .single();
+
+if (error || !staff) return Astro.redirect('/portal/staff-management/staff');
+
+const { data: agency } = staff.agency_id
+  ? await sb.from('staff_agencies').select('name, type').eq('id', staff.agency_id).single()
+  : { data: null };
+
+// Last 30 days attendance
+const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+const today = new Date().toISOString().split('T')[0];
+const { data: attendance } = await sb.from('staff_attendance')
+  .select('date, check_in, check_out, status, check_in_method, overtime_mins')
+  .eq('staff_id', id)
+  .gte('date', thirtyDaysAgo)
+  .order('date', { ascending: false });
+
+// Recent tasks
+const { data: recentTasks } = await sb.from('staff_task_assignments')
+  .select('id, title, status, due_date, completed_at')
+  .eq('assigned_to', id)
+  .gte('due_date', thirtyDaysAgo)
+  .order('due_date', { ascending: false })
+  .limit(15);
+
+// Feedback
+const { data: feedback } = await sb.from('staff_feedback')
+  .select('sentiment, category, message, is_anonymous, created_at')
+  .eq('staff_id', id)
+  .order('created_at', { ascending: false })
+  .limit(10);
+
+const presentCount = (attendance ?? []).filter(a => a.status === 'present').length;
+const absentCount  = (attendance ?? []).filter(a => a.status === 'absent').length;
+const tasksCompletedCount = (recentTasks ?? []).filter(t => t.status === 'completed').length;
+
+const DEPT_LABELS: Record<string, string> = {
+  security: 'Security', housekeeping: 'Housekeeping', gardening: 'Gardening',
+  maintenance: 'Maintenance', admin: 'Administration', multi: 'Multi-Dept',
+};
+
+const SENTIMENT_COLORS: Record<string, string> = {
+  positive: 'bg-secondary-500/10 border-secondary-500/20 text-secondary-500',
+  neutral:  'bg-gray-50 border-gray-200 text-text-secondary',
+  negative: 'bg-red-50 border-red-200 text-red-600',
+};
+
+const isExec = ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+---
+
+<PortalLayout title={staff.name} user={user} activeModule="staff_management">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <nav class="text-sm text-text-secondary mb-1">
+        <a href="/portal/staff-management/staff" class="hover:text-primary-600">Staff Directory</a>
+        <span class="mx-2">›</span><span class="text-text-primary">{staff.name}</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">{staff.name}</h1>
+      <p class="text-text-secondary text-sm mt-1">
+        {staff.designation ?? staff.role.replace('_', ' ')}
+        {staff.department ? ` · ${DEPT_LABELS[staff.department] ?? staff.department}` : ''}
+      </p>
+    </div>
+    <div class="flex gap-2">
+      {isExec && (
+        <button id="edit-staff-btn" class="btn-outline text-sm">
+          <i class="fas fa-edit mr-1.5" aria-hidden="true"></i>Edit
+        </button>
+      )}
+      <span class={`px-3 py-1.5 rounded-full text-sm font-medium ${staff.is_active ? 'bg-secondary-500/10 text-secondary-500' : 'bg-gray-100 text-gray-500'}`}>
+        {staff.is_active ? 'Active' : 'Inactive'}
+      </span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <!-- Left column: profile + stats -->
+    <div class="space-y-5">
+      <!-- Profile card -->
+      <div class="card-premium p-5">
+        <div class="flex items-center gap-4 mb-4">
+          <div class="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-user text-primary-600 text-2xl" aria-hidden="true"></i>
+          </div>
+          <div>
+            <div class="font-bold text-text-primary text-lg">{staff.name}</div>
+            <div class="text-sm text-text-secondary">{staff.designation ?? staff.role.replace('_', ' ')}</div>
+            {staff.portal_role && (
+              <span class="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full capitalize mt-1 inline-block">{staff.portal_role}</span>
+            )}
+          </div>
+        </div>
+        <div class="space-y-2 text-sm">
+          {agency && (
+            <div class="flex items-center gap-2 text-text-secondary">
+              <i class="fas fa-building w-4 text-center text-primary-400" aria-hidden="true"></i>
+              <span>{agency.name}</span>
+            </div>
+          )}
+          {staff.joining_date && (
+            <div class="flex items-center gap-2 text-text-secondary">
+              <i class="fas fa-calendar-check w-4 text-center text-primary-400" aria-hidden="true"></i>
+              <span>Joined {new Date(staff.joining_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            </div>
+          )}
+          {staff.language_preference && (
+            <div class="flex items-center gap-2 text-text-secondary">
+              <i class="fas fa-language w-4 text-center text-primary-400" aria-hidden="true"></i>
+              <span class="capitalize">{{ en: 'English', hi: 'हिन्दी', te: 'తెలుగు' }[staff.language_preference] ?? staff.language_preference}</span>
+            </div>
+          )}
+          {staff.whatsapp_number && (
+            <div class="flex items-center gap-2 text-text-secondary">
+              <i class="fab fa-whatsapp w-4 text-center text-green-500" aria-hidden="true"></i>
+              <span>{staff.whatsapp_number}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <!-- 30-day stats -->
+      <div class="card-premium p-5">
+        <h2 class="font-semibold text-text-primary mb-3 text-sm">Last 30 Days</h2>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="text-center p-2 bg-secondary-500/10 rounded-lg">
+            <div class="text-xl font-bold text-secondary-500">{presentCount}</div>
+            <div class="text-xs text-text-secondary">Present</div>
+          </div>
+          <div class="text-center p-2 bg-red-50 rounded-lg">
+            <div class="text-xl font-bold text-red-600">{absentCount}</div>
+            <div class="text-xs text-text-secondary">Absent</div>
+          </div>
+          <div class="text-center p-2 bg-primary-50 rounded-lg">
+            <div class="text-xl font-bold text-primary-600">{tasksCompletedCount}</div>
+            <div class="text-xs text-text-secondary">Tasks Done</div>
+          </div>
+        </div>
+        {(presentCount + absentCount) > 0 && (
+          <div class="mt-3">
+            <div class="flex items-center justify-between text-xs text-text-secondary mb-1">
+              <span>Attendance rate</span>
+              <span class="font-medium">{Math.round(presentCount / (presentCount + absentCount) * 100)}%</span>
+            </div>
+            <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div class="h-full bg-secondary-500 rounded-full" style={`width: ${Math.round(presentCount / (presentCount + absentCount) * 100)}%`}></div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <!-- Right columns: attendance history + tasks + feedback -->
+    <div class="lg:col-span-2 space-y-5">
+      <!-- Recent attendance -->
+      <div class="card-premium p-5">
+        <h2 class="font-semibold text-text-primary mb-3">Recent Attendance</h2>
+        {(attendance ?? []).length === 0 ? (
+          <p class="text-sm text-text-secondary">No records in the last 30 days.</p>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border-light">
+                  <th class="pb-2 text-left text-xs text-text-secondary font-medium">Date</th>
+                  <th class="pb-2 text-center text-xs text-text-secondary font-medium">In</th>
+                  <th class="pb-2 text-center text-xs text-text-secondary font-medium">Out</th>
+                  <th class="pb-2 text-right text-xs text-text-secondary font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border-light">
+                {(attendance ?? []).slice(0, 15).map(a => (
+                  <tr class="hover:bg-gray-50">
+                    <td class="py-2 text-text-secondary">{new Date(a.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</td>
+                    <td class="py-2 text-center text-text-primary">{a.check_in ? new Date(a.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                    <td class="py-2 text-center text-text-primary">{a.check_out ? new Date(a.check_out).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                    <td class="py-2 text-right">
+                      <span class={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${{present:'bg-secondary-500/10 text-secondary-500',absent:'bg-red-50 text-red-600',half_day:'bg-amber-50 text-amber-700',leave:'bg-blue-50 text-blue-600'}[a.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {a.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <!-- Recent tasks -->
+      <div class="card-premium p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold text-text-primary">Recent Tasks</h2>
+          <a href={`/portal/staff-management/assign?staff=${id}`} class="text-xs text-primary-600 hover:underline">Assign task →</a>
+        </div>
+        {(recentTasks ?? []).length === 0 ? (
+          <p class="text-sm text-text-secondary">No tasks in the last 30 days.</p>
+        ) : (
+          <div class="space-y-2">
+            {(recentTasks ?? []).map(t => (
+              <div class="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50">
+                <i class={`fas fa-circle text-[8px] ${t.status === 'completed' ? 'text-secondary-500' : t.status === 'overdue' ? 'text-red-500' : 'text-primary-300'}`} aria-hidden="true"></i>
+                <span class="flex-1 text-sm text-text-primary truncate">{t.title}</span>
+                <span class="text-xs text-text-secondary flex-shrink-0">{new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                <span class={`text-xs px-2 py-0.5 rounded-full font-medium capitalize flex-shrink-0 ${{completed:'bg-secondary-500/10 text-secondary-500',overdue:'bg-red-50 text-red-600',pending:'bg-amber-50 text-amber-700'}[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {t.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <!-- Feedback -->
+      {(feedback ?? []).length > 0 && (
+        <div class="card-premium p-5">
+          <h2 class="font-semibold text-text-primary mb-3">Resident Feedback</h2>
+          <div class="space-y-3">
+            {(feedback ?? []).map(f => (
+              <div class={`p-3 rounded-lg border ${SENTIMENT_COLORS[f.sentiment] ?? 'bg-gray-50 border-gray-200 text-text-secondary'}`}>
+                <div class="flex items-center gap-2 mb-1">
+                  <i class={`fas fa-${f.sentiment === 'positive' ? 'thumbs-up' : f.sentiment === 'negative' ? 'thumbs-down' : 'minus'} text-xs`} aria-hidden="true"></i>
+                  <span class="text-xs font-medium capitalize">{f.sentiment} · {f.category}</span>
+                  <span class="text-xs ml-auto opacity-70">{new Date(f.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                </div>
+                <p class="text-sm leading-relaxed">{f.message}</p>
+                {f.is_anonymous && <p class="text-xs opacity-60 mt-1">Anonymous</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</PortalLayout>

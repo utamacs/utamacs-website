@@ -1,0 +1,154 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isStaffRole = ['staff', 'supervisor', 'afm'].includes(user.portalRole);
+const isExec = ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+if (!isStaffRole && !isExec) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+// Date range: current month
+const now = new Date();
+const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+let records: { date: string; check_in: string | null; check_out: string | null; status: string; check_in_method: string; overtime_mins: number | null; notes: string | null }[] = [];
+let staffName = '';
+let presentCount = 0;
+let absentCount = 0;
+
+if (isStaffRole) {
+  const { data: sm } = await sb.from('staff_members').select('id, name').eq('user_id', user.id).eq('society_id', SOCIETY_ID).single();
+  if (sm) {
+    staffName = sm.name;
+    const { data } = await sb.from('staff_attendance')
+      .select('date, check_in, check_out, status, check_in_method, overtime_mins, notes')
+      .eq('staff_id', sm.id)
+      .gte('date', monthStart)
+      .lte('date', monthEnd)
+      .order('date', { ascending: false });
+    records = data ?? [];
+    presentCount = records.filter(r => r.status === 'present').length;
+    absentCount = records.filter(r => r.status === 'absent').length;
+  }
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  present:   'bg-secondary-500/10 text-secondary-500',
+  absent:    'bg-red-50 text-red-600',
+  half_day:  'bg-amber-50 text-amber-700',
+  leave:     'bg-blue-50 text-blue-600',
+  holiday:   'bg-purple-50 text-purple-600',
+};
+
+const METHOD_ICON: Record<string, string> = {
+  manual: 'fa-hand-pointer',
+  qr: 'fa-qrcode',
+  whatsapp: 'fa-whatsapp fab',
+  biometric: 'fa-fingerprint',
+};
+---
+
+<PortalLayout title="My Attendance" user={user} activeModule="staff_attendance">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">My Attendance</h1>
+      <p class="text-text-secondary text-sm mt-1">
+        {now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+        {isStaffRole && ` · ${staffName}`}
+      </p>
+    </div>
+    <div class="flex gap-2">
+      <select id="month-picker" class="form-input py-2 text-sm bg-white w-36">
+        {Array.from({ length: 6 }, (_, i) => {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const val = d.toISOString().slice(0, 7);
+          return <option value={val} selected={i === 0}>{d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</option>;
+        })}
+      </select>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  {isStaffRole && (
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="card-premium p-4 text-center">
+        <div class="text-2xl font-bold text-secondary-500">{presentCount}</div>
+        <div class="text-xs text-text-secondary mt-0.5">Present</div>
+      </div>
+      <div class="card-premium p-4 text-center">
+        <div class="text-2xl font-bold text-red-600">{absentCount}</div>
+        <div class="text-xs text-text-secondary mt-0.5">Absent</div>
+      </div>
+      <div class="card-premium p-4 text-center">
+        <div class="text-2xl font-bold text-primary-600">{records.filter(r => (r.overtime_mins ?? 0) > 0).length}</div>
+        <div class="text-xs text-text-secondary mt-0.5">OT Days</div>
+      </div>
+    </div>
+  )}
+
+  <!-- Attendance records -->
+  <div class="card-premium overflow-hidden">
+    <div class="p-4 border-b border-border-light flex items-center justify-between">
+      <h2 class="font-semibold text-text-primary">Attendance Log</h2>
+      {isExec && (
+        <a href="/portal/staff-management/reports" class="text-sm text-primary-600 hover:underline">
+          Full Report →
+        </a>
+      )}
+    </div>
+    {records.length === 0 ? (
+      <div class="text-center py-10">
+        <i class="fas fa-calendar-times text-4xl text-primary-200 mb-3" aria-hidden="true"></i>
+        <p class="text-sm text-text-secondary">No attendance records for this month.</p>
+      </div>
+    ) : (
+      <div class="divide-y divide-border-light">
+        {records.map(r => {
+          const inTime = r.check_in ? new Date(r.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
+          const outTime = r.check_out ? new Date(r.check_out).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
+          const date = new Date(r.date);
+          return (
+            <div class="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors">
+              <div class="w-14 text-center flex-shrink-0">
+                <div class="text-base font-bold text-text-primary">{date.getDate()}</div>
+                <div class="text-xs text-text-secondary">{date.toLocaleDateString('en-IN', { weekday: 'short' })}</div>
+              </div>
+              <div class="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                <div>
+                  <div class="text-xs text-text-secondary mb-0.5">Check-in</div>
+                  <div class="font-medium text-text-primary">{inTime}</div>
+                </div>
+                <div>
+                  <div class="text-xs text-text-secondary mb-0.5">Check-out</div>
+                  <div class="font-medium text-text-primary">{outTime}</div>
+                </div>
+                <div class="hidden sm:block">
+                  <div class="text-xs text-text-secondary mb-0.5">Method</div>
+                  <div class="text-text-secondary">
+                    <i class={`fas ${METHOD_ICON[r.check_in_method] ?? 'fa-hand-pointer'} mr-1 text-xs`} aria-hidden="true"></i>
+                    <span class="text-xs capitalize">{r.check_in_method}</span>
+                  </div>
+                </div>
+                {r.overtime_mins != null && r.overtime_mins > 0 && (
+                  <div class="hidden sm:block">
+                    <div class="text-xs text-text-secondary mb-0.5">Overtime</div>
+                    <div class="text-xs text-accent-500 font-medium">+{r.overtime_mins}m</div>
+                  </div>
+                )}
+              </div>
+              <span class={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 capitalize ${STATUS_BADGE[r.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                {r.status.replace('_', ' ')}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+</PortalLayout>
