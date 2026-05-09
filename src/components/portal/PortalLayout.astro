@@ -47,6 +47,7 @@ const FALLBACK_MODULES: FallbackModule[] = [
   { moduleKey: 'memberships',      displayName: 'Membership Registry',    icon: 'fa-id-card-alt',        navGroup: 'Administration', minNavRole: 'admin'     },
   { moduleKey: 'staff_kyc',        displayName: 'Staff & Maid KYC',       icon: 'fa-user-check',         navGroup: 'Administration', minNavRole: 'admin'     },
   { moduleKey: 'staff_management', displayName: 'Staff Management',       icon: 'fa-users-cog',          navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'assets',           displayName: 'Asset Register',         icon: 'fa-cogs',               navGroup: 'Administration', minNavRole: 'executive' },
   { moduleKey: 'register',         displayName: 'Society Membership',     icon: 'fa-certificate',        navGroup: 'Governance',     minNavRole: 'member'    },
 ];
 
@@ -80,6 +81,7 @@ const MODULE_PATHS: Record<string, string> = {
   memberships:      '/portal/admin/memberships',
   staff_kyc:        '/portal/admin/staff-kyc',
   staff_management: '/portal/staff-management',
+  assets:           '/portal/assets',
   register:         '/portal/register/membership',
 };
 
@@ -213,7 +215,7 @@ if (navRole === 'guard') {
     const adminItems = groupMap.get('Administration') ?? [];
     adminItems.unshift(
       link('Audit Logs',         '/portal/admin/audit',         'fa-shield-alt',        'admin_audit'),
-      link('Asset Management',   '/portal/admin/assets',        'fa-cogs',              'admin_assets'),
+      link('Asset Register',      '/portal/assets',              'fa-cogs',              'assets'),
       link('Rules Engine',       '/portal/admin/rules',         'fa-sliders-h',         'admin_rules'),
       link('RBAC & Permissions', '/portal/admin/rbac',          'fa-lock',              'admin_rbac'),
       link('Email Drafts',       '/portal/admin/email-drafts',  'fa-envelope-open-text','admin_email'),

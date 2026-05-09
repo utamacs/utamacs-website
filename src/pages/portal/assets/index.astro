@@ -96,7 +96,7 @@ const assetsJson   = JSON.stringify(allAssets);
 const locationsJson = JSON.stringify(allLocations);
 ---
 
-<PortalLayout title="Asset Register" user={user} activeModule="staff_management">
+<PortalLayout title="Asset Register" user={user} activeModule="assets">
   <!-- Page header -->
   <div class="flex items-center justify-between mb-6">
     <div>
@@ -661,7 +661,7 @@ document.getElementById('dp-decommission-btn')?.addEventListener('click', async 
   if (!currentAsset) return;
   if (!confirm(`Mark "${currentAsset.name}" as decommissioned?`)) return;
   try {
-    const res = await fetch(`/api/v1/staff-management/assets/${currentAsset.id}`, {
+    const res = await fetch(`/api/v1/assets/${currentAsset.id}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error((await res.json()).message ?? 'Error');
@@ -703,7 +703,7 @@ document.getElementById('asset-form')?.addEventListener('submit', async (e) => {
   };
 
   const isEdit  = !!editingId;
-  const url     = isEdit ? `/api/v1/staff-management/assets/${editingId}` : '/api/v1/staff-management/assets';
+  const url     = isEdit ? `/api/v1/assets/${editingId}` : '/api/v1/assets';
   const method  = isEdit ? 'PUT' : 'POST';
 
   submitBtn.textContent = 'Saving…';
