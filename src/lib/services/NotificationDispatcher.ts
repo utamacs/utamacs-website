@@ -62,16 +62,14 @@ export async function dispatchNotification(payload: DispatchPayload): Promise<vo
       await sendWhatsApp({
         to: payload.phoneE164,
         templateName: 'utamacs_general_notification',
-        languageCode: 'en',
-        components: [
-          {
-            type: 'body',
-            parameters: [
-              { type: 'text', text: payload.title },
-              { type: 'text', text: payload.body.slice(0, 200) },
-            ],
-          },
-        ],
+        languageCode: 'en_IN',
+        components: [{
+          type: 'body',
+          parameters: [
+            { type: 'text', text: payload.title },
+            { type: 'text', text: payload.body.slice(0, 200) },
+          ],
+        }],
       });
     } catch (err) {
       console.error('[NotificationDispatcher] WhatsApp failed:', err);
