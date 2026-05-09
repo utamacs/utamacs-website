@@ -1,351 +1,737 @@
 ---
 export const prerender = false;
 import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 
 const user = Astro.locals.user;
-const isPrivileged = user && (['executive', 'admin'].includes(user.role) ||
-  ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin);
+const isPrivileged = user && (
+  ['executive','admin'].includes(user.role) ||
+  ['executive','secretary','president'].includes(user.portalRole ?? '') ||
+  user.isAdmin
+);
 if (!isPrivileged) return Astro.redirect('/portal/admin');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+const [{ data: assets }, { data: locations }, { data: vendors }] = await Promise.all([
+  sb.from('infrastructure_assets')
+    .select(`
+      id, name, asset_code, category, make, model, serial_number,
+      capacity, quantity, supplier,
+      installation_date, warranty_expiry,
+      next_service_date, last_service_date,
+      amc_vendor_id, amc_vendor, amc_start, amc_end, amc_amount,
+      location_notes, status, is_active, notes, created_at,
+      location_id,
+      locations ( id, name, zone_type ),
+      vendors ( id, name )
+    `)
+    .eq('society_id', SOCIETY_ID)
+    .order('category').order('asset_code', { nullsFirst: false }).order('name'),
+  sb.from('locations')
+    .select('id, name, zone_type')
+    .eq('society_id', SOCIETY_ID).eq('is_active', true)
+    .order('zone_type').order('name'),
+  sb.from('vendors')
+    .select('id, name')
+    .eq('society_id', SOCIETY_ID).eq('is_active', true)
+    .order('name'),
+]);
+
+const allAssets    = assets    ?? [];
+const allLocations = locations ?? [];
+const allVendors   = vendors   ?? [];
+
+const today   = new Date().toISOString().slice(0, 10);
+const cut90   = (() => { const d = new Date(); d.setDate(d.getDate() + 90); return d.toISOString().slice(0, 10); })();
+
+const totalActive    = allAssets.filter(a => a.status === 'active').length;
+const underMaint     = allAssets.filter(a => a.status === 'under_maintenance').length;
+const amcAlert       = allAssets.filter(a => a.amc_end && a.amc_end <= cut90).length;
+const svcOverdue     = allAssets.filter(a => a.next_service_date && a.next_service_date < today).length;
+
+const locationsByZone: Record<string, typeof allLocations> = {};
+for (const l of allLocations) {
+  if (!locationsByZone[l.zone_type]) locationsByZone[l.zone_type] = [];
+  locationsByZone[l.zone_type].push(l);
+}
+
+const CAT_LABELS: Record<string, string> = {
+  electrical:'Electrical', plumbing:'Plumbing', fire_safety:'Fire Safety',
+  hvac:'HVAC', mechanical:'Mechanical', security:'Security',
+  civil:'Civil', it:'IT', general:'General',
+};
+const CAT_ICONS: Record<string, string> = {
+  electrical:'fa-bolt', plumbing:'fa-faucet', fire_safety:'fa-fire-extinguisher',
+  hvac:'fa-wind', mechanical:'fa-cogs', security:'fa-shield-alt',
+  civil:'fa-building', it:'fa-server', general:'fa-cube',
+};
+const CAT_COLORS: Record<string, string> = {
+  electrical:'bg-yellow-100 text-yellow-800', plumbing:'bg-blue-100 text-blue-800',
+  fire_safety:'bg-red-100 text-red-800', hvac:'bg-cyan-100 text-cyan-800',
+  mechanical:'bg-purple-100 text-purple-800', security:'bg-slate-100 text-slate-800',
+  civil:'bg-orange-100 text-orange-800', it:'bg-indigo-100 text-indigo-800',
+  general:'bg-gray-100 text-gray-600',
+};
+const STATUS_BADGE: Record<string, string> = {
+  active:'bg-green-100 text-green-700',
+  under_maintenance:'bg-amber-100 text-amber-700',
+  decommissioned:'bg-gray-100 text-gray-500',
+};
+
+function amcBadge(end: string | null) {
+  if (!end) return '';
+  if (end < today) return 'expired';
+  if (end <= cut90) return 'soon';
+  return 'ok';
+}
+
+const assetsJson    = JSON.stringify(allAssets);
+const locationsJson = JSON.stringify(allLocations);
 ---
 
-<PortalLayout title="Infrastructure Assets" user={user} activeModule="admin_assets">
-  <div class="mb-6 flex items-center justify-between">
+<PortalLayout title="Asset Register" user={user} activeModule="admin_assets">
+  <div class="flex items-center justify-between mb-6">
     <div>
       <nav class="text-sm text-text-secondary mb-2">
         <a href="/portal/admin" class="hover:text-primary-600">Admin</a>
-        <span class="mx-2">›</span><span class="text-text-primary">Infrastructure Assets</span>
+        <span class="mx-2">›</span><span class="text-text-primary">Asset Register</span>
       </nav>
-      <h1 class="text-2xl font-bold text-text-primary">Infrastructure Assets</h1>
-      <p class="text-sm text-text-secondary mt-1">Lifts, generators, CCTV, pumps — AMC and service tracking.</p>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Asset Register</h1>
+      <p class="text-text-secondary text-sm mt-1">{allAssets.length} assets · property equipment &amp; AMC tracking</p>
     </div>
-    <button id="add-asset-btn" class="btn-primary text-sm flex items-center gap-2">
+    <button id="add-asset-btn" class="btn-primary flex items-center gap-2">
       <i class="fas fa-plus" aria-hidden="true"></i>Add Asset
     </button>
   </div>
 
-  <!-- Alerts banner -->
-  <div id="alerts-banner" class="hidden mb-5"></div>
-
-  <!-- Assets grid -->
-  <div id="assets-container">
-    <div class="text-center py-10 text-text-secondary text-sm">Loading…</div>
+  <!-- Stats row -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="card-stats"><div class="number text-primary-600">{totalActive}</div><div class="label">Active</div></div>
+    <div class="card-stats"><div class="number text-amber-600">{underMaint}</div><div class="label">Under Maintenance</div></div>
+    <div class="card-stats"><div class="number text-red-600">{amcAlert}</div><div class="label">AMC Due ≤90 Days</div></div>
+    <div class="card-stats"><div class="number text-red-600">{svcOverdue}</div><div class="label">Service Overdue</div></div>
   </div>
 
-  <!-- Service log panel (slides in) -->
-  <div id="service-panel" class="hidden fixed inset-0 bg-black/50 z-50 flex justify-end">
-    <div class="bg-white w-full max-w-md h-full overflow-y-auto flex flex-col">
-      <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
-        <h2 id="service-panel-title" class="font-semibold text-text-primary">Service Logs</h2>
-        <button id="service-panel-close" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
-      </div>
-      <div id="service-logs-list" class="flex-1 p-5 overflow-y-auto">
-        <div class="text-center py-8 text-text-secondary text-sm">Loading…</div>
-      </div>
-      <div class="border-t border-border-light p-5">
-        <h3 class="text-sm font-semibold text-text-primary mb-3">Log Service</h3>
-        <div id="service-form-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700"></div>
-        <form id="service-form" class="space-y-3">
-          <input type="hidden" id="service-asset-id" />
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block text-xs font-medium text-text-primary mb-1">Date <span class="text-red-500">*</span></label>
-              <input type="date" name="service_date" required class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-text-primary mb-1">Type <span class="text-red-500">*</span></label>
-              <input type="text" name="service_type" required maxlength="100" placeholder="AMC, Repair, Inspection" class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-text-primary mb-1">Description</label>
-            <textarea name="description" rows="2" maxlength="500" class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block text-xs font-medium text-text-primary mb-1">Cost (₹)</label>
-              <input type="number" name="cost" min="0" step="0.01" class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-text-primary mb-1">Next Service Date</label>
-              <input type="date" name="next_service_date" class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
-            </div>
-          </div>
-          <button type="submit" class="btn-primary w-full text-sm">Log Service</button>
-        </form>
+  <!-- Filter bar -->
+  <div class="card-premium p-4 mb-6 flex flex-wrap items-center gap-3">
+    <div class="flex flex-wrap gap-1.5" id="cat-tabs">
+      <button data-cat="all" class="cat-tab active px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-600 text-white">All</button>
+      {Object.entries(CAT_LABELS).map(([c, label]) => (
+        <button data-cat={c} class="cat-tab px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-text-secondary hover:bg-gray-200">
+          <i class={`fas ${CAT_ICONS[c]} mr-1`} aria-hidden="true"></i>{label}
+        </button>
+      ))}
+    </div>
+    <div class="ml-auto flex items-center gap-3">
+      <select id="status-filter" class="form-input !py-1.5 !px-3 text-sm w-44">
+        <option value="">All Statuses</option>
+        <option value="active">Active</option>
+        <option value="under_maintenance">Under Maintenance</option>
+        <option value="decommissioned">Decommissioned</option>
+      </select>
+      <select id="expiry-filter" class="form-input !py-1.5 !px-3 text-sm w-44">
+        <option value="">All Assets</option>
+        <option value="amc">AMC Due ≤90 Days</option>
+        <option value="service">Service Overdue</option>
+      </select>
+      <div class="relative">
+        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
+        <input id="asset-search" type="text" placeholder="Search…" class="form-input !py-1.5 !pl-8 !pr-3 text-sm w-48" />
       </div>
     </div>
   </div>
 
-  <!-- Add Asset Modal -->
-  <div id="asset-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-lg max-h-screen overflow-y-auto">
-      <h3 class="font-semibold text-text-primary mb-4 flex justify-between">
-        Add Asset
-        <button id="asset-modal-close" class="text-text-secondary hover:text-text-primary"><i class="fas fa-times"></i></button>
-      </h3>
-      <div id="asset-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
-      <form id="asset-form" class="space-y-3">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">Name <span class="text-red-500">*</span></label>
-            <input name="name" required maxlength="200" placeholder="e.g. Lift A" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+  <p id="results-count" class="text-text-secondary text-sm mb-3"></p>
+
+  <!-- Asset grid -->
+  <div id="asset-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {allAssets.map(a => {
+      const amc = amcBadge(a.amc_end);
+      const loc = (a as Record<string, unknown>).locations as {name: string} | null;
+      const svcOverdueFlag = a.next_service_date && a.next_service_date < today;
+      return (
+        <div
+          class="card-premium p-4 cursor-pointer hover:shadow-medium transition-shadow asset-card"
+          data-id={a.id}
+          data-cat={a.category}
+          data-status={a.status}
+          data-amc-end={a.amc_end ?? ''}
+          data-svc-date={a.next_service_date ?? ''}
+          data-search={`${a.name} ${a.asset_code ?? ''} ${a.make ?? ''} ${a.model ?? ''} ${a.serial_number ?? ''} ${loc?.name ?? ''}`.toLowerCase()}
+        >
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-9 h-9 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                <i class={`fas ${CAT_ICONS[a.category] ?? 'fa-cube'} text-primary-600 text-sm`} aria-hidden="true"></i>
+              </div>
+              <div>
+                <div class="font-semibold text-text-primary text-sm leading-tight">{a.name}</div>
+                {a.asset_code && <div class="text-xs text-text-secondary font-mono">{a.asset_code}</div>}
+              </div>
+            </div>
+            <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[a.status] ?? ''}`}>
+              {a.status === 'under_maintenance' ? 'Maintenance' : a.status.charAt(0).toUpperCase() + a.status.slice(1)}
+            </span>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">Category <span class="text-red-500">*</span></label>
-            <select name="category" required class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
-              <option value="">Select</option>
-              {['Lift','Generator','Pump','CCTV','Fire_Safety','Gate','Electrical','Other'].map(c => (
-                <option value={c}>{c.replace('_',' ')}</option>
-              ))}
-            </select>
+          <div class="space-y-1 text-xs text-text-secondary mb-3">
+            {a.make && <div><span class="font-medium">Make:</span> {a.make}{a.model ? ` · ${a.model}` : ''}</div>}
+            {a.capacity && <div><span class="font-medium">Capacity:</span> {a.capacity}</div>}
+            {a.serial_number && <div><span class="font-medium">S/N:</span> <span class="font-mono">{a.serial_number}</span></div>}
+            {loc && <div><i class="fas fa-map-marker-alt mr-1 text-primary-400" aria-hidden="true"></i>{loc.name}{a.location_notes ? ` — ${a.location_notes}` : ''}</div>}
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CAT_COLORS[a.category] ?? ''}`}>
+              {CAT_LABELS[a.category] ?? a.category}
+            </span>
+            {a.quantity > 1 && <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Qty: {a.quantity}</span>}
+            {amc === 'expired' && <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700"><i class="fas fa-exclamation-circle" aria-hidden="true"></i> AMC Expired</span>}
+            {amc === 'soon'    && <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700"><i class="fas fa-clock" aria-hidden="true"></i> AMC Due Soon</span>}
+            {svcOverdueFlag    && <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700"><i class="fas fa-tools" aria-hidden="true"></i> Service Overdue</span>}
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+      );
+    })}
+  </div>
+
+  <div id="empty-state" class="hidden text-center py-16">
+    <i class="fas fa-cogs text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+    <h3 class="text-lg font-semibold text-text-primary mb-2">No assets found</h3>
+    <p class="text-text-secondary text-sm">Adjust your filters or add an asset.</p>
+  </div>
+
+  <!-- ── Detail Drawer ───────────────────────────────────────────────── -->
+  <div id="detail-panel"
+    class="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 id="dp-title" class="text-lg font-semibold text-primary-600 truncate pr-4"></h2>
+      <button id="close-panel" class="text-text-secondary hover:text-text-primary flex-shrink-0" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="p-4 space-y-4" id="dp-body"></div>
+    <div class="sticky bottom-0 bg-white border-t border-border-light p-4 flex gap-3">
+      <button id="dp-edit-btn" class="btn-primary flex-1"><i class="fas fa-edit mr-2" aria-hidden="true"></i>Edit</button>
+      <button id="dp-service-btn" class="btn-outline flex-1"><i class="fas fa-tools mr-2" aria-hidden="true"></i>Service Logs</button>
+      <button id="dp-decommission-btn" class="btn-outline text-red-600 border-red-300 hover:bg-red-50">
+        <i class="fas fa-times-circle" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Service Log Drawer ──────────────────────────────────────────── -->
+  <div id="service-panel"
+    class="fixed inset-y-0 right-0 w-full sm:w-[420px] bg-white shadow-large z-50 transform translate-x-full transition-transform duration-300 flex flex-col">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 id="service-panel-title" class="text-lg font-semibold text-primary-600 truncate pr-4">Service Logs</h2>
+      <button id="service-panel-close" class="text-text-secondary hover:text-text-primary flex-shrink-0">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div id="service-logs-list" class="flex-1 overflow-y-auto p-4">
+      <div class="text-center py-8 text-text-secondary text-sm">Loading…</div>
+    </div>
+    <div class="border-t border-border-light p-4 space-y-3">
+      <p class="text-sm font-semibold text-text-primary">Log Service</p>
+      <div id="service-form-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700"></div>
+      <form id="service-form" class="space-y-3">
+        <input type="hidden" id="service-asset-id" />
+        <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">Make</label>
-            <input name="make" maxlength="100" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            <label class="block text-xs font-medium text-text-primary mb-1">Date <span class="text-red-500">*</span></label>
+            <input type="date" name="service_date" required class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">Model</label>
-            <input name="model" maxlength="100" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            <label class="block text-xs font-medium text-text-primary mb-1">Type <span class="text-red-500">*</span></label>
+            <input type="text" name="service_type" required maxlength="100" placeholder="AMC, Repair, Inspection"
+              class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
           </div>
         </div>
         <div>
-          <label class="block text-sm font-medium text-text-primary mb-1">Serial Number</label>
-          <input name="serial_number" maxlength="100" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <label class="block text-xs font-medium text-text-primary mb-1">Description</label>
+          <textarea name="description" rows="2" maxlength="500"
+            class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"></textarea>
         </div>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">Installed</label>
-            <input type="date" name="installation_date" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            <label class="block text-xs font-medium text-text-primary mb-1">Cost (₹)</label>
+            <input type="number" name="cost" min="0" step="0.01"
+              class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">Warranty Until</label>
-            <input type="date" name="warranty_expiry" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">Next Service</label>
-            <input type="date" name="next_service_date" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-3">
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">AMC Start</label>
-            <input type="date" name="amc_start" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">AMC End</label>
-            <input type="date" name="amc_end" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-text-primary mb-1">AMC Amount (₹)</label>
-            <input type="number" name="amc_amount" min="0" step="0.01" class="w-full px-3 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+            <label class="block text-xs font-medium text-text-primary mb-1">Next Service</label>
+            <input type="date" name="next_service_date"
+              class="w-full px-3 py-2 border border-border-light rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary-600" />
           </div>
         </div>
-        <div class="flex gap-3 pt-2">
-          <button type="submit" class="btn-primary flex-1 text-sm">Save Asset</button>
-          <button type="button" id="asset-modal-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
-        </div>
+        <button type="submit" class="btn-primary w-full text-sm">Log Service</button>
       </form>
     </div>
   </div>
 
-  <script>
-    const CATEGORY_ICONS: Record<string, string> = {
-      Lift: 'fa-elevator text-blue-600', Generator: 'fa-bolt text-amber-600',
-      Pump: 'fa-tint text-cyan-600', CCTV: 'fa-video text-purple-600',
-      Fire_Safety: 'fa-fire-extinguisher text-red-600', Gate: 'fa-door-open text-green-600',
-      Electrical: 'fa-plug text-yellow-600', Other: 'fa-wrench text-gray-600',
-    };
+  <!-- ── Add / Edit Drawer ──────────────────────────────────────────── -->
+  <div id="form-panel"
+    class="fixed inset-y-0 right-0 w-full sm:w-[560px] bg-white shadow-large z-50 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 id="fp-title" class="text-lg font-semibold text-primary-600">Add Asset</h2>
+      <button id="close-form" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <form id="asset-form" class="p-4 space-y-4">
+      <input type="hidden" id="asset-id" />
 
-    let currentAssetId = '';
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2">
+          <label class="form-label" for="f-name">Asset Name <span class="text-red-500">*</span></label>
+          <input id="f-name" name="name" type="text" class="form-input" required maxlength="200" placeholder="e.g. Transformer-1 (1000 KVA)" />
+        </div>
+        <div>
+          <label class="form-label" for="f-code">Asset Code</label>
+          <input id="f-code" name="asset_code" type="text" class="form-input" maxlength="50" placeholder="EL-001" />
+        </div>
+        <div>
+          <label class="form-label" for="f-quantity">Quantity</label>
+          <input id="f-quantity" name="quantity" type="number" class="form-input" value="1" min="1" max="999" />
+        </div>
+      </div>
 
-    async function loadAssets() {
-      const res = await fetch('/api/v1/admin/assets', { credentials: 'include' });
-      const assets = res.ok ? await res.json() : [];
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label" for="f-category">Category <span class="text-red-500">*</span></label>
+          <select id="f-category" name="category" class="form-input" required>
+            <option value="">Select category</option>
+            <option value="electrical">Electrical</option>
+            <option value="plumbing">Plumbing</option>
+            <option value="fire_safety">Fire Safety</option>
+            <option value="hvac">HVAC</option>
+            <option value="mechanical">Mechanical</option>
+            <option value="security">Security</option>
+            <option value="civil">Civil</option>
+            <option value="it">IT</option>
+            <option value="general">General</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" for="f-status">Status</label>
+          <select id="f-status" name="status" class="form-input">
+            <option value="active">Active</option>
+            <option value="under_maintenance">Under Maintenance</option>
+            <option value="decommissioned">Decommissioned</option>
+          </select>
+        </div>
+      </div>
 
-      // Show alerts
-      const alerts = assets.filter((a: any) => a.amc_expired || a.service_overdue);
-      const alertsBanner = document.getElementById('alerts-banner')!;
-      if (alerts.length) {
-        alertsBanner.className = 'mb-5 p-4 bg-red-50 border border-red-200 rounded-xl';
-        alertsBanner.innerHTML = `
-          <div class="flex items-center gap-2 text-red-700 font-medium text-sm mb-2">
-            <i class="fas fa-exclamation-triangle"></i>${alerts.length} asset${alerts.length > 1 ? 's' : ''} need attention
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label" for="f-make">Make / Brand</label>
+          <input id="f-make" name="make" type="text" class="form-input" maxlength="100" />
+        </div>
+        <div>
+          <label class="form-label" for="f-model">Model / Part No.</label>
+          <input id="f-model" name="model" type="text" class="form-input" maxlength="100" />
+        </div>
+        <div>
+          <label class="form-label" for="f-serial">Serial Number</label>
+          <input id="f-serial" name="serial_number" type="text" class="form-input" maxlength="100" />
+        </div>
+        <div>
+          <label class="form-label" for="f-capacity">Capacity / Rating</label>
+          <input id="f-capacity" name="capacity" type="text" class="form-input" maxlength="100" placeholder="1000 KVA" />
+        </div>
+      </div>
+
+      <div>
+        <label class="form-label" for="f-location">Location</label>
+        <select id="f-location" name="location_id" class="form-input">
+          <option value="">No location</option>
+          {Object.entries(locationsByZone).map(([zone, locs]) => (
+            <optgroup label={zone.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}>
+              {locs.map(l => <option value={l.id}>{l.name}</option>)}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="f-loc-notes">Location Notes</label>
+        <input id="f-loc-notes" name="location_notes" type="text" class="form-input" maxlength="200" placeholder="e.g. Ground floor, next to LT panel" />
+      </div>
+
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="form-label" for="f-install">Installed</label>
+          <input id="f-install" name="installation_date" type="date" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label" for="f-warranty">Warranty Until</label>
+          <input id="f-warranty" name="warranty_expiry" type="date" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label" for="f-next-svc">Next Service</label>
+          <input id="f-next-svc" name="next_service_date" type="date" class="form-input" />
+        </div>
+      </div>
+
+      <div>
+        <label class="form-label" for="f-supplier">Supplier</label>
+        <input id="f-supplier" name="supplier" type="text" class="form-input" maxlength="200" />
+      </div>
+
+      <div class="border border-border-light rounded-xl p-4 space-y-3">
+        <p class="text-sm font-semibold text-text-primary">AMC Details</p>
+        <div>
+          <label class="form-label" for="f-amc-vendor">AMC Vendor (name)</label>
+          <input id="f-amc-vendor" name="amc_vendor" type="text" class="form-input" maxlength="200" placeholder="ANKURA, VK Engineer…" />
+        </div>
+        <div>
+          <label class="form-label" for="f-amc-vendor-id">AMC Vendor (from vendor list)</label>
+          <select id="f-amc-vendor-id" name="amc_vendor_id" class="form-input">
+            <option value="">Not linked</option>
+            {allVendors.map(v => <option value={v.id}>{v.name}</option>)}
+          </select>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="form-label" for="f-amc-start">AMC Start</label>
+            <input id="f-amc-start" name="amc_start" type="date" class="form-input" />
           </div>
-          <ul class="space-y-1">
-            ${alerts.map((a: any) => `
-              <li class="text-xs text-red-600 flex items-center gap-1.5">
-                <i class="fas fa-circle text-red-400" style="font-size:6px"></i>
-                <strong>${a.name}</strong>: ${a.amc_expired ? 'AMC expired' : ''}${a.amc_expired && a.service_overdue ? ', ' : ''}${a.service_overdue ? 'service overdue' : ''}
-              </li>
-            `).join('')}
-          </ul>`;
-        alertsBanner.classList.remove('hidden');
-      }
-
-      const container = document.getElementById('assets-container')!;
-      if (!assets.length) {
-        container.innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">No assets registered yet.</div>';
-        return;
-      }
-
-      // Group by category
-      const grouped: Record<string, any[]> = {};
-      assets.forEach((a: any) => { if (!grouped[a.category]) grouped[a.category] = []; grouped[a.category].push(a); });
-
-      container.innerHTML = Object.entries(grouped).map(([cat, items]) => `
-        <div class="mb-6">
-          <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3 flex items-center gap-2">
-            <i class="fas ${CATEGORY_ICONS[cat] ?? 'fa-wrench text-gray-400'} text-base" aria-hidden="true"></i>
-            ${cat.replace('_', ' ')}
-          </h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            ${items.map((a: any) => {
-              const statusFlags = [
-                a.amc_expired && '<span class="text-xs text-red-600 font-medium">AMC Expired</span>',
-                a.service_overdue && '<span class="text-xs text-red-600 font-medium">Service Overdue</span>',
-                a.service_due_soon && !a.service_overdue && '<span class="text-xs text-amber-600 font-medium">Service Due Soon</span>',
-                a.warranty_expired && '<span class="text-xs text-gray-500">Warranty Expired</span>',
-              ].filter(Boolean).join(' · ');
-
-              return `
-                <div class="bg-white rounded-xl border ${(a.amc_expired || a.service_overdue) ? 'border-red-200' : 'border-border-light'} p-4">
-                  <div class="flex items-start justify-between gap-2 mb-3">
-                    <div>
-                      <div class="font-medium text-text-primary text-sm">${a.name}</div>
-                      ${a.make ? `<div class="text-xs text-text-secondary mt-0.5">${a.make}${a.model ? ' · ' + a.model : ''}</div>` : ''}
-                    </div>
-                    <i class="fas ${CATEGORY_ICONS[a.category] ?? 'fa-wrench text-gray-400'} text-lg flex-shrink-0 mt-0.5" aria-hidden="true"></i>
-                  </div>
-                  <div class="space-y-1 text-xs text-text-secondary mb-3">
-                    ${a.next_service_date ? `<div><i class="fas fa-calendar mr-1"></i>Next service: <span class="${a.service_overdue ? 'text-red-600 font-medium' : a.service_due_soon ? 'text-amber-600 font-medium' : ''}">${new Date(a.next_service_date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span></div>` : ''}
-                    ${a.amc_end ? `<div><i class="fas fa-file-contract mr-1"></i>AMC until: <span class="${a.amc_expired ? 'text-red-600 font-medium' : ''}">${new Date(a.amc_end).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span></div>` : ''}
-                    ${a.vendors?.name ? `<div><i class="fas fa-building mr-1"></i>${a.vendors.name}</div>` : ''}
-                  </div>
-                  ${statusFlags ? `<div class="mb-3 flex flex-wrap gap-1">${statusFlags}</div>` : ''}
-                  <button onclick="openServicePanel('${a.id}','${a.name}')" class="w-full btn-outline text-xs py-1.5">
-                    <i class="fas fa-tools mr-1" aria-hidden="true"></i>Service Logs
-                  </button>
-                </div>
-              `;
-            }).join('')}
+          <div>
+            <label class="form-label" for="f-amc-end">AMC Expiry</label>
+            <input id="f-amc-end" name="amc_end" type="date" class="form-input" />
+          </div>
+          <div>
+            <label class="form-label" for="f-amc-amount">AMC Amount (₹)</label>
+            <input id="f-amc-amount" name="amc_amount" type="number" min="0" step="0.01" class="form-input" />
           </div>
         </div>
-      `).join('');
-    }
+      </div>
 
-    async function openServicePanel(assetId: string, assetName: string) {
-      currentAssetId = assetId;
-      document.getElementById('service-panel-title')!.textContent = `${assetName} — Service Logs`;
-      document.getElementById('service-asset-id')!.setAttribute('value', assetId);
-      document.getElementById('service-panel')!.classList.remove('hidden');
-      await loadServiceLogs(assetId);
-    }
+      <div>
+        <label class="form-label" for="f-notes">Notes</label>
+        <textarea id="f-notes" name="notes" rows="3" class="form-input" maxlength="2000"></textarea>
+      </div>
 
-    async function loadServiceLogs(assetId: string) {
-      const container = document.getElementById('service-logs-list')!;
-      container.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm">Loading…</div>';
+      <div class="flex gap-3 pt-2">
+        <button type="submit" id="form-submit-btn" class="btn-primary flex-1">
+          <i class="fas fa-save mr-2" aria-hidden="true"></i>Save Asset
+        </button>
+        <button type="button" id="form-cancel-btn" class="btn-outline flex-1">Cancel</button>
+      </div>
+      <p id="form-error" class="form-error hidden"></p>
+    </form>
+  </div>
 
-      const res = await fetch(`/api/v1/admin/assets/${assetId}/service-logs`, { credentials: 'include' });
-      const logs = res.ok ? await res.json() : [];
+  <div id="panel-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+</PortalLayout>
 
-      if (!logs.length) {
-        container.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm">No service logs yet.</div>';
-        return;
-      }
+<script>
+const ASSETS_DATA = JSON.parse(document.getElementById('__assets_data')?.textContent ?? '[]');
+const LOC_MAP     = JSON.parse(document.getElementById('__loc_data')?.textContent ?? '[]')
+  .reduce((m, l) => { m[l.id] = l; return m; }, {});
 
-      container.innerHTML = `<div class="space-y-3">
-        ${logs.map((l: any) => `
-          <div class="border border-border-light rounded-xl p-3">
-            <div class="flex items-start justify-between gap-2 mb-1">
-              <div class="font-medium text-sm text-text-primary">${l.service_type}</div>
-              <div class="text-xs text-text-secondary whitespace-nowrap">${new Date(l.service_date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
-            </div>
-            ${l.description ? `<p class="text-xs text-text-secondary mb-1">${l.description}</p>` : ''}
-            <div class="flex gap-3 text-xs text-text-secondary">
-              ${l.cost ? `<span>₹${Number(l.cost).toLocaleString('en-IN')}</span>` : ''}
-              ${l.vendors?.name ? `<span>${l.vendors.name}</span>` : ''}
-              ${l.next_service_date ? `<span>Next: ${new Date(l.next_service_date).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>` : ''}
-            </div>
-          </div>
-        `).join('')}
-      </div>`;
-    }
+const CAT_LABELS  = { electrical:'Electrical', plumbing:'Plumbing', fire_safety:'Fire Safety', hvac:'HVAC', mechanical:'Mechanical', security:'Security', civil:'Civil', it:'IT', general:'General' };
+const STATUS_LABELS = { active:'Active', under_maintenance:'Under Maintenance', decommissioned:'Decommissioned' };
 
-    // Service form
-    document.getElementById('service-form')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const assetId = (document.getElementById('service-asset-id') as HTMLInputElement).value;
-      const fd = new FormData(e.target as HTMLFormElement);
-      const errEl = document.getElementById('service-form-error')!;
-      errEl.classList.add('hidden');
+let activeCat    = 'all';
+let activeStatus = '';
+let activeExpiry = '';
+let searchTerm   = '';
+let currentAsset = null;
+let editingId    = null;
 
-      const res = await fetch(`/api/v1/admin/assets/${assetId}/service-logs`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          service_date: fd.get('service_date'),
-          service_type: fd.get('service_type'),
-          description: fd.get('description') || null,
-          cost: fd.get('cost') ? parseFloat(fd.get('cost') as string) : null,
-          next_service_date: fd.get('next_service_date') || null,
-        }),
-      });
+// ── Toast ──────────────────────────────────────────────────────────────────
+function showToast(message, type = 'success') {
+  const t = document.createElement('div');
+  t.className = `fixed bottom-6 right-6 z-[100] px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
+  t.textContent = message;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.remove('translate-y-4','opacity-0'));
+  setTimeout(() => { t.classList.add('translate-y-4','opacity-0'); setTimeout(() => t.remove(), 300); }, 3000);
+}
 
-      if (res.ok) {
-        (e.target as HTMLFormElement).reset();
-        loadServiceLogs(assetId);
-        loadAssets();
-      } else {
-        const d = await res.json();
-        errEl.textContent = d.detail ?? d.error ?? 'Failed to log service.';
-        errEl.classList.remove('hidden');
-      }
+// ── Filtering ──────────────────────────────────────────────────────────────
+function applyFilters() {
+  const today  = new Date().toISOString().slice(0,10);
+  const cut90  = (() => { const d = new Date(); d.setDate(d.getDate()+90); return d.toISOString().slice(0,10); })();
+  let shown = 0;
+  document.querySelectorAll('.asset-card').forEach(card => {
+    const cat    = card.getAttribute('data-cat') ?? '';
+    const status = card.getAttribute('data-status') ?? '';
+    const amcEnd = card.getAttribute('data-amc-end') ?? '';
+    const svcDate= card.getAttribute('data-svc-date') ?? '';
+    const search = card.getAttribute('data-search') ?? '';
+
+    const matchCat    = activeCat === 'all' || cat === activeCat;
+    const matchStatus = !activeStatus || status === activeStatus;
+    const matchSearch = !searchTerm || search.includes(searchTerm.toLowerCase());
+    let   matchExpiry = true;
+    if (activeExpiry === 'amc')     matchExpiry = !!amcEnd && amcEnd <= cut90;
+    if (activeExpiry === 'service') matchExpiry = !!svcDate && svcDate < today;
+
+    const visible = matchCat && matchStatus && matchSearch && matchExpiry;
+    (card as HTMLElement).style.display = visible ? '' : 'none';
+    if (visible) shown++;
+  });
+  const rc = document.getElementById('results-count');
+  if (rc) rc.textContent = `Showing ${shown} asset${shown === 1 ? '' : 's'}`;
+  const es = document.getElementById('empty-state');
+  if (es) es.classList.toggle('hidden', shown > 0);
+}
+
+document.querySelectorAll('.cat-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeCat = btn.getAttribute('data-cat') ?? 'all';
+    document.querySelectorAll('.cat-tab').forEach(b => {
+      b.classList.toggle('bg-primary-600', b === btn);
+      b.classList.toggle('text-white', b === btn);
+      b.classList.toggle('bg-gray-100', b !== btn);
+      b.classList.toggle('text-text-secondary', b !== btn);
     });
+    applyFilters();
+  });
+});
+document.getElementById('status-filter')?.addEventListener('change', e => { activeStatus = (e.target as HTMLSelectElement).value; applyFilters(); });
+document.getElementById('expiry-filter')?.addEventListener('change', e => { activeExpiry = (e.target as HTMLSelectElement).value; applyFilters(); });
+let sTimer = 0;
+document.getElementById('asset-search')?.addEventListener('input', e => {
+  clearTimeout(sTimer);
+  sTimer = window.setTimeout(() => { searchTerm = (e.target as HTMLInputElement).value.trim(); applyFilters(); }, 200);
+});
 
-    document.getElementById('service-panel-close')!.addEventListener('click', () => {
-      document.getElementById('service-panel')!.classList.add('hidden');
-    });
+// ── Panel helpers ──────────────────────────────────────────────────────────
+const backdrop = document.getElementById('panel-backdrop');
+function openPanel(id) { document.getElementById(id)?.classList.replace('translate-x-full','translate-x-0'); backdrop?.classList.remove('hidden'); }
+function closePanel(id) { document.getElementById(id)?.classList.replace('translate-x-0','translate-x-full'); }
+function closeAll() { ['detail-panel','service-panel','form-panel'].forEach(closePanel); backdrop?.classList.add('hidden'); currentAsset = null; editingId = null; }
 
-    // Add asset modal
-    const assetModal = document.getElementById('asset-modal')!;
-    document.getElementById('add-asset-btn')!.addEventListener('click', () => assetModal.classList.remove('hidden'));
-    document.getElementById('asset-modal-close')!.addEventListener('click', () => assetModal.classList.add('hidden'));
-    document.getElementById('asset-modal-cancel')!.addEventListener('click', () => assetModal.classList.add('hidden'));
+backdrop?.addEventListener('click', closeAll);
+document.getElementById('close-panel')?.addEventListener('click', closeAll);
+document.getElementById('service-panel-close')?.addEventListener('click', () => { closePanel('service-panel'); openPanel('detail-panel'); });
+document.getElementById('close-form')?.addEventListener('click', closeAll);
+document.getElementById('form-cancel-btn')?.addEventListener('click', closeAll);
 
-    document.getElementById('asset-form')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target as HTMLFormElement);
-      const errEl = document.getElementById('asset-error')!;
-      errEl.classList.add('hidden');
+// ── Detail drawer ──────────────────────────────────────────────────────────
+function openDetail(assetId) {
+  const a = ASSETS_DATA.find(x => x.id === assetId);
+  if (!a) return;
+  currentAsset = a;
+  const today  = new Date().toISOString().slice(0,10);
+  const cut90  = (() => { const d = new Date(); d.setDate(d.getDate()+90); return d.toISOString().slice(0,10); })();
+  const loc    = a.location_id ? LOC_MAP[a.location_id] : null;
 
-      const res = await fetch('/api/v1/admin/assets', {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: fd.get('name'), category: fd.get('category'),
-          make: fd.get('make') || null, model: fd.get('model') || null,
-          serial_number: fd.get('serial_number') || null,
-          installation_date: fd.get('installation_date') || null,
-          warranty_expiry: fd.get('warranty_expiry') || null,
-          next_service_date: fd.get('next_service_date') || null,
-          amc_start: fd.get('amc_start') || null,
-          amc_end: fd.get('amc_end') || null,
-          amc_amount: fd.get('amc_amount') ? parseFloat(fd.get('amc_amount') as string) : null,
-        }),
-      });
+  document.getElementById('dp-title').textContent = a.name;
 
-      if (res.ok) {
-        assetModal.classList.add('hidden');
-        (e.target as HTMLFormElement).reset();
-        loadAssets();
-      } else {
-        const d = await res.json();
-        errEl.textContent = d.detail ?? d.error ?? 'Failed to add asset.';
-        errEl.classList.remove('hidden');
-      }
-    });
+  function row(label, value, cls = '') {
+    if (!value && value !== 0) return '';
+    return `<div class="flex justify-between text-sm border-b border-border-light pb-2">
+      <span class="text-text-secondary font-medium w-40 flex-shrink-0">${label}</span>
+      <span class="text-text-primary text-right ${cls}">${value}</span>
+    </div>`;
+  }
 
-    (window as any).openServicePanel = openServicePanel;
-    loadAssets();
-  </script>
+  const amcCls = a.amc_end ? (a.amc_end < today ? 'text-red-600 font-semibold' : a.amc_end <= cut90 ? 'text-amber-600 font-semibold' : '') : '';
+  const svcCls = a.next_service_date && a.next_service_date < today ? 'text-red-600 font-semibold' : '';
+
+  document.getElementById('dp-body').innerHTML = `
+    <div class="space-y-2">
+      ${row('Asset Code',   a.asset_code)}
+      ${row('Category',     CAT_LABELS[a.category] ?? a.category)}
+      ${row('Status',       STATUS_LABELS[a.status] ?? a.status)}
+      ${a.quantity > 1 ? row('Quantity', a.quantity) : ''}
+      ${row('Capacity',     a.capacity)}
+      ${row('Make',         a.make)}
+      ${row('Model',        a.model)}
+      ${row('Serial No.',   a.serial_number)}
+      ${row('Location',     loc ? loc.name : null)}
+      ${row('Loc. Notes',   a.location_notes)}
+      ${row('Installed',    a.installation_date)}
+      ${a.warranty_expiry ? row('Warranty',  a.warranty_expiry, a.warranty_expiry < today ? 'text-gray-500' : '') : ''}
+      ${a.next_service_date ? row('Next Service', a.next_service_date, svcCls) : ''}
+      ${a.last_service_date ? row('Last Service', a.last_service_date) : ''}
+      ${row('Supplier',     a.supplier)}
+    </div>
+    ${(a.amc_vendor || a.amc_end) ? `
+    <div class="border border-border-light rounded-xl p-4 space-y-2">
+      <p class="text-sm font-semibold text-text-primary mb-3">AMC Details</p>
+      ${row('Vendor',     a.amc_vendor || a.vendors?.name)}
+      ${row('AMC Start',  a.amc_start)}
+      ${a.amc_end ? row('AMC Expiry', a.amc_end + (a.amc_end < today ? ' — EXPIRED' : a.amc_end <= cut90 ? ' — Due Soon' : ''), amcCls) : ''}
+      ${a.amc_amount ? row('AMC Amount', '₹' + Number(a.amc_amount).toLocaleString('en-IN')) : ''}
+    </div>` : ''}
+    ${a.notes ? `<div class="text-sm text-text-secondary bg-section-alt rounded-xl p-3">${a.notes}</div>` : ''}
+  `;
+  closePanel('form-panel');
+  openPanel('detail-panel');
+}
+
+document.querySelectorAll('.asset-card').forEach(card => {
+  card.addEventListener('click', () => openDetail(card.getAttribute('data-id')));
+});
+
+document.getElementById('dp-edit-btn')?.addEventListener('click', () => { if (currentAsset) openForm(currentAsset); });
+
+document.getElementById('dp-decommission-btn')?.addEventListener('click', async () => {
+  if (!currentAsset) return;
+  if (!confirm(`Mark "${currentAsset.name}" as decommissioned?`)) return;
+  try {
+    const res = await fetch(`/api/v1/admin/assets/${currentAsset.id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error((await res.json()).message ?? 'Error');
+    showToast('Asset decommissioned.');
+    closeAll();
+    setTimeout(() => location.reload(), 500);
+  } catch (e) { showToast(e.message ?? 'Failed.', 'error'); }
+});
+
+// ── Service log drawer ─────────────────────────────────────────────────────
+document.getElementById('dp-service-btn')?.addEventListener('click', () => {
+  if (!currentAsset) return;
+  document.getElementById('service-panel-title').textContent = `${currentAsset.name} — Service Logs`;
+  (document.getElementById('service-asset-id') as HTMLInputElement).value = currentAsset.id;
+  closePanel('detail-panel');
+  openPanel('service-panel');
+  loadServiceLogs(currentAsset.id);
+});
+
+async function loadServiceLogs(assetId) {
+  const c = document.getElementById('service-logs-list');
+  c.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm">Loading…</div>';
+  const res  = await fetch(`/api/v1/admin/assets/${assetId}/service-logs`);
+  const logs = res.ok ? await res.json() : [];
+  if (!logs.length) { c.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm">No service logs yet.</div>'; return; }
+  c.innerHTML = `<div class="space-y-3">${logs.map(l => `
+    <div class="border border-border-light rounded-xl p-3">
+      <div class="flex items-start justify-between gap-2 mb-1">
+        <div class="font-medium text-sm text-text-primary">${l.service_type}</div>
+        <div class="text-xs text-text-secondary whitespace-nowrap">${new Date(l.service_date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+      </div>
+      ${l.description ? `<p class="text-xs text-text-secondary mb-1">${l.description}</p>` : ''}
+      <div class="flex gap-3 text-xs text-text-secondary">
+        ${l.cost ? `<span>₹${Number(l.cost).toLocaleString('en-IN')}</span>` : ''}
+        ${l.vendors?.name ? `<span>${l.vendors.name}</span>` : ''}
+        ${l.next_service_date ? `<span>Next: ${new Date(l.next_service_date).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>` : ''}
+      </div>
+    </div>
+  `).join('')}</div>`;
+}
+
+document.getElementById('service-form')?.addEventListener('submit', async e => {
+  e.preventDefault();
+  const assetId = (document.getElementById('service-asset-id') as HTMLInputElement).value;
+  const fd  = new FormData(e.target as HTMLFormElement);
+  const err = document.getElementById('service-form-error');
+  err.classList.add('hidden');
+  const res = await fetch(`/api/v1/admin/assets/${assetId}/service-logs`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      service_date: fd.get('service_date'), service_type: fd.get('service_type'),
+      description: fd.get('description') || null,
+      cost: fd.get('cost') ? parseFloat(fd.get('cost') as string) : null,
+      next_service_date: fd.get('next_service_date') || null,
+    }),
+  });
+  if (res.ok) {
+    (e.target as HTMLFormElement).reset();
+    loadServiceLogs(assetId);
+  } else {
+    const d = await res.json();
+    err.textContent = d.message ?? d.error ?? 'Failed to log service.';
+    err.classList.remove('hidden');
+  }
+});
+
+// ── Add / Edit form ────────────────────────────────────────────────────────
+function openForm(asset = null) {
+  editingId = asset?.id ?? null;
+  document.getElementById('fp-title').textContent = asset ? 'Edit Asset' : 'Add Asset';
+  const form = document.getElementById('asset-form') as HTMLFormElement;
+  form.reset();
+  document.getElementById('asset-id').value    = '';
+  document.getElementById('f-quantity').value  = '1';
+
+  if (asset) {
+    document.getElementById('asset-id').value          = asset.id;
+    document.getElementById('f-name').value            = asset.name;
+    document.getElementById('f-code').value            = asset.asset_code ?? '';
+    document.getElementById('f-quantity').value        = asset.quantity ?? 1;
+    document.getElementById('f-category').value        = asset.category;
+    document.getElementById('f-status').value          = asset.status;
+    document.getElementById('f-make').value            = asset.make ?? '';
+    document.getElementById('f-model').value           = asset.model ?? '';
+    document.getElementById('f-serial').value          = asset.serial_number ?? '';
+    document.getElementById('f-capacity').value        = asset.capacity ?? '';
+    document.getElementById('f-location').value        = asset.location_id ?? '';
+    document.getElementById('f-loc-notes').value       = asset.location_notes ?? '';
+    document.getElementById('f-install').value         = asset.installation_date ?? '';
+    document.getElementById('f-warranty').value        = asset.warranty_expiry ?? '';
+    document.getElementById('f-next-svc').value        = asset.next_service_date ?? '';
+    document.getElementById('f-supplier').value        = asset.supplier ?? '';
+    document.getElementById('f-amc-vendor').value      = asset.amc_vendor ?? '';
+    document.getElementById('f-amc-vendor-id').value   = asset.amc_vendor_id ?? '';
+    document.getElementById('f-amc-start').value       = asset.amc_start ?? '';
+    document.getElementById('f-amc-end').value         = asset.amc_end ?? '';
+    document.getElementById('f-amc-amount').value      = asset.amc_amount ?? '';
+    document.getElementById('f-notes').value           = asset.notes ?? '';
+  }
+
+  document.getElementById('form-error').classList.add('hidden');
+  closePanel('detail-panel');
+  openPanel('form-panel');
+}
+
+document.getElementById('add-asset-btn')?.addEventListener('click', () => openForm(null));
+
+document.getElementById('asset-form')?.addEventListener('submit', async e => {
+  e.preventDefault();
+  const errEl = document.getElementById('form-error');
+  const btn   = document.getElementById('form-submit-btn') as HTMLButtonElement;
+  errEl.classList.add('hidden');
+
+  const body = {
+    name:             (document.getElementById('f-name') as HTMLInputElement).value.trim(),
+    asset_code:       (document.getElementById('f-code') as HTMLInputElement).value.trim() || null,
+    quantity:         Number((document.getElementById('f-quantity') as HTMLInputElement).value) || 1,
+    category:         (document.getElementById('f-category') as HTMLSelectElement).value,
+    status:           (document.getElementById('f-status') as HTMLSelectElement).value,
+    make:             (document.getElementById('f-make') as HTMLInputElement).value.trim() || null,
+    model:            (document.getElementById('f-model') as HTMLInputElement).value.trim() || null,
+    serial_number:    (document.getElementById('f-serial') as HTMLInputElement).value.trim() || null,
+    capacity:         (document.getElementById('f-capacity') as HTMLInputElement).value.trim() || null,
+    location_id:      (document.getElementById('f-location') as HTMLSelectElement).value || null,
+    location_notes:   (document.getElementById('f-loc-notes') as HTMLInputElement).value.trim() || null,
+    installation_date:(document.getElementById('f-install') as HTMLInputElement).value || null,
+    warranty_expiry:  (document.getElementById('f-warranty') as HTMLInputElement).value || null,
+    next_service_date:(document.getElementById('f-next-svc') as HTMLInputElement).value || null,
+    supplier:         (document.getElementById('f-supplier') as HTMLInputElement).value.trim() || null,
+    amc_vendor:       (document.getElementById('f-amc-vendor') as HTMLInputElement).value.trim() || null,
+    amc_vendor_id:    (document.getElementById('f-amc-vendor-id') as HTMLSelectElement).value || null,
+    amc_start:        (document.getElementById('f-amc-start') as HTMLInputElement).value || null,
+    amc_end:          (document.getElementById('f-amc-end') as HTMLInputElement).value || null,
+    amc_amount:       (document.getElementById('f-amc-amount') as HTMLInputElement).value ? parseFloat((document.getElementById('f-amc-amount') as HTMLInputElement).value) : null,
+    notes:            (document.getElementById('f-notes') as HTMLTextAreaElement).value.trim() || null,
+  };
+
+  const url    = editingId ? `/api/v1/admin/assets/${editingId}` : '/api/v1/admin/assets';
+  const method = editingId ? 'PUT' : 'POST';
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  try {
+    const res  = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message ?? 'Failed to save.');
+    showToast(editingId ? 'Asset updated.' : 'Asset added.');
+    closeAll();
+    setTimeout(() => location.reload(), 500);
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.textContent = 'Save Asset'; btn.disabled = false;
+  }
+});
+
+applyFilters();
+</script>
+
+<script id="__assets_data" type="application/json" set:html={assetsJson}></script>
+<script id="__loc_data" type="application/json" set:html={locationsJson}></script>
 </PortalLayout>
