@@ -33,13 +33,15 @@ CREATE INDEX idx_compliance_next_due ON staff_compliance_logs(next_due_at) WHERE
 
 ALTER TABLE staff_compliance_logs ENABLE ROW LEVEL SECURITY;
 
+-- NOTE: staff_members.user_id does not exist until migration 080.
+-- Policies referencing it are recreated properly in 080 after ADD COLUMN.
 CREATE POLICY "compliance_read" ON staff_compliance_logs FOR SELECT
   USING (
     society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
     AND (
       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()
               AND (portal_role IN ('executive','secretary','president') OR is_admin))
-      OR EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm'))
+      OR false  -- supervisor/afm-via-user_id: recreated in 080
     )
   );
 
@@ -49,7 +51,7 @@ CREATE POLICY "compliance_insert" ON staff_compliance_logs FOR INSERT
     AND (
       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()
               AND (portal_role IN ('executive','secretary','president') OR is_admin))
-      OR EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm'))
+      OR false  -- supervisor/afm-via-user_id: recreated in 080
     )
   );
 

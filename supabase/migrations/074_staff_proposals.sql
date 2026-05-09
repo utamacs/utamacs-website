@@ -35,6 +35,8 @@ CREATE INDEX idx_proposals_by      ON staff_activity_proposals(proposed_by);
 ALTER TABLE staff_activity_proposals ENABLE ROW LEVEL SECURITY;
 
 -- Supervisors see proposals for their department; AFM/exec see all
+-- NOTE: staff_members.user_id does not exist until migration 080.
+-- Policies referencing it are recreated properly in 080 after ADD COLUMN.
 CREATE POLICY "proposals_read" ON staff_activity_proposals FOR SELECT
   USING (
     society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
@@ -45,11 +47,7 @@ CREATE POLICY "proposals_read" ON staff_activity_proposals FOR SELECT
         WHERE id = auth.uid()
         AND (portal_role IN ('executive','secretary','president') OR is_admin)
       )
-      OR EXISTS (
-        SELECT 1 FROM staff_members
-        WHERE user_id = auth.uid()
-        AND portal_role = 'afm'
-      )
+      OR false  -- afm-via-user_id: recreated in 080
     )
   );
 
@@ -57,11 +55,7 @@ CREATE POLICY "proposals_read" ON staff_activity_proposals FOR SELECT
 CREATE POLICY "proposals_insert" ON staff_activity_proposals FOR INSERT
   WITH CHECK (
     society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
-    OR EXISTS (
-      SELECT 1 FROM staff_members
-      WHERE user_id = auth.uid()
-      AND portal_role IN ('supervisor','afm')
-    )
+    OR false  -- supervisor/afm-via-user_id: recreated in 080
   );
 
 -- Only AFM/exec can update (approve/reject)
@@ -70,8 +64,6 @@ CREATE POLICY "proposals_review" ON staff_activity_proposals FOR UPDATE
     SELECT 1 FROM profiles
     WHERE id = auth.uid()
     AND (portal_role IN ('executive','secretary','president') OR is_admin)
-  ) OR EXISTS (
-    SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role = 'afm'
-  ));
+  ) OR false);  -- afm-via-user_id: recreated in 080
 
 COMMIT;

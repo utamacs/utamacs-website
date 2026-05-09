@@ -19,10 +19,168 @@ ALTER TABLE staff_members
 
 CREATE INDEX IF NOT EXISTS idx_staff_members_user_id ON staff_members(user_id) WHERE user_id IS NOT NULL;
 
+-- Staff portal accounts can read their own staff_members record via user_id
+DROP POLICY IF EXISTS "staff_self_read" ON staff_members;
+CREATE POLICY "staff_self_read" ON staff_members FOR SELECT
+  USING (user_id = auth.uid());
+
 -- Ensure staff profiles can be linked back to their staff record
 -- (portal pages can JOIN profiles → staff_members via user_id)
 COMMENT ON COLUMN staff_members.user_id IS
   'Links to auth.users when this staff member has been given portal access. NULL = no portal account yet.';
+
+-- ── Recreate policies from 074-078 that reference user_id ─────────────────────
+-- Migrations 074–078 created these policies with `false` placeholders because
+-- user_id did not exist yet. Now that it does, we replace them with real logic.
+
+-- 074: staff_activity_proposals
+DROP POLICY IF EXISTS "proposals_read" ON staff_activity_proposals;
+CREATE POLICY "proposals_read" ON staff_activity_proposals FOR SELECT
+  USING (
+    society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
+    AND (
+      proposed_by = auth.uid()
+      OR EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid()
+        AND (portal_role IN ('executive','secretary','president') OR is_admin)
+      )
+      OR EXISTS (
+        SELECT 1 FROM staff_members
+        WHERE user_id = auth.uid()
+        AND portal_role = 'afm'
+      )
+    )
+  );
+
+DROP POLICY IF EXISTS "proposals_insert" ON staff_activity_proposals;
+CREATE POLICY "proposals_insert" ON staff_activity_proposals FOR INSERT
+  WITH CHECK (
+    society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM staff_members
+      WHERE user_id = auth.uid()
+      AND portal_role IN ('supervisor','afm')
+    )
+  );
+
+DROP POLICY IF EXISTS "proposals_review" ON staff_activity_proposals;
+CREATE POLICY "proposals_review" ON staff_activity_proposals FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid()
+      AND (portal_role IN ('executive','secretary','president') OR is_admin)
+    )
+    OR EXISTS (
+      SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role = 'afm'
+    )
+  );
+
+-- 075: staff_task_assignments
+DROP POLICY IF EXISTS "tasks_read" ON staff_task_assignments;
+CREATE POLICY "tasks_read" ON staff_task_assignments FOR SELECT
+  USING (
+    society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
+    AND (
+      EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND id = assigned_to)
+      OR assigned_by = auth.uid()
+      OR EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid()
+        AND (portal_role IN ('executive','secretary','president') OR is_admin)
+      )
+      OR EXISTS (
+        SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm')
+      )
+    )
+  );
+
+DROP POLICY IF EXISTS "tasks_insert" ON staff_task_assignments;
+CREATE POLICY "tasks_insert" ON staff_task_assignments FOR INSERT
+  WITH CHECK (
+    society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm')
+    )
+  );
+
+DROP POLICY IF EXISTS "tasks_update" ON staff_task_assignments;
+CREATE POLICY "tasks_update" ON staff_task_assignments FOR UPDATE
+  USING (
+    EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND id = assigned_to)
+    OR EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid()
+      AND (portal_role IN ('executive','secretary','president') OR is_admin)
+    )
+    OR EXISTS (
+      SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm')
+    )
+  );
+
+-- 076: staff_attendance
+DROP POLICY IF EXISTS "staff_attendance_self_read" ON staff_attendance;
+CREATE POLICY "staff_attendance_self_read" ON staff_attendance FOR SELECT
+  USING (
+    society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
+    AND (
+      EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND id = staff_id)
+      OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()
+                 AND (portal_role IN ('executive','secretary','president') OR is_admin))
+      OR EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm'))
+    )
+  );
+
+DROP POLICY IF EXISTS "staff_attendance_self_checkin" ON staff_attendance;
+CREATE POLICY "staff_attendance_self_checkin" ON staff_attendance FOR INSERT
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND id = staff_id)
+  );
+
+DROP POLICY IF EXISTS "staff_attendance_supervisor_update" ON staff_attendance;
+CREATE POLICY "staff_attendance_supervisor_update" ON staff_attendance FOR UPDATE
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()
+            AND (portal_role IN ('executive','secretary','president') OR is_admin))
+    OR EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm'))
+  );
+
+-- 077: staff_compliance_logs
+DROP POLICY IF EXISTS "compliance_read" ON staff_compliance_logs;
+CREATE POLICY "compliance_read" ON staff_compliance_logs FOR SELECT
+  USING (
+    society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
+    AND (
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()
+              AND (portal_role IN ('executive','secretary','president') OR is_admin))
+      OR EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm'))
+    )
+  );
+
+DROP POLICY IF EXISTS "compliance_insert" ON staff_compliance_logs;
+CREATE POLICY "compliance_insert" ON staff_compliance_logs FOR INSERT
+  WITH CHECK (
+    society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
+    AND (
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()
+              AND (portal_role IN ('executive','secretary','president') OR is_admin))
+      OR EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm'))
+    )
+  );
+
+-- 078: staff_feedback
+DROP POLICY IF EXISTS "feedback_read" ON staff_feedback;
+CREATE POLICY "feedback_read" ON staff_feedback FOR SELECT
+  USING (
+    society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
+    AND (
+      EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND id = staff_id)
+      OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()
+                 AND (portal_role IN ('executive','secretary','president') OR is_admin))
+      OR EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm'))
+    )
+  );
 
 -- ── B. Feature permissions — new staff portal roles ───────────────────────────
 -- portal_role column is TEXT (no enum constraint) — new values 'staff','supervisor','afm' are valid.

@@ -4,6 +4,8 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { sanitizePlainText } from '@lib/utils/sanitize';
+import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -16,11 +18,17 @@ export const GET: APIRoute = async ({ request, params }) => {
       });
     }
 
+    if (!params.id || !UUID_RE.test(params.id)) {
+      return new Response(JSON.stringify({ error: 'VALIDATION', message: 'Invalid asset id.' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const sb = getSupabaseServiceClient();
     const { data, error } = await sb
       .from('asset_maintenance_logs')
       .select('id, service_date, service_type, description, cost, next_service_date, performed_by, created_at, vendors(name)')
-      .eq('asset_id', params.id!)
+      .eq('asset_id', params.id)
       .order('service_date', { ascending: false });
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
@@ -37,6 +45,12 @@ export const POST: APIRoute = async ({ request, params }) => {
     if (!['executive', 'admin'].includes(user.role)) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!params.id || !UUID_RE.test(params.id)) {
+      return new Response(JSON.stringify({ error: 'VALIDATION', message: 'Invalid asset id.' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
       });
     }
 
@@ -70,7 +84,7 @@ export const POST: APIRoute = async ({ request, params }) => {
     const { data, error } = await sb
       .from('asset_maintenance_logs')
       .insert({
-        asset_id: params.id!,
+        asset_id: params.id,
         service_date: body.service_date,
         service_type: sanitizePlainText(body.service_type),
         description: body.description ? sanitizePlainText(body.description) : null,
@@ -85,12 +99,19 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
+    await writeAuditLog({
+      societyId: SOCIETY_ID, userId: user.id,
+      action: 'CREATE', resourceType: 'asset_maintenance_logs', resourceId: data.id,
+      ip: extractClientIP(request),
+      newValues: { asset_id: params.id, service_date: body.service_date, service_type: body.service_type },
+    });
+
     // Update next_service_date on the asset itself
     if (body.next_service_date) {
       await sb
         .from('infrastructure_assets')
         .update({ next_service_date: body.next_service_date })
-        .eq('id', params.id!);
+        .eq('id', params.id);
     }
 
     return new Response(JSON.stringify(data), { status: 201, headers: { 'Content-Type': 'application/json' } });

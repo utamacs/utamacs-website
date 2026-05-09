@@ -429,10 +429,14 @@ const verifyUrl = `${PORTAL_URL}/api/v1/visitors/verify?token=${token}`;
 </div>
 
 <script define:vars={{ token, verifyUrl, otpCode: pass.otp_code, visitorName: pass.visitor_name, isValid }}>
-// Generate QR code once qrcodejs loads
-window.addEventListener('load', () => {
+// Generate QR code — try immediately (if qrcodejs already loaded), then wait for it
+function tryRenderQR() {
   const qrContainer = document.getElementById('qr-canvas');
-  if (qrContainer && typeof window.QRCode !== 'undefined') {
+  if (!qrContainer) return false;
+  if (typeof window.QRCode === 'undefined') return false;
+  // Guard against double-render if already has child nodes
+  if (qrContainer.childNodes.length > 0) return true;
+  try {
     new window.QRCode(qrContainer, {
       text: verifyUrl,
       width: 200,
@@ -441,6 +445,21 @@ window.addEventListener('load', () => {
       colorLight: '#FFFFFF',
       correctLevel: window.QRCode.CorrectLevel.M,
     });
+  } catch (e) {
+    qrContainer.innerHTML = '<p style="font-size:11px;color:#9CA3AF;text-align:center;padding:8px;">QR unavailable — use entry code above</p>';
+  }
+  return true;
+}
+
+// Try on DOMContentLoaded (fires after deferred scripts run), then on load, then poll
+document.addEventListener('DOMContentLoaded', () => { tryRenderQR(); });
+window.addEventListener('load', () => {
+  if (!tryRenderQR()) {
+    // qrcodejs CDN may be slow — poll for up to 5 s
+    let attempts = 0;
+    const poll = setInterval(() => {
+      if (tryRenderQR() || ++attempts >= 10) clearInterval(poll);
+    }, 500);
   }
 });
 
