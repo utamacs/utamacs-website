@@ -51,6 +51,77 @@ for (const t of todayTasks ?? []) {
 ---
 
 <PortalLayout title="Team Roster" user={user} activeModule="staff_team">
+
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Supervisor's live view of their department — attendance status, pending tasks and quick-mark actions without requiring staff to log in individually.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Shift Begins</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Supervisor opens roster</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">View Team Status</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Live check-in times</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Mark Attendance</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Absent / Leave for no-shows</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Assign Tasks</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Ad-hoc or templated</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Track Progress</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Pending / done counts</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">End-of-Day</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Records finalised</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-lock text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Scoped to supervisor's <strong>own department only</strong> — supervisors cannot view or modify staff or tasks in other departments</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-palette text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Status colour: <span class="text-green-600 font-medium">Green</span> (checked in), <span class="text-amber-600 font-medium">Amber</span> (not yet in), <span class="text-red-600 font-medium">Red</span> (absent/leave), <span class="text-gray-500 font-medium">Gray</span> (off day)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-user-check text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Quick-mark attendance: supervisor marks Absent or Leave for no-shows without needing staff to log in — updates attendance record immediately</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-tasks text-amber-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Task count per member shows pending / completed split with red indicator for high-priority overdue tasks</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-plus-circle text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Supervisor can assign ad-hoc tasks from this view — task assignment drawer opens with template selector and due date picker</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-user-tie text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>AFM sees all departments from the Departments page — supervisors are redirected to their own team when visiting that page</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div>
       <h1 class="text-2xl font-bold text-primary-600 font-poppins">

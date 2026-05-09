@@ -67,6 +67,77 @@ const totalOverdue = summaryRows.reduce((s, r) => s + r.tasks_overdue, 0);
 ---
 
 <PortalLayout title="Staff Reports" user={user} activeModule="staff_reports">
+
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Month-by-month attendance and task completion summaries — exportable in CLRA Form B format for statutory wage register submission to the Labour Department.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Select Month</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Any historical month</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Compile Attendance</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Present / absent / leave</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Tally Tasks</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Completion % per staff</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Calculate OT</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Overtime hours flagged</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Generate Report</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Summary + per-staff table</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Export</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">CSV / CLRA Form B PDF</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-percent text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span><strong>Attendance % formula:</strong> (Days Present ÷ Working Days in Month) × 100 — holidays and approved leave excluded from denominator</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-gavel text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span><strong>CLRA Form B:</strong> Contract Labour (Regulation and Abolition) Act 1970 — statutory wage register required for all contract labour establishments</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-clock text-amber-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Overtime hours tracked separately — flagged in the report for payroll processing; OT rate calculation is managed outside the system by HR</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-chart-bar text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Per-staff breakdown shows: name, department, present days, absent days, OT hours, task completion % and attendance progress bar</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-download text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>CSV export for HR and payroll software; PDF for CLRA Form B submission — both include agency name and PSARA number where applicable</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-history text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>All historical months available — CLRA requires 3-year record retention; reports can be re-generated at any time from stored attendance logs</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div>
       <h1 class="text-2xl font-bold text-primary-600 font-poppins">Staff Reports</h1>

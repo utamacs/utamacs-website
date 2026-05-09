@@ -14,7 +14,7 @@ if (!user) return Astro.redirect('/portal/login');
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Residents raise maintenance complaints that are assigned to executives and tracked through to resolution.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Residents raise maintenance complaints that are triaged to in-house staff (Maintenance dept) or vendor work orders — tracked through SLA-enforced stages to resident-confirmed closure.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -24,58 +24,71 @@ if (!user) return Astro.redirect('/portal/login');
       <div class="pt-4 border-t border-primary-100 space-y-4">
         <!-- Main flow -->
         <div class="process-snake-flow -mx-1 px-1">
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Filed</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Resident submits</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Resident submits + photo</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Acknowledged</p>
-            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Exec assigned</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Exec assigns within 48h</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Triaged</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Staff task or vendor WO</p>
+          </div>
+
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">In Progress</p>
-            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Work underway</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Repair underway</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
-            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Work Order</p>
-            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Vendor if needed</p>
-          </div>
-
-          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Resolved</p>
             <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Resident confirms</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Closed</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Record filed</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Record filed + SLA logged</p>
           </div>
         </div>
-        <!-- Exception row -->
+        <!-- Exception rows -->
         <div class="flex items-center gap-2 text-xs text-red-600">
           <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
           <span class="font-medium">Escalated</span>
-          <span class="text-red-500">— Auto-escalates to President if no action taken within 7 days of filing</span>
+          <span class="text-red-500">— Auto-escalates to President if not acknowledged within 48 h; second escalation if unresolved past rules-engine SLA days</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-amber-600">
+          <i class="fas fa-arrow-turn-down text-amber-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Re-opened</span>
+          <span class="text-amber-700">— Resident can re-open within the rules-engine window if the fix didn't hold; complaint restarts from In Progress</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Complaints automatically escalate to the President if not acknowledged within 48 hours</span>
+            <i class="fas fa-clock text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>SLA timers are rules-engine driven — acknowledgment window (default 48 h) and resolution target are configurable by admin without code changes</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Work orders can be created directly from a complaint for vendor-assisted repairs</span>
+            <i class="fas fa-hard-hat text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Maintenance complaints are typically triaged to the <strong>Maintenance dept</strong> in Staff Management — a staff task is auto-created and linked to the complaint</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Residents receive a notification when their complaint status changes</span>
+            <i class="fas fa-file-alt text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Vendor work orders created from a complaint link both records — vendor WO completion auto-marks the complaint Resolved without a separate exec action</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Closed complaints contribute to the maintenance performance report</span>
+            <i class="fas fa-bell text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Residents receive a portal notification + email on every status change — anonymous complaints show no name in notifications to exec</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-paperclip text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Photo/video attachments up to 50 MB stored privately in GitHub Docs — signed URL generated on demand for exec viewing; access logged for DPDPA compliance</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-chart-bar text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Closed complaints feed the <strong>Analytics</strong> module — SLA breach rate, average resolution time, and dept-wise heatmap visible to exec</span>
           </div>
         </div>
       </div>

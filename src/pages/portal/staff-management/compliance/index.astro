@@ -42,6 +42,82 @@ const RESULT_BADGE: Record<string, string> = {
 ---
 
 <PortalLayout title="Compliance Logs" user={user} activeModule="staff_compliance">
+
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Legally mandated SOP records for fire, lift, electrical and safety activities — immutable after filing per CLRA 1970 and Bureau of Indian Standards.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Activity Due</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Next due date reached</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Conducted</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Staff / vendor carries out</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Log Recorded</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Result + notes entered</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Document Filed</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Certificate / report attached</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Next Due Set</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Auto-calculated from frequency</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Issue Found</span>
+          <span class="text-red-500">— Issue notes required; action must be logged separately; re-inspection creates a new log entry</span>
+        </div>
+        <div class="p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2 text-xs text-red-700">
+          <i class="fas fa-lock mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+          <span><strong>Immutable records:</strong> Compliance logs cannot be edited or deleted after filing. This is a statutory requirement under the Contract Labour (Regulation and Abolition) Act 1970 and applicable IS standards for fire, lift and electrical safety.</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-th-large text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>8 categories: Fire Safety, Lift/Elevator, Water/STP, DG Set, Electrical, Pest Control, Security Drill, Other</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Result options: <strong>OK</strong> (passed), <strong>Issue Found</strong> (noted, action pending), <strong>Failed</strong> (requires immediate intervention)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-calendar-alt text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Next due date auto-calculated from frequency: Monthly (lifts, fire extinguishers), Quarterly (DG set), Annually (electrical audit)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-file-upload text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Certificates and inspection reports committed to private encrypted repository — never stored in public locations</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-exclamation-triangle text-red-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Overdue activities highlighted in red on the dashboard — exec receives alert if compliance is more than 7 days overdue</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-gavel text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Records are admissible in labour / fire / electrical inspections — maintain at least 3 years of history per statutory requirement</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div>
       <h1 class="text-2xl font-bold text-primary-600 font-poppins">Compliance Logs</h1>

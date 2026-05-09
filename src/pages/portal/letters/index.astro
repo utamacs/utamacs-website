@@ -18,7 +18,7 @@ if (!canSeeLetters) return Astro.redirect('/portal');
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Official letters are generated from society letterhead templates — draft, review, and download as a signed PDF.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Official letters are generated from society letterhead templates with sequential reference numbers — used for RERA notices, demand letters, AGM notices, builder correspondence, and general communication.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -28,42 +28,61 @@ if (!canSeeLetters) return Astro.redirect('/portal');
       <div class="pt-4 border-t border-primary-100 space-y-4">
         <!-- Main flow -->
         <div class="process-snake-flow -mx-1 px-1">
-          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Select Template</p>
-            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Choose letter type</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">RERA / AGM / general</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Fill Details</p>
-            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Edit content &amp; fields</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Recipient + body + ref#</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Secretary Review</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Counter-sign before issue</p>
+          </div>
+
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Generate PDF</p>
-            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Letterhead applied</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Letterhead + ref stamped</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Dispatch &amp; File</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Saved to Documents</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">GitHub Docs + Document Repo</p>
           </div>
+        </div>
+        <!-- Exception row -->
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Sent Back</span>
+          <span class="text-red-500">— Secretary can reject a draft for corrections; rejected letter is not assigned a reference number until re-submitted and approved</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Templates include Society letterhead, RERA notice, and general correspondence</span>
+            <i class="fas fa-user-tie text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Only Secretary and above can generate letters on official society letterhead — executive members can draft, Secretary or President must counter-sign before the PDF is issued</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Letters are auto-filed in the Document Repository under the 'Letters' category</span>
+            <i class="fas fa-hashtag text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Each issued letter gets a sequential reference number (e.g., UTAMACS/2025-26/042) — auto-incremented per financial year, stamped into the PDF header and audit log</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Only Secretary and above can create letters using official society letterhead</span>
+            <i class="fas fa-building text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>RERA notice template links to the corresponding <strong>Snag</strong> or <strong>HOTO</strong> item — builder's name, project ID, and RERA registration are auto-filled from the referenced record</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Downloaded PDFs include a document reference number for tracking</span>
+            <i class="fas fa-calendar-alt text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>AGM Notice template pulls the meeting date, agenda, and venue from the <strong>AGM</strong> module — ensures statutory 21-day window is computed automatically from the chosen AGM date</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-folder text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Issued PDFs are stored in private GitHub Docs and auto-filed in the <strong>Document Repository</strong> under the 'Letters' category — accessible to exec with time-limited signed URLs</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-rupee-sign text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Demand notice template is linked to the Finance module — outstanding maintenance dues for a specific flat are fetched and embedded in the letter body automatically</span>
           </div>
         </div>
       </div>

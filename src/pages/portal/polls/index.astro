@@ -13,7 +13,7 @@ if (!user) return Astro.redirect('/portal/login');
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Polls allow the committee to gather resident opinion — results are non-binding advisory votes unless designated as a formal resolution.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Polls gather resident opinion on a one-vote-per-unit basis — anonymous voting optional, results exported as PDF and linkable to AGM minutes for formal record-keeping.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -22,43 +22,57 @@ if (!user) return Astro.redirect('/portal/login');
     <div class="px-5 pb-5">
       <div class="pt-4 border-t border-primary-100 space-y-4">
         <div class="process-snake-flow -mx-1 px-1">
-          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Created</p>
-            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Options defined</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Options + anon flag set</p>
           </div>
-          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Open</p>
-            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Voting window active</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">1 vote / unit, live count</p>
           </div>
-          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Closed</p>
-            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Window ends</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Window ends or exec closes</p>
           </div>
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Tallied</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Results computed</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Results + turnout %</p>
           </div>
-          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Published</p>
-            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Outcome shared</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Shared + PDF exported</p>
           </div>
+        </div>
+        <!-- Exception row -->
+        <div class="flex items-center gap-2 text-xs text-amber-600">
+          <i class="fas fa-arrow-turn-down text-amber-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Cancelled</span>
+          <span class="text-amber-700">— Exec can cancel a poll before it closes (e.g., duplicate or withdrawn question); all cast votes are deleted to protect DPDPA data minimisation</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>All active members are eligible to vote — one vote per registered unit</span>
+            <i class="fas fa-vote-yea text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>One vote per registered flat — the system enforces unit-level deduplication, so owner and co-owner of the same flat cannot both vote on the same poll</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Anonymous voting is configurable at poll creation time</span>
+            <i class="fas fa-user-secret text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>When anonymous mode is enabled, the portal stores <code>unit_id</code> for deduplication only — the display layer never reveals who voted for which option</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-link text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Polls can be linked to an <strong>AGM session</strong> — linked poll results appear automatically in the session proceedings and are included in the exported minutes PDF</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-file-pdf text-red-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Published results can be exported as a signed PDF (pdfmake, society letterhead) — stored in GitHub Docs and accessible from the Document Repository</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
             <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Formal resolutions (binding votes) require the Board Resolution workflow in HOTO Finance</span>
+            <span>Advisory polls are non-binding — formal resolutions (byelaw changes, major expenditure) require a Special Resolution at AGM under Telangana CSACT §42</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Poll results are stored and linked to the relevant AGM or meeting minutes</span>
+            <i class="fas fa-bell text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>All active members receive a portal notification when a new poll opens — reminder sent 24 h before close if they have not yet voted</span>
           </div>
         </div>
       </div>

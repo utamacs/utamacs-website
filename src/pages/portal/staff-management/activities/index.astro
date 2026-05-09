@@ -43,6 +43,82 @@ for (const t of templates ?? []) {
 ---
 
 <PortalLayout title="Activity Templates" user={user} activeModule="staff_management">
+
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Standard operating procedures defined here auto-generate recurring tasks for department staff — frequency, trilingual labels and photo requirements all set per template.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Create Template</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Or propose via supervisor</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Set Department</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Security / HK / Garden / Maint</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Set Frequency</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Daily → Yearly → On-Demand</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Add Labels</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">EN + हिं + తె titles</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Activated</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Live in task engine</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Tasks Generated</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Per cycle, per assignee</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-amber-700">
+          <i class="fas fa-arrow-turn-down text-amber-500 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">New template via Supervisor</span>
+          <span class="text-amber-600">— Supervisors propose; AFM approves; on approval the template is auto-created and activated</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-calendar-alt text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Frequencies: <strong>Daily</strong> (gate checks, cleaning), <strong>Weekly</strong> (pump checks), <strong>Monthly</strong> (fire extinguisher), <strong>Quarterly</strong> (DG set), <strong>Half-Yearly</strong>, <strong>Yearly</strong> (electrical audit), <strong>On-Demand</strong></span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-language text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Trilingual titles: English (required), Hindi and Telugu (optional) — each staff member's preferred language is used when displaying tasks</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-camera text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Photo-proof flag: when set, staff must upload an image before completing the task — ideal for equipment checks and post-cleaning verification</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-seedling text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>~25 default templates seeded at setup across all 4 departments — exec can add department-specific SOPs at any time</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-pause-circle text-red-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Templates can be deactivated without deletion — inactive templates stop generating new tasks but historical records are preserved</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-random text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>On-Demand templates are never auto-scheduled — they appear in the assignment drawer for supervisors to assign manually as needed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div>
       <nav class="text-sm text-text-secondary mb-1">

@@ -78,7 +78,7 @@ const VISITOR_TYPES = [
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">All visitors are logged at the gate — residents can pre-register expected guests to speed up entry.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">All visitors are logged at the gate — residents pre-share a time-bound QR pass or OTP; guards scan or verify before admitting. Walk-in visitors can be gate-approved by the resident in real time.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -86,24 +86,95 @@ const VISITOR_TYPES = [
     </summary>
     <div class="px-5 pb-5">
       <div class="pt-4 border-t border-primary-100 space-y-4">
-        <div class="flex flex-wrap gap-2">
-          {[
-            { label: 'Pre-Register', sub: 'Resident shares QR / OTP', color: 'border-primary-300 bg-blue-50 text-primary-700' },
-            { label: 'Arrival', sub: 'Visitor reaches gate', color: 'border-gray-200 bg-gray-50 text-gray-700' },
-            { label: 'Guard Verifies', sub: 'Scans QR or enters OTP', color: 'border-amber-300 bg-amber-50 text-amber-800' },
-            { label: 'Entry Logged', sub: 'Type & gate captured', color: 'border-green-300 bg-green-50 text-green-800' },
-            { label: 'Exit Logged', sub: 'Departure recorded', color: 'border-gray-300 bg-gray-100 text-gray-700' },
-          ].map(step => (
-            <div class={`rounded-lg border px-3 py-2 text-center min-w-[120px] ${step.color}`}>
-              <p class="text-[12px] font-semibold">{step.label}</p>
-              <p class="text-[10px] mt-0.5 opacity-80">{step.sub}</p>
-            </div>
-          ))}
+        <!-- Path A: QR / OTP pass flow -->
+        <p class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">Path A — Pre-Approved Visitor (QR / OTP Pass)</p>
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-dashed border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Create Pass</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Resident sets time window</p>
+            <p class="text-[10px] text-blue-400 whitespace-nowrap">2h / 6h / 24h / custom</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Share Pass</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">QR image or 6-digit OTP</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Visitor Arrives</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Shows QR or quotes OTP</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Guard Scans / Enters</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Camera QR or OTP field</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Entry Logged</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Scan count incremented</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Exit Logged</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Departure recorded</p>
+          </div>
         </div>
-        <p class="text-xs text-text-secondary">
-          <i class="fas fa-mobile-alt text-primary-400 mr-1" aria-hidden="true"></i>
-          Residents can also share a time-bound QR pass image with visitors — no app download needed.
-        </p>
+        <!-- Path B: Walk-in with gate approval -->
+        <p class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide mt-3">Path B — Walk-in Visitor (Gate Approval)</p>
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Walk-in Arrives</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">No pre-approval</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Guard Requests Approval</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Sends to resident portal</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Resident Decides</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Approve / Reject in 10 min</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Entry Auto-Logged</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">On approval, log created</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Guard Notified</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Decision shown live (10s poll)</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Pass Invalid</span>
+          <span class="text-red-500">— Guard sees red modal if pass is expired, maxed out (all entries used) or the window hasn't started yet; visitor is not admitted</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Gate Request Expired</span>
+          <span class="text-red-500">— Approval requests auto-expire after 10 minutes; guard must re-submit or log as walk-in directly</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-qrcode text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>QR pass encodes a verify URL — guard's camera decodes it, previews pass details in a modal, then taps "Admit" to record entry</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-key text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>6-digit OTP is shown on the pass image — visitor can quote it verbally; guard enters it in the OTP field as backup to QR scanning</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-repeat text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Multi-entry passes (up to 5 or unlimited) are supported — useful for vendors with multiple trips; scan count shown on each entry</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-clock text-amber-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Pass validity window enforced at the gate — guards can admit up to 30 minutes before the start time (configurable grace period)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-mobile-alt text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Pass image can be downloaded or shared via WhatsApp/iMessage — visitor needs no app; the pass page works in any mobile browser</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-shield-alt text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Gate approval requests expire in 10 minutes — residents see a live countdown; guard's panel refreshes every 10 seconds for the decision</span>
+          </div>
+        </div>
       </div>
     </div>
   </details>

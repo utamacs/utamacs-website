@@ -13,7 +13,7 @@ if (!user) return Astro.redirect('/portal/login');
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Residents book shared amenities (clubhouse, terrace, pool) — bookings are subject to availability and committee approval.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Residents book shared amenities (clubhouse, terrace, pool) — advance-booking window and security deposit are rules-engine configurable; Housekeeping staff handles post-use cleaning via a linked task.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -23,53 +23,66 @@ if (!user) return Astro.redirect('/portal/login');
       <div class="pt-4 border-t border-primary-100 space-y-4">
         <!-- Main flow -->
         <div class="process-snake-flow -mx-1 px-1">
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Select Slot</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Choose facility &amp; time</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Facility + date + time</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Request Sent</p>
-            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Booking submitted</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Deposit invoiced if reqd</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Under Review</p>
-            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Committee checks</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Committee availability check</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Confirmed</p>
-            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Slot reserved</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Slot reserved + notified</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Completed</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Usage recorded</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">HK task + deposit refund</p>
           </div>
         </div>
-        <!-- Exception row -->
+        <!-- Exception rows -->
         <div class="flex items-center gap-2 text-xs text-red-600">
           <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
           <span class="font-medium">Rejected</span>
-          <span class="text-red-500">— Slot unavailable or booking declined by committee</span>
+          <span class="text-red-500">— Slot unavailable or booking declined by committee with reason; resident notified and can re-book for a different slot</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-amber-600">
+          <i class="fas fa-arrow-turn-down text-amber-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Emergency Override</span>
+          <span class="text-amber-700">— Maintenance emergency can cancel a confirmed booking with 4-hour notice; security deposit refunded automatically</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Bookings must be made at least 24 hours in advance</span>
+            <i class="fas fa-clock text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Advance booking window (default 24 h minimum, up to 7 days ahead) is configurable via the rules engine — admin can adjust per facility type without code changes</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Security deposit may be required for clubhouse bookings</span>
+            <i class="fas fa-rupee-sign text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Security deposit (if enabled) is invoiced via the <strong>Finance</strong> module at booking confirmation — refunded as a credit note after the booking completes without damage</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Repeated no-shows may result in booking privileges being suspended</span>
+            <i class="fas fa-broom text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>On booking completion, a cleaning task is auto-created for the <strong>Housekeeping dept</strong> in Staff Management — linked to the facility slot for scheduling accuracy</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Emergency maintenance can override confirmed bookings with 4-hour notice</span>
+            <i class="fas fa-ban text-red-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Three no-shows in 6 months suspends a member's booking privileges — threshold configurable via rules engine; exec can manually lift suspension</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-calendar-check text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>The facility calendar shows society-level events (from <strong>Events</strong> module) alongside member bookings — execs see both layers; members see only their own and society events</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-wrench text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Facility defects noted during post-use inspection are raised directly as a <strong>Complaint</strong> — tagged to the facility and assigned to the Maintenance dept automatically</span>
           </div>
         </div>
       </div>

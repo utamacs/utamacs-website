@@ -15,7 +15,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Official notices and circulars are drafted by authorised executives, published, and automatically notified to all residents.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Official notices and circulars are drafted by authorised executives, reviewed, published with portal + email notification, and auto-archived to the Document Repository — published notices are immutable; corrections require a corrigendum.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -25,47 +25,66 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       <div class="pt-4 border-t border-primary-100 space-y-4">
         <!-- Main flow -->
         <div class="process-snake-flow -mx-1 px-1">
-          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Draft</p>
-            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Secretary / President writes</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Secretary / President</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Review</p>
-            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Second executive checks</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Second exec checks</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Published</p>
-            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Visible to all members</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Portal + email notified</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Effective Period</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Pinned until expiry date</p>
+          </div>
+
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Archived</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Stored in Documents</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Filed in Document Repo</p>
           </div>
         </div>
-        <!-- Annotation row -->
-        <div class="flex items-center gap-2 text-xs text-text-secondary">
-          <i class="fas fa-info-circle text-primary-400 text-[10px]" aria-hidden="true"></i>
-          <span>Email and portal notification sent automatically when a notice is published</span>
+        <!-- Exception rows -->
+        <div class="flex items-center gap-2 text-xs text-amber-600">
+          <i class="fas fa-arrow-turn-down text-amber-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Corrigendum</span>
+          <span class="text-amber-700">— Published notices cannot be edited; a correction notice (corrigendum) is issued as a separate notice referencing the original ref#</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Draft Rejected</span>
+          <span class="text-red-500">— Reviewing exec can send a draft back with comments; rejected draft stays in Draft state for the author to revise and re-submit</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Only Secretary or President can publish notices</span>
+            <i class="fas fa-user-tie text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Only Secretary or President can publish — executive members can draft but not publish; this two-stage gate prevents unreviewed notices reaching residents</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Urgent notices trigger an immediate email to all members</span>
+            <i class="fas fa-bell text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Publication triggers a portal notification to all members; Urgent-category notices send an immediate email — non-urgent notices are batched into the daily digest</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Published notices cannot be edited — a corrigendum must be issued</span>
+            <i class="fas fa-tag text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Categories: <strong>Maintenance</strong> (planned shutdowns), <strong>Financial</strong> (levy changes), <strong>Governance</strong> (AGM, byelaw), <strong>General</strong>, and <strong>Urgent</strong> — category determines notification priority</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Notices are auto-archived after their effective date passes</span>
+            <i class="fas fa-paperclip text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Attachments up to 10 MB stored in private GitHub Docs — formal notice PDFs generated via the <strong>Letters</strong> module use society letterhead with a sequential ref#</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-calendar-times text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Notices with an expiry date are auto-archived to the Document Repository when the date passes — they remain searchable but no longer appear on the main board</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-user-secret text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>DPDPA compliance: notices must not contain personal data (Aadhaar, full phone numbers) — the portal flags text containing patterns resembling ID numbers before publish</span>
           </div>
         </div>
       </div>

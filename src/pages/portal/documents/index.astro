@@ -15,7 +15,7 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Official society documents — bye-laws, audit reports, AGM minutes, and circulars — stored and categorised for resident access.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Official society documents — byelaws, audit reports, AGM minutes, letters, and circulars — stored privately in GitHub Docs and categorised for role-based resident access.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -29,21 +29,21 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
               <i class="fas fa-folder-open text-primary-600 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Document Categories</div>
-            <div class="text-xs text-text-secondary">Society records organised into Governance, Finance, Legal, Minutes, HOTO, Circulars, and more.</div>
+            <div class="text-xs text-text-secondary">Records organised into: <strong>Governance</strong> (byelaws, AGM minutes), <strong>Finance</strong> (audits, budgets), <strong>Legal</strong> (RERA, licences), <strong>HOTO</strong> (handover evidence), <strong>Letters</strong>, <strong>Staff KYC</strong>, and <strong>General</strong>. Documents auto-filed from other modules appear in the appropriate category automatically.</div>
           </div>
           <div class="bg-white rounded-lg border border-border-light p-4">
             <div class="w-8 h-8 rounded-lg bg-secondary-50 flex items-center justify-center mb-2">
               <i class="fas fa-lock text-secondary-500 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Access Control</div>
-            <div class="text-xs text-text-secondary">Some documents are restricted to executives. Members can view all member-level and public documents.</div>
+            <div class="text-xs text-text-secondary">Three tiers: <strong>Public</strong> (all members), <strong>Member</strong> (active members only), <strong>Exec</strong> (Secretary and above). Downloads generate a 1-hour signed URL from private GitHub Docs — exec access is logged in audit_logs for DPDPA compliance. Documents never served directly from a public URL.</div>
           </div>
           <div class="bg-white rounded-lg border border-border-light p-4">
             <div class="w-8 h-8 rounded-lg bg-accent-500/10 flex items-center justify-center mb-2">
               <i class="fas fa-upload text-accent-500 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Uploading Documents</div>
-            <div class="text-xs text-text-secondary">Only Secretary and above can upload or archive documents. PDF, DOCX, XLSX, and CSV supported.</div>
+            <div class="text-xs text-text-secondary">Only Secretary and above can upload directly. PDF, DOCX, XLSX, and CSV supported (up to 20 MB, rules-engine configurable). Other modules (Letters, AGM, Finance, Notices) auto-file their generated PDFs here — no manual re-upload needed. Versioning tracks superseded documents.</div>
           </div>
         </div>
       </div>

@@ -18,7 +18,7 @@ const isAdmin = user.isAdmin;
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">The member directory lists all registered flat owners and residents — contact details are visible only to authorised executives.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">The member directory lists all registered flat owners and residents — contact details are DPDPA-protected; member status determines voting eligibility, Finance dues, and Tenant KYC requirements.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -32,21 +32,21 @@ const isAdmin = user.isAdmin;
               <i class="fas fa-user-check text-primary-600 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Member Status</div>
-            <div class="text-xs text-text-secondary">Active, inactive, and tenant-occupied units are tracked separately. Only active members can vote.</div>
+            <div class="text-xs text-text-secondary"><strong>Active</strong> — owner in residence, can vote in polls and AGMs. <strong>Tenant-occupied</strong> — flat let out; owner remains the member-of-record, Tenant KYC required. <strong>Inactive</strong> — dues unpaid or resigned; voting rights suspended until cleared via Finance. Status change is exec-gated and audit-logged.</div>
           </div>
           <div class="bg-white rounded-lg border border-border-light p-4">
             <div class="w-8 h-8 rounded-lg bg-secondary-50 flex items-center justify-center mb-2">
-              <i class="fas fa-phone text-secondary-500 text-sm"></i>
+              <i class="fas fa-user-secret text-secondary-500 text-sm"></i>
             </div>
-            <div class="text-sm font-semibold text-text-primary mb-1">Contact Privacy</div>
-            <div class="text-xs text-text-secondary">Phone numbers are visible only to Secretary and above. Email is shown to all executives.</div>
+            <div class="text-sm font-semibold text-text-primary mb-1">Contact Privacy (DPDPA)</div>
+            <div class="text-xs text-text-secondary">Phone numbers visible only to Secretary and above — access logged in audit_logs per DPDPA 2023. Email visible to all executives. Members can view their own profile; cross-member contact lookup is disabled by design. Aadhaar numbers, if stored, are encrypted and show only last 4 digits to any user.</div>
           </div>
           <div class="bg-white rounded-lg border border-border-light p-4">
             <div class="w-8 h-8 rounded-lg bg-accent-500/10 flex items-center justify-center mb-2">
               <i class="fas fa-door-open text-accent-500 text-sm"></i>
             </div>
-            <div class="text-sm font-semibold text-text-primary mb-1">Inviting Members</div>
-            <div class="text-xs text-text-secondary">New members are invited by email — they set their own password. Executive approval is required.</div>
+            <div class="text-sm font-semibold text-text-primary mb-1">Onboarding Members</div>
+            <div class="text-xs text-text-secondary">New members apply via the <strong>Society Membership</strong> module (Byelaw §4) — exec reviews the application, raises an invoice for ₹1,000 admission + ₹1,000 share capital via Finance, and activates on payment. Members are invited by email and set their own password; admin assigns portal role (member, executive, secretary, president).</div>
           </div>
         </div>
       </div>
