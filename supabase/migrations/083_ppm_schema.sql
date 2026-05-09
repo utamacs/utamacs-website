@@ -13,14 +13,21 @@ WHERE a.id > b.id
   AND a.department  = b.department
   AND a.title       = b.title;
 
-ALTER TABLE staff_activity_templates
-  ADD CONSTRAINT uq_templates_dept_title UNIQUE (society_id, department, title);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'uq_templates_dept_title'
+  ) THEN
+    ALTER TABLE staff_activity_templates
+      ADD CONSTRAINT uq_templates_dept_title UNIQUE (society_id, department, title);
+  END IF;
+END $$;
 
 -- ── 2. Locations lookup table ─────────────────────────────────────────────────
 -- Stores named zones / areas within a society (blocks, utility rooms, amenities).
 -- Templates reference locations via the location_variants UUID[] soft-array.
 
-CREATE TABLE locations (
+CREATE TABLE IF NOT EXISTS locations (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   society_id  uuid NOT NULL REFERENCES societies(id) ON DELETE CASCADE,
   name        varchar(100) NOT NULL,
@@ -34,13 +41,15 @@ CREATE TABLE locations (
   UNIQUE (society_id, name)
 );
 
-CREATE INDEX idx_locations_society ON locations(society_id, zone_type);
+CREATE INDEX IF NOT EXISTS idx_locations_society ON locations(society_id, zone_type);
 
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "locations_read" ON locations;
 CREATE POLICY "locations_read" ON locations FOR SELECT
   USING (society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid()));
 
+DROP POLICY IF EXISTS "locations_manage" ON locations;
 CREATE POLICY "locations_manage" ON locations FOR ALL
   USING (EXISTS (
     SELECT 1 FROM profiles
@@ -52,7 +61,7 @@ CREATE POLICY "locations_manage" ON locations FOR ALL
 -- Equipment inventory: transformers, pumps, DG sets, panels, etc.
 -- Templates reference assets via asset_id FK for compliance and PPM tracking.
 
-CREATE TABLE assets (
+CREATE TABLE IF NOT EXISTS assets (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   society_id      uuid NOT NULL REFERENCES societies(id) ON DELETE CASCADE,
   name            varchar(200) NOT NULL,                -- 'Transformer-1 (800 KVA)'
@@ -75,14 +84,16 @@ CREATE TABLE assets (
   created_by      uuid REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_assets_society  ON assets(society_id, category, status);
-CREATE INDEX idx_assets_warranty ON assets(warranty_expiry) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_assets_society  ON assets(society_id, category, status);
+CREATE INDEX IF NOT EXISTS idx_assets_warranty ON assets(warranty_expiry) WHERE status = 'active';
 
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "assets_read" ON assets;
 CREATE POLICY "assets_read" ON assets FOR SELECT
   USING (society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid()));
 
+DROP POLICY IF EXISTS "assets_manage" ON assets;
 CREATE POLICY "assets_manage" ON assets FOR ALL
   USING (EXISTS (
     SELECT 1 FROM profiles
@@ -91,76 +102,30 @@ CREATE POLICY "assets_manage" ON assets FOR ALL
   ));
 
 -- ── 4. Extend staff_activity_templates ───────────────────────────────────────
---
--- frequency_days INT
---   When set, overrides the default interval implied by `frequency`.
---   Example: frequency='monthly', frequency_days=15 → "Monthly Twice" (every 15 days).
---
--- location_variants UUID[]
---   Soft-reference array to locations(id).  When populated, the task scheduler
---   fans out one task instance per location on each generation cycle.
---   No FK enforcement (Postgres arrays don't support FK); enforce in application.
---
--- preferred_day_of_week SMALLINT  0=Sunday … 6=Saturday (NULL = any day in window)
---
--- default_assigned_to UUID → staff_members(id)
---   PPM owner: tasks generated from this template default to this staff member.
---
--- asset_id UUID → assets(id)
---   Linked equipment record.
---
--- checklist JSONB  (default '[]')
---   Ordered array of inspection steps.  Schema per element:
---   {
---     "id":             "<uuid-string>",
---     "order":          <int>,
---     "text_en":        "<string>",
---     "text_hi":        "<string|null>",
---     "text_te":        "<string|null>",
---     "expected_value": "<string|null>",   -- e.g. "≥ 1 MΩ", "OK / Low / Critical"
---     "photo_required": <bool>,
---     "severity":       "warning" | "critical"
---     -- critical: step failure auto-raises a Complaint via the API
---   }
 
 ALTER TABLE staff_activity_templates
-  ADD COLUMN frequency_days        int     CHECK (frequency_days > 0),
-  ADD COLUMN location_variants     uuid[],
-  ADD COLUMN preferred_day_of_week smallint CHECK (preferred_day_of_week BETWEEN 0 AND 6),
-  ADD COLUMN default_assigned_to   uuid    REFERENCES staff_members(id) ON DELETE SET NULL,
-  ADD COLUMN asset_id              uuid    REFERENCES assets(id) ON DELETE SET NULL,
-  ADD COLUMN checklist             jsonb   NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS frequency_days        int     CHECK (frequency_days > 0),
+  ADD COLUMN IF NOT EXISTS location_variants     uuid[],
+  ADD COLUMN IF NOT EXISTS preferred_day_of_week smallint CHECK (preferred_day_of_week BETWEEN 0 AND 6),
+  ADD COLUMN IF NOT EXISTS default_assigned_to   uuid    REFERENCES staff_members(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS asset_id              uuid    REFERENCES assets(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS checklist             jsonb   NOT NULL DEFAULT '[]'::jsonb;
 
-CREATE INDEX idx_templates_loc_variants ON staff_activity_templates
+CREATE INDEX IF NOT EXISTS idx_templates_loc_variants ON staff_activity_templates
   USING GIN (location_variants) WHERE location_variants IS NOT NULL;
 
-CREATE INDEX idx_templates_checklist ON staff_activity_templates
+CREATE INDEX IF NOT EXISTS idx_templates_checklist ON staff_activity_templates
   USING GIN (checklist) WHERE checklist <> '[]'::jsonb;
 
 -- ── 5. Extend staff_task_assignments ─────────────────────────────────────────
---
--- location_id UUID → locations(id)
---   Which specific location this task instance covers.
---   Populated when the scheduler fans out a template with location_variants.
---
--- checklist_responses JSONB  (default '[]')
---   Per-step completion tracking, mirroring the template's checklist array.  Schema:
---   {
---     "step_id":      "<matches checklist[n].id>",
---     "actual_value": "<string|null>",
---     "status":       "pass" | "fail" | "na",
---     "photo_key":    "<github-path|null>",
---     "responded_at": "<iso-timestamp>",
---     "responded_by": "<user-uuid>"
---   }
 
 ALTER TABLE staff_task_assignments
-  ADD COLUMN location_id         uuid  REFERENCES locations(id) ON DELETE SET NULL,
-  ADD COLUMN checklist_responses jsonb NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS location_id         uuid  REFERENCES locations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS checklist_responses jsonb NOT NULL DEFAULT '[]'::jsonb;
 
-CREATE INDEX idx_tasks_location  ON staff_task_assignments(location_id) WHERE location_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_location  ON staff_task_assignments(location_id) WHERE location_id IS NOT NULL;
 
-CREATE INDEX idx_tasks_checklist ON staff_task_assignments
+CREATE INDEX IF NOT EXISTS idx_tasks_checklist ON staff_task_assignments
   USING GIN (checklist_responses) WHERE checklist_responses <> '[]'::jsonb;
 
 COMMIT;

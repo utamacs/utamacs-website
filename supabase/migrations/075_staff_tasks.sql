@@ -40,42 +40,38 @@ CREATE INDEX idx_tasks_due          ON staff_task_assignments(due_date, status) 
 ALTER TABLE staff_task_assignments ENABLE ROW LEVEL SECURITY;
 
 -- Staff see own tasks; supervisors see team tasks; exec/admin see all
+-- NOTE: staff_members.user_id does not exist until migration 080.
+-- Policies referencing it are recreated properly in 080 after ADD COLUMN.
 CREATE POLICY "tasks_read" ON staff_task_assignments FOR SELECT
   USING (
     society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
     AND (
-      EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND id = assigned_to)
+      false  -- self-via-user_id: recreated in 080
       OR assigned_by = auth.uid()
       OR EXISTS (
         SELECT 1 FROM profiles
         WHERE id = auth.uid()
         AND (portal_role IN ('executive','secretary','president') OR is_admin)
       )
-      OR EXISTS (
-        SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm')
-      )
+      OR false  -- supervisor/afm-via-user_id: recreated in 080
     )
   );
 
 CREATE POLICY "tasks_insert" ON staff_task_assignments FOR INSERT
   WITH CHECK (
     society_id IN (SELECT society_id FROM profiles WHERE id = auth.uid())
-    OR EXISTS (
-      SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm')
-    )
+    OR false  -- supervisor/afm-via-user_id: recreated in 080
   );
 
 CREATE POLICY "tasks_update" ON staff_task_assignments FOR UPDATE
   USING (
-    EXISTS (SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND id = assigned_to)
+    false  -- self-via-user_id: recreated in 080
     OR EXISTS (
       SELECT 1 FROM profiles
       WHERE id = auth.uid()
       AND (portal_role IN ('executive','secretary','president') OR is_admin)
     )
-    OR EXISTS (
-      SELECT 1 FROM staff_members WHERE user_id = auth.uid() AND portal_role IN ('supervisor','afm')
-    )
+    OR false  -- supervisor/afm-via-user_id: recreated in 080
   );
 
 COMMIT;

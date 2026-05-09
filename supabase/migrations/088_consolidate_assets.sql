@@ -28,15 +28,11 @@ ALTER TABLE infrastructure_assets
     CHECK (status IN ('active','under_maintenance','decommissioned'));
 
 -- ── 2. Expand category CHECK to unified lowercase set ─────────────────────────
+-- Drop old constraint first, normalize existing rows, then add new constraint.
 
 ALTER TABLE infrastructure_assets DROP CONSTRAINT IF EXISTS infrastructure_assets_category_check;
-ALTER TABLE infrastructure_assets ADD CONSTRAINT infrastructure_assets_category_check
-  CHECK (category IN (
-    'electrical','plumbing','fire_safety','hvac',
-    'civil','security','it','general','mechanical'
-  ));
 
--- Normalize the 8 existing placeholder rows to lowercase categories
+-- Normalize existing placeholder rows to lowercase categories BEFORE adding constraint
 UPDATE infrastructure_assets SET
   category = CASE category
     WHEN 'Lift'       THEN 'mechanical'
@@ -50,6 +46,12 @@ UPDATE infrastructure_assets SET
     ELSE category
   END,
   status = CASE WHEN is_active THEN 'active' ELSE 'decommissioned' END;
+
+ALTER TABLE infrastructure_assets ADD CONSTRAINT infrastructure_assets_category_check
+  CHECK (category IN (
+    'electrical','plumbing','fire_safety','hvac',
+    'civil','security','it','general','mechanical'
+  ));
 
 -- ── 3. Add AMC expiry index (mirrors migration 085) ──────────────────────────
 

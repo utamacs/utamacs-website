@@ -73,11 +73,11 @@ CREATE POLICY "guard_cancel_own_requests" ON visitor_gate_requests FOR UPDATE
 -- The API also checks expires_at on read and skips expired rows.
 
 -- Rule: approval window duration (minutes a request stays pending before auto-expiry)
-INSERT INTO rules (society_id, rule_code, value_type, current_value, label, description, is_locked)
-SELECT s.id, 'GATE_APPROVAL_TIMEOUT_MINS', 'int', '10',
-       'Gate Approval Timeout (minutes)',
+INSERT INTO rules (society_id, rule_category, rule_code, label, description, value_type, current_value, default_value, is_locked)
+SELECT s.id, 'visitor', 'GATE_APPROVAL_TIMEOUT_MINS',
+       'Gate approval timeout (minutes)',
        'How long a guard-submitted gate approval request stays valid before it expires.',
-       false
+       'INTEGER', '10'::jsonb, '10'::jsonb, false
 FROM societies s
 WHERE NOT EXISTS (
   SELECT 1 FROM rules r WHERE r.society_id = s.id AND r.rule_code = 'GATE_APPROVAL_TIMEOUT_MINS'

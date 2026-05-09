@@ -43,20 +43,17 @@ UPDATE staff_members SET department =
   END
 WHERE department IS NULL;
 
--- ── RLS: staff portal roles can read their own record ────────────────────────
-
-DROP POLICY IF EXISTS "staff_self_read" ON staff_members;
-CREATE POLICY "staff_self_read" ON staff_members FOR SELECT
-  USING (user_id = auth.uid());
-
 -- ── Rules: portal staff count threshold alert ─────────────────────────────────
-INSERT INTO rules (society_id, rule_code, description, value_type, current_value, is_locked)
+INSERT INTO rules (society_id, rule_category, rule_code, label, description, value_type, current_value, default_value, is_locked)
 SELECT
   id,
+  'staff',
   'STAFF_LATE_CHECKIN_ALERT_MINS',
+  'Late check-in alert threshold (minutes)',
   'Minutes after shift start before a late check-in alert is triggered',
-  'integer',
-  '30',
+  'INTEGER',
+  '30'::jsonb,
+  '30'::jsonb,
   false
 FROM societies
 ON CONFLICT (society_id, rule_code) DO NOTHING;

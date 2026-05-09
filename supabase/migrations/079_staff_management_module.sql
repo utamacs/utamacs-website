@@ -23,31 +23,34 @@ ON CONFLICT (society_id, module_key, feature_key) DO UPDATE
 
 -- ── Upload limit rule for staff task proof photos ─────────────────────────────
 
-INSERT INTO rules (society_id, rule_code, description, value_type, current_value, is_locked)
-SELECT id,
+INSERT INTO rules (society_id, rule_category, rule_code, label, description, value_type, current_value, default_value, is_locked)
+SELECT id, 'staff',
   'UPLOAD_LIMIT_STAFF_PROOF_MB',
+  'Staff task proof upload limit (MB)',
   'Maximum file size (MB) for task completion proof photos',
-  'integer', '5', false
+  'INTEGER', '5'::jsonb, '5'::jsonb, false
 FROM societies
 ON CONFLICT (society_id, rule_code) DO NOTHING;
 
 -- ── Upload limit rule for compliance log documents ────────────────────────────
 
-INSERT INTO rules (society_id, rule_code, description, value_type, current_value, is_locked)
-SELECT id,
+INSERT INTO rules (society_id, rule_category, rule_code, label, description, value_type, current_value, default_value, is_locked)
+SELECT id, 'staff',
   'UPLOAD_LIMIT_STAFF_COMPLIANCE_MB',
+  'Staff compliance doc upload limit (MB)',
   'Maximum file size (MB) for compliance log documents',
-  'integer', '10', false
+  'INTEGER', '10'::jsonb, '10'::jsonb, false
 FROM societies
 ON CONFLICT (society_id, rule_code) DO NOTHING;
 
 -- ── Upload limit rule for agency contracts ────────────────────────────────────
 
-INSERT INTO rules (society_id, rule_code, description, value_type, current_value, is_locked)
-SELECT id,
+INSERT INTO rules (society_id, rule_category, rule_code, label, description, value_type, current_value, default_value, is_locked)
+SELECT id, 'staff',
   'UPLOAD_LIMIT_STAFF_CONTRACT_MB',
+  'Agency contract upload limit (MB)',
   'Maximum file size (MB) for agency contract documents',
-  'integer', '10', false
+  'INTEGER', '10'::jsonb, '10'::jsonb, false
 FROM societies
 ON CONFLICT (society_id, rule_code) DO NOTHING;
 

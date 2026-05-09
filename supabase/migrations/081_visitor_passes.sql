@@ -52,15 +52,15 @@ COMMENT ON COLUMN visitor_pre_approvals.otp_code IS
 
 -- ── Rules ────────────────────────────────────────────────────────────────────
 
-INSERT INTO rules (society_id, rule_code, description, value_type, current_value, is_locked)
-SELECT s.id, r.code, r.desc, r.vtype, r.val, r.locked
+INSERT INTO rules (society_id, rule_category, rule_code, label, description, value_type, current_value, default_value, is_locked)
+SELECT s.id, r.cat, r.code, r.lbl, r.descr, r.vtype, r.val::jsonb, r.val::jsonb, r.locked
 FROM societies s
 CROSS JOIN (VALUES
-  ('VISITOR_PASS_DEFAULT_HOURS',      'Default visitor pass validity in hours',           'integer', '24',  false),
-  ('VISITOR_PASS_MAX_HOURS',          'Maximum visitor pass validity in hours',            'integer', '168', false),
-  ('VISITOR_PASS_MAX_USES_DEFAULT',   'Default max gate entries per pass (1 = one-time)', 'integer', '1',   false),
-  ('VISITOR_PASS_OTP_WINDOW_MINS',    'Minutes around pass window to accept OTP',          'integer', '30',  false)
-) AS r(code, desc, vtype, val, locked)
+  ('visitor', 'VISITOR_PASS_DEFAULT_HOURS',   'Default visitor pass validity (hours)',     'Default visitor pass validity in hours',           'INTEGER', '24',  false),
+  ('visitor', 'VISITOR_PASS_MAX_HOURS',        'Maximum visitor pass validity (hours)',     'Maximum visitor pass validity in hours',            'INTEGER', '168', false),
+  ('visitor', 'VISITOR_PASS_MAX_USES_DEFAULT', 'Default max gate entries per pass',        'Default max gate entries per pass (1 = one-time)', 'INTEGER', '1',   false),
+  ('visitor', 'VISITOR_PASS_OTP_WINDOW_MINS',  'OTP acceptance window (minutes)',          'Minutes around pass window to accept OTP',          'INTEGER', '30',  false)
+) AS r(cat, code, lbl, descr, vtype, val, locked)
 ON CONFLICT (society_id, rule_code) DO NOTHING;
 
 COMMIT;
