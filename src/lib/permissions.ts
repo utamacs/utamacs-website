@@ -6,11 +6,56 @@
 import { getSupabaseServiceClient } from './services/providers/supabase/SupabaseDB';
 import type { Feature } from './features';
 
-export type PortalRole = 'member' | 'executive' | 'secretary' | 'president';
+export type PortalRole = 'member' | 'executive' | 'secretary' | 'president' | 'staff' | 'supervisor' | 'afm';
 
 // Hardcoded defaults — authoritative when no DB override exists for a role+feature.
 // Mirrors migration 025 seed data exactly. Any change here requires a matching migration.
 export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
+  // ── Staff portal roles (society employees — not residents) ─────────────
+  // These roles are assigned to staff members who are given portal access.
+  // They cannot see resident data (complaints, finance, member directory, etc.)
+  // Access is gated entirely through staff.* features.
+
+  staff: [
+    'staff.view_own_profile',
+    'staff.checkin',
+    'staff.view_own_tasks',
+    'staff.mark_tasks',
+  ],
+
+  supervisor: [
+    'staff.view_own_profile',
+    'staff.checkin',
+    'staff.view_own_tasks',
+    'staff.mark_tasks',
+    'staff.view_team',
+    'staff.mark_team_attendance',
+    'staff.assign_tasks',
+    'staff.propose_template',
+    'staff.view_compliance',
+    'staff.record_compliance',
+    'staff.view_reports',
+  ],
+
+  afm: [
+    'staff.view_own_profile',
+    'staff.checkin',
+    'staff.view_own_tasks',
+    'staff.mark_tasks',
+    'staff.view_team',
+    'staff.mark_team_attendance',
+    'staff.assign_tasks',
+    'staff.propose_template',
+    'staff.approve_proposals',
+    'staff.view_all_depts',
+    'staff.view_compliance',
+    'staff.record_compliance',
+    'staff.view_reports',
+    'staff.manage',
+  ],
+
+  // ── Resident roles ────────────────────────────────────────────────────────
+
   member: [
     'hoto.view',
     'snag.view',
@@ -35,6 +80,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
     'policies.view', 'policies.manage',
     'documents.manage', 'events.manage', 'polls.manage',
     'admin.registrations', 'admin.gates',
+    // Staff management — exec can view all depts, reports, approve proposals; cannot configure
+    'staff.view_all_depts', 'staff.view_reports', 'staff.approve_proposals',
+    'staff.manage', 'staff.manage_agencies', 'staff.configure',
   ],
 
   secretary: [
@@ -56,6 +104,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
     'policies.view', 'policies.manage',
     'documents.manage', 'events.manage', 'polls.manage',
     'admin.registrations', 'admin.gates',
+    'staff.view_all_depts', 'staff.view_reports', 'staff.approve_proposals',
+    'staff.manage', 'staff.manage_agencies', 'staff.configure',
   ],
 
   president: [
@@ -77,6 +127,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PortalRole, Feature[]> = {
     'policies.view', 'policies.manage',
     'documents.manage', 'events.manage', 'polls.manage',
     'admin.registrations', 'admin.gates',
+    'staff.view_all_depts', 'staff.view_reports', 'staff.approve_proposals',
+    'staff.manage', 'staff.manage_agencies', 'staff.configure',
   ],
 };
 

@@ -88,6 +88,28 @@ export const FEATURES = {
   // ── Admin: Registrations & Gates ─────────────────────────────────────────
   'admin.registrations':       { label: 'Review member registration requests',       locked: false },
   'admin.gates':               { label: 'Manage society access gates',               locked: false },
+
+  // ── Staff Management (self-service — staff/supervisor/afm portal roles) ───
+  'staff.view_own_profile':    { label: 'View own staff profile',                    locked: true  },
+  'staff.checkin':             { label: 'Self check-in / check-out',                 locked: true  },
+  'staff.view_own_tasks':      { label: 'View own assigned tasks',                   locked: true  },
+  'staff.mark_tasks':          { label: 'Mark own tasks complete (with photo)',       locked: false },
+
+  // ── Staff Management (supervisor — own department) ────────────────────────
+  'staff.view_team':           { label: 'View department team and their status',     locked: false },
+  'staff.mark_team_attendance':{ label: 'Mark attendance for own department',        locked: false },
+  'staff.assign_tasks':        { label: 'Assign tasks to team members',              locked: false },
+  'staff.propose_template':    { label: 'Propose new activity templates (for AFM approval)', locked: false },
+  'staff.view_compliance':     { label: 'View compliance logs for own department',   locked: false },
+  'staff.record_compliance':   { label: 'Record compliance activities',              locked: false },
+  'staff.view_reports':        { label: 'View staff attendance and task reports',    locked: false },
+
+  // ── Staff Management (AFM / exec — all departments) ──────────────────────
+  'staff.view_all_depts':      { label: 'View all departments and staff',            locked: false },
+  'staff.approve_proposals':   { label: 'Approve or reject task template proposals', locked: false },
+  'staff.manage':              { label: 'Add, edit, and remove staff members',       locked: false },
+  'staff.manage_agencies':     { label: 'Manage agency profiles and contracts',      locked: false },
+  'staff.configure':           { label: 'Configure shifts and activity templates',   locked: false },
 } as const;
 
 export type Feature = keyof typeof FEATURES;
