@@ -44,12 +44,15 @@ export const GET: APIRoute = async ({ request, params }) => {
 
     const isClosed = poll.ends_at && new Date(poll.ends_at) < new Date();
     const visibility = (poll as any).result_visibility ?? 'after_vote';
+    const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
 
     // Enforce result_visibility:
     //   always      → always show results
     //   after_vote  → show only after user has voted
     //   after_close → show only after poll is closed
+    // Exec/admin bypass: always see live results regardless of setting
     const canSeeResults =
+      isPrivileged ||
       visibility === 'always' ||
       (visibility === 'after_vote' && !!userVote) ||
       (visibility === 'after_close' && isClosed);
