@@ -5,6 +5,8 @@ import { checkRateLimit } from './lib/middleware/rateLimiter';
 import { extractClientIP } from './lib/middleware/auditLogger';
 
 const PUBLIC_PORTAL_PATHS = ['/portal/login', '/portal/forgot-password'];
+// Path prefixes that are publicly accessible without authentication
+const PUBLIC_PORTAL_PREFIXES = ['/portal/visitors/pass/'];
 const PORTAL_PREFIX = '/portal';
 const API_PREFIX = '/api/v1';
 
@@ -32,7 +34,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // 2. Guard /portal/* pages before calling next() so locals.user is set at render time
   if (path.startsWith(PORTAL_PREFIX) && !path.startsWith(API_PREFIX)) {
-    if (!PUBLIC_PORTAL_PATHS.includes(path)) {
+    const isPublicPath = PUBLIC_PORTAL_PATHS.includes(path) ||
+      PUBLIC_PORTAL_PREFIXES.some(prefix => path.startsWith(prefix));
+    if (!isPublicPath) {
       // Use Astro's cookies API — reads the incoming Cookie header correctly
       const accessToken = cookies.get('sb-access-token')?.value;
       console.log('[middleware] path:', path, '| has token:', !!accessToken);
