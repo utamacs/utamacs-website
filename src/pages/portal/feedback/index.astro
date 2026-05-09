@@ -353,11 +353,11 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
 
     // Star rating
     document.getElementById('star-row')?.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest('[data-star]') as HTMLElement;
+      const btn = e.target.closest('[data-star]');
       if (!btn) return;
       selectedRating = parseInt(btn.dataset.star ?? '0', 10);
       document.getElementById('fb-rating').value = String(selectedRating);
-      document.querySelectorAll('.star-btn').forEach((s: any) => {
+      document.querySelectorAll('.star-btn').forEach((s) => {
         const n = parseInt(s.dataset.star, 10);
         s.style.color = n <= selectedRating ? 'var(--color-accent-500, #F59E0B)' : '#D1D5DB';
       });
@@ -367,7 +367,7 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
       const subject  = document.getElementById('fb-subject')?.value.trim();
       const body     = document.getElementById('fb-body')?.value.trim();
       const category = document.getElementById('fb-category')?.value;
-      const isAnon   = (document.getElementById('fb-anonymous') as HTMLInputElement)?.checked ?? false;
+      const isAnon   = document.getElementById('fb-anonymous')?.checked ?? false;
       const rating   = selectedRating || undefined;
       const errEl    = document.getElementById('fb-error');
       const btn      = document.getElementById('fb-save-btn');

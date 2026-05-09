@@ -158,18 +158,18 @@ const { data: units } = isPrivileged
   <script define:vars={{ isPrivileged }}>
     let statusFilter = '';
 
-    const STATUS_COLORS: Record<string, string> = {
+    const STATUS_COLORS = {
       pending:        'bg-gray-100 text-gray-700',
       submitted:      'bg-blue-100 text-blue-700',
       police_verified:'bg-amber-100 text-amber-700',
       completed:      'bg-green-100 text-green-700',
       expired:        'bg-red-100 text-red-600',
     };
-    const STATUS_LABELS: Record<string, string> = {
+    const STATUS_LABELS = {
       pending: 'Pending', submitted: 'Submitted', police_verified: 'Police Verified', completed: 'Completed', expired: 'Expired',
     };
 
-    function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    function showToast(msg, type = 'success') {
       const toast = document.createElement('div');
       toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
       toast.textContent = msg;
@@ -179,18 +179,18 @@ const { data: units } = isPrivileged
     }
 
     async function load() {
-      const container = document.getElementById('kyc-list')!;
+      const container = document.getElementById('kyc-list');
       container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
       const res = await fetch(`/api/v1/tenant-kyc?${params}`, { credentials: 'include' });
-      const records: any[] = res.ok ? await res.json() : [];
+      const records = res.ok ? await res.json() : [];
 
       // Stats
-      document.getElementById('stat-total')!.textContent = String(records.length);
-      document.getElementById('stat-pending')!.textContent = String(records.filter(r => ['pending','submitted'].includes(r.status)).length);
-      document.getElementById('stat-verified')!.textContent = String(records.filter(r => r.status === 'police_verified').length);
-      document.getElementById('stat-completed')!.textContent = String(records.filter(r => r.status === 'completed').length);
+      document.getElementById('stat-total').textContent = String(records.length);
+      document.getElementById('stat-pending').textContent = String(records.filter(r => ['pending','submitted'].includes(r.status)).length);
+      document.getElementById('stat-verified').textContent = String(records.filter(r => r.status === 'police_verified').length);
+      document.getElementById('stat-completed').textContent = String(records.filter(r => r.status === 'completed').length);
 
       if (!records.length) {
         container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No KYC records found.</div>';
@@ -228,21 +228,21 @@ const { data: units } = isPrivileged
       }).join('');
     }
 
-    async function openDrawer(id: string) {
+    async function openDrawer(id) {
       const res = await fetch(`/api/v1/tenant-kyc?status=`, { credentials: 'include' });
-      const all: any[] = res.ok ? await res.json() : [];
+      const all = res.ok ? await res.json() : [];
       const r = all.find(x => x.id === id);
       if (!r) return;
 
-      const drawer = document.getElementById('detail-drawer')!;
-      const backdrop = document.getElementById('drawer-backdrop')!;
-      const content = document.getElementById('drawer-content')!;
+      const drawer = document.getElementById('detail-drawer');
+      const backdrop = document.getElementById('drawer-backdrop');
+      const content = document.getElementById('drawer-content');
       drawer.classList.remove('translate-x-full');
       backdrop.classList.remove('hidden');
 
       const unitLabel = r.units ? `${r.units.block ? r.units.block + '-' : ''}${r.units.unit_number}` : '—';
       const badge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[r.status] ?? 'bg-gray-100'}">${STATUS_LABELS[r.status] ?? r.status}</span>`;
-      const nextStatuses: Record<string, string[]> = {
+      const nextStatuses = {
         pending: ['submitted', 'expired'],
         submitted: ['police_verified', 'pending', 'expired'],
         police_verified: ['completed', 'expired'],
@@ -311,7 +311,7 @@ const { data: units } = isPrivileged
       `;
     }
 
-    async function updateStatus(id: string, status: string) {
+    async function updateStatus(id, status) {
       const res = await fetch(`/api/v1/tenant-kyc/${id}`, {
         method: 'PATCH', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -321,10 +321,10 @@ const { data: units } = isPrivileged
       else { showToast('Failed to update status.', 'error'); }
     }
 
-    async function recordPoliceVerification(id: string) {
-      const station = (document.getElementById('dv-station') as HTMLInputElement)?.value.trim();
-      const date    = (document.getElementById('dv-date') as HTMLInputElement)?.value;
-      const ref     = (document.getElementById('dv-ref') as HTMLInputElement)?.value.trim();
+    async function recordPoliceVerification(id) {
+      const station = document.getElementById('dv-station')?.value.trim();
+      const date    = document.getElementById('dv-date')?.value;
+      const ref     = document.getElementById('dv-ref')?.value.trim();
       if (!station || !date) { showToast('Police station and date are required.', 'error'); return; }
       const res = await fetch(`/api/v1/tenant-kyc/${id}`, {
         method: 'PATCH', credentials: 'include',
@@ -336,11 +336,11 @@ const { data: units } = isPrivileged
     }
 
     function closeDrawer() {
-      document.getElementById('detail-drawer')!.classList.add('translate-x-full');
-      document.getElementById('drawer-backdrop')!.classList.add('hidden');
+      document.getElementById('detail-drawer').classList.add('translate-x-full');
+      document.getElementById('drawer-backdrop').classList.add('hidden');
     }
-    document.getElementById('close-drawer')!.addEventListener('click', closeDrawer);
-    document.getElementById('drawer-backdrop')!.addEventListener('click', closeDrawer);
+    document.getElementById('close-drawer').addEventListener('click', closeDrawer);
+    document.getElementById('drawer-backdrop').addEventListener('click', closeDrawer);
 
     // Status filter tabs
     document.querySelectorAll('.status-btn').forEach(btn => {
@@ -351,49 +351,49 @@ const { data: units } = isPrivileged
         });
         btn.classList.add('bg-primary-600', 'text-white', 'border-primary-600');
         btn.classList.remove('bg-white', 'text-text-secondary', 'border-border-light');
-        statusFilter = (btn as HTMLElement).dataset.status!;
+        statusFilter = btn.dataset.status;
         load();
       });
     });
 
     // Add KYC modal
     if (isPrivileged) {
-      const modal = document.getElementById('add-modal')!;
-      const errEl = document.getElementById('am-error')!;
-      const submitBtn = document.getElementById('am-submit') as HTMLButtonElement;
-      const submitLbl = document.getElementById('am-submit-label')!;
+      const modal = document.getElementById('add-modal');
+      const errEl = document.getElementById('am-error');
+      const submitBtn = document.getElementById('am-submit');
+      const submitLbl = document.getElementById('am-submit-label');
 
       function openModal() {
         modal.classList.remove('hidden');
         errEl.classList.add('hidden');
-        (document.getElementById('am-start') as HTMLInputElement).value = new Date().toISOString().slice(0, 10);
+        document.getElementById('am-start').value = new Date().toISOString().slice(0, 10);
       }
       function closeModal() { modal.classList.add('hidden'); }
 
-      document.getElementById('add-btn')!.addEventListener('click', openModal);
-      document.getElementById('am-close')!.addEventListener('click', closeModal);
-      document.getElementById('am-cancel')!.addEventListener('click', closeModal);
+      document.getElementById('add-btn').addEventListener('click', openModal);
+      document.getElementById('am-close').addEventListener('click', closeModal);
+      document.getElementById('am-cancel').addEventListener('click', closeModal);
       modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
       submitBtn.addEventListener('click', async () => {
         errEl.classList.add('hidden');
-        const unit_id = (document.getElementById('am-unit') as HTMLSelectElement).value;
-        const full_name = (document.getElementById('am-name') as HTMLInputElement).value.trim();
-        const tenancy_start_date = (document.getElementById('am-start') as HTMLInputElement).value;
+        const unit_id = document.getElementById('am-unit').value;
+        const full_name = document.getElementById('am-name').value.trim();
+        const tenancy_start_date = document.getElementById('am-start').value;
         if (!unit_id || !full_name || !tenancy_start_date) {
           errEl.textContent = 'Unit, tenant name and start date are required.';
           errEl.classList.remove('hidden');
           return;
         }
         submitBtn.disabled = true; submitLbl.textContent = 'Saving…';
-        const body: Record<string, unknown> = {
+        const body = {
           unit_id, full_name, tenancy_start_date,
-          date_of_birth: (document.getElementById('am-dob') as HTMLInputElement).value || undefined,
-          aadhaar_last4: (document.getElementById('am-aadhaar') as HTMLInputElement).value || undefined,
-          tenancy_end_date: (document.getElementById('am-end') as HTMLInputElement).value || undefined,
-          monthly_rent: parseFloat((document.getElementById('am-rent') as HTMLInputElement).value) || undefined,
-          pan_number: (document.getElementById('am-pan') as HTMLInputElement).value.toUpperCase().trim() || undefined,
-          notes: (document.getElementById('am-notes') as HTMLTextAreaElement).value.trim() || undefined,
+          date_of_birth: document.getElementById('am-dob').value || undefined,
+          aadhaar_last4: document.getElementById('am-aadhaar').value || undefined,
+          tenancy_end_date: document.getElementById('am-end').value || undefined,
+          monthly_rent: parseFloat(document.getElementById('am-rent').value) || undefined,
+          pan_number: document.getElementById('am-pan').value.toUpperCase().trim() || undefined,
+          notes: document.getElementById('am-notes').value.trim() || undefined,
         };
         const res = await fetch('/api/v1/tenant-kyc', {
           method: 'POST', credentials: 'include',
@@ -407,9 +407,9 @@ const { data: units } = isPrivileged
       });
     }
 
-    (window as any).openDrawer = openDrawer;
-    (window as any).updateStatus = updateStatus;
-    (window as any).recordPoliceVerification = recordPoliceVerification;
+    window.openDrawer = openDrawer;
+    window.updateStatus = updateStatus;
+    window.recordPoliceVerification = recordPoliceVerification;
     load();
   </script>
 </PortalLayout>

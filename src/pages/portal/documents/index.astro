@@ -211,7 +211,7 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
   )}
 
   <script define:vars={{ canUpload }}>
-    const MIME_ICONS: Record<string, string> = {
+    const MIME_ICONS = {
       'application/pdf': 'fa-file-pdf text-red-500',
       'application/msword': 'fa-file-word text-blue-500',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'fa-file-word text-blue-500',
@@ -222,14 +222,14 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       'image/png': 'fa-file-image text-purple-500',
     };
 
-    function formatSize(bytes: number) {
+    function formatSize(bytes) {
       if (!bytes) return '';
       if (bytes < 1024) return `${bytes} B`;
       if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
       return `${(bytes / 1048576).toFixed(1)} MB`;
     }
 
-    function showToast(message: string, type: 'success' | 'error' = 'success') {
+    function showToast(message, type = 'success') {
       const toast = document.createElement('div');
       const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
       toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
@@ -241,16 +241,16 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
 
     let currentCategory = '';
     let searchQuery = '';
-    let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+    let searchTimeout = null;
 
     async function loadDocuments() {
-      const container = document.getElementById('documents-container')!;
+      const container = document.getElementById('documents-container');
       const params = new URLSearchParams();
       if (currentCategory) params.set('category', currentCategory);
       if (searchQuery)     params.set('q', searchQuery);
 
       const res = await fetch(`/api/v1/documents?${params}`, { credentials: 'include' });
-      const docs: any[] = res.ok ? await res.json() : [];
+      const docs = res.ok ? await res.json() : [];
 
       if (!docs.length) {
         container.innerHTML = '<div class="text-center py-10 text-text-secondary text-sm">No documents found.</div>';
@@ -258,7 +258,7 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       }
 
       // Group by category when not filtered
-      const grouped: Record<string, any[]> = {};
+      const grouped = {};
       docs.forEach(d => {
         if (!grouped[d.category]) grouped[d.category] = [];
         grouped[d.category].push(d);
@@ -272,7 +272,7 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
             <span class="text-xs font-normal text-text-secondary">(${items.length})</span>
           </h2>
           <div class="bg-white rounded-xl border border-border-light overflow-hidden">
-            ${items.map((d: any) => {
+            ${items.map((d) => {
               const icon = MIME_ICONS[d.mime_type] ?? 'fa-file text-gray-400';
               return `
                 <div class="flex items-center gap-4 px-5 py-4 border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors">
@@ -324,7 +324,7 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       `).join('');
     }
 
-    async function archiveDoc(id: string) {
+    async function archiveDoc(id) {
       if (!confirm('Archive this document? It can be recovered by administrators.')) return;
       const res = await fetch(`/api/v1/documents?id=${id}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) { showToast('Document archived.'); loadDocuments(); }
@@ -332,26 +332,26 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
     }
 
     // ── Version history drawer ────────────────────────────────────────────────
-    const historyDrawer   = document.getElementById('history-drawer')!;
-    const historyBackdrop = document.getElementById('history-backdrop')!;
-    const historyList     = document.getElementById('history-list')!;
-    const historyTitle    = document.getElementById('history-doc-title')!;
+    const historyDrawer   = document.getElementById('history-drawer');
+    const historyBackdrop = document.getElementById('history-backdrop');
+    const historyList     = document.getElementById('history-list');
+    const historyTitle    = document.getElementById('history-doc-title');
 
     function closeHistory() {
       historyDrawer.classList.add('translate-x-full');
       historyBackdrop.classList.add('hidden');
     }
-    document.getElementById('close-history')!.addEventListener('click', closeHistory);
+    document.getElementById('close-history').addEventListener('click', closeHistory);
     historyBackdrop.addEventListener('click', closeHistory);
 
-    async function openHistory(docId: string, title: string) {
+    async function openHistory(docId, title) {
       historyTitle.textContent = title;
       historyList.innerHTML = '<div class="text-sm text-text-secondary text-center py-8">Loading…</div>';
       historyDrawer.classList.remove('translate-x-full');
       historyBackdrop.classList.remove('hidden');
 
       const res = await fetch(`/api/v1/documents/${docId}/history`, { credentials: 'include' });
-      const versions: any[] = res.ok ? await res.json() : [];
+      const versions = res.ok ? await res.json() : [];
 
       if (!versions.length) {
         historyList.innerHTML = '<div class="text-sm text-text-secondary text-center py-8">No version history found.</div>';
@@ -383,29 +383,29 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
     // ── New version upload ────────────────────────────────────────────────────
     let newVersionDocId = '';
 
-    function openNewVersion(docId: string, title: string) {
+    function openNewVersion(docId, title) {
       newVersionDocId = docId;
-      (document.getElementById('nv-doc-name') as HTMLElement).textContent = title;
-      (document.getElementById('nv-file') as HTMLInputElement).value = '';
-      (document.getElementById('nv-drop-label') as HTMLElement).innerHTML = 'Drop replacement file here or <span class="text-primary-600 font-medium">click to select</span>';
-      (document.getElementById('nv-notes') as HTMLInputElement).value = '';
-      (document.getElementById('nv-error') as HTMLElement).classList.add('hidden');
-      document.getElementById('nv-modal')!.classList.remove('hidden');
+      document.getElementById('nv-doc-name').textContent = title;
+      document.getElementById('nv-file').value = '';
+      document.getElementById('nv-drop-label').innerHTML = 'Drop replacement file here or <span class="text-primary-600 font-medium">click to select</span>';
+      document.getElementById('nv-notes').value = '';
+      document.getElementById('nv-error').classList.add('hidden');
+      document.getElementById('nv-modal').classList.remove('hidden');
     }
 
     // ── New version modal wiring ──────────────────────────────────────────────
     if (canUpload) {
-      const nvModal    = document.getElementById('nv-modal')!;
-      const nvFileInp  = document.getElementById('nv-file') as HTMLInputElement;
-      const nvDropZone = document.getElementById('nv-drop-zone')!;
-      const nvDropLbl  = document.getElementById('nv-drop-label')!;
-      const nvErrEl    = document.getElementById('nv-error')!;
-      const nvSubmit   = document.getElementById('nv-submit') as HTMLButtonElement;
-      const nvLbl      = document.getElementById('nv-submit-label')!;
+      const nvModal    = document.getElementById('nv-modal');
+      const nvFileInp  = document.getElementById('nv-file');
+      const nvDropZone = document.getElementById('nv-drop-zone');
+      const nvDropLbl  = document.getElementById('nv-drop-label');
+      const nvErrEl    = document.getElementById('nv-error');
+      const nvSubmit   = document.getElementById('nv-submit');
+      const nvLbl      = document.getElementById('nv-submit-label');
 
       function closeNvModal() { nvModal.classList.add('hidden'); newVersionDocId = ''; }
-      document.getElementById('nv-close')!.addEventListener('click', closeNvModal);
-      document.getElementById('nv-cancel')!.addEventListener('click', closeNvModal);
+      document.getElementById('nv-close').addEventListener('click', closeNvModal);
+      document.getElementById('nv-cancel').addEventListener('click', closeNvModal);
       nvModal.addEventListener('click', (e) => { if (e.target === nvModal) closeNvModal(); });
 
       nvDropZone.addEventListener('click', () => nvFileInp.click());
@@ -415,7 +415,7 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
         e.preventDefault();
         nvDropZone.classList.remove('border-primary-400', 'bg-primary-50/50');
         const f = e.dataTransfer?.files[0];
-        if (f) { nvFileInp.files = e.dataTransfer!.files; nvDropLbl.textContent = f.name; }
+        if (f) { nvFileInp.files = e.dataTransfer.files; nvDropLbl.textContent = f.name; }
       });
       nvFileInp.addEventListener('change', () => { if (nvFileInp.files?.[0]) nvDropLbl.textContent = nvFileInp.files[0].name; });
 
@@ -429,7 +429,7 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
 
         const fd = new FormData();
         fd.append('file', file);
-        fd.append('notes', (document.getElementById('nv-notes') as HTMLInputElement).value.trim());
+        fd.append('notes', document.getElementById('nv-notes').value.trim());
 
         try {
           const res = await fetch(`/api/v1/documents/${newVersionDocId}`, { method: 'PUT', credentials: 'include', body: fd });
@@ -438,7 +438,7 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
           showToast(`Version ${data.version} saved.`);
           closeNvModal();
           loadDocuments();
-        } catch (err: any) {
+        } catch (err) {
           nvErrEl.textContent = err.message;
           nvErrEl.classList.remove('hidden');
         } finally {
@@ -448,13 +448,13 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       });
     }
 
-    (window as any).archiveDoc = archiveDoc;
-    (window as any).openHistory = openHistory;
-    (window as any).openNewVersion = openNewVersion;
+    window.archiveDoc = archiveDoc;
+    window.openHistory = openHistory;
+    window.openNewVersion = openNewVersion;
 
     // Category filter
-    document.getElementById('category-filters')!.addEventListener('click', (e) => {
-      const btn = (e.target as Element).closest('.filter-btn') as HTMLElement | null;
+    document.getElementById('category-filters').addEventListener('click', (e) => {
+      const btn = e.target.closest('.filter-btn');
       if (!btn) return;
       document.querySelectorAll('.filter-btn').forEach(b => {
         b.classList.remove('bg-primary-600', 'text-white', 'border-primary-600');
@@ -467,30 +467,30 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
     });
 
     // Search
-    document.getElementById('search-input')!.addEventListener('input', (e) => {
+    document.getElementById('search-input').addEventListener('input', (e) => {
       if (searchTimeout) clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
-        searchQuery = (e.target as HTMLInputElement).value.trim();
+        searchQuery = e.target.value.trim();
         loadDocuments();
       }, 300);
     });
 
     // Upload modal
     if (canUpload) {
-      const modal      = document.getElementById('upload-modal')!;
-      const fileInput  = document.getElementById('up-file') as HTMLInputElement;
-      const dropZone   = document.getElementById('file-drop-zone')!;
-      const dropLabel  = document.getElementById('file-drop-label')!;
-      const errEl      = document.getElementById('upload-error')!;
-      const submitBtn  = document.getElementById('upload-submit-btn') as HTMLButtonElement;
-      const submitLabel= document.getElementById('upload-submit-label')!;
+      const modal      = document.getElementById('upload-modal');
+      const fileInput  = document.getElementById('up-file');
+      const dropZone   = document.getElementById('file-drop-zone');
+      const dropLabel  = document.getElementById('file-drop-label');
+      const errEl      = document.getElementById('upload-error');
+      const submitBtn  = document.getElementById('upload-submit-btn');
+      const submitLabel= document.getElementById('upload-submit-label');
 
       function openModal() { modal.classList.remove('hidden'); errEl.classList.add('hidden'); fileInput.value = ''; dropLabel.innerHTML = 'Drop file here or <span class="text-primary-600 font-medium">click to select</span>'; }
       function closeModal() { modal.classList.add('hidden'); }
 
-      document.getElementById('upload-btn')!.addEventListener('click', openModal);
-      document.getElementById('modal-close')!.addEventListener('click', closeModal);
-      document.getElementById('modal-cancel')!.addEventListener('click', closeModal);
+      document.getElementById('upload-btn').addEventListener('click', openModal);
+      document.getElementById('modal-close').addEventListener('click', closeModal);
+      document.getElementById('modal-cancel').addEventListener('click', closeModal);
       modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
       dropZone.addEventListener('click', () => fileInput.click());
@@ -500,17 +500,17 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
         e.preventDefault();
         dropZone.classList.remove('border-primary-400', 'bg-primary-50/50');
         const file = e.dataTransfer?.files[0];
-        if (file) { fileInput.files = e.dataTransfer!.files; dropLabel.textContent = file.name; }
+        if (file) { fileInput.files = e.dataTransfer.files; dropLabel.textContent = file.name; }
       });
       fileInput.addEventListener('change', () => {
         if (fileInput.files?.[0]) dropLabel.textContent = fileInput.files[0].name;
       });
 
-      document.getElementById('upload-submit-btn')!.addEventListener('click', async () => {
+      document.getElementById('upload-submit-btn').addEventListener('click', async () => {
         errEl.classList.add('hidden');
         const file     = fileInput.files?.[0];
-        const title    = (document.getElementById('up-title') as HTMLInputElement).value.trim();
-        const category = (document.getElementById('up-category') as HTMLSelectElement).value;
+        const title    = document.getElementById('up-title').value.trim();
+        const category = document.getElementById('up-category').value;
 
         if (!file)     { errEl.textContent = 'Please select a file.';       errEl.classList.remove('hidden'); return; }
         if (!title)    { errEl.textContent = 'Title is required.';           errEl.classList.remove('hidden'); return; }
@@ -523,9 +523,9 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
         fd.append('file',         file);
         fd.append('title',        title);
         fd.append('category',     category);
-        fd.append('description',  (document.getElementById('up-description') as HTMLTextAreaElement).value.trim());
-        fd.append('requires_role',(document.getElementById('up-access') as HTMLSelectElement).value);
-        fd.append('is_public',    String((document.getElementById('up-public') as HTMLInputElement).checked));
+        fd.append('description',  document.getElementById('up-description').value.trim());
+        fd.append('requires_role', document.getElementById('up-access').value);
+        fd.append('is_public',    String(document.getElementById('up-public').checked));
 
         try {
           const res = await fetch('/api/v1/documents', { method: 'POST', credentials: 'include', body: fd });
@@ -534,7 +534,7 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
           showToast('Document uploaded successfully.');
           closeModal();
           loadDocuments();
-        } catch (err: any) {
+        } catch (err) {
           errEl.textContent = err.message;
           errEl.classList.remove('hidden');
         } finally {

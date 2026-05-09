@@ -346,7 +346,7 @@ const statusColors: Record<string, string> = {
 
   if (fileInput) {
     fileInput.addEventListener('change', () => {
-      const f = (fileInput as HTMLInputElement).files?.[0];
+      const f = fileInput.files?.[0];
       if (f) {
         uploadBtn?.classList.remove('hidden');
         if (fileNameEl) {
@@ -359,10 +359,10 @@ const statusColors: Record<string, string> = {
 
   if (uploadBtn && existingId) {
     uploadBtn.addEventListener('click', async () => {
-      const f = (fileInput as HTMLInputElement)?.files?.[0];
+      const f = fileInput?.files?.[0];
       if (!f) return;
       uploadBtn.textContent = 'Uploading…';
-      (uploadBtn as HTMLButtonElement).disabled = true;
+      uploadBtn.disabled = true;
       const fd = new FormData();
       fd.append('file', f);
       const res = await fetch(`/api/v1/memberships/${existingId}/sale-deed`, { method: 'POST', body: fd });
@@ -372,14 +372,14 @@ const statusColors: Record<string, string> = {
       } else {
         const err = await res.json();
         showToast(err.message ?? 'Upload failed', 'error');
-        (uploadBtn as HTMLButtonElement).disabled = false;
+        uploadBtn.disabled = false;
         uploadBtn.textContent = 'Upload';
       }
     });
   }
 
   // View sale deed
-  window.viewSaleDeed = async (id: string) => {
+  window.viewSaleDeed = async (id) => {
     const res = await fetch(`/api/v1/memberships/${id}/sale-deed`);
     if (res.ok) {
       const { signed_url } = await res.json();
@@ -390,9 +390,9 @@ const statusColors: Record<string, string> = {
   };
 
   // Application form submission
-  const form = document.getElementById('membership-form') as HTMLFormElement;
+  const form = document.getElementById('membership-form');
   const formError = document.getElementById('form-error');
-  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+  const submitBtn = document.getElementById('submit-btn');
 
   if (form) {
     form.addEventListener('submit', async (e) => {
@@ -402,7 +402,7 @@ const statusColors: Record<string, string> = {
       submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting…';
 
       const fd = new FormData(form);
-      const jointText = (fd.get('joint_owners_text') as string ?? '').trim();
+      const jointText = (fd.get('joint_owners_text') ?? '').trim();
       const jointOwnerNames = jointText ? jointText.split('\n').map(s => s.trim()).filter(Boolean) : [];
 
       const body = {
@@ -437,7 +437,7 @@ const statusColors: Record<string, string> = {
     });
   }
 
-  function showToast(message: string, type = 'success') {
+  function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
     toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;

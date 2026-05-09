@@ -450,7 +450,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
     const ACTIVE_CLS   = 'main-fin-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
     const INACTIVE_CLS = 'main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
 
-    function activateTab(which: 'dues' | 'ledger' | 'expenses') {
+    function activateTab(which) {
       [tabDues, tabLedger, tabExpenses].forEach(t => t?.setAttribute('class', INACTIVE_CLS));
       [panelDues, panelLedger, panelExp].forEach(p => p?.classList.add('hidden'));
       if (which === 'dues')     { tabDues?.setAttribute('class', ACTIVE_CLS);     panelDues?.classList.remove('hidden'); }
@@ -471,12 +471,12 @@ const isExec = ['executive', 'admin'].includes(user.role);
         if (!res.ok) throw new Error('Failed to load');
         const { ledger, summary } = await res.json();
 
-        const fmt = (n: number) => `₹${Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-        const balColor = (b: number) => b > 0 ? 'text-red-600' : b < 0 ? 'text-secondary-500' : 'text-text-secondary';
+        const fmt = (n) => `₹${Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        const balColor = (b) => b > 0 ? 'text-red-600' : b < 0 ? 'text-secondary-500' : 'text-text-secondary';
 
-        document.getElementById('ledger-total-dues')!.textContent  = fmt(summary.total_dues);
-        document.getElementById('ledger-total-paid')!.textContent  = fmt(summary.total_paid);
-        const outEl = document.getElementById('ledger-outstanding')!;
+        document.getElementById('ledger-total-dues').textContent  = fmt(summary.total_dues);
+        document.getElementById('ledger-total-paid').textContent  = fmt(summary.total_paid);
+        const outEl = document.getElementById('ledger-outstanding');
         outEl.textContent = fmt(summary.outstanding);
         outEl.className = `text-xl font-bold ${summary.outstanding > 0 ? 'text-red-600' : 'text-secondary-500'}`;
 
@@ -485,7 +485,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
           return;
         }
 
-        rowsEl.innerHTML = ledger.map((e: any) => `
+        rowsEl.innerHTML = ledger.map((e) => `
           <div class="grid grid-cols-12 gap-2 px-5 py-3 border-b border-border-light last:border-0 hover:bg-gray-50 text-sm">
             <div class="col-span-2 text-xs text-text-secondary">${e.date}</div>
             <div class="col-span-5 text-text-primary">
@@ -509,8 +509,8 @@ const isExec = ['executive', 'admin'].includes(user.role);
       if (!list) return;
       list.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
 
-      const from = (document.getElementById('exp-from') as HTMLInputElement)?.value ?? '';
-      const to   = (document.getElementById('exp-to')   as HTMLInputElement)?.value ?? '';
+      const from = document.getElementById('exp-from')?.value ?? '';
+      const to   = document.getElementById('exp-to')?.value ?? '';
       const params = new URLSearchParams({ limit: '50' });
       if (from) params.set('from', from);
       if (to)   params.set('to', to);
@@ -524,13 +524,13 @@ const isExec = ['executive', 'admin'].includes(user.role);
           return;
         }
 
-        const totalNet = data.reduce((s: number, e: any) => s + Number(e.net_payable ?? 0), 0);
+        const totalNet = data.reduce((s, e) => s + Number(e.net_payable ?? 0), 0);
         list.innerHTML = `
           <div class="bg-primary-50 border border-primary-100 rounded-xl px-5 py-3 mb-4 flex items-center justify-between">
             <span class="text-sm font-medium text-primary-700">${data.length} expense${data.length !== 1 ? 's' : ''} found</span>
             <span class="text-base font-bold text-primary-700">Total Net: ₹${totalNet.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
           </div>
-          ${data.map((e: any) => `
+          ${data.map((e) => `
             <div class="card-premium p-4">
               <div class="flex items-start justify-between gap-4">
                 <div class="flex-1 min-w-0">
@@ -563,7 +563,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
       const addExpBtn    = document.getElementById('add-expense-btn');
       const closeExpBtn  = document.getElementById('close-expense-modal');
       const cancelExpBtn = document.getElementById('cancel-expense-btn');
-      const expForm      = document.getElementById('expense-form') as HTMLFormElement | null;
+      const expForm      = document.getElementById('expense-form');
       const expErrEl     = document.getElementById('expense-error');
 
       addExpBtn?.addEventListener('click', () => expModal?.classList.remove('hidden'));
@@ -573,12 +573,12 @@ const isExec = ['executive', 'admin'].includes(user.role);
       expForm?.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         expErrEl?.classList.add('hidden');
-        const btn = document.getElementById('expense-submit-btn') as HTMLButtonElement;
+        const btn = document.getElementById('expense-submit-btn');
         btn.disabled = true;
         btn.textContent = 'Saving…';
 
         const fd = new FormData(expForm);
-        const body: Record<string, unknown> = {
+        const body = {
           description:   fd.get('description'),
           amount:        parseFloat(String(fd.get('amount'))),
           gst_amount:    parseFloat(String(fd.get('gst_amount') ?? '0')) || 0,

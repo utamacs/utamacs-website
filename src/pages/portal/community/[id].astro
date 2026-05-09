@@ -211,8 +211,8 @@ const p = post as any;
 
     function openEditModal() {
       const modal = document.getElementById('edit-modal');
-      const titleEl = document.getElementById('edit-title') as HTMLInputElement;
-      const bodyEl  = document.getElementById('edit-body') as HTMLTextAreaElement;
+      const titleEl = document.getElementById('edit-title');
+      const bodyEl  = document.getElementById('edit-body');
       // Pre-fill with current values from the page
       titleEl.value = document.querySelector('h1.text-2xl')?.textContent?.trim() ?? '';
       bodyEl.value  = document.querySelector('.prose')?.textContent?.trim() ?? '';
@@ -220,10 +220,10 @@ const p = post as any;
     }
 
     async function submitEdit() {
-      const btn     = document.getElementById('edit-submit-btn') as HTMLButtonElement;
+      const btn     = document.getElementById('edit-submit-btn');
       const errEl   = document.getElementById('edit-error');
-      const title   = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
-      const body    = (document.getElementById('edit-body') as HTMLTextAreaElement).value.trim();
+      const title   = document.getElementById('edit-title').value.trim();
+      const body    = document.getElementById('edit-body').value.trim();
       if (!title || !body) { if (errEl) { errEl.textContent = 'Title and body are required.'; errEl.classList.remove('hidden'); } return; }
       btn.disabled = true; btn.textContent = 'Saving…';
       if (errEl) errEl.classList.add('hidden');
@@ -243,7 +243,7 @@ const p = post as any;
       }
     }
 
-    function showToast(message: string, type = 'success') {
+    function showToast(message, type = 'success') {
       const toast = document.createElement('div');
       const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
       toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;

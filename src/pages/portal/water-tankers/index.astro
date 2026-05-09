@@ -143,7 +143,7 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
   )}
 
   <script define:vars={{ isPrivileged }}>
-    function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    function showToast(msg, type = 'success') {
       const toast = document.createElement('div');
       toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
       toast.textContent = msg;
@@ -152,34 +152,34 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
       setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3500);
     }
 
-    function fmt(n: number | null | undefined, decimals = 0) {
+    function fmt(n, decimals = 0) {
       if (n == null) return '—';
       return n.toLocaleString('en-IN', { maximumFractionDigits: decimals });
     }
-    function fmtCurrency(n: number | null | undefined) {
+    function fmtCurrency(n) {
       if (n == null) return '—';
       return '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
     }
 
     async function loadDeliveries() {
-      const month = (document.getElementById('month-picker') as HTMLInputElement).value;
+      const month = document.getElementById('month-picker').value;
       const res = await fetch(`/api/v1/water-tankers?month=${month}`, { credentials: 'include' });
-      const items: any[] = res.ok ? await res.json() : [];
-      const container = document.getElementById('deliveries-list')!;
+      const items = res.ok ? await res.json() : [];
+      const container = document.getElementById('deliveries-list');
 
       // Update month stats
       const totalKl = items.reduce((s, d) => s + (d.total_kl ?? 0), 0);
       const totalCost = items.reduce((s, d) => s + (d.total_cost ?? 0), 0);
-      document.getElementById('stat-month-kl')!.textContent = fmt(totalKl, 1);
-      document.getElementById('stat-month-deliveries')!.textContent = String(items.length);
-      document.getElementById('stat-month-cost')!.textContent = fmtCurrency(totalCost || null);
+      document.getElementById('stat-month-kl').textContent = fmt(totalKl, 1);
+      document.getElementById('stat-month-deliveries').textContent = String(items.length);
+      document.getElementById('stat-month-cost').textContent = fmtCurrency(totalCost || null);
 
       if (!items.length) {
         container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No deliveries recorded this month.</div>';
         return;
       }
 
-      const PAYMENT_LABELS: Record<string, string> = { cash: 'Cash', upi: 'UPI', bank_transfer: 'Bank Transfer', credit: 'Credit', other: 'Other' };
+      const PAYMENT_LABELS = { cash: 'Cash', upi: 'UPI', bank_transfer: 'Bank Transfer', credit: 'Credit', other: 'Other' };
 
       container.innerHTML = `
         <div class="grid grid-cols-5 text-xs font-medium text-text-secondary px-5 py-3 border-b border-border-light bg-gray-50">
@@ -199,14 +199,14 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
 
     async function loadSummary() {
       const res = await fetch('/api/v1/water-tankers?summary=true', { credentials: 'include' });
-      const months: any[] = res.ok ? await res.json() : [];
-      const container = document.getElementById('monthly-chart')!;
+      const months = res.ok ? await res.json() : [];
+      const container = document.getElementById('monthly-chart');
       if (!months.length) { container.innerHTML = '<div class="text-sm text-text-secondary text-center py-6">No data yet.</div>'; return; }
 
       const maxKl = Math.max(...months.map(m => m.total_kl ?? 0), 1);
       const currentYear = new Date().getFullYear().toString();
       const ytdKl = months.filter(m => (m.month ?? '').startsWith(currentYear)).reduce((s, m) => s + (m.total_kl ?? 0), 0);
-      document.getElementById('stat-ytd-kl')!.textContent = fmt(ytdKl, 1);
+      document.getElementById('stat-ytd-kl').textContent = fmt(ytdKl, 1);
 
       container.innerHTML = months.map(m => {
         const monthLabel = new Date(m.month + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
@@ -224,44 +224,44 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
       }).join('');
     }
 
-    document.getElementById('month-picker')!.addEventListener('change', loadDeliveries);
+    document.getElementById('month-picker').addEventListener('change', loadDeliveries);
 
     // Modal
     if (isPrivileged) {
-      const modal = document.getElementById('log-modal')!;
-      const errEl = document.getElementById('log-error')!;
-      const submitBtn = document.getElementById('log-submit') as HTMLButtonElement;
-      const submitLbl = document.getElementById('log-submit-label')!;
+      const modal = document.getElementById('log-modal');
+      const errEl = document.getElementById('log-error');
+      const submitBtn = document.getElementById('log-submit');
+      const submitLbl = document.getElementById('log-submit-label');
 
       function openModal() {
         modal.classList.remove('hidden');
         errEl.classList.add('hidden');
-        (document.getElementById('lf-date') as HTMLInputElement).value = new Date().toISOString().slice(0, 10);
+        document.getElementById('lf-date').value = new Date().toISOString().slice(0, 10);
       }
       function closeModal() { modal.classList.add('hidden'); }
 
-      document.getElementById('log-btn')!.addEventListener('click', openModal);
-      document.getElementById('log-close')!.addEventListener('click', closeModal);
-      document.getElementById('log-cancel')!.addEventListener('click', closeModal);
+      document.getElementById('log-btn').addEventListener('click', openModal);
+      document.getElementById('log-close').addEventListener('click', closeModal);
+      document.getElementById('log-cancel').addEventListener('click', closeModal);
       modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
       // Auto-calculate total cost
       function recalcTotal() {
-        const cap = parseFloat((document.getElementById('lf-capacity') as HTMLInputElement).value) || 0;
-        const count = parseInt((document.getElementById('lf-count') as HTMLInputElement).value) || 1;
-        const cpk = parseFloat((document.getElementById('lf-cost-per-kl') as HTMLInputElement).value) || 0;
-        if (cpk > 0) (document.getElementById('lf-total-cost') as HTMLInputElement).value = String((cap * count * cpk).toFixed(2));
+        const cap = parseFloat(document.getElementById('lf-capacity').value) || 0;
+        const count = parseInt(document.getElementById('lf-count').value) || 1;
+        const cpk = parseFloat(document.getElementById('lf-cost-per-kl').value) || 0;
+        if (cpk > 0) document.getElementById('lf-total-cost').value = String((cap * count * cpk).toFixed(2));
       }
-      document.getElementById('lf-capacity')!.addEventListener('input', recalcTotal);
-      document.getElementById('lf-count')!.addEventListener('input', recalcTotal);
-      document.getElementById('lf-cost-per-kl')!.addEventListener('input', recalcTotal);
+      document.getElementById('lf-capacity').addEventListener('input', recalcTotal);
+      document.getElementById('lf-count').addEventListener('input', recalcTotal);
+      document.getElementById('lf-cost-per-kl').addEventListener('input', recalcTotal);
 
       submitBtn.addEventListener('click', async () => {
         errEl.classList.add('hidden');
-        const delivery_date = (document.getElementById('lf-date') as HTMLInputElement).value;
-        const supplier_name = (document.getElementById('lf-supplier') as HTMLInputElement).value.trim();
-        const tanker_capacity_kl = parseFloat((document.getElementById('lf-capacity') as HTMLInputElement).value);
-        const tanker_count = parseInt((document.getElementById('lf-count') as HTMLInputElement).value);
+        const delivery_date = document.getElementById('lf-date').value;
+        const supplier_name = document.getElementById('lf-supplier').value.trim();
+        const tanker_capacity_kl = parseFloat(document.getElementById('lf-capacity').value);
+        const tanker_count = parseInt(document.getElementById('lf-count').value);
 
         if (!delivery_date || !supplier_name || !tanker_capacity_kl || !tanker_count) {
           errEl.textContent = 'Date, supplier, capacity and tanker count are required.';
@@ -271,13 +271,13 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
 
         submitBtn.disabled = true; submitLbl.textContent = 'Saving…';
 
-        const body: Record<string, unknown> = {
+        const body = {
           delivery_date, supplier_name, tanker_capacity_kl, tanker_count,
-          cost_per_kl: parseFloat((document.getElementById('lf-cost-per-kl') as HTMLInputElement).value) || undefined,
-          total_cost: parseFloat((document.getElementById('lf-total-cost') as HTMLInputElement).value) || undefined,
-          payment_mode: (document.getElementById('lf-payment') as HTMLSelectElement).value || undefined,
-          invoice_number: (document.getElementById('lf-invoice') as HTMLInputElement).value.trim() || undefined,
-          notes: (document.getElementById('lf-notes') as HTMLTextAreaElement).value.trim() || undefined,
+          cost_per_kl: parseFloat(document.getElementById('lf-cost-per-kl').value) || undefined,
+          total_cost: parseFloat(document.getElementById('lf-total-cost').value) || undefined,
+          payment_mode: document.getElementById('lf-payment').value || undefined,
+          invoice_number: document.getElementById('lf-invoice').value.trim() || undefined,
+          notes: document.getElementById('lf-notes').value.trim() || undefined,
         };
 
         const res = await fetch('/api/v1/water-tankers', {

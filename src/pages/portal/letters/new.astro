@@ -793,15 +793,15 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
     document.getElementById('btn-save').addEventListener('click', saveToArchive);
 
     // ── Content template library ──────────────────────────────────────────────
-    let contentTemplates: any[] = [];
-    let contentMembers: any[] = [];
+    let contentTemplates = [];
+    let contentMembers = [];
 
     async function loadContentTemplates(category = '') {
       const params = new URLSearchParams();
       if (category) params.set('category', category);
       const res = await fetch(`/api/v1/letters/content-templates?${params}`, { credentials: 'include' });
       contentTemplates = res.ok ? await res.json() : [];
-      const sel = document.getElementById('ct-select') as HTMLSelectElement;
+      const sel = document.getElementById('ct-select');
       const prev = sel.value;
       sel.innerHTML = '<option value="">Select a content template…</option>' +
         contentTemplates.map(t => `<option value="${t.id}">[${t.category.toUpperCase()}] ${t.name}</option>`).join('');
@@ -813,29 +813,29 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
       if (contentMembers.length) return;
       const res = await fetch('/api/v1/members?limit=300', { credentials: 'include' });
       contentMembers = res.ok ? await res.json() : [];
-      const sel = document.getElementById('ct-member') as HTMLSelectElement;
+      const sel = document.getElementById('ct-member');
       sel.innerHTML = '<option value="">Select member to auto-fill data…</option>' +
-        contentMembers.map((m: any) => `<option value="${m.id}">${m.full_name}${m.unit_number ? ' (' + m.unit_number + ')' : ''}</option>`).join('');
+        contentMembers.map((m) => `<option value="${m.id}">${m.full_name}${m.unit_number ? ' (' + m.unit_number + ')' : ''}</option>`).join('');
     }
 
     function updateCtApplyBtn() {
-      const hasTemplate = !!(document.getElementById('ct-select') as HTMLSelectElement).value;
-      (document.getElementById('ct-apply-btn') as HTMLButtonElement).disabled = !hasTemplate;
-      document.getElementById('ct-member-row')!.classList.toggle('hidden', !hasTemplate);
+      const hasTemplate = !!document.getElementById('ct-select').value;
+      document.getElementById('ct-apply-btn').disabled = !hasTemplate;
+      document.getElementById('ct-member-row').classList.toggle('hidden', !hasTemplate);
       if (hasTemplate) loadCtMembers();
     }
 
-    document.getElementById('ct-category')!.addEventListener('change', (e) => {
-      loadContentTemplates((e.target as HTMLSelectElement).value);
+    document.getElementById('ct-category').addEventListener('change', (e) => {
+      loadContentTemplates(e.target.value);
     });
-    document.getElementById('ct-select')!.addEventListener('change', updateCtApplyBtn);
+    document.getElementById('ct-select').addEventListener('change', updateCtApplyBtn);
 
-    document.getElementById('ct-apply-btn')!.addEventListener('click', async () => {
-      const templateId = (document.getElementById('ct-select') as HTMLSelectElement).value;
-      const memberId   = (document.getElementById('ct-member') as HTMLSelectElement).value;
+    document.getElementById('ct-apply-btn').addEventListener('click', async () => {
+      const templateId = document.getElementById('ct-select').value;
+      const memberId   = document.getElementById('ct-member').value;
       if (!templateId) return;
 
-      const btn = document.getElementById('ct-apply-btn') as HTMLButtonElement;
+      const btn = document.getElementById('ct-apply-btn');
       btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Loading…';
 
       try {
@@ -848,40 +848,40 @@ const preselectedTemplate = Astro.url.searchParams.get('template') ?? '';
         if (!res.ok) throw new Error(rendered.message ?? 'Render failed');
 
         // Pre-fill subject field (look for input with name="subject" or id containing "subject")
-        const subjectField = document.querySelector('[name="subject"], #f-subject, [id*="subject"]') as HTMLInputElement | null;
+        const subjectField = document.querySelector('[name="subject"], #f-subject, [id*="subject"]');
         if (subjectField) subjectField.value = rendered.rendered_subject;
 
         // Pre-fill body field (look for textarea with name="body" or id containing "body"/"message")
-        const bodyField = document.querySelector('textarea[name="body"], textarea[id*="body"], textarea[id*="message"]') as HTMLTextAreaElement | null;
+        const bodyField = document.querySelector('textarea[name="body"], textarea[id*="body"], textarea[id*="message"]');
         if (bodyField) {
           bodyField.value = rendered.rendered_body;
           bodyField.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
         // Show unfilled variable warning
-        const warnEl = document.getElementById('ct-unfilled-warn')!;
+        const warnEl = document.getElementById('ct-unfilled-warn');
         if (rendered.unfilled_variables?.length) {
-          warnEl.textContent = `Still needs: ${rendered.unfilled_variables.map((v: string) => '{{' + v + '}}').join(', ')}`;
+          warnEl.textContent = `Still needs: ${rendered.unfilled_variables.map((v) => '{{' + v + '}}').join(', ')}`;
           warnEl.classList.remove('hidden');
         } else {
           warnEl.classList.add('hidden');
         }
 
         // Trigger preview update
-        if (typeof (window as any).updatePreview === 'function') (window as any).updatePreview();
+        if (typeof window.updatePreview === 'function') window.updatePreview();
 
-      } catch (err: any) {
+      } catch (err) {
         console.error('Content template render error:', err);
       } finally {
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic mr-1" aria-hidden="true"></i> Load into Letter';
       }
     });
 
-    document.getElementById('ct-clear-btn')!.addEventListener('click', () => {
-      (document.getElementById('ct-select') as HTMLSelectElement).value = '';
-      document.getElementById('ct-member-row')!.classList.add('hidden');
-      (document.getElementById('ct-apply-btn') as HTMLButtonElement).disabled = true;
-      document.getElementById('ct-unfilled-warn')!.classList.add('hidden');
+    document.getElementById('ct-clear-btn').addEventListener('click', () => {
+      document.getElementById('ct-select').value = '';
+      document.getElementById('ct-member-row').classList.add('hidden');
+      document.getElementById('ct-apply-btn').disabled = true;
+      document.getElementById('ct-unfilled-warn').classList.add('hidden');
     });
 
     loadContentTemplates();

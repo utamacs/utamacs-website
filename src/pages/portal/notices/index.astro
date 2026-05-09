@@ -139,7 +139,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
   )}
 
   <script define:vars={{ isExec }}>
-    const CATEGORY_COLORS: Record<string, string> = {
+    const CATEGORY_COLORS = {
       Urgent: 'border-red-400 bg-red-50',
       Financial: 'border-amber-400 bg-amber-50',
       Governance: 'border-purple-400 bg-purple-50',
@@ -147,7 +147,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       Events: 'border-green-400 bg-green-50',
       General: 'border-gray-300 bg-white',
     };
-    const CATEGORY_BADGE: Record<string, string> = {
+    const CATEGORY_BADGE = {
       Urgent: 'bg-red-100 text-red-700',
       Financial: 'bg-amber-100 text-amber-700',
       Governance: 'bg-purple-100 text-purple-700',
@@ -157,7 +157,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
     };
 
     // Track which notices have been acknowledged in this session
-    const acknowledged = new Set<string>();
+    const acknowledged = new Set();
 
     async function loadNotices() {
       const container = document.getElementById('notices-list');
@@ -171,8 +171,8 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
         }
 
         // For notices requiring acknowledgement, pre-check status in parallel
-        const ackNotices = notices.filter((n: any) => n.requires_acknowledgement);
-        await Promise.all(ackNotices.map(async (n: any) => {
+        const ackNotices = notices.filter((n) => n.requires_acknowledgement);
+        await Promise.all(ackNotices.map(async (n) => {
           const r = await fetch(`/api/v1/notices/${n.id}/acknowledge`, { credentials: 'include' }).catch(() => null);
           if (r?.ok) {
             const d = await r.json();
@@ -180,7 +180,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
           }
         }));
 
-        container.innerHTML = notices.map((n: any) => {
+        container.innerHTML = notices.map((n) => {
           const isAcknowledged = acknowledged.has(n.id);
           const ackAction = n.requires_acknowledgement
             ? isAcknowledged
@@ -212,7 +212,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       }
     }
 
-    async function acknowledge(noticeId: string, btn: HTMLElement) {
+    async function acknowledge(noticeId, btn) {
       btn.setAttribute('disabled', 'true');
       btn.textContent = 'Acknowledging…';
       const res = await fetch(`/api/v1/notices/${noticeId}/acknowledge`, {
@@ -227,7 +227,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       }
     }
 
-    async function viewAttachment(noticeId: string, btn: HTMLElement) {
+    async function viewAttachment(noticeId, btn) {
       btn.setAttribute('disabled', 'true');
       btn.innerHTML = '<i class="fas fa-spinner fa-spin text-[11px]"></i>';
       try {
@@ -242,7 +242,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
         btn.innerHTML = '<i class="fas fa-paperclip text-[11px]"></i> Attachment';
       }
     }
-    (window as any).viewAttachment = viewAttachment;
+    window.viewAttachment = viewAttachment;
 
     // ── Acknowledgement tracking panel (exec only) ────────────────────────────
     if (isExec) {
@@ -257,14 +257,14 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
       document.getElementById('close-ack-panel')?.addEventListener('click', closeAckPanel);
       ackBackdrop?.addEventListener('click', closeAckPanel);
 
-      async function openAckPanel(noticeId: string, title: string) {
+      async function openAckPanel(noticeId, title) {
         // Show panel immediately with loading state
-        document.getElementById('ack-panel-title')!.textContent = title;
-        document.getElementById('ack-summary')!.innerHTML = '';
-        document.getElementById('ack-members')!.innerHTML =
+        document.getElementById('ack-panel-title').textContent = title;
+        document.getElementById('ack-summary').innerHTML = '';
+        document.getElementById('ack-members').innerHTML =
           '<div class="flex items-center justify-center h-24 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
-        document.getElementById('ack-pct')!.textContent = '';
-        (document.getElementById('ack-progress-bar') as HTMLElement).style.width = '0%';
+        document.getElementById('ack-pct').textContent = '';
+        document.getElementById('ack-progress-bar').style.width = '0%';
         ackPanel?.classList.remove('translate-x-full');
         ackBackdrop?.classList.remove('hidden');
 
@@ -274,10 +274,10 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
           const { summary, members } = await res.json();
 
           const pct = summary.total ? Math.round((summary.acknowledged_count / summary.total) * 100) : 0;
-          document.getElementById('ack-pct')!.textContent = `${pct}%`;
-          (document.getElementById('ack-progress-bar') as HTMLElement).style.width = `${pct}%`;
+          document.getElementById('ack-pct').textContent = `${pct}%`;
+          document.getElementById('ack-progress-bar').style.width = `${pct}%`;
 
-          document.getElementById('ack-summary')!.innerHTML = `
+          document.getElementById('ack-summary').innerHTML = `
             <div class="rounded-xl border border-border-light p-3 text-center">
               <p class="text-2xl font-bold text-text-primary">${summary.total}</p>
               <p class="text-xs text-text-secondary mt-0.5">Total members</p>
@@ -292,11 +292,11 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
             </div>
           `;
 
-          const fmtDate = (iso: string) =>
+          const fmtDate = (iso) =>
             new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-          document.getElementById('ack-members')!.innerHTML = members.length
-            ? members.map((m: any) => `
+          document.getElementById('ack-members').innerHTML = members.length
+            ? members.map((m) => `
               <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg ${m.acknowledged_at ? 'bg-green-50 border border-green-100' : 'bg-gray-50 border border-border-light'}">
                 <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold ${m.acknowledged_at ? 'bg-secondary-500 text-white' : 'bg-gray-200 text-text-secondary'}">
                   ${m.name[0].toUpperCase()}
@@ -313,15 +313,15 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
             `).join('')
             : '<p class="text-sm text-text-secondary text-center py-6">No members found.</p>';
         } catch {
-          document.getElementById('ack-members')!.innerHTML =
+          document.getElementById('ack-members').innerHTML =
             '<p class="text-sm text-red-600 text-center py-6">Failed to load acknowledgement data.</p>';
         }
       }
 
-      (window as any).openAckPanel = openAckPanel;
+      window.openAckPanel = openAckPanel;
     }
 
-    (window as any).acknowledge = acknowledge;
+    window.acknowledge = acknowledge;
     loadNotices();
 
     // ── Scheduled notices tab (exec only) ─────────────────────────────────────
@@ -352,7 +352,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
           return;
         }
 
-        scheduledPanel.innerHTML = items.map((n: any) => `
+        scheduledPanel.innerHTML = items.map((n) => `
           <div class="bg-white rounded-xl border border-amber-200 bg-amber-50/30 p-5 flex items-start justify-between gap-4">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
@@ -369,7 +369,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
         `).join('');
       }
 
-      async function publishNow(noticeId: string, btn: HTMLElement) {
+      async function publishNow(noticeId, btn) {
         if (!confirm('Publish this notice immediately to all members?')) return;
         btn.setAttribute('disabled', 'true');
         btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i>';
@@ -386,7 +386,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
         }
       }
 
-      function showToast(message: string, type = 'success') {
+      function showToast(message, type = 'success') {
         const toast = document.createElement('div');
         const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
         toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
@@ -396,7 +396,7 @@ const isExec = ['executive', 'admin'].includes(user.role) || user.isAdmin;
         setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
       }
 
-      (window as any).publishNow = publishNow;
+      window.publishNow = publishNow;
 
       tabPublished?.addEventListener('click', () => {
         tabPublished.classList.add('text-primary-600', 'border-primary-600');
