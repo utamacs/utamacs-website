@@ -15,8 +15,8 @@ const { data: pass, error } = await sb
   .select(`
     id, visitor_name, purpose, expected_time_from, expected_time_to, expires_at,
     status, otp_code, scan_count, max_uses, guard_note, vehicle_number,
-    units(unit_number, block),
-    profiles!host_user_id(display_name)
+    host_user_id,
+    units!host_unit_id(unit_number, block)
   `)
   .eq('pass_token', token)
   .eq('society_id', SOCIETY_ID)
@@ -24,6 +24,13 @@ const { data: pass, error } = await sb
 
 if (error || !pass) {
   return new Response('Pass not found or cancelled.', { status: 404 });
+}
+
+// Fetch host display name separately (avoids FK resolution issues across auth.users/profiles)
+let hostDisplayName: string | null = null;
+if (pass.host_user_id) {
+  const { data: profile } = await sb.from('profiles').select('display_name').eq('id', pass.host_user_id).single();
+  hostDisplayName = (profile as { display_name?: string } | null)?.display_name ?? null;
 }
 
 const now = new Date();
@@ -34,7 +41,7 @@ const notYet     = validFrom ? validFrom > now : false;
 const maxedOut   = pass.scan_count >= pass.max_uses;
 const isValid    = !isExpired && !notYet && !maxedOut && pass.status === 'approved';
 
-const hostName    = (pass.profiles as { display_name?: string } | null)?.display_name ?? 'A resident';
+const hostName    = hostDisplayName ?? 'A resident';
 const unitLabel   = pass.units ? `Flat ${(pass.units as { unit_number?: string; block?: string }).unit_number ?? ''}${(pass.units as { block?: string }).block ? ` · Block ${(pass.units as { block?: string }).block}` : ''}` : '';
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', {

@@ -87,7 +87,7 @@ export const POST: APIRoute = async ({ request }) => {
     // Verify unit belongs to this society
     const { data: unit, error: unitErr } = await sb.from('units').select('id').eq('id', body.unit_id).eq('society_id', SOCIETY_ID).single();
     if (unitErr || !unit) {
-      return Response.json({ error: 'VALIDATION_ERROR', message: 'Unit not found' }, { status: 400 });
+      return Response.json({ error: 'NOT_FOUND', message: 'Unit not found' }, { status: 404 });
     }
 
     // Generate 6-digit OTP
