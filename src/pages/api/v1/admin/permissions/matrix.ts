@@ -7,7 +7,7 @@ import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const ROLES = ['member', 'executive', 'secretary', 'president'] as const;
+const ROLES = ['member', 'executive', 'secretary', 'president', 'staff', 'supervisor', 'afm'] as const;
 
 // GET — full role-feature permission matrix (admin only)
 // Returns: { matrix: { [feature]: { [role]: { enabled, is_locked } } }, roles, features }
