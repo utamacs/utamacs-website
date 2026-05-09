@@ -112,7 +112,7 @@ export const PATCH: APIRoute = async ({ request }) => {
       userId: user.id, societyId: SOCIETY_ID,
       action: 'UPDATE', resourceType: 'profile', resourceId: user.id,
       ip: extractClientIP(request),
-      oldValues: before, newValues: updates,
+      oldValues: before ?? undefined, newValues: updates,
     });
 
     return Response.json(data);

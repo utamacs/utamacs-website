@@ -88,6 +88,7 @@ export interface ResolvedUser {
   isAdmin: boolean;
   societyId: string;
   permissions: Set<Feature>;
+  role?: string;
 }
 
 // Full permission resolution: role defaults → role DB overrides → user overrides.
@@ -158,6 +159,7 @@ export async function resolveUserPermissions(
     isAdmin: (profile.is_admin ?? false) || userRole?.role === 'admin',
     societyId,
     permissions,
+    role: userRole?.role,
   };
 }
 
