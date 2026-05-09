@@ -159,12 +159,12 @@ ALTER TABLE maids
                               CHECK (kyc_status IN ('pending','documents_submitted','police_verified','pass_issued','pass_expired'));
 
 -- ── Module registrations ──────────────────────────────────────────────────────
-INSERT INTO module_configurations (society_id, module_key, is_active, display_order, settings)
-SELECT id, 'memberships', true, 95, '{}'::jsonb
+INSERT INTO module_configurations (society_id, module_key, display_name, icon, is_active, display_order)
+SELECT id, 'memberships', 'Membership Registry', 'fa-id-card-alt', true, 95
 FROM societies
 ON CONFLICT (society_id, module_key) DO NOTHING;
 
-INSERT INTO module_configurations (society_id, module_key, is_active, display_order, settings)
-SELECT id, 'staff_kyc', true, 96, '{}'::jsonb
+INSERT INTO module_configurations (society_id, module_key, display_name, icon, is_active, display_order)
+SELECT id, 'staff_kyc', 'Staff & Maid KYC', 'fa-user-check', true, 96
 FROM societies
 ON CONFLICT (society_id, module_key) DO NOTHING;

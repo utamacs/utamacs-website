@@ -1,6 +1,7 @@
 ---
 import type { UserClaims } from '@lib/services/interfaces/IAuthService';
 import { featureFlagService } from '@lib/services/index';
+import { resolveNavRole, NAV_ROLE_RANK, GROUP_ORDER } from '@lib/navRoles';
 import '../../styles/global.css';
 
 export interface Props {
@@ -15,37 +16,40 @@ const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000
 
 // ── Module system (DB-backed with hardcoded fallback) ─────────────────────────
 
-const FALLBACK_MODULES: Array<{ moduleKey: string; displayName: string; icon: string }> = [
-  { moduleKey: 'members',          displayName: 'Member Directory',      icon: 'fa-users' },
-  { moduleKey: 'complaints',       displayName: 'Complaints',             icon: 'fa-tools' },
-  { moduleKey: 'notices',          displayName: 'Notices & Circulars',    icon: 'fa-bell' },
-  { moduleKey: 'events',           displayName: 'Events',                 icon: 'fa-calendar-alt' },
-  { moduleKey: 'polls',            displayName: 'Polls & Voting',         icon: 'fa-vote-yea' },
-  { moduleKey: 'finance',          displayName: 'Finance & Dues',         icon: 'fa-rupee-sign' },
-  { moduleKey: 'facility_booking', displayName: 'Facility Booking',       icon: 'fa-building' },
-  { moduleKey: 'visitor_mgmt',     displayName: 'Visitor Management',     icon: 'fa-id-badge' },
-  { moduleKey: 'vendors',          displayName: 'Vendors & Work Orders',  icon: 'fa-hard-hat' },
-  { moduleKey: 'hoto',             displayName: 'HOTO Tracker',           icon: 'fa-tasks' },
-  { moduleKey: 'snags',            displayName: 'Snag List',              icon: 'fa-bug' },
-  { moduleKey: 'community',        displayName: 'Community Board',        icon: 'fa-comments' },
-  { moduleKey: 'documents',        displayName: 'Documents',              icon: 'fa-file-alt' },
-  { moduleKey: 'parking',          displayName: 'Parking Management',     icon: 'fa-car' },
-  { moduleKey: 'agm',              displayName: 'AGM & Governance',       icon: 'fa-landmark' },
-  { moduleKey: 'notifications',    displayName: 'Notifications',          icon: 'fa-envelope' },
-  { moduleKey: 'analytics',        displayName: 'Analytics & Reports',    icon: 'fa-chart-bar' },
-  { moduleKey: 'letters',          displayName: 'Official Letters',        icon: 'fa-envelope-open-text' },
-  { moduleKey: 'policies',         displayName: 'Policies',               icon: 'fa-shield-alt' },
-  { moduleKey: 'maids',            displayName: 'Domestic Help Registry', icon: 'fa-user-friends' },
-  { moduleKey: 'gallery',          displayName: 'Photo Gallery',          icon: 'fa-images' },
-  { moduleKey: 'feedback',         displayName: 'Resident Feedback',      icon: 'fa-star' },
-  { moduleKey: 'water_tankers',    displayName: 'Water Management',       icon: 'fa-tint' },
-  { moduleKey: 'security_patrol',  displayName: 'Security Patrol Log',    icon: 'fa-shield-alt' },
-  { moduleKey: 'tenant_kyc',       displayName: 'Tenant KYC',             icon: 'fa-id-card' },
-  { moduleKey: 'memberships',      displayName: 'Membership Registry',    icon: 'fa-id-card' },
-  { moduleKey: 'staff_kyc',        displayName: 'Staff & Maid KYC',       icon: 'fa-user-check' },
-  { moduleKey: 'register',         displayName: 'Society Membership',     icon: 'fa-certificate' },
+type FallbackModule = { moduleKey: string; displayName: string; icon: string; navGroup: string; minNavRole: string };
+
+const FALLBACK_MODULES: FallbackModule[] = [
+  { moduleKey: 'members',          displayName: 'Member Directory',      icon: 'fa-users',              navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'complaints',       displayName: 'Complaints',             icon: 'fa-tools',              navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'notices',          displayName: 'Notices & Circulars',    icon: 'fa-bell',               navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'events',           displayName: 'Events',                 icon: 'fa-calendar-alt',       navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'polls',            displayName: 'Polls & Voting',         icon: 'fa-vote-yea',           navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'finance',          displayName: 'Finance & Dues',         icon: 'fa-rupee-sign',         navGroup: 'Services',       minNavRole: 'member'    },
+  { moduleKey: 'facility_booking', displayName: 'Facility Booking',       icon: 'fa-building',           navGroup: 'Services',       minNavRole: 'member'    },
+  { moduleKey: 'visitor_mgmt',     displayName: 'Visitor Management',     icon: 'fa-id-badge',           navGroup: 'Services',       minNavRole: 'member'    },
+  { moduleKey: 'vendors',          displayName: 'Vendors & Work Orders',  icon: 'fa-hard-hat',           navGroup: 'HOTO Platform',  minNavRole: 'member'    },
+  { moduleKey: 'hoto',             displayName: 'HOTO Tracker',           icon: 'fa-tasks',              navGroup: 'HOTO Platform',  minNavRole: 'member'    },
+  { moduleKey: 'snags',            displayName: 'Snag List',              icon: 'fa-bug',                navGroup: 'HOTO Platform',  minNavRole: 'member'    },
+  { moduleKey: 'community',        displayName: 'Community Board',        icon: 'fa-comments',           navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'documents',        displayName: 'Documents',              icon: 'fa-file-alt',           navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'parking',          displayName: 'Parking Management',     icon: 'fa-car',                navGroup: 'Services',       minNavRole: 'member'    },
+  { moduleKey: 'agm',              displayName: 'AGM & Governance',       icon: 'fa-landmark',           navGroup: 'Governance',     minNavRole: 'member'    },
+  { moduleKey: 'notifications',    displayName: 'Notifications',          icon: 'fa-envelope',           navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'analytics',        displayName: 'Analytics & Reports',    icon: 'fa-chart-bar',          navGroup: 'Governance',     minNavRole: 'executive' },
+  { moduleKey: 'letters',          displayName: 'Official Letters',        icon: 'fa-envelope-open-text', navGroup: 'Governance',     minNavRole: 'executive' },
+  { moduleKey: 'policies',         displayName: 'Policies',               icon: 'fa-shield-alt',         navGroup: 'Governance',     minNavRole: 'member'    },
+  { moduleKey: 'maids',            displayName: 'Domestic Help Registry', icon: 'fa-user-friends',       navGroup: 'Services',       minNavRole: 'member'    },
+  { moduleKey: 'gallery',          displayName: 'Photo Gallery',          icon: 'fa-images',             navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'feedback',         displayName: 'Resident Feedback',      icon: 'fa-star',               navGroup: 'Community',      minNavRole: 'member'    },
+  { moduleKey: 'water_tankers',    displayName: 'Water Management',       icon: 'fa-tint',               navGroup: 'Services',       minNavRole: 'member'    },
+  { moduleKey: 'security_patrol',  displayName: 'Security Patrol Log',    icon: 'fa-shield-alt',         navGroup: 'Governance',     minNavRole: 'executive' },
+  { moduleKey: 'tenant_kyc',       displayName: 'Tenant KYC',             icon: 'fa-id-card',            navGroup: 'Governance',     minNavRole: 'executive' },
+  { moduleKey: 'memberships',      displayName: 'Membership Registry',    icon: 'fa-id-card-alt',        navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'staff_kyc',        displayName: 'Staff & Maid KYC',       icon: 'fa-user-check',         navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'register',         displayName: 'Society Membership',     icon: 'fa-certificate',        navGroup: 'Governance',     minNavRole: 'member'    },
 ];
 
+// Canonical path for each module key. DB never stores this — it's tied to code.
 const MODULE_PATHS: Record<string, string> = {
   members:          '/portal/members',
   complaints:       '/portal/complaints',
@@ -77,7 +81,9 @@ const MODULE_PATHS: Record<string, string> = {
   register:         '/portal/register/membership',
 };
 
-let allModules: Array<{ moduleKey: string; displayName: string; icon: string | null }> = FALLBACK_MODULES;
+type ActiveModule = { moduleKey: string; displayName: string; icon: string | null; navGroup: string; minNavRole: string; isActive?: boolean };
+
+let allModules: ActiveModule[] = FALLBACK_MODULES;
 try {
   const dbModules = await featureFlagService.getModules(SOCIETY_ID);
   if (dbModules.length > 0) {
@@ -87,37 +93,15 @@ try {
 } catch {
   // keep FALLBACK_MODULES
 }
-const moduleMap = new Map(allModules.map((m) => [m.moduleKey, m]));
 
-// ── Role helpers ──────────────────────────────────────────────────────────────
+// ── Nav role resolution ───────────────────────────────────────────────────────
 
-const isGuard  = user.role === 'security_guard';
-const isVendor = user.role === 'vendor';
-const isPrivileged =
-  ['executive', 'secretary', 'president'].includes(user.portalRole) ||
-  ['executive', 'admin'].includes(user.role) ||
-  user.isAdmin;
-const isHotoAdmin = ['secretary', 'president'].includes(user.portalRole) || user.isAdmin;
-const isAdmin = user.isAdmin;
-const canSeeLetters =
-  ['executive', 'admin'].includes(user.role) ||
-  ['executive', 'secretary', 'president'].includes(user.portalRole) ||
-  user.isAdmin;
+const navRole = resolveNavRole(user);
+const navRank = NAV_ROLE_RANK[navRole];
 
-// ── Nav item builder ──────────────────────────────────────────────────────────
+// ── Nav item type and helper ──────────────────────────────────────────────────
 
 type NavItem = { label: string; href: string; icon: string; activeKey: string };
-
-function modItem(key: string): NavItem | null {
-  const m = moduleMap.get(key);
-  if (!m) return null;
-  return {
-    label: m.displayName,
-    href: MODULE_PATHS[key] ?? `/portal/${key}`,
-    icon: m.icon ?? 'fa-circle',
-    activeKey: key,
-  };
-}
 
 function link(label: string, href: string, icon: string, activeKey: string): NavItem {
   return { label, href, icon, activeKey };
@@ -128,74 +112,84 @@ function link(label: string, href: string, icon: string, activeKey: string): Nav
 type NavGroup = { label: string; items: NavItem[] };
 const navGroups: NavGroup[] = [];
 
-if (isGuard) {
-  // Security guards: visitor management only (no groups, flat)
-  const vi = modItem('visitor_mgmt');
-  if (vi) navGroups.push({ label: 'Operations', items: [vi] });
-} else if (isVendor) {
+if (navRole === 'guard') {
+  // Security guards: visitor log only
+  const vm = allModules.find((m) => m.moduleKey === 'visitor_mgmt');
+  if (vm) navGroups.push({ label: 'Operations', items: [link(vm.displayName, MODULE_PATHS.visitor_mgmt, vm.icon ?? 'fa-id-badge', 'visitor_mgmt')] });
+
+} else if (navRole === 'vendor') {
   // Vendors: their work orders only
-  const vi = modItem('vendors');
-  if (vi) navGroups.push({ label: 'My Work', items: [vi] });
+  const vm = allModules.find((m) => m.moduleKey === 'vendors');
+  if (vm) navGroups.push({ label: 'My Work', items: [link(vm.displayName, MODULE_PATHS.vendors, vm.icon ?? 'fa-hard-hat', 'vendors')] });
+
 } else {
-  // ── Community ────────────────────────────────────────────────────────────
-  const communityItems = (
-    ['members','complaints','notices','events','polls','community','gallery','feedback','documents','notifications'] as const
-  ).map(modItem).filter((x) => x != null) as NavItem[];
-  if (communityItems.length) navGroups.push({ label: 'Community', items: communityItems });
+  // ── DB-driven nav for member / executive / admin ──────────────────────────
 
-  // ── Services ─────────────────────────────────────────────────────────────
-  const serviceItems = (
-    ['finance','facility_booking','visitor_mgmt','parking','maids'] as const
-  ).map(modItem).filter((x) => x != null) as NavItem[];
-  if (serviceItems.length) navGroups.push({ label: 'Services', items: serviceItems });
+  // 1. Filter modules the current user can see and group them by nav_group.
+  const groupMap = new Map<string, NavItem[]>();
+  for (const m of allModules) {
+    const moduleRank = NAV_ROLE_RANK[m.minNavRole as keyof typeof NAV_ROLE_RANK] ?? NAV_ROLE_RANK.member;
+    if (navRank < moduleRank) continue;
+    const group = m.navGroup ?? 'Community';
+    if (!groupMap.has(group)) groupMap.set(group, []);
+    groupMap.get(group)!.push(link(
+      m.displayName,
+      MODULE_PATHS[m.moduleKey] ?? `/portal/${m.moduleKey}`,
+      m.icon ?? 'fa-circle',
+      m.moduleKey,
+    ));
+  }
 
-  // ── HOTO Platform ─────────────────────────────────────────────────────────
-  const hotoItems: NavItem[] = [];
-  const hotoMod = modItem('hoto');   if (hotoMod)  hotoItems.push(hotoMod);
-  const snagsMod = modItem('snags'); if (snagsMod) hotoItems.push(snagsMod);
-  const vendorsMod = modItem('vendors'); if (vendorsMod) hotoItems.push(vendorsMod);
-  if (isPrivileged) {
-    hotoItems.push(link('Vendor Procurement', '/portal/vendors/procurement',        'fa-clipboard-list', 'vendors_procurement'));
-    hotoItems.push(link('HOTO Progress',      '/portal/hoto/progress',              'fa-chart-pie',   'hoto_progress'));
-    hotoItems.push(link('Pending Approvals',  '/portal/hoto/pending',               'fa-clock',        'hoto_pending'));
-    hotoItems.push(link('HOTO Finance',       '/portal/hoto/finance',               'fa-coins',        'hoto_finance'));
-    hotoItems.push(link('Board Resolutions',  '/portal/hoto/finance/resolutions',   'fa-scroll',       'hoto_resolutions'));
+  // 2. Inject exec-only HOTO Platform sub-page links (sub-pages, not modules).
+  if (navRank >= NAV_ROLE_RANK.executive) {
+    const hotoItems = groupMap.get('HOTO Platform') ?? [];
+    hotoItems.push(
+      link('Vendor Procurement', '/portal/vendors/procurement',      'fa-clipboard-list', 'vendors_procurement'),
+      link('HOTO Progress',      '/portal/hoto/progress',            'fa-chart-pie',      'hoto_progress'),
+      link('Pending Approvals',  '/portal/hoto/pending',             'fa-clock',          'hoto_pending'),
+      link('HOTO Finance',       '/portal/hoto/finance',             'fa-coins',          'hoto_finance'),
+      link('Board Resolutions',  '/portal/hoto/finance/resolutions', 'fa-scroll',         'hoto_resolutions'),
+    );
+    groupMap.set('HOTO Platform', hotoItems);
   }
-  if (hotoItems.length) navGroups.push({ label: 'HOTO Platform', items: hotoItems });
 
-  // ── Governance ────────────────────────────────────────────────────────────
-  const govItems: NavItem[] = [];
-  const agmMod = modItem('agm'); if (agmMod) govItems.push(agmMod);
-  const polMod = modItem('policies'); if (polMod) govItems.push(polMod);
-  if (canSeeLetters) {
-    const lm = modItem('letters'); if (lm) govItems.push(lm);
+  // 3. Inject Secretary/President governance admin links.
+  if (['secretary', 'president'].includes(user.portalRole) || user.isAdmin) {
+    const govItems = groupMap.get('Governance') ?? [];
+    govItems.push(
+      link('Role Management', '/portal/hoto/admin/users',      'fa-user-cog',  'hoto_roles'),
+      link('Elections',       '/portal/hoto/admin/elections',  'fa-vote-yea',  'hoto_elections'),
+      link('Delegations',     '/portal/hoto/admin/delegation', 'fa-handshake', 'hoto_delegation'),
+    );
+    groupMap.set('Governance', govItems);
   }
-  if (isPrivileged) {
-    const am = modItem('analytics'); if (am) govItems.push(am);
-  }
-  if (isHotoAdmin) {
-    govItems.push(link('Role Management', '/portal/hoto/admin/users',     'fa-user-cog',  'hoto_roles'));
-    govItems.push(link('Elections',       '/portal/hoto/admin/elections', 'fa-vote-yea',  'hoto_elections'));
-    govItems.push(link('Delegations',     '/portal/hoto/admin/delegation','fa-handshake', 'hoto_delegation'));
-  }
-  if (govItems.length) navGroups.push({ label: 'Governance', items: govItems });
 
-  // ── Administration (admin only) ───────────────────────────────────────────
-  if (isAdmin) {
-    navGroups.push({
-      label: 'Administration',
-      items: [
-        link('Audit Logs',       '/portal/admin/audit',         'fa-shield-alt',       'admin_audit'),
-        link('Asset Management', '/portal/admin/assets',        'fa-cogs',             'admin_assets'),
-        link('Rules Engine',     '/portal/admin/rules',         'fa-sliders-h',        'admin_rules'),
-        link('RBAC & Permissions','/portal/admin/rbac',         'fa-lock',             'admin_rbac'),
-        link('Email Drafts',     '/portal/admin/email-drafts',  'fa-envelope-open-text','admin_email'),
-        link('Feature Config',   '/portal/admin/features',      'fa-toggle-on',        'admin_features'),
-        link('Staff Attendance', '/portal/admin/staff',         'fa-user-clock',       'admin_staff'),
-        link('TDS Tracking',     '/portal/admin/tds',           'fa-file-invoice',     'admin_tds'),
-        link('Consent Mgmt',     '/portal/admin/consent',       'fa-user-shield',      'admin_consent'),
-      ],
-    });
+  // 4. Prepend hardcoded admin tool links to the Administration group.
+  if (user.isAdmin) {
+    const adminItems = groupMap.get('Administration') ?? [];
+    adminItems.unshift(
+      link('Audit Logs',         '/portal/admin/audit',         'fa-shield-alt',        'admin_audit'),
+      link('Asset Management',   '/portal/admin/assets',        'fa-cogs',              'admin_assets'),
+      link('Rules Engine',       '/portal/admin/rules',         'fa-sliders-h',         'admin_rules'),
+      link('RBAC & Permissions', '/portal/admin/rbac',          'fa-lock',              'admin_rbac'),
+      link('Email Drafts',       '/portal/admin/email-drafts',  'fa-envelope-open-text','admin_email'),
+      link('Feature Config',     '/portal/admin/features',      'fa-toggle-on',         'admin_features'),
+      link('Staff Attendance',   '/portal/admin/staff',         'fa-user-clock',        'admin_staff'),
+      link('TDS Tracking',       '/portal/admin/tds',           'fa-file-invoice',      'admin_tds'),
+      link('Consent Mgmt',       '/portal/admin/consent',       'fa-user-shield',       'admin_consent'),
+    );
+    groupMap.set('Administration', adminItems);
+  }
+
+  // 5. Emit groups in canonical order; append any unknown groups last.
+  for (const groupLabel of GROUP_ORDER) {
+    const items = groupMap.get(groupLabel);
+    if (items?.length) navGroups.push({ label: groupLabel, items });
+  }
+  for (const [label, items] of groupMap) {
+    if (!(GROUP_ORDER as readonly string[]).includes(label) && items.length) {
+      navGroups.push({ label, items });
+    }
   }
 }
 ---
