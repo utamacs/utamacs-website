@@ -303,10 +303,12 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
                     }
                     ${d.download_url
                       ? `<a href="${d.download_url}" target="_blank" rel="noopener"
-                           class="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1 text-primary-600">
+                           class="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1 text-primary-600" title="Download">
                            <i class="fas fa-download text-xs" aria-hidden="true"></i> Download
                          </a>`
-                      : ''
+                      : `<span class="inline-flex items-center gap-1 text-xs px-3 py-1.5 text-text-secondary opacity-50 cursor-not-allowed select-none" title="No file uploaded yet">
+                           <i class="fas fa-download text-xs" aria-hidden="true"></i> Download
+                         </span>`
                     }
                     ${canUpload
                       ? `<button onclick="openNewVersion('${d.id}', '${d.title.replace(/'/g, "\\'")}')"

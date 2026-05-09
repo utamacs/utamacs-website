@@ -144,7 +144,7 @@ const catColor = categoryColors[doc.category] ?? categoryColors.Other;
         )}
 
         <!-- Download / no-file state -->
-        <div class="mt-5 pt-4 border-t border-border-light">
+        <div class="mt-5 pt-4 border-t border-border-light flex items-center gap-3 flex-wrap">
           {downloadUrl ? (
             <a href={downloadUrl} target="_blank" rel="noopener noreferrer"
                class="btn-primary text-sm inline-flex items-center gap-2">
@@ -152,10 +152,13 @@ const catColor = categoryColors[doc.category] ?? categoryColors.Other;
               Download {doc.file_name ?? 'File'}
             </a>
           ) : (
-            <div class="flex items-center gap-2 text-sm text-text-secondary bg-section-alt rounded-lg px-4 py-3">
-              <i class="fas fa-info-circle text-primary-400" aria-hidden="true"></i>
-              File not available for download — the document record exists but no file has been uploaded to storage yet.
-            </div>
+            <>
+              <button disabled class="btn-primary text-sm inline-flex items-center gap-2 opacity-50 cursor-not-allowed" title="No file uploaded yet">
+                <i class="fas fa-download" aria-hidden="true"></i>
+                Download {doc.file_name ?? 'File'}
+              </button>
+              <span class="text-xs text-text-secondary">No file uploaded yet</span>
+            </>
           )}
         </div>
       </div>
@@ -249,7 +252,9 @@ const catColor = categoryColors[doc.category] ?? categoryColors.Other;
               <i class="fas fa-download" aria-hidden="true"></i> Download
             </a>
           ) : (
-            <div class="w-full text-center text-xs text-text-secondary py-2 bg-section-alt rounded-lg">No file in storage</div>
+            <button disabled class="w-full btn-primary text-sm flex items-center justify-center gap-2 opacity-50 cursor-not-allowed" title="No file uploaded yet">
+              <i class="fas fa-download" aria-hidden="true"></i> Download
+            </button>
           )}
           <a href="/portal/documents" class="w-full btn-ghost text-sm flex items-center justify-center gap-2">
             <i class="fas fa-list" aria-hidden="true"></i> All Documents
