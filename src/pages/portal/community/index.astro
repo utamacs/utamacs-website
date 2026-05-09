@@ -15,7 +15,7 @@ const canPost = ['member', 'executive', 'admin'].includes(user.role);
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">The community board lets residents post announcements, discussion threads, and marketplace listings for the society.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">The community board lets residents post announcements, discussion threads, and marketplace listings — visible only within the society; images stored in private GitHub Docs; moderation threshold configurable via rules engine.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -29,21 +29,21 @@ const canPost = ['member', 'executive', 'admin'].includes(user.role);
               <i class="fas fa-comments text-primary-600 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Discussion Threads</div>
-            <div class="text-xs text-text-secondary">Start or join conversations on society topics. Executives can pin important threads to the top.</div>
+            <div class="text-xs text-text-secondary">Start or join conversations on society topics — maintenance feedback, event suggestions, neighbourhood updates. Executives can pin important threads to the top. Posts with images support up to <strong>5 images per post</strong> (configurable via COMMUNITY_POST_MAX_IMAGES rule); images stored in private GitHub Docs as time-limited signed URLs.</div>
           </div>
           <div class="bg-white rounded-lg border border-border-light p-4">
             <div class="w-8 h-8 rounded-lg bg-secondary-50 flex items-center justify-center mb-2">
               <i class="fas fa-shopping-bag text-secondary-500 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Marketplace</div>
-            <div class="text-xs text-text-secondary">Buy, sell, or give away items within the society. Listings are visible only to registered members.</div>
+            <div class="text-xs text-text-secondary">Buy, sell, or give away items within the society — listings are visible only to registered members (not public). Sellers include their flat number for pickup coordination. Listings auto-expire after 30 days (rules-engine configurable); expired listings move to an archive. No payment processing — transactions are between members directly.</div>
           </div>
           <div class="bg-white rounded-lg border border-border-light p-4">
             <div class="w-8 h-8 rounded-lg bg-accent-500/10 flex items-center justify-center mb-2">
               <i class="fas fa-shield-alt text-accent-500 text-sm"></i>
             </div>
             <div class="text-sm font-semibold text-text-primary mb-1">Moderation</div>
-            <div class="text-xs text-text-secondary">Executives can remove inappropriate content. Three reports from members flags a post for review.</div>
+            <div class="text-xs text-text-secondary">Executives can remove any post or comment. <strong>3 member reports</strong> (configurable via rules engine) flags a post for exec review — flagged posts are hidden from the board until an exec clears or removes them. DPDPA: posts must not include personal data; exec moderation actions are audit-logged. Removed posts are soft-deleted (content cleared, record retained).</div>
           </div>
         </div>
       </div>

@@ -15,7 +15,7 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Snags are construction defects logged against the builder — each follows a track-and-verify closure process.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Builder defects are logged per flat or common area — if the builder fails to rectify within SLA, the Maintenance dept (Staff Management) or a vendor work order takes over. All evidence links to the parent HOTO record.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -25,58 +25,71 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
       <div class="pt-4 border-t border-primary-100 space-y-4">
         <!-- Main flow -->
         <div class="process-snake-flow -mx-1 px-1">
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Reported</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Defect logged</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Defect + photo logged</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Notified</p>
-            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Builder informed</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Builder formally informed</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">In Progress</p>
-            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Rectification underway</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Builder / staff / vendor</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Pending Verify</p>
-            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Awaiting inspection</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Exec inspects on site</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Verified</p>
-            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Rectification confirmed</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Secretary / President</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Closed</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Sign-off complete</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">HOTO parent updated</p>
           </div>
         </div>
-        <!-- Exception row -->
+        <!-- Exception rows -->
         <div class="flex items-center gap-2 text-xs text-red-600">
           <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
           <span class="font-medium">Re-opened</span>
-          <span class="text-red-500">— If verification fails, snag returns to In Progress for further rectification</span>
+          <span class="text-red-500">— If verification fails (defect recurs), snag returns to In Progress; re-open count is tracked in the audit log</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-amber-600">
+          <i class="fas fa-arrow-turn-down text-amber-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Escalated to Society</span>
+          <span class="text-amber-700">— Builder SLA breach (configurable days) triggers escalation; exec can assign to Maintenance dept or raise a vendor work order at society cost</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Only Secretary or President can mark a snag as Verified — members can report</span>
+            <i class="fas fa-user-check text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Only Secretary or President can mark a snag Verified — ensures an independent inspection rather than self-certification by the exec who raised it</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-hard-hat text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Builder SLA breach routes the snag to the <strong>Maintenance dept</strong> in Staff Management (staff task auto-created) or a <strong>Vendor work order</strong> — society bears cost and recovers from builder</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-link text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Snags linked to <strong>HOTO</strong> items update the parent item's doc status — HOTO Secretary review is blocked until all linked snags reach Verified or Closed</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-hashtag text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Builder Ref numbers cross-reference the builder's own defect tracker — useful for formal RERA correspondence and builder warranty claims</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-paperclip text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Photo attachments up to 50 MB stored privately in GitHub Docs — before/after photos are compared at Verify stage; each upload audit-logged</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
             <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Critical snags trigger an automatic builder notification email</span>
-          </div>
-          <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Snags linked to HOTO items update the parent item's documentation status</span>
-          </div>
-          <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Builder reference numbers (Builder Ref) can be added to cross-reference builder's own tracker</span>
+            <span>Critical-priority snags send an immediate exec notification and appear at the top of the Pending Approvals queue — SLA timer starts from Notified state</span>
           </div>
         </div>
       </div>

@@ -15,7 +15,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Maintenance billing runs in monthly periods — dues are raised, members pay, and overdue accounts are tracked for follow-up.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Maintenance billing runs in monthly periods — dues are raised per unit category, members pay, overdue accounts attract interest per byelaw, and all records are immutable with full GST/TDS compliance.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -50,22 +50,35 @@ const isExec = ['executive', 'admin'].includes(user.role);
             <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Accounts reconciled</p>
           </div>
         </div>
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Overdue Reminder</span>
+          <span class="text-red-500">— Auto-reminder sent to unit owner after due date; interest accrues per byelaw rate (configurable via Rules Engine)</span>
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Maintenance amounts can differ by flat category (1BHK / 2BHK / 3BHK)</span>
+            <i class="fas fa-home text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Maintenance amount configurable by unit category — 1BHK, 2BHK, 3BHK and penthouse rates set independently in the Rules Engine</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Late payments may attract interest as per society bye-laws</span>
+            <i class="fas fa-receipt text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>GST invoice generated for each payment if society is GST-registered — 18% GST on maintenance above exemption threshold (₹7,500/month)</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Finance entries above ₹10,000 require a second-level approval (see HOTO Finance for approval tiers)</span>
+            <i class="fas fa-percent text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>TDS deducted at source on vendor payments above ₹30,000 — TDS certificates generated and traceable from the Finance module</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>All financial records are available in the Document Repository after period close</span>
+            <i class="fas fa-lock text-red-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span><strong>Immutable records:</strong> Payment entries cannot be edited or deleted after posting — matching the audit_logs and compliance_logs immutability standard</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-layer-group text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Finance entries above ₹10,000 require second-level executive approval — approval tiers configured in the HOTO Finance sub-module</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-file-alt text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>All period statements and receipts committed to Document Repository on close — available for member download and auditor access</span>
           </div>
         </div>
       </div>

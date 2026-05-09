@@ -19,7 +19,7 @@ if (!isExec && !isVendor) return Astro.redirect('/portal');
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Approved vendors are assigned work orders — each order tracks scope, deadlines, and payment for maintenance services.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Approved vendors deliver services under a structured work-order system — linked to procurement selection, agency licence tracking, and the maintenance staff roster for complete accountability.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
@@ -29,53 +29,71 @@ if (!isExec && !isVendor) return Astro.redirect('/portal');
       <div class="pt-4 border-t border-primary-100 space-y-4">
         <!-- Main flow -->
         <div class="process-snake-flow -mx-1 px-1">
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
-            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Draft</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Work order created</p>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Empanel</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Procurement selection</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
-            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Issued</p>
-            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Sent to vendor</p>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Issue WO</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Draft → sent to vendor</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">In Progress</p>
-            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Work underway</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Work underway on site</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Inspect</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Exec verifies quality</p>
+          </div>
+
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Completed</p>
-            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Work finished</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Invoice uploaded</p>
           </div>
 
-          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
             <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Closed</p>
-            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Payment settled</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Payment settled + TDS</p>
           </div>
         </div>
-        <!-- Exception row -->
+        <!-- Exception rows -->
         <div class="flex items-center gap-2 text-xs text-red-600">
           <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
           <span class="font-medium">Disputed</span>
-          <span class="text-red-500">— Query raised on completed work; halts closure until resolved</span>
+          <span class="text-red-500">— Query raised on completed work; halts closure and payment until exec resolves</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-amber-600">
+          <i class="fas fa-arrow-turn-down text-amber-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Licence Expiry</span>
+          <span class="text-amber-700">— Agency vendor flagged amber/red when PSARA, PF registration, or ESIC expires; new WOs blocked</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Only active vendors in the approved vendor list can be assigned work orders</span>
+            <i class="fas fa-gavel text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Vendor empanelment follows the <strong>Procurement</strong> module's democratic committee-selection process — minimum 3 quotes for works above the rules-engine threshold</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Work orders linked to complaints auto-update the complaint status on completion</span>
+            <i class="fas fa-hard-hat text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Agency vendors (security, housekeeping) are also tracked in <strong>Staff Management → Agencies</strong> with PSARA, PF, and ESIC licence expiry monitoring</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-exclamation-circle text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>Quoted amounts are tracked separately from final invoice amounts</span>
+            <i class="fas fa-receipt text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>TDS deducted on payments above ₹30,000 per order — certificates managed in <strong>Finance → TDS</strong>; final invoices stored in GitHub Docs</span>
           </div>
           <div class="flex items-start gap-2 text-xs text-text-secondary">
-            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
-            <span>All work orders are visible in the HOTO audit trail</span>
+            <i class="fas fa-link text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Work orders linked to <strong>Complaints</strong> auto-resolve the complaint on WO completion — no separate update needed by exec</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-clipboard-list text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>All work orders appear in the <strong>HOTO audit trail</strong> — builder-handover items that required vendor remediation are fully traceable</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-rupee-sign text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Quoted vs. final invoice amounts tracked separately — variance above the rules-engine threshold triggers exec approval before payment</span>
           </div>
         </div>
       </div>

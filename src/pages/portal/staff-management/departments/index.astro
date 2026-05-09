@@ -57,6 +57,73 @@ for (const s of staffList ?? []) {
 ---
 
 <PortalLayout title="All Departments" user={user} activeModule="staff_departments">
+
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Society-wide department overview with live attendance rings and task status — for AFM and exec oversight across all 4 departments.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">AFM / Exec View</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Society-wide scope</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Dept Summary Cards</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Headcount + shift info</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Attendance Ring</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Present / total fraction</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Task Status</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Pending / done per dept</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Drill Down</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Team roster per dept</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-building text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>4 departments: <strong>Security</strong> (gate + rounds), <strong>Housekeeping</strong> (cleaning), <strong>Gardening</strong> (landscaping), <strong>Maintenance</strong> (plumbing, electrical, civil)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-chart-pie text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Attendance ring shows real-time present/total fraction for today — colour changes from green (full) to amber (partial) to red (low turnout)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-mouse-pointer text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Each department card links to the full team roster — click to see individual staff status, check-in times and pending tasks</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-user-shield text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>AFM can view and manage all departments — supervisors visiting this page are redirected to their own department's team roster</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-palette text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Department cards use colour-coded gradient headers for quick visual identification — consistent across all staff management pages</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-calendar-day text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Data shown is for the current day — select Reports for historical month-by-month department breakdowns and CLRA export</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="mb-6">
     <h1 class="text-2xl font-bold text-primary-600 font-poppins">All Departments</h1>
     <p class="text-text-secondary text-sm mt-1">Society-wide staff overview — {(staffList ?? []).filter(s => s.is_active).length} active staff</p>

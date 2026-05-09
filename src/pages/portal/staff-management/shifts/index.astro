@@ -33,6 +33,77 @@ for (const s of shifts ?? []) {
 ---
 
 <PortalLayout title="Shift Configuration" user={user} activeModule="staff_management">
+
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Define shift schedules per department — start/end times, working days of the week and grace periods feed the attendance and late-alert system.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Create Shift</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Name + department</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Set Hours</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Start time → End time</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Configure Days</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">ISO weekday selection</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Set Grace Period</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Late-check-in threshold</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Assign to Staff</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Link via staff profile</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Attendance Active</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Alerts fire on schedule</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-calendar-week text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Working days use ISO weekday numbers: <strong>Mon=1, Tue=2, … Sun=7</strong> — select any combination (e.g. security: all 7; gardening: Mon–Sat)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-clock text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Grace period: minutes allowed past shift start before marking late — default 30 min, overridable per shift via Rules Engine</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-moon text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Multiple shifts per department: security typically has 3 shifts (7am morning, 2pm afternoon, 9pm night) covering 24 hours</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-forward text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Shift changes take effect from the next check-in cycle — retroactive modification of past attendance records is not permitted</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-seedling text-green-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Default shifts seeded at setup: Security (3 shifts, 7 days), Housekeeping (2 shifts, Mon–Sat), Gardening and Maintenance (1 shift each)</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-link text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>One shift per staff member — changing a staff member's shift in their profile takes effect from the next working day</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div>
       <nav class="text-sm text-text-secondary mb-1">

@@ -55,6 +55,77 @@ const STATUS_BADGE: Record<string, string> = {
 ---
 
 <PortalLayout title="Task Assignment" user={user} activeModule="staff_assign">
+
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Supervisors and AFM assign tasks to individual staff members — use activity templates for recurring SOPs or create a one-off custom task for ad-hoc needs.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Select Staff</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Pick team member</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Choose Template</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Or custom task title</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Set Due Date</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Today or future date</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Set Priority</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Low / Medium / High</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Assign</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Appears in staff's tasks</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Staff Completes</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Mark done + photo proof</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-magic text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Selecting a template auto-fills the title in all 3 languages and the photo-proof requirement — reduces manual entry and ensures consistency</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-pencil-alt text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Custom tasks (no template) are fully manual — useful for one-off requests like "fix the broken tap in Block B stairwell"</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-exclamation-circle text-red-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>High-priority tasks display a red left-border in the staff member's My Tasks page — used for safety-critical or time-sensitive work</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-bolt text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Assigned tasks appear immediately in the staff member's dashboard — no refresh required; staff can start working right away</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-lock text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Supervisors can only assign tasks to their own department — AFM can assign across all departments from this page</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-list-ol text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Each staff member's current task list is shown in the assignment view — helps supervisors balance workload before assigning more tasks</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div>
       <h1 class="text-2xl font-bold text-primary-600 font-poppins">Task Assignment</h1>

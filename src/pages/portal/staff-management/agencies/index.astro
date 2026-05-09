@@ -37,6 +37,82 @@ const TYPE_LABELS: Record<string, string> = {
 ---
 
 <PortalLayout title="Agency Management" user={user} activeModule="staff_management">
+
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Empanel outsourced staffing agencies with PSARA, PF and ESIC compliance — track contract lifecycle and monitor licence expiry dates.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Empanel Agency</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Name, type, contact</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Verify Licences</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">PSARA + PF + ESIC</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Contract Signed</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Dates + rate recorded</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Staff Deployed</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Agency staff registered</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Monthly Invoice</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Tracked against contract</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Annual Renewal</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Contract + PSARA review</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">PSARA Expiry</span>
+          <span class="text-red-500">— Flagged amber 30 days before expiry, red after expiry — deploying un-licensed security agency is a PSARA Act 2005 violation</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-shield-alt text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span><strong>PSARA Act 2005:</strong> Private Security Agencies (Regulation) licence mandatory for all security agencies — valid state and national licence required</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-check-circle text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span><strong>PF &amp; ESIC:</strong> Provident Fund and Employee State Insurance numbers verified — ensures agency is compliant with statutory employee benefits law</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-file-contract text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Contract documents committed to private encrypted repository — monthly rate and contract period tracked for payment reconciliation</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-link text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Agency-linked staff inherit the agency's PSARA and PF/ESIC details — no duplication; update the agency record to reflect all linked staff</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-palette text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Status colour: <span class="text-green-600 font-medium">Green</span> (valid), <span class="text-amber-600 font-medium">Amber</span> (expiring &lt;30 days), <span class="text-red-600 font-medium">Red</span> (expired) — applies to PSARA and contract end date</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-building text-gray-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>One agency can supply staff to multiple departments — security agency provides guards while housekeeping agency provides cleaners, for example</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div>
       <nav class="text-sm text-text-secondary mb-1">

@@ -76,6 +76,107 @@ const pendingTasks = myTasksToday.filter(t => t.status === 'pending').length;
 
 <PortalLayout title="Staff Management" user={user} activeModule={isStaffRole ? 'staff_dashboard' : 'staff_management'}>
 
+  <!-- Process info panel -->
+  <details class="mb-6 group rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50/50 to-blue-50/20 overflow-hidden">
+    <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer list-none select-none hover:bg-primary-50/60 transition-colors">
+      <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-project-diagram text-white text-xs" aria-hidden="true"></i>
+      </div>
+      <span class="text-sm font-medium text-text-primary flex-1">Society staff are onboarded, assigned shifts and activity templates; daily attendance and tasks are tracked through to monthly CLRA-compliant reports.</span>
+      <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
+        How it works
+        <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
+      </span>
+    </summary>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <!-- Staff lifecycle flow -->
+        <p class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">Staff Lifecycle</p>
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Onboard</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Register staff + KYC</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Assign Shift</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Department + schedule</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Daily Attendance</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Check-in via QR / manual</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Task Completion</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">SOPs + photo proof</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Compliance Logged</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Immutable CLRA record</p>
+          </div>
+          <div class="flex-shrink-0 w-52 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Monthly Report</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">CLRA Form B export</p>
+          </div>
+        </div>
+        <!-- Daily task flow for staff -->
+        <p class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide mt-3">Daily Staff Flow</p>
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Shift Begins</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Schedule triggers tasks</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Check In</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">QR / manual / WhatsApp</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Complete Tasks</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Mark done + photo proof</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Check Out</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Hours + OT calculated</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Record Filed</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Attendance + tasks saved</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <i class="fas fa-arrow-turn-down text-red-400 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">Late Check-in Alert</span>
+          <span class="text-red-500">— Supervisor notified if staff has not checked in within 30 minutes of shift start (configurable)</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-users text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Three portal roles: <strong>Staff</strong> (self-view), <strong>Supervisor</strong> (own dept), <strong>AFM</strong> (all depts) — each sees a scoped dashboard</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-tasks text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Activity templates define recurring SOPs — tasks are auto-scheduled daily, weekly or monthly per frequency setting</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-lock text-red-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Compliance logs (fire, lift, electrical, STP, pest control) are <strong>immutable</strong> — no edit or delete after filing, per CLRA 1970</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-building text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>4 departments: Security, Housekeeping, Gardening, Maintenance — each with independent shift schedules and SOP libraries</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-file-alt text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Monthly reports export in CLRA Form B format for statutory wage register submission to the Labour Department</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-language text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Task titles in Telugu, Hindi and English — staff see their preferred language based on profile setting</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
   <!-- Page header -->
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div>

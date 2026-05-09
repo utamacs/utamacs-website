@@ -17,16 +17,72 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
       <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
         <i class="fas fa-user-friends text-white text-xs" aria-hidden="true"></i>
       </div>
-      <span class="text-sm font-medium text-text-primary flex-1">Domestic staff are registered once and approved per flat — members can track daily attendance and manage their approved helpers.</span>
+      <span class="text-sm font-medium text-text-primary flex-1">Domestic helpers are registered with KYC once and approved per flat — members track daily attendance and the gate maintains a verified list for entry.</span>
       <span class="text-xs text-primary-600 flex items-center gap-1.5 flex-shrink-0 font-medium">
         How it works
         <i class="fas fa-chevron-down text-[10px] transition-transform duration-200 group-open:rotate-180" aria-hidden="true"></i>
       </span>
     </summary>
-    <div class="px-5 pb-5 pt-4 border-t border-primary-100 text-xs text-text-secondary space-y-1">
-      <p><i class="fas fa-check-circle text-secondary-500 mr-1.5"></i>Exec/admin registers a domestic helper once with identity verification</p>
-      <p><i class="fas fa-check-circle text-secondary-500 mr-1.5"></i>Each flat approves which helpers can enter their unit</p>
-      <p><i class="fas fa-check-circle text-secondary-500 mr-1.5"></i>Members log daily attendance for their approved helpers</p>
+    <div class="px-5 pb-5">
+      <div class="pt-4 border-t border-primary-100 space-y-4">
+        <div class="process-snake-flow -mx-1 px-1">
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Register</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Exec enters details</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">KYC &amp; Photo</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">ID verified + face captured</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-amber-800 whitespace-nowrap">Unit Approval</p>
+            <p class="text-[11px] text-amber-700 mt-0.5 whitespace-nowrap">Flat grants access</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-primary-300 bg-blue-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-primary-700 whitespace-nowrap">Gate Entry</p>
+            <p class="text-[11px] text-primary-600 mt-0.5 whitespace-nowrap">Guard verifies KYC pass</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-green-800 whitespace-nowrap">Attendance Logged</p>
+            <p class="text-[11px] text-green-700 mt-0.5 whitespace-nowrap">Member marks daily</p>
+          </div>
+          <div class="flex-shrink-0 w-44 rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-center">
+            <p class="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Monthly Summary</p>
+            <p class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">Days worked per flat</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-amber-700">
+          <i class="fas fa-arrow-turn-down text-amber-500 text-[10px]" aria-hidden="true"></i>
+          <span class="font-medium">KYC Renewal</span>
+          <span class="text-amber-600">— Annual re-verification required; helpers marked pending-KYC are flagged at the gate until documents are re-uploaded</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-1">
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-id-card text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>KYC pass issued per helper — guard scans or views the pass image at the gate; no phone app required for the domestic helper</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-home text-accent-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Each helper is approved per flat individually — a maid approved for Flat A-201 is not automatically allowed into A-202</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-file-lock text-secondary-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>KYC photos and ID documents stored in a private encrypted repository — never exposed in public URLs; access logged per DPDPA 2023</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-users text-primary-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Society-level registry: one helper record for multiple flats — if the same maid works in multiple flats, one KYC covers all approvals</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-calendar-check text-amber-500 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Attendance is marked by the member for their approved helpers — monthly summary available for salary calculation reference</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-text-secondary">
+            <i class="fas fa-ban text-red-400 mt-0.5 flex-shrink-0 text-[11px]"></i>
+            <span>Access can be revoked per flat at any time — guard is notified immediately; helper will not be admitted to that unit on next visit</span>
+          </div>
+        </div>
+      </div>
     </div>
   </details>
 
