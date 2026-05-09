@@ -1,0 +1,191 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isExec = ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+const isAfm = user.portalRole === 'afm';
+if (!isExec && !isAfm) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+const { data: templates } = await sb
+  .from('staff_activity_templates')
+  .select('id, department, title, title_hi, title_te, frequency, requires_photo, is_active, created_at')
+  .eq('society_id', SOCIETY_ID)
+  .order('department')
+  .order('frequency')
+  .order('title');
+
+const DEPT_LABELS: Record<string, string> = {
+  security: 'Security', housekeeping: 'Housekeeping', gardening: 'Gardening',
+  maintenance: 'Maintenance', admin: 'Administration', multi: 'Multi',
+};
+
+const FREQ_BADGE: Record<string, string> = {
+  daily:       'bg-primary-50 text-primary-700',
+  weekly:      'bg-blue-50 text-blue-700',
+  monthly:     'bg-purple-50 text-purple-700',
+  quarterly:   'bg-amber-50 text-amber-700',
+  half_yearly: 'bg-orange-50 text-orange-700',
+  yearly:      'bg-red-50 text-red-700',
+  on_demand:   'bg-gray-100 text-gray-600',
+};
+
+const deptGroups: Record<string, typeof templates> = {};
+for (const t of templates ?? []) {
+  if (!deptGroups[t.department]) deptGroups[t.department] = [];
+  deptGroups[t.department]!.push(t);
+}
+---
+
+<PortalLayout title="Activity Templates" user={user} activeModule="staff_management">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <nav class="text-sm text-text-secondary mb-1">
+        <a href="/portal/staff-management" class="hover:text-primary-600">Staff Management</a>
+        <span class="mx-2">›</span><span class="text-text-primary">Activities</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Activity Template Library</h1>
+      <p class="text-text-secondary text-sm mt-1">{(templates ?? []).filter(t => t.is_active).length} active templates across all departments</p>
+    </div>
+    <div class="flex gap-2">
+      {isExec && (
+        <button id="add-template-btn" class="btn-primary text-sm">
+          <i class="fas fa-plus mr-1.5" aria-hidden="true"></i>Add Template
+        </button>
+      )}
+      <a href="/portal/staff-management/proposals" class="btn-outline text-sm">
+        <i class="fas fa-inbox mr-1.5" aria-hidden="true"></i>Proposals
+      </a>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="card-premium p-4 mb-5 flex flex-wrap gap-3">
+    <select id="dept-filter" class="form-input py-2 text-sm w-44 bg-white">
+      <option value="">All Departments</option>
+      {Object.entries(DEPT_LABELS).map(([k, v]) => <option value={k}>{v}</option>)}
+    </select>
+    <select id="freq-filter" class="form-input py-2 text-sm w-36 bg-white">
+      <option value="">All Frequencies</option>
+      {Object.keys(FREQ_BADGE).map(f => <option value={f}>{f.replace('_', ' ')}</option>)}
+    </select>
+  </div>
+
+  {Object.entries(deptGroups).map(([dept, deptTemplates]) => (
+    <div class="mb-6" data-dept={dept}>
+      <div class="flex items-center gap-2 mb-3">
+        <h2 class="text-base font-semibold text-text-primary">{DEPT_LABELS[dept] ?? dept}</h2>
+        <span class="text-xs bg-primary-50 text-primary-600 px-2 py-0.5 rounded-full">{(deptTemplates ?? []).length}</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {(deptTemplates ?? []).map(t => (
+          <div class={`card-premium p-4 template-card ${!t.is_active ? 'opacity-60' : ''}`} data-dept={t.department} data-freq={t.frequency}>
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <div class="font-medium text-text-primary text-sm leading-snug flex-1">{t.title}</div>
+              <span class={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 capitalize ${FREQ_BADGE[t.frequency] ?? 'bg-gray-100 text-gray-600'}`}>
+                {t.frequency.replace('_', ' ')}
+              </span>
+            </div>
+            {(t.title_hi || t.title_te) && (
+              <div class="text-xs text-text-secondary space-y-0.5 mb-2">
+                {t.title_hi && <div>{t.title_hi}</div>}
+                {t.title_te && <div>{t.title_te}</div>}
+              </div>
+            )}
+            <div class="flex items-center gap-2 text-xs text-text-secondary">
+              {t.requires_photo && (
+                <span class="flex items-center gap-1 text-primary-500">
+                  <i class="fas fa-camera" aria-hidden="true"></i>Photo
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ))}
+
+  <!-- Add Template Drawer -->
+  <div id="add-template-panel" class="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-primary-600">Add Activity Template</h2>
+      <button id="close-template-panel" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="p-4">
+      <div id="template-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+      <form id="add-template-form" class="space-y-4">
+        <div>
+          <label class="form-label">Title (English) <span class="text-red-500">*</span></label>
+          <input name="title" type="text" required maxlength="200" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label">Title in Hindi (हिन्दी)</label>
+          <input name="title_hi" type="text" maxlength="200" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label">Title in Telugu (తెలుగు)</label>
+          <input name="title_te" type="text" maxlength="200" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label">Department <span class="text-red-500">*</span></label>
+          <select name="department" required class="form-input bg-white">
+            {Object.entries(DEPT_LABELS).map(([k, v]) => <option value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Frequency <span class="text-red-500">*</span></label>
+          <select name="frequency" required class="form-input bg-white">
+            {Object.keys(FREQ_BADGE).map(f => <option value={f}>{f.replace('_', ' ')}</option>)}
+          </select>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="checkbox" name="requires_photo" id="tpl_photo" class="w-4 h-4 accent-primary-600" />
+          <label for="tpl_photo" class="text-sm text-text-primary">Requires photo proof</label>
+        </div>
+        <button type="submit" class="btn-primary w-full">Add Template</button>
+      </form>
+    </div>
+  </div>
+  <div id="template-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+</PortalLayout>
+
+<script>
+const panel = document.getElementById('add-template-panel')!;
+const backdrop = document.getElementById('template-backdrop')!;
+const open = () => { panel.classList.remove('translate-x-full'); backdrop.classList.remove('hidden'); };
+const close = () => { panel.classList.add('translate-x-full'); backdrop.classList.add('hidden'); };
+document.getElementById('add-template-btn')?.addEventListener('click', open);
+document.getElementById('close-template-panel')?.addEventListener('click', close);
+backdrop.addEventListener('click', close);
+
+const deptFilter = document.getElementById('dept-filter') as HTMLSelectElement;
+const freqFilter = document.getElementById('freq-filter') as HTMLSelectElement;
+function applyFilters() {
+  const d = deptFilter.value; const f = freqFilter.value;
+  document.querySelectorAll<HTMLElement>('.template-card').forEach(card => {
+    const dOk = !d || card.dataset.dept === d;
+    const fOk = !f || card.dataset.freq === f;
+    card.style.display = (dOk && fOk) ? '' : 'none';
+  });
+}
+deptFilter.addEventListener('change', applyFilters);
+freqFilter.addEventListener('change', applyFilters);
+
+document.getElementById('add-template-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target as HTMLFormElement);
+  const body = { ...Object.fromEntries(fd.entries()), requires_photo: fd.has('requires_photo') };
+  const errEl = document.getElementById('template-error')!;
+  errEl.classList.add('hidden');
+  const res = await fetch('/api/v1/staff/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (res.ok) { window.location.reload(); }
+  else { const d = await res.json().catch(() => ({})); errEl.textContent = d.message ?? 'Failed.'; errEl.classList.remove('hidden'); }
+});
+</script>

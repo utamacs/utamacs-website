@@ -46,6 +46,7 @@ const FALLBACK_MODULES: FallbackModule[] = [
   { moduleKey: 'tenant_kyc',       displayName: 'Tenant KYC',             icon: 'fa-id-card',            navGroup: 'Governance',     minNavRole: 'executive' },
   { moduleKey: 'memberships',      displayName: 'Membership Registry',    icon: 'fa-id-card-alt',        navGroup: 'Administration', minNavRole: 'admin'     },
   { moduleKey: 'staff_kyc',        displayName: 'Staff & Maid KYC',       icon: 'fa-user-check',         navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'staff_management', displayName: 'Staff Management',       icon: 'fa-users-cog',          navGroup: 'Administration', minNavRole: 'executive' },
   { moduleKey: 'register',         displayName: 'Society Membership',     icon: 'fa-certificate',        navGroup: 'Governance',     minNavRole: 'member'    },
 ];
 
@@ -78,6 +79,7 @@ const MODULE_PATHS: Record<string, string> = {
   tenant_kyc:       '/portal/tenant-kyc',
   memberships:      '/portal/admin/memberships',
   staff_kyc:        '/portal/admin/staff-kyc',
+  staff_management: '/portal/staff-management',
   register:         '/portal/register/membership',
 };
 
@@ -122,6 +124,29 @@ if (navRole === 'guard') {
   const vm = allModules.find((m) => m.moduleKey === 'vendors');
   if (vm) navGroups.push({ label: 'My Work', items: [link(vm.displayName, MODULE_PATHS.vendors, vm.icon ?? 'fa-hard-hat', 'vendors')] });
 
+} else if (['staff', 'supervisor', 'afm'].includes(user.portalRole)) {
+  // Staff portal roles: only see staff operations — no resident data
+  const staffItems: NavItem[] = [
+    link('My Dashboard',    '/portal/staff-management',             'fa-tachometer-alt', 'staff_dashboard'),
+    link('My Tasks',        '/portal/staff-management/tasks',       'fa-check-square',   'staff_tasks'),
+    link('My Attendance',   '/portal/staff-management/attendance',  'fa-clock',          'staff_attendance'),
+  ];
+  if (user.portalRole === 'supervisor' || user.portalRole === 'afm') {
+    staffItems.push(
+      link('Team Roster',      '/portal/staff-management/team',             'fa-users',          'staff_team'),
+      link('Task Assignment',  '/portal/staff-management/assign',           'fa-tasks',          'staff_assign'),
+      link('Compliance Logs',  '/portal/staff-management/compliance',       'fa-clipboard-check','staff_compliance'),
+      link('Reports',          '/portal/staff-management/reports',          'fa-chart-bar',      'staff_reports'),
+    );
+  }
+  if (user.portalRole === 'afm') {
+    staffItems.push(
+      link('Proposals Queue',  '/portal/staff-management/proposals',        'fa-inbox',          'staff_proposals'),
+      link('All Departments',  '/portal/staff-management/departments',      'fa-sitemap',        'staff_departments'),
+    );
+  }
+  navGroups.push({ label: 'Staff Operations', items: staffItems });
+
 } else {
   // ── DB-driven nav for member / executive / admin ──────────────────────────
 
@@ -164,7 +189,26 @@ if (navRole === 'guard') {
     groupMap.set('Governance', govItems);
   }
 
-  // 4. Prepend hardcoded admin tool links to the Administration group.
+  // 4a. Inject Staff Management sub-page links for exec+ users.
+  if (navRank >= NAV_ROLE_RANK.executive) {
+    const adminItems = groupMap.get('Administration') ?? [];
+    const smIdx = adminItems.findIndex(i => i.activeKey === 'staff_management');
+    const smLinks = [
+      link('Staff Directory',    '/portal/staff-management/staff',       'fa-id-card',         'staff_management_staff'),
+      link('Activity Templates', '/portal/staff-management/activities',  'fa-list-alt',        'staff_management_activities'),
+      link('Shift Config',       '/portal/staff-management/shifts',      'fa-calendar-alt',    'staff_management_shifts'),
+      link('Agency Management',  '/portal/staff-management/agencies',    'fa-building',        'staff_management_agencies'),
+      link('Proposals Queue',    '/portal/staff-management/proposals',   'fa-inbox',           'staff_management_proposals'),
+    ];
+    if (smIdx >= 0) {
+      adminItems.splice(smIdx + 1, 0, ...smLinks);
+    } else {
+      adminItems.push(link('Staff Management', '/portal/staff-management', 'fa-users-cog', 'staff_management'), ...smLinks);
+    }
+    groupMap.set('Administration', adminItems);
+  }
+
+  // 4b. Prepend hardcoded admin tool links to the Administration group.
   if (user.isAdmin) {
     const adminItems = groupMap.get('Administration') ?? [];
     adminItems.unshift(

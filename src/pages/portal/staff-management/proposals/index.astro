@@ -1,0 +1,254 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const canPropose = ['supervisor', 'afm'].includes(user.portalRole);
+const canReview  = user.portalRole === 'afm' || ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+if (!canPropose && !canReview) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+const { data: proposals } = await sb
+  .from('staff_activity_proposals')
+  .select('id, department, title, frequency, status, requires_photo, review_notes, created_at, proposed_by')
+  .eq('society_id', SOCIETY_ID)
+  .order('created_at', { ascending: false });
+
+const pending   = (proposals ?? []).filter(p => p.status === 'pending');
+const reviewed  = (proposals ?? []).filter(p => p.status !== 'pending');
+
+const DEPT_LABELS: Record<string, string> = {
+  security: 'Security', housekeeping: 'Housekeeping', gardening: 'Gardening',
+  maintenance: 'Maintenance', admin: 'Administration', multi: 'Multi',
+};
+---
+
+<PortalLayout title="Proposals Queue" user={user} activeModule="staff_proposals">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Activity Proposals</h1>
+      <p class="text-text-secondary text-sm mt-1">
+        {pending.length} pending review
+      </p>
+    </div>
+    {canPropose && (
+      <button id="propose-btn" class="btn-primary text-sm">
+        <i class="fas fa-plus mr-1.5" aria-hidden="true"></i>Propose Activity
+      </button>
+    )}
+  </div>
+
+  <!-- Pending proposals -->
+  {pending.length > 0 && (
+    <div class="mb-6">
+      <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">Pending Review ({pending.length})</h2>
+      <div class="space-y-3">
+        {pending.map(p => (
+          <div class="card-premium p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1">
+                <div class="font-semibold text-text-primary">{p.title}</div>
+                <div class="flex items-center gap-3 mt-1 flex-wrap">
+                  <span class="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full capitalize">
+                    {DEPT_LABELS[p.department] ?? p.department}
+                  </span>
+                  <span class="text-xs text-text-secondary capitalize">{p.frequency}</span>
+                  {p.requires_photo && (
+                    <span class="text-xs text-primary-500">
+                      <i class="fas fa-camera mr-1" aria-hidden="true"></i>Photo required
+                    </span>
+                  )}
+                </div>
+                <div class="text-xs text-text-secondary mt-1.5">
+                  Proposed {new Date(p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </div>
+              </div>
+              {canReview && (
+                <div class="flex gap-2 flex-shrink-0">
+                  <button class="approve-btn text-xs bg-secondary-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 transition-colors"
+                    data-id={p.id}>Approve</button>
+                  <button class="reject-btn text-xs border border-red-300 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    data-id={p.id}>Reject</button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {pending.length === 0 && (
+    <div class="text-center py-10 mb-6">
+      <i class="fas fa-inbox text-5xl text-primary-200 mb-3" aria-hidden="true"></i>
+      <h3 class="text-base font-semibold text-text-primary mb-1">No pending proposals</h3>
+      <p class="text-sm text-text-secondary">All proposals have been reviewed.</p>
+    </div>
+  )}
+
+  <!-- Reviewed proposals history -->
+  {reviewed.length > 0 && (
+    <div>
+      <h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">Recently Reviewed</h2>
+      <div class="space-y-2">
+        {reviewed.slice(0, 10).map(p => (
+          <div class="card-premium p-3 flex items-center gap-3">
+            <i class={`fas ${p.status === 'approved' ? 'fa-check-circle text-secondary-500' : 'fa-times-circle text-red-500'}`} aria-hidden="true"></i>
+            <span class="flex-1 text-sm text-text-primary">{p.title}</span>
+            <span class="text-xs text-text-secondary capitalize">{DEPT_LABELS[p.department] ?? p.department}</span>
+            <span class={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${p.status === 'approved' ? 'bg-secondary-500/10 text-secondary-500' : 'bg-red-50 text-red-600'}`}>
+              {p.status}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  <!-- Propose activity drawer -->
+  <div id="propose-panel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-primary-600">Propose New Activity</h2>
+      <button id="close-propose-panel" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="p-4">
+      <div id="propose-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+      <form id="propose-form" class="space-y-4">
+        <div>
+          <label class="form-label">Activity Title (English) <span class="text-red-500">*</span></label>
+          <input name="title" type="text" required maxlength="200" class="form-input" placeholder="e.g. Weekly Fire Door Inspection" />
+        </div>
+        <div>
+          <label class="form-label">Title in Hindi (हिन्दी)</label>
+          <input name="title_hi" type="text" maxlength="200" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label">Title in Telugu (తెలుగు)</label>
+          <input name="title_te" type="text" maxlength="200" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label">Department <span class="text-red-500">*</span></label>
+          <select name="department" required class="form-input bg-white">
+            {Object.entries(DEPT_LABELS).map(([k, v]) => <option value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Frequency <span class="text-red-500">*</span></label>
+          <select name="frequency" required class="form-input bg-white">
+            {['daily','weekly','monthly','quarterly','half_yearly','yearly','on_demand'].map(f => (
+              <option value={f}>{f.replace('_', ' ')}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Description / Justification</label>
+          <textarea name="description" rows={3} class="form-input" placeholder="Why is this activity needed? What safety/compliance requirement does it address?"></textarea>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="checkbox" name="requires_photo" id="requires_photo" class="w-4 h-4 rounded accent-primary-600" />
+          <label for="requires_photo" class="text-sm text-text-primary">Requires photo proof on completion</label>
+        </div>
+        <button type="submit" class="btn-primary w-full">Submit Proposal for Review</button>
+      </form>
+    </div>
+  </div>
+  <div id="propose-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+
+  <!-- Review modal -->
+  <div id="review-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-sm">
+      <div class="p-5">
+        <h3 id="review-modal-title" class="font-semibold text-text-primary mb-3">Review Proposal</h3>
+        <div id="review-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+        <form id="review-form" class="space-y-3">
+          <input type="hidden" id="review-proposal-id" name="proposal_id" />
+          <input type="hidden" id="review-action" name="action" />
+          <div>
+            <label class="form-label">Review Notes</label>
+            <textarea name="review_notes" rows={3} class="form-input" placeholder="Optional feedback for the proposer…"></textarea>
+          </div>
+          <div class="flex gap-2 pt-1">
+            <button type="button" id="cancel-review" class="btn-outline flex-1 text-sm">Cancel</button>
+            <button type="submit" id="confirm-review-btn" class="btn-primary flex-1 text-sm">Confirm</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</PortalLayout>
+
+<script>
+const proposePanel = document.getElementById('propose-panel')!;
+const proposeBackdrop = document.getElementById('propose-backdrop')!;
+const openPropose = () => { proposePanel.classList.remove('translate-x-full'); proposeBackdrop.classList.remove('hidden'); };
+const closePropose = () => { proposePanel.classList.add('translate-x-full'); proposeBackdrop.classList.add('hidden'); };
+document.getElementById('propose-btn')?.addEventListener('click', openPropose);
+document.getElementById('close-propose-panel')?.addEventListener('click', closePropose);
+proposeBackdrop.addEventListener('click', closePropose);
+
+const reviewModal = document.getElementById('review-modal')!;
+const reviewIdInput = document.getElementById('review-proposal-id') as HTMLInputElement;
+const reviewActionInput = document.getElementById('review-action') as HTMLInputElement;
+const reviewTitle = document.getElementById('review-modal-title')!;
+const confirmBtn = document.getElementById('confirm-review-btn')!;
+
+document.querySelectorAll('.approve-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    reviewIdInput.value = (btn as HTMLElement).dataset.id!;
+    reviewActionInput.value = 'approved';
+    reviewTitle.textContent = 'Approve Proposal';
+    confirmBtn.textContent = 'Approve';
+    confirmBtn.className = 'btn-primary flex-1 text-sm';
+    reviewModal.classList.remove('hidden');
+  });
+});
+
+document.querySelectorAll('.reject-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    reviewIdInput.value = (btn as HTMLElement).dataset.id!;
+    reviewActionInput.value = 'rejected';
+    reviewTitle.textContent = 'Reject Proposal';
+    confirmBtn.textContent = 'Reject';
+    confirmBtn.className = 'flex-1 text-sm bg-red-600 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-red-700 transition-colors';
+    reviewModal.classList.remove('hidden');
+  });
+});
+
+document.getElementById('cancel-review')?.addEventListener('click', () => reviewModal.classList.add('hidden'));
+
+document.getElementById('review-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target as HTMLFormElement);
+  const errEl = document.getElementById('review-error')!;
+  errEl.classList.add('hidden');
+  const res = await fetch('/api/v1/staff/proposals/review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.fromEntries(fd.entries())),
+  });
+  if (res.ok) { window.location.reload(); }
+  else { const d = await res.json().catch(() => ({})); errEl.textContent = d.message ?? 'Failed.'; errEl.classList.remove('hidden'); }
+});
+
+document.getElementById('propose-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target as HTMLFormElement);
+  const body = Object.fromEntries(fd.entries());
+  body.requires_photo = fd.has('requires_photo') ? 'true' : 'false';
+  const errEl = document.getElementById('propose-error')!;
+  errEl.classList.add('hidden');
+  const res = await fetch('/api/v1/staff/proposals', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.ok) { window.location.reload(); }
+  else { const d = await res.json().catch(() => ({})); errEl.textContent = d.message ?? 'Failed to submit proposal.'; errEl.classList.remove('hidden'); }
+});
+</script>

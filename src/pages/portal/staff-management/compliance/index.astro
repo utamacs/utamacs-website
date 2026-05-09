@@ -1,0 +1,205 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isSupervisorPlus = ['supervisor', 'afm'].includes(user.portalRole) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+if (!isSupervisorPlus) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+const { data: logs } = await sb
+  .from('staff_compliance_logs')
+  .select('id, category, title, result, performed_at, next_due_at, issue_notes')
+  .eq('society_id', SOCIETY_ID)
+  .order('performed_at', { ascending: false })
+  .limit(100);
+
+const today = new Date();
+const overdue = (logs ?? []).filter(l => l.next_due_at && new Date(l.next_due_at) < today);
+
+const CATEGORY_LABELS: Record<string, string> = {
+  fire: 'Fire Safety', lift: 'Lift', water_stp: 'Water/STP', dg_set: 'DG Set',
+  electrical: 'Electrical', pest_control: 'Pest Control',
+  security_drill: 'Security Drill', other: 'Other',
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  fire: 'fa-fire-extinguisher', lift: 'fa-elevator', water_stp: 'fa-water',
+  dg_set: 'fa-bolt', electrical: 'fa-plug', pest_control: 'fa-bug',
+  security_drill: 'fa-shield-alt', other: 'fa-clipboard',
+};
+
+const RESULT_BADGE: Record<string, string> = {
+  ok: 'bg-secondary-500/10 text-secondary-500',
+  issue_found: 'bg-amber-50 text-amber-700',
+  failed: 'bg-red-50 text-red-600',
+};
+---
+
+<PortalLayout title="Compliance Logs" user={user} activeModule="staff_compliance">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Compliance Logs</h1>
+      <p class="text-text-secondary text-sm mt-1">Legally mandated SOP records — immutable</p>
+    </div>
+    <button id="log-btn" class="btn-primary text-sm">
+      <i class="fas fa-plus mr-1.5" aria-hidden="true"></i>Record Activity
+    </button>
+  </div>
+
+  {overdue.length > 0 && (
+    <div class="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+      <i class="fas fa-exclamation-triangle text-red-500 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+      <div>
+        <div class="font-semibold text-red-700 text-sm">{overdue.length} compliance activit{overdue.length > 1 ? 'ies are' : 'y is'} overdue</div>
+        <div class="text-xs text-red-600 mt-0.5">
+          {overdue.slice(0, 3).map(l => l.title).join(', ')}{overdue.length > 3 ? ` +${overdue.length - 3} more` : ''}
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Category summary -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    {Object.entries(CATEGORY_LABELS).map(([cat, label]) => {
+      const count = (logs ?? []).filter(l => l.category === cat).length;
+      return (
+        <div class="card-premium p-3 text-center">
+          <i class={`fas ${CATEGORY_ICONS[cat] ?? 'fa-clipboard'} text-primary-400 text-lg mb-1`} aria-hidden="true"></i>
+          <div class="text-lg font-bold text-text-primary">{count}</div>
+          <div class="text-xs text-text-secondary">{label}</div>
+        </div>
+      );
+    })}
+  </div>
+
+  <!-- Log table -->
+  <div class="card-premium overflow-hidden">
+    <div class="p-4 border-b border-border-light">
+      <h2 class="font-semibold text-text-primary">Recent Records</h2>
+      <p class="text-xs text-text-secondary mt-0.5">Records are permanent — no edits or deletions allowed</p>
+    </div>
+    {(logs ?? []).length === 0 ? (
+      <div class="text-center py-10">
+        <i class="fas fa-clipboard text-4xl text-primary-200 mb-3" aria-hidden="true"></i>
+        <p class="text-sm text-text-secondary">No compliance records yet. Start recording activities.</p>
+      </div>
+    ) : (
+      <div class="divide-y divide-border-light">
+        {(logs ?? []).slice(0, 50).map(log => (
+          <div class="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors">
+            <div class="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i class={`fas ${CATEGORY_ICONS[log.category] ?? 'fa-clipboard'} text-primary-500 text-xs`} aria-hidden="true"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-text-primary truncate">{log.title}</div>
+              <div class="text-xs text-text-secondary">
+                {CATEGORY_LABELS[log.category] ?? log.category} ·
+                {new Date(log.performed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+              {log.issue_notes && (
+                <div class="text-xs text-amber-600 mt-0.5 truncate">
+                  <i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>{log.issue_notes}
+                </div>
+              )}
+            </div>
+            {log.next_due_at && (
+              <div class="hidden sm:block text-xs text-text-secondary flex-shrink-0">
+                Next: {new Date(log.next_due_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+              </div>
+            )}
+            <span class={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 capitalize ${RESULT_BADGE[log.result] ?? 'bg-gray-100 text-gray-600'}`}>
+              {log.result.replace('_', ' ')}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+
+  <!-- Record Activity Drawer -->
+  <div id="log-panel" class="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-primary-600">Record Compliance Activity</h2>
+      <button id="close-log-panel" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="p-4">
+      <div id="log-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+      <form id="log-form" class="space-y-4">
+        <div>
+          <label class="form-label">Category <span class="text-red-500">*</span></label>
+          <select name="category" required class="form-input bg-white">
+            {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Activity Title <span class="text-red-500">*</span></label>
+          <input name="title" type="text" required maxlength="200" class="form-input" placeholder="e.g. Monthly fire extinguisher inspection" />
+        </div>
+        <div>
+          <label class="form-label">Description / Findings</label>
+          <textarea name="description" rows={2} class="form-input" placeholder="What was done? Any observations?"></textarea>
+        </div>
+        <div>
+          <label class="form-label">Result <span class="text-red-500">*</span></label>
+          <select name="result" required class="form-input bg-white">
+            <option value="ok">OK — No issues</option>
+            <option value="issue_found">Issue Found — Noted for follow-up</option>
+            <option value="failed">Failed — Immediate action required</option>
+          </select>
+        </div>
+        <div id="issue-notes-section" class="hidden">
+          <label class="form-label">Issue Notes <span class="text-red-500">*</span></label>
+          <textarea name="issue_notes" rows={2} class="form-input" placeholder="Describe the issue…"></textarea>
+        </div>
+        <div>
+          <label class="form-label">Performed At</label>
+          <input name="performed_at" type="datetime-local" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label">Next Due Date</label>
+          <input name="next_due_at" type="date" class="form-input" />
+        </div>
+        <button type="submit" class="btn-primary w-full">
+          <i class="fas fa-save mr-2" aria-hidden="true"></i>Record Activity
+        </button>
+      </form>
+    </div>
+  </div>
+  <div id="log-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+</PortalLayout>
+
+<script>
+const panel = document.getElementById('log-panel')!;
+const backdrop = document.getElementById('log-backdrop')!;
+const open = () => { panel.classList.remove('translate-x-full'); backdrop.classList.remove('hidden'); };
+const close = () => { panel.classList.add('translate-x-full'); backdrop.classList.add('hidden'); };
+document.getElementById('log-btn')?.addEventListener('click', open);
+document.getElementById('close-log-panel')?.addEventListener('click', close);
+backdrop.addEventListener('click', close);
+
+const resultSelect = document.getElementById('log-form')?.querySelector('[name="result"]') as HTMLSelectElement;
+const issueSection = document.getElementById('issue-notes-section')!;
+resultSelect?.addEventListener('change', () => {
+  issueSection.classList.toggle('hidden', resultSelect.value === 'ok');
+});
+
+document.getElementById('log-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target as HTMLFormElement);
+  const body = Object.fromEntries(fd.entries());
+  if (!body.performed_at) body.performed_at = new Date().toISOString();
+  const errEl = document.getElementById('log-error')!;
+  errEl.classList.add('hidden');
+  const res = await fetch('/api/v1/staff/compliance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (res.ok) { window.location.reload(); }
+  else { const d = await res.json().catch(() => ({})); errEl.textContent = d.message ?? 'Failed.'; errEl.classList.remove('hidden'); }
+});
+</script>

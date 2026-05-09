@@ -1,0 +1,228 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isSupervisorPlus = ['supervisor', 'afm'].includes(user.portalRole) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+if (!isSupervisorPlus) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+const today = new Date().toISOString().split('T')[0];
+
+// For supervisor: fetch own department from staff_members record
+let supervisorDept: string | null = null;
+if (user.portalRole === 'supervisor') {
+  const { data: sm } = await sb.from('staff_members').select('department').eq('user_id', user.id).eq('society_id', SOCIETY_ID).single();
+  supervisorDept = sm?.department ?? null;
+}
+
+let staffQuery = sb.from('staff_members')
+  .select('id, name, role, department, designation, shift_id, is_active')
+  .eq('society_id', SOCIETY_ID)
+  .eq('is_active', true);
+
+if (supervisorDept) staffQuery = staffQuery.eq('department', supervisorDept);
+
+const { data: team } = await staffQuery.order('name');
+
+// Today's attendance for each team member
+const teamIds = (team ?? []).map(s => s.id);
+const { data: todayAtt } = await sb.from('staff_attendance')
+  .select('staff_id, check_in, check_out, status')
+  .in('staff_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
+  .eq('date', today);
+
+const attMap = Object.fromEntries((todayAtt ?? []).map(a => [a.staff_id, a]));
+
+// Today's pending tasks count per member
+const { data: todayTasks } = await sb.from('staff_task_assignments')
+  .select('assigned_to, status')
+  .in('assigned_to', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
+  .eq('due_date', today);
+
+const taskPendingMap: Record<string, number> = {};
+for (const t of todayTasks ?? []) {
+  if (t.status === 'pending') taskPendingMap[t.assigned_to] = (taskPendingMap[t.assigned_to] ?? 0) + 1;
+}
+---
+
+<PortalLayout title="Team Roster" user={user} activeModule="staff_team">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">
+        Team Roster{supervisorDept ? ` — ${supervisorDept.charAt(0).toUpperCase() + supervisorDept.slice(1)}` : ''}
+      </h1>
+      <p class="text-text-secondary text-sm mt-1">
+        {(team ?? []).length} members · Live status as of {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+      </p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/portal/staff-management/assign" class="btn-primary text-sm">
+        <i class="fas fa-tasks mr-1.5" aria-hidden="true"></i>Assign Tasks
+      </a>
+      <button id="bulk-att-btn" class="btn-outline text-sm">
+        <i class="fas fa-clock mr-1.5" aria-hidden="true"></i>Mark Attendance
+      </button>
+    </div>
+  </div>
+
+  <!-- Status summary chips -->
+  <div class="flex flex-wrap gap-3 mb-5">
+    {[
+      { label: 'Present',      count: (todayAtt ?? []).filter(a => a.status === 'present').length,  color: 'bg-secondary-500/10 text-secondary-500' },
+      { label: 'Absent',       count: (todayAtt ?? []).filter(a => a.status === 'absent').length,   color: 'bg-red-50 text-red-600' },
+      { label: 'Not recorded', count: (team ?? []).length - (todayAtt ?? []).length,                color: 'bg-gray-100 text-gray-600' },
+    ].map(chip => (
+      <div class={`px-3 py-1.5 rounded-full text-sm font-medium ${chip.color}`}>
+        {chip.count} {chip.label}
+      </div>
+    ))}
+  </div>
+
+  <!-- Team grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    {(team ?? []).map(member => {
+      const att = attMap[member.id];
+      const pending = taskPendingMap[member.id] ?? 0;
+      const checkedIn = !!att?.check_in;
+      const checkedOut = !!att?.check_out;
+      const status = att?.status ?? 'not_recorded';
+      return (
+        <div class="card-premium p-4">
+          <div class="flex items-start gap-3">
+            <div class={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+              checkedIn && !checkedOut ? 'bg-secondary-500/20' :
+              checkedOut ? 'bg-primary-50' :
+              status === 'absent' ? 'bg-red-50' : 'bg-gray-100'
+            }`}>
+              <i class={`fas fa-user text-sm ${
+                checkedIn && !checkedOut ? 'text-secondary-500' :
+                checkedOut ? 'text-primary-500' :
+                status === 'absent' ? 'text-red-400' : 'text-gray-400'
+              }`} aria-hidden="true"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <a href={`/portal/staff-management/staff/${member.id}`} class="font-semibold text-text-primary text-sm hover:text-primary-600 truncate block">
+                {member.name}
+              </a>
+              <div class="text-xs text-text-secondary">{member.designation ?? member.role.replace('_', ' ')}</div>
+            </div>
+          </div>
+
+          <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span class="text-text-secondary">In: </span>
+              <span class="font-medium text-text-primary">
+                {att?.check_in ? new Date(att.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
+              </span>
+            </div>
+            <div>
+              <span class="text-text-secondary">Out: </span>
+              <span class="font-medium text-text-primary">
+                {att?.check_out ? new Date(att.check_out).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-2 flex items-center justify-between">
+            <span class={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+              status === 'present' ? 'bg-secondary-500/10 text-secondary-500' :
+              status === 'absent'  ? 'bg-red-50 text-red-600' :
+              'bg-gray-100 text-gray-500'
+            }`}>
+              {status.replace('_', ' ')}
+            </span>
+            {pending > 0 && (
+              <span class="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                {pending} task{pending > 1 ? 's' : ''} pending
+              </span>
+            )}
+          </div>
+
+          {!att && (
+            <button class="mark-att-btn mt-2 w-full text-xs border border-border-light rounded-lg py-1.5 text-text-secondary hover:bg-primary-50 hover:text-primary-600 hover:border-primary-300 transition-colors"
+              data-staff-id={member.id} data-staff-name={member.name}>
+              Mark Attendance
+            </button>
+          )}
+        </div>
+      );
+    })}
+  </div>
+
+  <!-- Quick mark attendance modal -->
+  <div id="att-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-sm">
+      <div class="p-5">
+        <h3 class="font-semibold text-text-primary mb-1">Mark Attendance</h3>
+        <p id="att-modal-name" class="text-sm text-text-secondary mb-4"></p>
+        <div id="att-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+        <form id="att-form" class="space-y-3">
+          <input type="hidden" id="att-staff-id" name="staff_id" />
+          <div>
+            <label class="form-label">Status <span class="text-red-500">*</span></label>
+            <select name="status" required class="form-input bg-white">
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+              <option value="half_day">Half Day</option>
+              <option value="leave">On Leave</option>
+            </select>
+          </div>
+          <div id="checkin-time-row">
+            <label class="form-label">Check-in Time</label>
+            <input name="check_in" type="time" class="form-input" />
+          </div>
+          <div>
+            <label class="form-label">Notes</label>
+            <input name="notes" type="text" maxlength="200" class="form-input" />
+          </div>
+          <div class="flex gap-2">
+            <button type="button" id="cancel-att" class="btn-outline flex-1 text-sm">Cancel</button>
+            <button type="submit" class="btn-primary flex-1 text-sm">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</PortalLayout>
+
+<script>
+const attModal = document.getElementById('att-modal')!;
+const attStaffId = document.getElementById('att-staff-id') as HTMLInputElement;
+const attModalName = document.getElementById('att-modal-name')!;
+const checkInRow = document.getElementById('checkin-time-row')!;
+
+document.querySelectorAll('.mark-att-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    attStaffId.value = (btn as HTMLElement).dataset.staffId!;
+    attModalName.textContent = (btn as HTMLElement).dataset.staffName!;
+    attModal.classList.remove('hidden');
+  });
+});
+
+document.getElementById('cancel-att')?.addEventListener('click', () => attModal.classList.add('hidden'));
+attModal.addEventListener('click', (e) => { if (e.target === attModal) attModal.classList.add('hidden'); });
+
+const statusSelect = document.getElementById('att-form')?.querySelector('[name="status"]') as HTMLSelectElement;
+statusSelect?.addEventListener('change', () => {
+  checkInRow.classList.toggle('hidden', statusSelect.value !== 'present' && statusSelect.value !== 'half_day');
+});
+
+document.getElementById('att-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target as HTMLFormElement);
+  const body: Record<string, string> = {};
+  fd.forEach((v, k) => { body[k] = String(v); });
+  const errEl = document.getElementById('att-error')!;
+  errEl.classList.add('hidden');
+  const res = await fetch('/api/v1/staff/attendance/supervisor', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (res.ok) { window.location.reload(); }
+  else { const d = await res.json().catch(() => ({})); errEl.textContent = d.message ?? 'Failed.'; errEl.classList.remove('hidden'); }
+});
+</script>

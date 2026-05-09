@@ -1,0 +1,110 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isAfmPlus = user.portalRole === 'afm' || ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+if (!isAfmPlus) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+const today = new Date().toISOString().split('T')[0];
+
+const { data: staffList } = await sb
+  .from('staff_members')
+  .select('id, name, department, designation, is_active')
+  .eq('society_id', SOCIETY_ID);
+
+const { data: todayAtt } = await sb
+  .from('staff_attendance')
+  .select('staff_id, status')
+  .eq('society_id', SOCIETY_ID)
+  .eq('date', today);
+
+const attMap = Object.fromEntries((todayAtt ?? []).map(a => [a.staff_id, a.status]));
+
+const DEPT_LABELS: Record<string, string> = {
+  security: 'Security', housekeeping: 'Housekeeping', gardening: 'Gardening',
+  maintenance: 'Maintenance', admin: 'Administration', multi: 'Multi-Dept', other: 'Other',
+};
+
+const DEPT_ICONS: Record<string, string> = {
+  security: 'fa-shield-alt', housekeeping: 'fa-broom', gardening: 'fa-seedling',
+  maintenance: 'fa-wrench', admin: 'fa-user-tie', multi: 'fa-users', other: 'fa-user',
+};
+
+const DEPT_COLORS: Record<string, string> = {
+  security: 'from-blue-500 to-blue-600', housekeeping: 'from-green-500 to-green-600',
+  gardening: 'from-emerald-500 to-emerald-600', maintenance: 'from-orange-500 to-orange-600',
+  admin: 'from-purple-500 to-purple-600', multi: 'from-primary-500 to-primary-600', other: 'from-gray-500 to-gray-600',
+};
+
+const depts: Record<string, { total: number; active: number; present: number; absent: number; members: typeof staffList }> = {};
+for (const s of staffList ?? []) {
+  const d = s.department ?? 'other';
+  if (!depts[d]) depts[d] = { total: 0, active: 0, present: 0, absent: 0, members: [] };
+  depts[d]!.total++;
+  if (s.is_active) {
+    depts[d]!.active++;
+    const attStatus = attMap[s.id];
+    if (attStatus === 'present') depts[d]!.present++;
+    else if (attStatus === 'absent') depts[d]!.absent++;
+    depts[d]!.members!.push(s);
+  }
+}
+---
+
+<PortalLayout title="All Departments" user={user} activeModule="staff_departments">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-primary-600 font-poppins">All Departments</h1>
+    <p class="text-text-secondary text-sm mt-1">Society-wide staff overview — {(staffList ?? []).filter(s => s.is_active).length} active staff</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+    {Object.entries(depts).map(([dept, info]) => {
+      const attendancePct = info.active > 0 ? Math.round(info.present / info.active * 100) : 0;
+      return (
+        <div class="card-premium overflow-hidden">
+          <div class={`bg-gradient-to-r ${DEPT_COLORS[dept] ?? DEPT_COLORS.other} p-5 text-white`}>
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-2xl font-bold">{info.active}</div>
+                <div class="text-sm opacity-90">{DEPT_LABELS[dept] ?? dept}</div>
+              </div>
+              <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <i class={`fas ${DEPT_ICONS[dept] ?? 'fa-users'} text-xl`} aria-hidden="true"></i>
+              </div>
+            </div>
+            <!-- Attendance bar -->
+            <div class="mt-4">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="opacity-80">Today's attendance</span>
+                <span class="font-semibold">{attendancePct}%</span>
+              </div>
+              <div class="w-full h-1.5 bg-white/30 rounded-full overflow-hidden">
+                <div class="h-full bg-white rounded-full transition-all" style={`width: ${attendancePct}%`}></div>
+              </div>
+            </div>
+          </div>
+          <div class="p-4">
+            <div class="grid grid-cols-2 gap-3 text-sm mb-3">
+              <div class="text-center p-2 bg-secondary-500/10 rounded-lg">
+                <div class="font-bold text-secondary-500">{info.present}</div>
+                <div class="text-xs text-text-secondary">Present</div>
+              </div>
+              <div class="text-center p-2 bg-red-50 rounded-lg">
+                <div class="font-bold text-red-600">{info.absent}</div>
+                <div class="text-xs text-text-secondary">Absent</div>
+              </div>
+            </div>
+            <a href={`/portal/staff-management/team?dept=${dept}`} class="btn-outline w-full text-sm text-center block">
+              View Team →
+            </a>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</PortalLayout>

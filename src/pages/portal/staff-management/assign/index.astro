@@ -1,0 +1,208 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isSupervisorPlus = ['supervisor', 'afm'].includes(user.portalRole) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole) || user.isAdmin;
+if (!isSupervisorPlus) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+const today = new Date().toISOString().split('T')[0];
+
+// For supervisors: scope to own dept
+let supervisorDept: string | null = null;
+if (user.portalRole === 'supervisor') {
+  const { data: sm } = await sb.from('staff_members').select('department').eq('user_id', user.id).eq('society_id', SOCIETY_ID).single();
+  supervisorDept = sm?.department ?? null;
+}
+
+let staffQuery = sb.from('staff_members').select('id, name, department').eq('society_id', SOCIETY_ID).eq('is_active', true);
+if (supervisorDept) staffQuery = staffQuery.eq('department', supervisorDept);
+const { data: team } = await staffQuery.order('name');
+
+const { data: templates } = await sb
+  .from('staff_activity_templates')
+  .select('id, title, department, frequency, requires_photo')
+  .eq('society_id', SOCIETY_ID)
+  .eq('is_active', true)
+  .order('title');
+
+// Today's existing assignments
+const teamIds = (team ?? []).map(s => s.id);
+const { data: todayAssignments } = await sb
+  .from('staff_task_assignments')
+  .select('id, assigned_to, title, status, priority, due_time, requires_photo')
+  .in('assigned_to', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
+  .eq('due_date', today)
+  .order('priority', { ascending: false });
+
+const assignMap: Record<string, typeof todayAssignments> = {};
+for (const a of todayAssignments ?? []) {
+  if (!assignMap[a.assigned_to]) assignMap[a.assigned_to] = [];
+  assignMap[a.assigned_to]!.push(a);
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  pending: 'bg-amber-50 text-amber-700',
+  in_progress: 'bg-blue-50 text-blue-700',
+  completed: 'bg-secondary-500/10 text-secondary-500',
+  overdue: 'bg-red-50 text-red-600',
+};
+---
+
+<PortalLayout title="Task Assignment" user={user} activeModule="staff_assign">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Task Assignment</h1>
+      <p class="text-text-secondary text-sm mt-1">Assign tasks to team members for today</p>
+    </div>
+    <button id="assign-btn" class="btn-primary text-sm">
+      <i class="fas fa-plus mr-1.5" aria-hidden="true"></i>Assign Task
+    </button>
+  </div>
+
+  <!-- Per-member task view -->
+  <div class="space-y-4">
+    {(team ?? []).map(member => {
+      const tasks = assignMap[member.id] ?? [];
+      return (
+        <div class="card-premium p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 bg-primary-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-user text-primary-500 text-sm" aria-hidden="true"></i>
+              </div>
+              <div>
+                <div class="font-semibold text-text-primary text-sm">{member.name}</div>
+                <div class="text-xs text-text-secondary capitalize">{member.department}</div>
+              </div>
+            </div>
+            <button class="quick-assign-btn text-xs border border-border-light px-2.5 py-1 rounded-lg text-text-secondary hover:bg-primary-50 hover:text-primary-600 hover:border-primary-300 transition-colors"
+              data-staff-id={member.id} data-staff-name={member.name} data-dept={member.department}>
+              <i class="fas fa-plus mr-1" aria-hidden="true"></i>Assign
+            </button>
+          </div>
+          {tasks.length === 0 ? (
+            <p class="text-xs text-text-secondary italic">No tasks assigned today</p>
+          ) : (
+            <div class="space-y-1.5">
+              {tasks.map(t => (
+                <div class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                  <i class={`fas fa-circle text-[7px] ${t.priority === 'urgent' ? 'text-red-500' : t.priority === 'high' ? 'text-accent-500' : 'text-primary-300'}`} aria-hidden="true"></i>
+                  <span class="flex-1 text-xs text-text-primary truncate">{t.title}</span>
+                  {t.requires_photo && <i class="fas fa-camera text-xs text-primary-400" title="Photo required" aria-label="Photo required"></i>}
+                  <span class={`text-xs px-1.5 py-0.5 rounded-full font-medium capitalize ${STATUS_BADGE[t.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {t.status.replace('_', ' ')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+
+  <!-- Assign Task Drawer -->
+  <div id="assign-panel" class="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-primary-600">Assign Task</h2>
+      <button id="close-assign-panel" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="p-4">
+      <div id="assign-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+      <form id="assign-form" class="space-y-4">
+        <div>
+          <label class="form-label">Assign To <span class="text-red-500">*</span></label>
+          <select id="assign-to-select" name="assigned_to" required class="form-input bg-white">
+            <option value="">Select staff member</option>
+            {(team ?? []).map(m => <option value={m.id} data-dept={m.department}>{m.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">From Template</label>
+          <select id="template-select" name="template_id" class="form-input bg-white">
+            <option value="">Custom task (enter below)</option>
+            {(templates ?? []).map(t => <option value={t.id} data-title={t.title} data-photo={t.requires_photo ? 'true' : 'false'}>{t.title} ({t.frequency})</option>)}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Task Title <span class="text-red-500">*</span></label>
+          <input id="task-title" name="title" type="text" required maxlength="200" class="form-input" placeholder="Task description…" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label">Due Date <span class="text-red-500">*</span></label>
+            <input name="due_date" type="date" required class="form-input" value={today} />
+          </div>
+          <div>
+            <label class="form-label">Due Time</label>
+            <input name="due_time" type="time" class="form-input" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Priority</label>
+          <select name="priority" class="form-input bg-white">
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="checkbox" name="requires_photo" id="ap_photo" class="w-4 h-4 accent-primary-600" />
+          <label for="ap_photo" class="text-sm text-text-primary">Requires photo proof</label>
+        </div>
+        <button type="submit" class="btn-primary w-full">Assign Task</button>
+      </form>
+    </div>
+  </div>
+  <div id="assign-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+</PortalLayout>
+
+<script>
+const panel = document.getElementById('assign-panel')!;
+const backdrop = document.getElementById('assign-backdrop')!;
+const assignToSelect = document.getElementById('assign-to-select') as HTMLSelectElement;
+const templateSelect = document.getElementById('template-select') as HTMLSelectElement;
+const taskTitle = document.getElementById('task-title') as HTMLInputElement;
+
+function openPanel(staffId?: string) {
+  if (staffId) assignToSelect.value = staffId;
+  panel.classList.remove('translate-x-full');
+  backdrop.classList.remove('hidden');
+}
+function closePanel() { panel.classList.add('translate-x-full'); backdrop.classList.add('hidden'); }
+
+document.getElementById('assign-btn')?.addEventListener('click', () => openPanel());
+document.getElementById('close-assign-panel')?.addEventListener('click', closePanel);
+backdrop.addEventListener('click', closePanel);
+
+document.querySelectorAll('.quick-assign-btn').forEach(btn => {
+  btn.addEventListener('click', () => openPanel((btn as HTMLElement).dataset.staffId));
+});
+
+templateSelect.addEventListener('change', () => {
+  const opt = templateSelect.options[templateSelect.selectedIndex];
+  if (opt.value && opt.dataset.title) taskTitle.value = opt.dataset.title;
+  const photoCheck = document.getElementById('ap_photo') as HTMLInputElement;
+  if (photoCheck) photoCheck.checked = opt.dataset.photo === 'true';
+});
+
+document.getElementById('assign-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target as HTMLFormElement);
+  const body = { ...Object.fromEntries(fd.entries()), requires_photo: fd.has('requires_photo') };
+  const errEl = document.getElementById('assign-error')!;
+  errEl.classList.add('hidden');
+  const res = await fetch('/api/v1/staff/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (res.ok) { window.location.reload(); }
+  else { const d = await res.json().catch(() => ({})); errEl.textContent = d.message ?? 'Failed.'; errEl.classList.remove('hidden'); }
+});
+</script>
