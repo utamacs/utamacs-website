@@ -247,16 +247,16 @@ const VALID_STATUS = ['Open','Assigned','In_Progress','Waiting_for_User','Resolv
 
     function initRatingWidget() {
       const starPicker = document.getElementById('star-picker');
-      const submitRating = document.getElementById('submit-rating') as HTMLButtonElement | null;
+      const submitRating = document.getElementById('submit-rating');
       if (!starPicker || !submitRating) return;
 
       let selectedStar = 0;
 
       starPicker.querySelectorAll('.star-btn').forEach(btn => {
-        btn.addEventListener('mouseenter', () => highlightStars(parseInt((btn as HTMLElement).dataset.star!)));
+        btn.addEventListener('mouseenter', () => highlightStars(parseInt(btn.dataset.star)));
         btn.addEventListener('mouseleave', () => highlightStars(selectedStar));
         btn.addEventListener('click', () => {
-          selectedStar = parseInt((btn as HTMLElement).dataset.star!);
+          selectedStar = parseInt(btn.dataset.star);
           highlightStars(selectedStar);
           submitRating.disabled = false;
         });
@@ -264,7 +264,7 @@ const VALID_STATUS = ['Open','Assigned','In_Progress','Waiting_for_User','Resolv
 
       submitRating.addEventListener('click', async () => {
         if (!selectedStar) return;
-        const feedback = (document.getElementById('rating-feedback') as HTMLTextAreaElement).value.trim();
+        const feedback = document.getElementById('rating-feedback').value.trim();
         submitRating.disabled = true;
         submitRating.textContent = 'Submitting…';
         const res = await fetch(`/api/v1/complaints/${id}/rating`, {
