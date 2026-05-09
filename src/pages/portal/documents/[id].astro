@@ -1,0 +1,392 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+import { getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
+import { UUID_RE } from '@lib/constants';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const { id } = Astro.params;
+if (!id || !UUID_RE.test(id)) return Astro.redirect('/portal/documents');
+
+const sb = getSupabaseServiceClient();
+const ROLE_ORDER: Record<string, number> = { member: 0, executive: 1, admin: 2 };
+
+const { data: doc, error } = await sb
+  .from('documents')
+  .select('id, title, description, category, file_name, mime_type, file_size_bytes, version, is_public, requires_role, tags, folder_id, is_archived, download_count, storage_key, created_by, created_at, updated_at')
+  .eq('id', id)
+  .eq('society_id', SOCIETY_ID)
+  .is('parent_id', null)
+  .single();
+
+if (error || !doc) return Astro.redirect('/portal/documents');
+
+const userLevel = user.isAdmin ? 2 : (ROLE_ORDER[user.portalRole ?? ''] ?? 0);
+const docLevel  = ROLE_ORDER[doc.requires_role ?? 'member'] ?? 0;
+if (docLevel > userLevel && !doc.is_public) return new Response('Forbidden', { status: 403 });
+
+let downloadUrl: string | null = null;
+try { downloadUrl = await getDocumentDownloadUrl(doc.storage_key); } catch { /* file not yet in storage */ }
+
+const canManage = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+
+function fmtBytes(b: number | null) {
+  if (!b) return '—';
+  if (b < 1024) return `${b} B`;
+  if (b < 1048576) return `${(b/1024).toFixed(1)} KB`;
+  return `${(b/1048576).toFixed(1)} MB`;
+}
+
+function mimeIcon(mime: string | null) {
+  if (!mime) return 'fa-file';
+  if (mime.includes('pdf'))   return 'fa-file-pdf';
+  if (mime.includes('word') || mime.includes('docx')) return 'fa-file-word';
+  if (mime.includes('sheet') || mime.includes('excel') || mime.includes('csv')) return 'fa-file-excel';
+  if (mime.includes('image')) return 'fa-file-image';
+  return 'fa-file-alt';
+}
+
+function mimeColor(mime: string | null) {
+  if (!mime) return 'text-text-secondary';
+  if (mime.includes('pdf'))   return 'text-red-500';
+  if (mime.includes('word') || mime.includes('docx')) return 'text-blue-600';
+  if (mime.includes('sheet') || mime.includes('excel') || mime.includes('csv')) return 'text-secondary-500';
+  if (mime.includes('image')) return 'text-accent-500';
+  return 'text-primary-400';
+}
+
+const categoryColors: Record<string, string> = {
+  Bylaws:      'bg-purple-50 text-purple-700 border-purple-200',
+  Minutes:     'bg-blue-50 text-blue-700 border-blue-200',
+  Financial:   'bg-secondary-500/10 text-secondary-600 border-secondary-200',
+  Legal:       'bg-red-50 text-red-700 border-red-200',
+  Circulars:   'bg-primary-50 text-primary-700 border-primary-200',
+  Governance:  'bg-indigo-50 text-indigo-700 border-indigo-200',
+  HOTO:        'bg-orange-50 text-orange-700 border-orange-200',
+  Maintenance: 'bg-amber-50 text-amber-700 border-amber-200',
+  Forms:       'bg-teal-50 text-teal-700 border-teal-200',
+  Other:       'bg-gray-50 text-gray-600 border-gray-200',
+};
+const catColor = categoryColors[doc.category] ?? categoryColors.Other;
+---
+
+<PortalLayout title={doc.title} user={user} activeModule="documents">
+
+  <!-- Back + actions header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <a href="/portal/documents" class="text-text-secondary hover:text-primary-600 transition-colors p-1.5 rounded-lg hover:bg-primary-50" aria-label="Back to Documents">
+        <i class="fas fa-arrow-left" aria-hidden="true"></i>
+      </a>
+      <div>
+        <h1 class="text-2xl font-bold text-primary-600 font-poppins">{doc.title}</h1>
+        <p class="text-text-secondary text-sm mt-0.5">Document details &amp; download</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      {canManage && !doc.is_archived && (
+        <button id="new-version-btn" class="btn-outline text-sm flex items-center gap-2">
+          <i class="fas fa-upload" aria-hidden="true"></i>
+          New Version
+        </button>
+      )}
+      {canManage && !doc.is_archived && (
+        <button id="archive-btn" class="btn-ghost text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+          <i class="fas fa-archive" aria-hidden="true"></i>
+          Archive
+        </button>
+      )}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Left: main content -->
+    <div class="lg:col-span-2 space-y-5">
+
+      <!-- File card -->
+      <div class="card-premium p-6">
+        <div class="flex items-start gap-4">
+          <div class={`w-14 h-14 rounded-xl bg-gray-50 border border-border-light flex items-center justify-center flex-shrink-0`}>
+            <i class={`fas ${mimeIcon(doc.mime_type)} text-2xl ${mimeColor(doc.mime_type)}`} aria-hidden="true"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <span class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${catColor}`}>{doc.category}</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
+                v{doc.version}
+              </span>
+              {doc.is_archived && (
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                  Archived
+                </span>
+              )}
+              {doc.is_public && (
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary-500/10 text-secondary-600 border border-secondary-200">
+                  Public
+                </span>
+              )}
+            </div>
+            <p class="text-sm text-text-secondary truncate">{doc.file_name ?? 'No filename'}</p>
+            <p class="text-xs text-text-secondary mt-0.5">{fmtBytes(doc.file_size_bytes)}{doc.mime_type ? ` · ${doc.mime_type}` : ''}</p>
+          </div>
+        </div>
+
+        {doc.description && (
+          <p class="mt-4 text-sm text-text-primary leading-relaxed border-t border-border-light pt-4">
+            {doc.description}
+          </p>
+        )}
+
+        <!-- Download / no-file state -->
+        <div class="mt-5 pt-4 border-t border-border-light">
+          {downloadUrl ? (
+            <a href={downloadUrl} target="_blank" rel="noopener noreferrer"
+               class="btn-primary text-sm inline-flex items-center gap-2">
+              <i class="fas fa-download" aria-hidden="true"></i>
+              Download {doc.file_name ?? 'File'}
+            </a>
+          ) : (
+            <div class="flex items-center gap-2 text-sm text-text-secondary bg-section-alt rounded-lg px-4 py-3">
+              <i class="fas fa-info-circle text-primary-400" aria-hidden="true"></i>
+              File not available for download — the document record exists but no file has been uploaded to storage yet.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <!-- Tags -->
+      {doc.tags && doc.tags.length > 0 && (
+        <div class="card-premium p-5">
+          <h3 class="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+            <i class="fas fa-tags text-primary-400 text-xs" aria-hidden="true"></i>
+            Tags
+          </h3>
+          <div class="flex flex-wrap gap-2">
+            {doc.tags.map((tag: string) => (
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-100">{tag}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <!-- Version history -->
+      <div class="card-premium p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-text-primary flex items-center gap-2">
+            <i class="fas fa-history text-primary-400 text-xs" aria-hidden="true"></i>
+            Version History
+          </h3>
+          <span class="text-xs text-text-secondary">v{doc.version} total</span>
+        </div>
+        <div id="history-list">
+          <div class="text-sm text-text-secondary text-center py-6">
+            <i class="fas fa-spinner fa-spin text-primary-400 mb-2 block text-lg" aria-hidden="true"></i>
+            Loading history…
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right: metadata sidebar -->
+    <div class="space-y-5">
+
+      <div class="card-premium p-5">
+        <h3 class="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <i class="fas fa-info-circle text-primary-400 text-xs" aria-hidden="true"></i>
+          Details
+        </h3>
+        <dl class="space-y-3">
+          <div>
+            <dt class="form-label mb-0.5">Category</dt>
+            <dd><span class={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${catColor}`}>{doc.category}</span></dd>
+          </div>
+          <div>
+            <dt class="form-label mb-0.5">Version</dt>
+            <dd class="text-sm text-text-primary">v{doc.version}</dd>
+          </div>
+          <div>
+            <dt class="form-label mb-0.5">Access level</dt>
+            <dd class="text-sm text-text-primary capitalize">{doc.requires_role}</dd>
+          </div>
+          <div>
+            <dt class="form-label mb-0.5">Visibility</dt>
+            <dd class="text-sm text-text-primary">{doc.is_public ? 'Public' : 'Members only'}</dd>
+          </div>
+          {doc.download_count != null && (
+            <div>
+              <dt class="form-label mb-0.5">Downloads</dt>
+              <dd class="text-sm text-text-primary">{doc.download_count}</dd>
+            </div>
+          )}
+          <div>
+            <dt class="form-label mb-0.5">Uploaded</dt>
+            <dd class="text-sm text-text-primary">{new Date(doc.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</dd>
+          </div>
+          <div>
+            <dt class="form-label mb-0.5">Last updated</dt>
+            <dd class="text-sm text-text-primary">{new Date(doc.updated_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="card-premium p-5">
+        <h3 class="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+          <i class="fas fa-bolt text-primary-400 text-xs" aria-hidden="true"></i>
+          Actions
+        </h3>
+        <div class="space-y-2">
+          {downloadUrl ? (
+            <a href={downloadUrl} target="_blank" rel="noopener noreferrer"
+               class="w-full btn-primary text-sm flex items-center justify-center gap-2">
+              <i class="fas fa-download" aria-hidden="true"></i> Download
+            </a>
+          ) : (
+            <div class="w-full text-center text-xs text-text-secondary py-2 bg-section-alt rounded-lg">No file in storage</div>
+          )}
+          <a href="/portal/documents" class="w-full btn-ghost text-sm flex items-center justify-center gap-2">
+            <i class="fas fa-list" aria-hidden="true"></i> All Documents
+          </a>
+          {canManage && !doc.is_archived && (
+            <button id="new-version-btn-side" class="w-full btn-outline text-sm flex items-center justify-center gap-2">
+              <i class="fas fa-upload" aria-hidden="true"></i> Upload New Version
+            </button>
+          )}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- New version upload modal -->
+  {canManage && (
+    <div id="new-version-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+        <div class="flex items-center justify-between p-5 border-b border-border-light">
+          <h3 class="text-lg font-semibold text-primary-600">Upload New Version</h3>
+          <button id="close-version-modal" class="text-text-secondary hover:text-text-primary p-1" aria-label="Close">
+            <i class="fas fa-times text-xl" aria-hidden="true"></i>
+          </button>
+        </div>
+        <form id="new-version-form" class="p-5 space-y-4">
+          <div>
+            <label class="form-label">File <span class="text-red-500">*</span></label>
+            <input id="new-version-file" type="file" accept=".pdf,.docx,.xlsx,.xls,.csv,.png,.jpg,.jpeg"
+                   class="form-input text-sm" required />
+          </div>
+          <div>
+            <label class="form-label">Change notes</label>
+            <textarea id="new-version-notes" rows="2" placeholder="What changed in this version?" class="form-input text-sm resize-none"></textarea>
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button type="submit" class="btn-primary flex-1 text-sm">
+              <span id="upload-version-label">Upload v{doc.version + 1}</span>
+            </button>
+            <button type="button" id="cancel-version-modal" class="btn-ghost flex-1 text-sm">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
+
+</PortalLayout>
+
+<script define:vars={{ docId: doc.id, canManage }}>
+const DOC_ID = docId;
+
+// ── Version history ──────────────────────────────────────────────────────────
+async function loadHistory() {
+  const container = document.getElementById('history-list');
+  try {
+    const res = await fetch(`/api/v1/documents/${DOC_ID}/history`, { credentials: 'include' });
+    if (!res.ok) throw new Error();
+    const versions = await res.json();
+    if (!versions.length) {
+      container.innerHTML = '<p class="text-sm text-text-secondary text-center py-4">No version history.</p>';
+      return;
+    }
+    container.innerHTML = versions.map(v => `
+      <div class="flex items-center justify-between gap-3 py-3 ${v.is_current ? '' : 'opacity-70'} border-b border-border-light last:border-0">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-8 h-8 rounded-lg ${v.is_current ? 'bg-primary-600' : 'bg-gray-100'} flex items-center justify-center flex-shrink-0">
+            <span class="text-xs font-bold ${v.is_current ? 'text-white' : 'text-text-secondary'}">v${v.version}</span>
+          </div>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-text-primary truncate">${v.file_name ?? 'Unnamed file'}</p>
+            <p class="text-xs text-text-secondary">${v.file_size_bytes ? (v.file_size_bytes > 1048576 ? (v.file_size_bytes/1048576).toFixed(1)+' MB' : (v.file_size_bytes/1024).toFixed(1)+' KB') : '—'} · ${new Date(v.created_at).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'})}</p>
+          </div>
+        </div>
+        ${v.is_current ? '<span class="text-xs font-medium text-secondary-500 flex-shrink-0">Current</span>' : ''}
+        ${v.download_url ? `<a href="${v.download_url}" target="_blank" rel="noopener" class="btn-ghost text-xs px-2 py-1.5 text-primary-600 flex-shrink-0"><i class="fas fa-download text-xs"></i></a>` : ''}
+      </div>
+    `).join('');
+  } catch {
+    container.innerHTML = '<p class="text-sm text-red-500 text-center py-4">Failed to load history.</p>';
+  }
+}
+loadHistory();
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+  toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+  setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
+// ── Archive ──────────────────────────────────────────────────────────────────
+document.getElementById('archive-btn')?.addEventListener('click', async () => {
+  if (!confirm('Archive this document? It will no longer appear in the documents list.')) return;
+  const res = await fetch(`/api/v1/documents?id=${DOC_ID}`, { method: 'DELETE', credentials: 'include' });
+  if (res.ok) { showToast('Document archived'); setTimeout(() => location.href = '/portal/documents', 1200); }
+  else showToast('Failed to archive document', 'error');
+});
+
+// ── New version modal ────────────────────────────────────────────────────────
+if (canManage) {
+  const modal = document.getElementById('new-version-modal');
+  const openModal = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); };
+  const closeModal = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+
+  document.getElementById('new-version-btn')?.addEventListener('click', openModal);
+  document.getElementById('new-version-btn-side')?.addEventListener('click', openModal);
+  document.getElementById('close-version-modal')?.addEventListener('click', closeModal);
+  document.getElementById('cancel-version-modal')?.addEventListener('click', closeModal);
+  modal?.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  document.getElementById('new-version-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fileInput = document.getElementById('new-version-file');
+    const notes = document.getElementById('new-version-notes').value.trim();
+    if (!fileInput.files[0]) return;
+
+    const label = document.getElementById('upload-version-label');
+    label.textContent = 'Uploading…';
+
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    if (notes) fd.append('notes', notes);
+
+    const res = await fetch(`/api/v1/documents/${DOC_ID}`, { method: 'PUT', credentials: 'include', body: fd });
+    if (res.ok) {
+      showToast('New version uploaded successfully');
+      closeModal();
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.message ?? 'Upload failed', 'error');
+      label.textContent = 'Retry Upload';
+    }
+  });
+}
+</script>

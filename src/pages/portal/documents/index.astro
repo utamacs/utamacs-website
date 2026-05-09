@@ -277,9 +277,9 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
               return `
                 <div class="flex items-center gap-4 px-5 py-4 border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors">
                   <i class="fas ${icon} text-xl w-6 text-center flex-shrink-0" aria-hidden="true"></i>
-                  <div class="flex-1 min-w-0">
+                  <div class="flex-1 min-w-0 cursor-pointer" onclick="location.href='/portal/documents/${d.id}'">
                     <div class="flex items-center gap-2">
-                      <span class="text-sm font-medium text-text-primary truncate">${d.title}</span>
+                      <span class="text-sm font-medium text-text-primary truncate hover:text-primary-600 transition-colors">${d.title}</span>
                       ${(d.version ?? 1) > 1 ? `<span class="text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded font-medium flex-shrink-0">v${d.version}</span>` : ''}
                     </div>
                     <div class="text-xs text-text-secondary mt-0.5">
@@ -290,6 +290,10 @@ const canUpload = ['executive', 'admin'].includes(user.role) || user.isAdmin;
                   </div>
                   <div class="flex items-center gap-1 flex-shrink-0">
                     ${d.requires_role === 'executive' ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium mr-1">Exec only</span>' : ''}
+                    <a href="/portal/documents/${d.id}"
+                       class="btn-ghost text-xs px-2 py-1.5 text-primary-600 hover:text-primary-700" title="View details">
+                      <i class="fas fa-eye text-xs" aria-hidden="true"></i>
+                    </a>
                     ${(d.version ?? 1) > 1
                       ? `<button onclick="openHistory('${d.id}', '${d.title.replace(/'/g, "\\'")}')"
                            class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-primary-600" title="Version history">

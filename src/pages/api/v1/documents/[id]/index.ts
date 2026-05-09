@@ -11,6 +11,43 @@ import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
+const ROLE_ORDER: Record<string, number> = { member: 0, executive: 1, admin: 2 };
+
+// GET /api/v1/documents/:id — single document detail + download URL
+export const GET: APIRoute = async ({ request, params }) => {
+  try {
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+
+    const id = params.id ?? '';
+    if (!UUID_RE.test(id)) return Response.json({ error: 'VALIDATION', message: 'Invalid document id' }, { status: 400 });
+
+    const sb = getSupabaseServiceClient();
+
+    const { data: doc, error } = await sb
+      .from('documents')
+      .select('id, title, description, category, file_name, mime_type, file_size_bytes, version, is_public, requires_role, tags, folder_id, is_archived, download_count, storage_key, created_by, created_at, updated_at')
+      .eq('id', id)
+      .eq('society_id', SOCIETY_ID)
+      .is('parent_id', null)
+      .single();
+
+    if (error || !doc) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
+
+    const userLevel = user.isAdmin ? 2 : (ROLE_ORDER[user.portalRole ?? ''] ?? 0);
+    const docLevel  = ROLE_ORDER[doc.requires_role ?? 'member'] ?? 0;
+    if (docLevel > userLevel && !doc.is_public) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
+
+    let download_url: string | null = null;
+    try { download_url = await getDocumentDownloadUrl(doc.storage_key); } catch { /* file may not exist yet */ }
+
+    const { storage_key: _sk, ...rest } = doc;
+    return Response.json({ ...rest, download_url });
+  } catch (err) {
+    return normalizeError(err, request.url);
+  }
+};
+
 const ALLOWED_MIME: Record<string, string> = {
   'application/pdf': 'pdf',
   'image/jpeg': 'jpg',
