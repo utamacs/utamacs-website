@@ -132,7 +132,7 @@ const canLog = isGuard || isPrivileged;
     let dateFrom = '';
     let dateTo = '';
 
-    function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    function showToast(msg, type = 'success') {
       const toast = document.createElement('div');
       toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
       toast.textContent = msg;
@@ -141,10 +141,10 @@ const canLog = isGuard || isPrivileged;
       setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3500);
     }
 
-    const SHIFT_LABELS: Record<string, string> = {
+    const SHIFT_LABELS = {
       morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', night: 'Night', full_day: 'Full Day'
     };
-    const SHIFT_COLORS: Record<string, string> = {
+    const SHIFT_COLORS = {
       morning: 'bg-yellow-100 text-yellow-700',
       afternoon: 'bg-orange-100 text-orange-700',
       evening: 'bg-purple-100 text-purple-700',
@@ -153,14 +153,14 @@ const canLog = isGuard || isPrivileged;
     };
 
     async function load() {
-      const container = document.getElementById('patrol-list')!;
+      const container = document.getElementById('patrol-list');
       container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
       const params = new URLSearchParams();
       if (incidentFilter) params.set('incidents', 'true');
       if (dateFrom) params.set('from', dateFrom);
       if (dateTo) params.set('to', dateTo);
       const res = await fetch(`/api/v1/security-patrol?${params}`, { credentials: 'include' });
-      const logs: any[] = res.ok ? await res.json() : [];
+      const logs = res.ok ? await res.json() : [];
 
       if (!logs.length) {
         container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No patrol logs found.</div>';
@@ -199,7 +199,7 @@ const canLog = isGuard || isPrivileged;
       }).join('');
     }
 
-    async function deleteLog(id: string) {
+    async function deleteLog(id) {
       if (!confirm('Delete this patrol log?')) return;
       const res = await fetch(`/api/v1/security-patrol?id=${id}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) { showToast('Log deleted.'); load(); }
@@ -215,40 +215,40 @@ const canLog = isGuard || isPrivileged;
         });
         btn.classList.add('bg-primary-600', 'text-white', 'border-primary-600');
         btn.classList.remove('bg-white', 'text-text-secondary', 'border-border-light');
-        incidentFilter = (btn as HTMLElement).dataset.filter === 'incidents';
+        incidentFilter = btn.dataset.filter === 'incidents';
         load();
       });
     });
 
-    document.getElementById('date-from')!.addEventListener('change', (e) => { dateFrom = (e.target as HTMLInputElement).value; load(); });
-    document.getElementById('date-to')!.addEventListener('change',   (e) => { dateTo   = (e.target as HTMLInputElement).value; load(); });
+    document.getElementById('date-from').addEventListener('change', (e) => { dateFrom = e.target.value; load(); });
+    document.getElementById('date-to').addEventListener('change',   (e) => { dateTo   = e.target.value; load(); });
 
     // Patrol modal
     if (canLog) {
-      const modal = document.getElementById('patrol-modal')!;
-      const errEl = document.getElementById('pm-error')!;
-      const submitBtn = document.getElementById('pm-submit') as HTMLButtonElement;
-      const submitLbl = document.getElementById('pm-submit-label')!;
+      const modal = document.getElementById('patrol-modal');
+      const errEl = document.getElementById('pm-error');
+      const submitBtn = document.getElementById('pm-submit');
+      const submitLbl = document.getElementById('pm-submit-label');
 
       function openModal() {
         modal.classList.remove('hidden');
         errEl.classList.add('hidden');
-        (document.getElementById('pm-date') as HTMLInputElement).value = new Date().toISOString().slice(0, 10);
-        document.querySelectorAll('.checkpoint-cb').forEach((cb: any) => { cb.checked = false; });
-        (document.getElementById('pm-incident') as HTMLInputElement).checked = false;
+        document.getElementById('pm-date').value = new Date().toISOString().slice(0, 10);
+        document.querySelectorAll('.checkpoint-cb').forEach((cb) => { cb.checked = false; });
+        document.getElementById('pm-incident').checked = false;
       }
       function closeModal() { modal.classList.add('hidden'); }
 
-      document.getElementById('log-btn')!.addEventListener('click', openModal);
-      document.getElementById('pm-close')!.addEventListener('click', closeModal);
-      document.getElementById('pm-cancel')!.addEventListener('click', closeModal);
+      document.getElementById('log-btn').addEventListener('click', openModal);
+      document.getElementById('pm-close').addEventListener('click', closeModal);
+      document.getElementById('pm-cancel').addEventListener('click', closeModal);
       modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
       submitBtn.addEventListener('click', async () => {
         errEl.classList.add('hidden');
-        const patrol_date = (document.getElementById('pm-date') as HTMLInputElement).value;
-        const shift = (document.getElementById('pm-shift') as HTMLSelectElement).value;
-        const guard_name = (document.getElementById('pm-guard') as HTMLInputElement).value.trim();
+        const patrol_date = document.getElementById('pm-date').value;
+        const shift = document.getElementById('pm-shift').value;
+        const guard_name = document.getElementById('pm-guard').value.trim();
 
         if (!patrol_date || !shift || !guard_name) {
           errEl.textContent = 'Date, shift and guard name are required.';
@@ -256,8 +256,8 @@ const canLog = isGuard || isPrivileged;
           return;
         }
 
-        const is_incident = (document.getElementById('pm-incident') as HTMLInputElement).checked;
-        const incidents = (document.getElementById('pm-incidents') as HTMLTextAreaElement).value.trim();
+        const is_incident = document.getElementById('pm-incident').checked;
+        const incidents = document.getElementById('pm-incidents').value.trim();
         if (is_incident && !incidents) {
           errEl.textContent = 'Please describe the incident.';
           errEl.classList.remove('hidden');
@@ -266,17 +266,17 @@ const canLog = isGuard || isPrivileged;
 
         submitBtn.disabled = true; submitLbl.textContent = 'Saving…';
 
-        const checkpoints: string[] = [];
-        document.querySelectorAll('.checkpoint-cb').forEach((cb: any) => { if (cb.checked) checkpoints.push(cb.value); });
+        const checkpoints = [];
+        document.querySelectorAll('.checkpoint-cb').forEach((cb) => { if (cb.checked) checkpoints.push(cb.value); });
 
         const body = {
           patrol_date, shift, guard_name,
-          start_time: (document.getElementById('pm-start') as HTMLInputElement).value || undefined,
-          end_time: (document.getElementById('pm-end') as HTMLInputElement).value || undefined,
+          start_time: document.getElementById('pm-start').value || undefined,
+          end_time: document.getElementById('pm-end').value || undefined,
           checkpoints: checkpoints.length ? checkpoints : undefined,
           is_incident,
           incidents: incidents || undefined,
-          remarks: (document.getElementById('pm-remarks') as HTMLTextAreaElement).value.trim() || undefined,
+          remarks: document.getElementById('pm-remarks').value.trim() || undefined,
         };
 
         const res = await fetch('/api/v1/security-patrol', {
@@ -297,7 +297,7 @@ const canLog = isGuard || isPrivileged;
       });
     }
 
-    (window as any).deleteLog = deleteLog;
+    window.deleteLog = deleteLog;
     load();
   </script>
 </PortalLayout>

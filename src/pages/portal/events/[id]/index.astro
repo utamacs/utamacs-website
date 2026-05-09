@@ -313,7 +313,7 @@ function fmtTime(d: Date) {
 
     async function doRsvp() {
       const btn = document.getElementById('rsvp-btn');
-      const count = parseInt((document.getElementById('attendees-count') as HTMLSelectElement)?.value ?? '1', 10);
+      const count = parseInt(document.getElementById('attendees-count')?.value ?? '1', 10);
       if (btn) { btn.setAttribute('disabled', ''); btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Registering…'; }
       const res = await fetch(`/api/v1/events/${eventId}/register`, {
         method: 'POST', credentials: 'include',
@@ -352,7 +352,7 @@ function fmtTime(d: Date) {
         const res = await fetch(`/api/v1/events/attendance?event_id=${eventId}`, { credentials: 'include' });
         const records = res.ok ? await res.json() : [];
 
-        const checkedIn = records.filter((r: any) => r.checked_in_at).length;
+        const checkedIn = records.filter((r) => r.checked_in_at).length;
         if (summary) summary.textContent = `${records.length} registered · ${checkedIn} checked in`;
 
         if (!records.length) {
@@ -372,7 +372,7 @@ function fmtTime(d: Date) {
                 </tr>
               </thead>
               <tbody id="attendee-rows">
-                ${records.map((r: any) => `
+                ${records.map((r) => `
                   <tr class="border-b border-border-light last:border-b-0 hover:bg-gray-50 transition-colors" data-record-id="${r.id}">
                     <td class="py-3 pr-4 font-medium text-text-primary">${r.profiles?.full_name ?? '—'}</td>
                     <td class="py-3 pr-4 text-text-secondary">${r.units?.unit_number ?? '—'}</td>
@@ -397,8 +397,8 @@ function fmtTime(d: Date) {
       }
     }
 
-    async function toggleCheckin(recordId: string, checkIn: boolean) {
-      const btn = document.querySelector(`[data-record-id="${recordId}"] button`) as HTMLButtonElement;
+    async function toggleCheckin(recordId, checkIn) {
+      const btn = document.querySelector(`[data-record-id="${recordId}"] button`);
       if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i>'; }
 
       const res = await fetch('/api/v1/events/attendance', {
@@ -419,7 +419,7 @@ function fmtTime(d: Date) {
     document.getElementById('refresh-attendees')?.addEventListener('click', loadAttendees);
 
     // ── Toast ─────────────────────────────────────────────────────────────────
-    function showToast(message: string, type = 'success') {
+    function showToast(message, type = 'success') {
       const toast = document.createElement('div');
       const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
       toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
@@ -432,9 +432,9 @@ function fmtTime(d: Date) {
       }, 3000);
     }
 
-    (window as any).doRsvp         = doRsvp;
-    (window as any).doCancelRsvp   = doCancelRsvp;
-    (window as any).toggleCheckin  = toggleCheckin;
+    window.doRsvp         = doRsvp;
+    window.doCancelRsvp   = doCancelRsvp;
+    window.toggleCheckin  = toggleCheckin;
 
     loadRsvp();
     if (isExec) loadAttendees();

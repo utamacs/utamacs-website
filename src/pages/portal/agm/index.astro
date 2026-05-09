@@ -439,10 +439,10 @@ const isAdmin = user.role === 'admin';
       }
 
       // Load quorum data for each visible session meter
-      document.querySelectorAll('.quorum-meter').forEach(async (el: Element) => {
-        const sessionId = (el as HTMLElement).dataset.session!;
-        const bar = el.querySelector('.quorum-bar') as HTMLElement | null;
-        const label = el.querySelector('.quorum-label') as HTMLElement | null;
+      document.querySelectorAll('.quorum-meter').forEach(async (el) => {
+        const sessionId = el.dataset.session;
+        const bar = el.querySelector('.quorum-bar');
+        const label = el.querySelector('.quorum-label');
         if (!bar || !label) return;
         try {
           const res = await fetch(`/api/v1/agm/sessions/${sessionId}/quorum`, { credentials: 'include' });
@@ -459,8 +459,8 @@ const isAdmin = user.role === 'admin';
       });
     }
 
-    async function updateAttendees(sessionId: string, btn: HTMLElement) {
-      const input = document.querySelector(`[data-qinput="${sessionId}"]`) as HTMLInputElement | null;
+    async function updateAttendees(sessionId, btn) {
+      const input = document.querySelector(`[data-qinput="${sessionId}"]`);
       if (!input) return;
       const count = parseInt(input.value, 10);
       if (isNaN(count) || count < 0) return;

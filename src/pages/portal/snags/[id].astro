@@ -378,7 +378,7 @@ const canUpload = canEdit;
         .then(r => r.ok ? r.json() : [])
         .then((members) => {
           if (!sel) return;
-          const committee = members.filter((m: any) =>
+          const committee = members.filter((m) =>
             ['executive', 'secretary', 'president', 'admin'].includes(m.role ?? ''),
           );
           for (const m of committee) {
@@ -390,7 +390,7 @@ const canUpload = canEdit;
         }).catch(() => {});
 
       sel?.addEventListener('change', async () => {
-        const userId = (sel as HTMLSelectElement).value;
+        const userId = sel.value;
         if (statusEl) { statusEl.textContent = 'Saving…'; statusEl.classList.remove('hidden', 'text-red-600', 'text-secondary-500'); }
         const res = await fetch(`/api/v1/hoto/snags/${snagId}`, {
           method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
@@ -447,7 +447,7 @@ const canUpload = canEdit;
 
       // Sync assignee dropdown with current value
       if (canEdit) {
-        const sel = document.getElementById('assignee-select') as HTMLSelectElement | null;
+        const sel = document.getElementById('assignee-select');
         if (sel) sel.value = snag.responsible_user_id ?? '';
       }
 
@@ -794,7 +794,7 @@ const canUpload = canEdit;
       // Lightbox click
       grid.querySelectorAll('[data-idx]').forEach(el => {
         el.addEventListener('click', (e) => {
-          if ((e.target as Element).closest('.delete-photo-btn')) return;
+          if (e.target.closest('.delete-photo-btn')) return;
           openLightbox(parseInt(el.dataset.idx));
         });
       });
@@ -804,7 +804,7 @@ const canUpload = canEdit;
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
           if (!confirm('Delete this photo?')) return;
-          const id = (btn as HTMLElement).dataset.id;
+          const id = btn.dataset.id;
           const res = await fetch(`/api/v1/hoto/snags/${snagId}/attachments?attachment_id=${id}`, {
             method: 'DELETE', credentials: 'include',
           });
@@ -813,8 +813,8 @@ const canUpload = canEdit;
       });
     }
 
-    function openLightbox(idx: number) {
-      const lb = document.getElementById('photo-lightbox')!;
+    function openLightbox(idx) {
+      const lb = document.getElementById('photo-lightbox');
       lbIndex = idx;
       lb.classList.remove('hidden');
       showLbPhoto();
@@ -822,19 +822,19 @@ const canUpload = canEdit;
     }
 
     function closeLightbox() {
-      document.getElementById('photo-lightbox')!.classList.add('hidden');
+      document.getElementById('photo-lightbox').classList.add('hidden');
       document.removeEventListener('keydown', lbKeyHandler);
     }
 
     function showLbPhoto() {
       const p = photoData[lbIndex];
       if (!p) return;
-      const img = document.getElementById('lb-img') as HTMLImageElement;
+      const img = document.getElementById('lb-img');
       img.src = p.signed_url ?? '';
-      document.getElementById('lb-caption')!.textContent = p.caption ?? '';
+      document.getElementById('lb-caption').textContent = p.caption ?? '';
     }
 
-    function lbKeyHandler(e: KeyboardEvent) {
+    function lbKeyHandler(e) {
       if (e.key === 'Escape')     closeLightbox();
       if (e.key === 'ArrowLeft')  { lbIndex = (lbIndex - 1 + photoData.length) % photoData.length; showLbPhoto(); }
       if (e.key === 'ArrowRight') { lbIndex = (lbIndex + 1) % photoData.length; showLbPhoto(); }
@@ -846,8 +846,8 @@ const canUpload = canEdit;
     document.getElementById('photo-lightbox')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeLightbox(); });
 
     if (canUpload) {
-      async function uploadPhotoFiles(files: FileList | File[]) {
-        const statusEl = document.getElementById('photo-upload-status')!;
+      async function uploadPhotoFiles(files) {
+        const statusEl = document.getElementById('photo-upload-status');
         statusEl.classList.remove('hidden');
         let uploaded = 0;
         for (const file of Array.from(files)) {
@@ -864,8 +864,8 @@ const canUpload = canEdit;
         await loadPhotos();
       }
 
-      const photoInput = document.getElementById('photo-file-input') as HTMLInputElement;
-      const dropZone   = document.getElementById('photo-drop-zone')!;
+      const photoInput = document.getElementById('photo-file-input');
+      const dropZone   = document.getElementById('photo-drop-zone');
 
       photoInput?.addEventListener('change', () => {
         if (photoInput.files?.length) uploadPhotoFiles(photoInput.files);
@@ -915,42 +915,42 @@ const canUpload = canEdit;
       const woModal  = document.getElementById('wo-modal');
       const woClose  = document.getElementById('wo-modal-close');
       const woCancel = document.getElementById('wo-cancel');
-      const woError  = document.getElementById('wo-error')!;
+      const woError  = document.getElementById('wo-error');
 
       async function openWoModal() {
         // Load vendors
         const vRes = await fetch('/api/v1/vendors', { credentials: 'include' });
         const vendors = vRes.ok ? await vRes.json() : [];
-        const sel = document.getElementById('wo-vendor') as HTMLSelectElement;
+        const sel = document.getElementById('wo-vendor');
         sel.innerHTML = '<option value="">— Select vendor —</option>' +
-          vendors.map((v: any) => `<option value="${v.id}">${v.name} (${v.category})</option>`).join('');
+          vendors.map((v) => `<option value="${v.id}">${v.name} (${v.category})</option>`).join('');
 
         // Pre-fill title from snag
         const snag = await (await fetch(`/api/v1/hoto/snags/${snagId}`, { credentials: 'include' })).json();
-        (document.getElementById('wo-title') as HTMLInputElement).value =
+        document.getElementById('wo-title').value =
           `Fix snag: ${snag.description?.slice(0, 80) ?? snag.id}`;
-        (document.getElementById('wo-desc') as HTMLTextAreaElement).value =
+        document.getElementById('wo-desc').value =
           `Location: ${snag.location}\nCategory: ${snag.category}\n\n${snag.description ?? ''}`.trim();
 
         woError.classList.add('hidden');
-        woModal!.classList.remove('hidden');
+        woModal?.classList.remove('hidden');
       }
 
       woBtn?.addEventListener('click', openWoModal);
-      woClose?.addEventListener('click', () => woModal!.classList.add('hidden'));
-      woCancel?.addEventListener('click', () => woModal!.classList.add('hidden'));
+      woClose?.addEventListener('click', () => woModal?.classList.add('hidden'));
+      woCancel?.addEventListener('click', () => woModal?.classList.add('hidden'));
 
-      document.getElementById('wo-form')!.addEventListener('submit', async (e) => {
+      document.getElementById('wo-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         woError.classList.add('hidden');
         const body = {
-          vendor_id:    (document.getElementById('wo-vendor') as HTMLSelectElement).value,
-          title:        (document.getElementById('wo-title') as HTMLInputElement).value.trim(),
-          description:  (document.getElementById('wo-desc') as HTMLTextAreaElement).value.trim() || undefined,
+          vendor_id:    document.getElementById('wo-vendor').value,
+          title:        document.getElementById('wo-title').value.trim(),
+          description:  document.getElementById('wo-desc').value.trim() || undefined,
           snag_id:      snagId,
-          deadline:     (document.getElementById('wo-deadline') as HTMLInputElement).value || undefined,
-          quoted_amount: (document.getElementById('wo-amount') as HTMLInputElement).value
-            ? Number((document.getElementById('wo-amount') as HTMLInputElement).value) : undefined,
+          deadline:     document.getElementById('wo-deadline').value || undefined,
+          quoted_amount: document.getElementById('wo-amount').value
+            ? Number(document.getElementById('wo-amount').value) : undefined,
         };
         const res = await fetch('/api/v1/vendors/work-orders', {
           method: 'POST', credentials: 'include',
@@ -959,12 +959,12 @@ const canUpload = canEdit;
         });
         if (res.ok) {
           const wo = await res.json();
-          woModal!.classList.add('hidden');
-          document.getElementById('linked-wo')!.innerHTML =
+          woModal?.classList.add('hidden');
+          document.getElementById('linked-wo').innerHTML =
             `<i class="fas fa-check-circle text-green-500 mr-1"></i>Linked to work order — <a href="/portal/vendors" class="text-primary-600 underline">view</a>`;
-          document.getElementById('linked-wo')!.classList.remove('hidden');
-          (woBtn as HTMLButtonElement).disabled = true;
-          (woBtn as HTMLButtonElement).textContent = 'Work Order Created';
+          document.getElementById('linked-wo').classList.remove('hidden');
+          woBtn.disabled = true;
+          woBtn.textContent = 'Work Order Created';
         } else {
           const err = await res.json().catch(() => ({}));
           woError.textContent = err.message ?? 'Failed to create work order.';
