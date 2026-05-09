@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
+import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
 import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
@@ -120,6 +121,13 @@ export const POST: APIRoute = async ({ request }) => {
       }
       throw Object.assign(new Error(error.message), { status: 500 });
     }
+
+    await writeAuditLog({
+      societyId: SOCIETY_ID, userId: user.id,
+      action: 'CREATE', resourceType: 'staff_activity_templates', resourceId: data!.id,
+      ip: extractClientIP(request),
+      newValues: { title: String(title).trim(), department, frequency },
+    });
 
     return new Response(JSON.stringify({ id: data!.id }), { status: 201, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {

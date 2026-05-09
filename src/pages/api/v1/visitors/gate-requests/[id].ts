@@ -8,6 +8,20 @@ import { UUID_RE } from '@lib/constants';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
+// visitor_logs.visitor_type has a strict CHECK constraint (migration 036).
+// Gate request visitor_type is free-text, so validate before inserting into visitor_logs.
+const VALID_VISITOR_TYPES = new Set([
+  'guest','relative','friend',
+  'domestic_help','cook','driver','nurse','tutor',
+  'plumber','electrician','carpenter','painter','pest_control_tech',
+  'courier','food_delivery','grocery_delivery','ecommerce_delivery',
+  'cab_driver','auto_driver',
+  'medical','emergency',
+  'real_estate_agent','prospective_buyer','prospective_tenant',
+  'maintenance_staff','security_audit','govt_official',
+  'other',
+]);
+
 // PUT /api/v1/visitors/gate-requests/{id}
 // Resident (or exec) approves or rejects a pending gate request.
 // Body: { action: 'approve' | 'reject', note?: string }
@@ -65,15 +79,20 @@ export const PUT: APIRoute = async ({ request, params }) => {
 
     if (body.action === 'approve') {
       // Create a visitor_log entry
+      // visitor_logs.visitor_type has a strict CHECK enum (migration 036);
+      // gate request visitor_type is free-text — use only if it matches the enum.
+      const safeVisitorType = gateReq.visitor_type && VALID_VISITOR_TYPES.has(gateReq.visitor_type)
+        ? gateReq.visitor_type : null;
+
       const { data: logEntry } = await sb.from('visitor_logs').insert({
-        society_id:   SOCIETY_ID,
-        visitor_name: gateReq.visitor_name,
-        host_unit_id: gateReq.host_unit_id,
-        entry_type:   'walk_in',
-        visitor_type: gateReq.visitor_type ?? null,
+        society_id:     SOCIETY_ID,
+        visitor_name:   gateReq.visitor_name,
+        host_unit_id:   gateReq.host_unit_id,
+        entry_type:     'walk_in',
+        visitor_type:   safeVisitorType,
         vehicle_number: gateReq.vehicle_number ?? null,
-        entry_time:   now,
-        logged_by:    gateReq.requested_by, // guard who initiated
+        entry_time:     now,
+        logged_by:      gateReq.requested_by, // guard who initiated
       }).select('id').single();
       logId = logEntry?.id ?? null;
     }
@@ -132,6 +151,14 @@ export const DELETE: APIRoute = async ({ request, params }) => {
     }
 
     await sb.from('visitor_gate_requests').update({ status: 'cancelled' }).eq('id', id);
+
+    await writeAuditLog({
+      societyId: SOCIETY_ID, userId: user.id,
+      action: 'UPDATE', resourceType: 'visitor_gate_request', resourceId: id,
+      ip: extractClientIP(request),
+      newValues: { status: 'cancelled' },
+    });
+
     return Response.json({ ok: true });
   } catch (err) {
     return normalizeError(err, request.url);
