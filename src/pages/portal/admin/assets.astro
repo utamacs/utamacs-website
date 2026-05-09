@@ -149,8 +149,8 @@ const locationsJson = JSON.stringify(allLocations);
   <div id="asset-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
     {allAssets.map(a => {
       const amc = amcBadge(a.amc_end);
-      const loc = (a as Record<string, unknown>).locations as {name: string} | null;
-      const svcOverdueFlag = a.next_service_date && a.next_service_date < today;
+      const loc = (a as any).locations as ({ name: string } | null);
+      const svcOverdueFlag = !!(a.next_service_date && today > a.next_service_date);
       return (
         <div
           class="card-premium p-4 cursor-pointer hover:shadow-medium transition-shadow asset-card"

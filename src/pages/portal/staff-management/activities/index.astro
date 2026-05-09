@@ -318,7 +318,7 @@ for (const l of locations ?? []) locNames[l.id] = l.name;
           ) : (
             <div class="grid grid-cols-2 gap-y-1 max-h-48 overflow-y-auto border border-border-light rounded-lg p-3">
               {(() => {
-                const grouped: Record<string, typeof locations> = {};
+                const grouped: any = {};
                 for (const l of locations ?? []) {
                   const g = ZONE_LABELS[l.zone_type] ?? l.zone_type;
                   if (!grouped[g]) grouped[g] = [];

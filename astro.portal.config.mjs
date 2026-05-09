@@ -1,4 +1,4 @@
-import { defineConfig } from 'astro/config';
+import { defineConfig, passthroughImageService } from 'astro/config';
 import tailwind from '@astrojs/tailwind';
 import react from '@astrojs/react';
 import vercel from '@astrojs/vercel/serverless';
@@ -8,6 +8,11 @@ export default defineConfig({
     tailwind({ applyBaseStyles: false }),
     react(),
   ],
+  image: {
+    // Portal uses CSS icons/Tailwind — no Astro <Image> components.
+    // Passthrough avoids the sharp native-binary requirement at build time.
+    service: passthroughImageService(),
+  },
   output: 'hybrid',
   adapter: vercel({
     edgeMiddleware: false,
