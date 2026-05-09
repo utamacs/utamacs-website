@@ -194,6 +194,7 @@ export const PATCH: APIRoute = async ({ request, params }) => {
 
         await writeAuditLog({
           userId: user.id,
+          societyId: SOCIETY_ID,
           action: 'UPDATE',
           resourceType: 'registration_request',
           resourceId: membership.linked_registration_id,
@@ -205,6 +206,7 @@ export const PATCH: APIRoute = async ({ request, params }) => {
 
     await writeAuditLog({
       userId: user.id,
+      societyId: SOCIETY_ID,
       action: 'UPDATE',
       resourceType: 'membership',
       resourceId: id,

@@ -74,6 +74,7 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     await writeAuditLog({
       userId: user.id,
+      societyId: SOCIETY_ID,
       action: 'UPDATE',
       resourceType: 'membership_sale_deed',
       resourceId: id,
@@ -118,10 +119,10 @@ export const GET: APIRoute = async ({ request, params }) => {
 
     await writeAuditLog({
       userId: user.id,
-      action: 'READ',
+      societyId: SOCIETY_ID,
+      action: 'EXPORT',
       resourceType: 'membership_sale_deed',
       resourceId: id,
-      oldValues: null,
       newValues: { accessed_at: new Date().toISOString() },
     });
 
