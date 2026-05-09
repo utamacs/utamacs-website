@@ -40,6 +40,8 @@ function makeSupabaseFeatureFlagDB() {
         isActive: r['is_active'] as boolean,
         displayOrder: r['display_order'] as number,
         icon: r['icon'] as string | null,
+        navGroup: (r['nav_group'] as string | null) ?? 'Community',
+        minNavRole: (r['min_nav_role'] as string | null) ?? 'member',
       }));
     },
     async updateFlag(flagId: string, isEnabled: boolean, updatedBy: string) {

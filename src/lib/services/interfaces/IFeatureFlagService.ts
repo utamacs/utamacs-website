@@ -16,6 +16,8 @@ export interface ModuleConfiguration {
   isActive: boolean;
   displayOrder: number;
   icon: string | null;
+  navGroup: string;
+  minNavRole: string;
 }
 
 export interface IFeatureFlagService {
