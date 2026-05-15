@@ -150,7 +150,8 @@ class VisitorRepository {
           'vehicle_number': vehicleNumber,
           'purpose': purpose,
           'expected_date': dateStr,
-          'expires_at': expiresAt?.toIso8601String(),
+          // expires_at is NOT NULL — default to end of expected date + 24 h if unset
+          'expires_at': (expiresAt ?? expectedDate.add(const Duration(hours: 24))).toIso8601String(),
           'status': 'pending',
           'otp_code': otp,
         })
