@@ -1,0 +1,253 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (user.role === 'security_guard' || user.role === 'vendor') return new Response('Forbidden', { status: 403 });
+
+const { id: paymentId } = Astro.params;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+if (!paymentId || !UUID_RE.test(paymentId)) return Astro.redirect('/portal/finance');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const isExec = ['executive', 'admin'].includes(user.role) ||
+               ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') ||
+               user.isAdmin;
+
+const sb = getSupabaseServiceClient();
+
+const { data: payment } = await sb
+  .from('payments')
+  .select(`
+    id, amount, payment_mode, transaction_ref, receipt_number,
+    tds_deducted, paid_at, gst_invoice_no, user_id,
+    maintenance_dues(
+      id, base_amount, penalty_amount, gst_amount, total_amount,
+      billing_periods(name, start_date, end_date, due_date),
+      units(unit_number, block, floor),
+      profiles(id, full_name)
+    )
+  `)
+  .eq('id', paymentId)
+  .eq('society_id', SOCIETY_ID)
+  .single();
+
+if (!payment) return Astro.redirect('/portal/finance');
+
+// Members can only view their own invoices
+const p = payment as any;
+if (!isExec && p.user_id !== user.id) return new Response('Forbidden', { status: 403 });
+
+const { data: society } = await sb
+  .from('societies')
+  .select('name, address, city, state, pincode, gstin, pan, registration_no')
+  .eq('id', SOCIETY_ID)
+  .single();
+const soc = (society ?? {}) as any;
+
+// Generate or reuse invoice number
+let invoiceNo = p.gst_invoice_no ?? null;
+if (!invoiceNo && isExec) {
+  const now = new Date();
+  const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const seq = paymentId.slice(-6).toUpperCase();
+  invoiceNo = `INV/${fy}-${String(fy + 1).slice(-2)}/${seq}`;
+  await sb.from('payments').update({ gst_invoice_no: invoiceNo }).eq('id', paymentId);
+}
+
+const due = p.maintenance_dues ?? {};
+const period = due.billing_periods ?? {};
+const unit = due.units ?? {};
+const member = due.profiles ?? {};
+
+const baseAmount     = Number(due.base_amount ?? 0);
+const penaltyAmount  = Number(due.penalty_amount ?? 0);
+const gstAmount      = Number(due.gst_amount ?? 0);
+const totalAmount    = Number(due.total_amount ?? p.amount ?? 0);
+const paidAmount     = Number(p.amount ?? 0);
+const tdsDeducted    = Number(p.tds_deducted ?? 0);
+const netPayable     = paidAmount - tdsDeducted;
+const gstRate        = baseAmount > 0 ? Math.round((gstAmount / baseAmount) * 100) + '%' : '0%';
+
+const fmtINR = (n: number) => n.toFixed(2);
+const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const invoiceDate = fmtDate(p.paid_at ?? new Date().toISOString());
+---
+
+<PortalLayout title={`Invoice ${invoiceNo ?? paymentId.slice(-8).toUpperCase()}`} user={user} activeModule="finance">
+  <!-- Nav breadcrumb + actions -->
+  <div class="flex items-center justify-between mb-6 no-print">
+    <div>
+      <nav class="text-sm text-text-secondary mb-1">
+        <a href="/portal/finance" class="hover:text-primary-600">Finance</a>
+        <span class="mx-2">›</span>
+        <span class="text-text-primary">Invoice {invoiceNo ?? '—'}</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">GST Invoice</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/portal/finance" class="btn-outline text-sm">
+        <i class="fas fa-arrow-left mr-1.5" aria-hidden="true"></i>Back
+      </a>
+      <button onclick="window.print()" class="btn-primary text-sm">
+        <i class="fas fa-print mr-1.5" aria-hidden="true"></i>Print / PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- Invoice document -->
+  <div class="max-w-3xl mx-auto">
+    <div class="bg-white rounded-xl border-2 border-primary-600 overflow-hidden shadow-medium" id="invoice-doc">
+
+      <!-- Header -->
+      <div class="bg-primary-600 text-white px-6 py-5 flex justify-between items-start">
+        <div>
+          <h2 class="text-xl font-bold">{soc.name ?? 'UTA MACS'}</h2>
+          <p class="text-sm opacity-85 mt-0.5">{soc.address ?? ''}{soc.city ? `, ${soc.city}` : ''} – {soc.pincode ?? ''}</p>
+          {soc.gstin && <p class="text-sm opacity-85">GSTIN: {soc.gstin}</p>}
+          {soc.pan && <p class="text-sm opacity-85">PAN: {soc.pan}</p>}
+          <p class="text-sm opacity-85">Reg. No.: {soc.registration_no ?? 'TS MACS'}</p>
+        </div>
+        <div class="bg-white text-primary-600 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">
+          TAX INVOICE
+        </div>
+      </div>
+
+      <!-- Meta row -->
+      <div class="grid grid-cols-4 border-b border-border-light bg-gray-50">
+        {[
+          { label: 'Invoice No.', value: invoiceNo ?? '—' },
+          { label: 'Invoice Date', value: invoiceDate },
+          { label: 'Billing Period', value: period.name ?? '—' },
+          { label: 'Due Date', value: fmtDate(period.due_date) },
+        ].map(({ label, value }) => (
+          <div class="px-5 py-3 border-r border-border-light last:border-r-0">
+            <p class="text-[10px] font-bold text-text-secondary uppercase tracking-wide">{label}</p>
+            <p class="text-sm font-bold text-text-primary mt-0.5">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <!-- Parties -->
+      <div class="grid grid-cols-2 border-b border-border-light">
+        <div class="px-6 py-4 border-r border-border-light">
+          <p class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-2">Supplier (Society)</p>
+          <p class="font-bold text-text-primary">{soc.name ?? 'UTA MACS'}</p>
+          <p class="text-sm text-text-secondary mt-0.5">{soc.address ?? ''}</p>
+          <p class="text-sm text-text-secondary">{soc.city ?? ''}, {soc.state ?? 'Telangana'} – {soc.pincode ?? ''}</p>
+          {soc.gstin && <p class="text-sm text-text-secondary">GSTIN: {soc.gstin}</p>}
+        </div>
+        <div class="px-6 py-4">
+          <p class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-2">Recipient (Member)</p>
+          <p class="font-bold text-text-primary">{member.full_name ?? '—'}</p>
+          <p class="text-sm text-text-secondary mt-0.5">
+            Unit: {unit.block ?? ''}{unit.unit_number ?? '—'}, Floor {unit.floor ?? 0}
+          </p>
+          <p class="text-sm text-text-secondary">{soc.name ?? ''}</p>
+          <p class="text-sm text-text-secondary">{soc.city ?? ''}, {soc.state ?? 'Telangana'}</p>
+        </div>
+      </div>
+
+      <!-- Line items table -->
+      <table class="w-full border-b border-border-light">
+        <thead>
+          <tr class="bg-gray-50 text-[11px] font-bold text-text-secondary uppercase tracking-wide">
+            <th class="text-left px-6 py-2.5 w-8">#</th>
+            <th class="text-left px-4 py-2.5">Description</th>
+            <th class="text-left px-4 py-2.5 w-20">HSN/SAC</th>
+            <th class="text-left px-4 py-2.5 w-20">GST Rate</th>
+            <th class="text-right px-6 py-2.5 w-28">Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody class="text-sm">
+          <tr class="border-t border-border-light">
+            <td class="px-6 py-3 text-text-secondary">1</td>
+            <td class="px-4 py-3">
+              <p class="font-medium text-text-primary">Maintenance Charges</p>
+              <p class="text-xs text-text-secondary mt-0.5">
+                Period: {period.name ?? '—'}
+                {period.start_date && period.end_date && ` (${fmtDate(period.start_date)} to ${fmtDate(period.end_date)})`}
+              </p>
+            </td>
+            <td class="px-4 py-3 text-text-secondary">9972</td>
+            <td class="px-4 py-3 text-text-secondary">{gstRate}</td>
+            <td class="px-6 py-3 text-right font-mono">{fmtINR(baseAmount)}</td>
+          </tr>
+          {penaltyAmount > 0 && (
+            <tr class="border-t border-border-light">
+              <td class="px-6 py-3 text-text-secondary">2</td>
+              <td class="px-4 py-3 font-medium text-text-primary">Late Payment Penalty</td>
+              <td class="px-4 py-3 text-text-secondary">9972</td>
+              <td class="px-4 py-3 text-text-secondary">Nil</td>
+              <td class="px-6 py-3 text-right font-mono">{fmtINR(penaltyAmount)}</td>
+            </tr>
+          )}
+          <tr class="border-t border-border-light bg-gray-50">
+            <td colspan="4" class="px-4 py-2 text-right text-sm text-text-secondary pr-6">Sub-Total</td>
+            <td class="px-6 py-2 text-right font-mono text-sm">{fmtINR(baseAmount + penaltyAmount)}</td>
+          </tr>
+          <tr class="border-t border-border-light bg-gray-50">
+            <td colspan="4" class="px-4 py-2 text-right text-sm text-text-secondary pr-6">GST @ {gstRate}</td>
+            <td class="px-6 py-2 text-right font-mono text-sm">{fmtINR(gstAmount)}</td>
+          </tr>
+          <tr class="border-t-2 border-primary-600 bg-primary-50">
+            <td colspan="4" class="px-4 py-3 text-right font-bold text-primary-700 pr-6">Total Invoice Amount</td>
+            <td class="px-6 py-3 text-right font-bold font-mono text-primary-700">₹{fmtINR(totalAmount)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Payment details table -->
+      <table class="w-full border-b border-border-light">
+        <thead>
+          <tr class="bg-gray-50">
+            <th colspan="4" class="text-left px-6 py-2.5 text-[11px] font-bold text-text-secondary uppercase tracking-wide">
+              Payment Details
+            </th>
+          </tr>
+        </thead>
+        <tbody class="text-sm">
+          <tr class="border-t border-border-light">
+            <td class="px-6 py-3"><span class="text-text-secondary">Mode:</span> <strong>{p.payment_mode?.replace(/_/g, ' ').toUpperCase() ?? '—'}</strong></td>
+            <td class="px-4 py-3"><span class="text-text-secondary">Ref:</span> <strong>{p.transaction_ref ?? '—'}</strong></td>
+            <td class="px-4 py-3"><span class="text-text-secondary">Date:</span> <strong>{fmtDate(p.paid_at)}</strong></td>
+            <td class="px-6 py-3 text-right"><strong>Paid: ₹{fmtINR(paidAmount)}</strong></td>
+          </tr>
+          {tdsDeducted > 0 && (
+            <tr class="border-t border-border-light">
+              <td colspan="3" class="px-6 py-2 text-text-secondary">TDS Deducted (u/s 194C)</td>
+              <td class="px-6 py-2 text-right text-red-600 font-mono">-₹{fmtINR(tdsDeducted)}</td>
+            </tr>
+          )}
+          <tr class="border-t-2 border-primary-600 bg-primary-50">
+            <td colspan="3" class="px-4 py-3 text-right font-bold text-primary-700 pr-6">Net Amount Received</td>
+            <td class="px-6 py-3 text-right font-bold font-mono text-primary-700">₹{fmtINR(netPayable)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 flex items-center justify-between">
+        <div>
+          <p class="text-sm font-semibold text-text-primary">Receipt No.: {p.receipt_number ?? '—'}</p>
+          <p class="text-xs text-text-secondary mt-1">This is a computer-generated invoice. No signature required.</p>
+          <p class="text-xs text-text-secondary">For support: management@utamacs.org</p>
+        </div>
+        <div class="border-4 border-secondary-500 rounded-lg px-5 py-2 inline-block"
+             style="transform: rotate(-5deg)">
+          <span class="text-secondary-500 font-bold text-xl">✓ PAID</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</PortalLayout>
+
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    body { background: white !important; }
+    #invoice-doc { border-radius: 0 !important; box-shadow: none !important; }
+  }
+</style>

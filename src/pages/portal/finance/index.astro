@@ -451,10 +451,10 @@ const isExec = ['executive', 'admin'].includes(user.role) ||
                     class="btn-outline text-sm flex items-center gap-1.5">
                     <i class="fas fa-receipt" aria-hidden="true"></i> Receipt
                   </a>
-                  <button onclick="generateGstInvoice('${d.payment_id}')"
+                  <a href="/portal/finance/invoices/${d.payment_id}" target="_blank"
                     class="btn-outline text-sm flex items-center gap-1.5">
                     <i class="fas fa-file-invoice" aria-hidden="true"></i> GST Invoice
-                  </button>
+                  </a>
                 ` : ''}
                 ${d.status === 'paid' && !d.payment_id ? `
                   <span class="text-xs text-green-600 font-medium"><i class="fas fa-check-circle"></i> Paid</span>
@@ -624,21 +624,6 @@ const isExec = ['executive', 'admin'].includes(user.role) ||
         btn.disabled = false;
         btn.textContent = 'Generate Dues';
       });
-    }
-
-    async function generateGstInvoice(paymentId) {
-      try {
-        const res = await fetch('/api/v1/finance/invoices/generate', {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ payment_id: paymentId }),
-        });
-        const data = await res.json();
-        if (!res.ok) { alert(data.error || 'Failed to generate invoice.'); return; }
-        // Open invoice HTML in new tab
-        const win = window.open('', '_blank');
-        if (win) { win.document.write(data.html); win.document.close(); }
-      } catch { alert('Network error generating invoice.'); }
     }
 
     window.handlePay = handlePay;
