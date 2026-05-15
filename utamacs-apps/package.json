@@ -1,0 +1,29 @@
+{
+  "name": "utamacs-apps",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "shared-components",
+    "android-app",
+    "ios-app"
+  ],
+  "scripts": {
+    "shared:build": "npm run build -w shared-components",
+    "shared:test": "npm run test -w shared-components",
+    "android:start": "npm run start -w android-app",
+    "android:build:preview": "npm run build:preview -w android-app",
+    "android:build:prod": "npm run build:prod -w android-app",
+    "ios:start": "npm run start -w ios-app",
+    "ios:build:preview": "npm run build:preview -w ios-app",
+    "ios:build:prod": "npm run build:prod -w ios-app",
+    "lint": "eslint . --ext .ts,.tsx",
+    "type-check": "tsc --noEmit --project tsconfig.base.json"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0"
+  }
+}

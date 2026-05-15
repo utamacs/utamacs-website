@@ -1,0 +1,117 @@
+{
+  "expo": {
+    "name": "UTA MACS",
+    "slug": "utamacs",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "utamacs",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1E3A8A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "org.utamacs.portal",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "UTA MACS uses your camera to scan visitor QR codes at the gate and attach photos to complaints.",
+        "NSPhotoLibraryUsageDescription": "UTA MACS uses your photo library to attach images to complaints and community posts.",
+        "NSPhotoLibraryAddUsageDescription": "UTA MACS saves visitor pass QR codes to your photo library.",
+        "NSFaceIDUsageDescription": "UTA MACS uses Face ID to quickly and securely log you in.",
+        "NSUserNotificationsUsageDescription": "UTA MACS sends notifications for gate approvals, due date reminders, and new notices.",
+        "UIBackgroundModes": ["remote-notification", "fetch"]
+      },
+      "associatedDomains": [
+        "applinks:portal.utamacs.org"
+      ],
+      "entitlements": {
+        "aps-environment": "production"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#1E3A8A"
+      },
+      "package": "org.utamacs.portal",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "portal.utamacs.org",
+              "pathPrefix": "/visitors/pass"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#1E3A8A",
+          "sounds": ["./assets/sounds/notification.wav"],
+          "androidMode": "default",
+          "androidCollapsedTitle": "#{unread_notifications} new notifications"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "UTA MACS uses your camera to scan visitor QR codes at the society gate."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "UTA MACS accesses your photos to attach images to complaints and community posts."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "UTA MACS uses Face ID to securely log you in without a password."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      },
+      "supabaseUrl": "REPLACE_WITH_SUPABASE_URL",
+      "supabaseAnonKey": "REPLACE_WITH_SUPABASE_ANON_KEY",
+      "apiBaseUrl": "https://portal.utamacs.org",
+      "societyId": "00000000-0000-0000-0000-000000000001"
+    }
+  }
+}

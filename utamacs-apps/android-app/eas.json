@@ -1,0 +1,59 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "APP_ENV": "development"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "channel": "preview",
+      "env": {
+        "APP_ENV": "preview"
+      }
+    },
+    "staging": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "channel": "staging",
+      "env": {
+        "APP_ENV": "staging"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "channel": "production",
+      "env": {
+        "APP_ENV": "production"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./play-store-service-account.json",
+        "track": "internal",
+        "releaseStatus": "draft",
+        "rollout": 0.1
+      }
+    }
+  }
+}
