@@ -230,7 +230,7 @@ const isAdmin = user.isAdmin;
         const expiryNote = m.role_expires_at ? `<div class="text-xs text-amber-600 mt-0.5"><i class="fas fa-clock"></i> Role expires ${new Date(m.role_expires_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>` : '';
 
         return `
-          <div class="bg-white rounded-xl border border-border-light p-4 hover:shadow-soft transition-shadow">
+          <div data-member-row class="bg-white rounded-xl border border-border-light p-4 hover:shadow-soft transition-shadow">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
                 ${initials}

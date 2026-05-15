@@ -37,6 +37,10 @@ test.describe('Complaints – member', () => {
       await descField.fill('Automated test complaint — please ignore.');
     }
 
+    // Select first available unit (required field)
+    const firstUnit = await page.locator('#unit_id option:not([value=""])').first().getAttribute('value');
+    if (firstUnit) await page.selectOption('#unit_id', firstUnit);
+
     await page.click('#complaint-form button[type="submit"]');
     await expect(page).toHaveURL(/\/portal\/complaints\/[0-9a-f-]+\?created=1/, { timeout: 15000 });
   });
@@ -45,6 +49,11 @@ test.describe('Complaints – member', () => {
     await page.goto('/portal/complaints/new');
     await page.fill('#title', 'Test: Waterlogging in basement');
     await page.selectOption('#category', 'Plumbing');
+
+    // Select first available unit (required field)
+    const firstUnit = await page.locator('#unit_id option:not([value=""])').first().getAttribute('value');
+    if (firstUnit) await page.selectOption('#unit_id', firstUnit);
+
     await page.click('#complaint-form button[type="submit"]');
     await page.waitForURL(/\?created=1/, { timeout: 15000 });
     await expect(page.locator('#success-banner')).toBeVisible();

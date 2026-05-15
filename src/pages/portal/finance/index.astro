@@ -4,8 +4,11 @@ import PortalLayout from '@portal/PortalLayout.astro';
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
+if (user.role === 'security_guard' || user.role === 'vendor') return new Response('Forbidden', { status: 403 });
 
-const isExec = ['executive', 'admin'].includes(user.role);
+const isExec = ['executive', 'admin'].includes(user.role) ||
+               ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') ||
+               user.isAdmin;
 ---
 
 <PortalLayout title="Finance & Dues" user={user} activeModule="finance">

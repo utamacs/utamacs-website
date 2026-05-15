@@ -11,15 +11,15 @@ test.describe('HOTO / Snags – executive', () => {
     await expect(page.locator('body')).not.toContainText('Internal Server Error');
   });
 
-  test('HT-E02: snags page loads at /portal/hoto/snags for exec', async ({ page }) => {
-    await page.goto('/portal/hoto/snags');
-    await expect(page).toHaveURL('/portal/hoto/snags');
+  test('HT-E02: snags page loads at /portal/snags for exec', async ({ page }) => {
+    await page.goto('/portal/snags');
+    await expect(page).toHaveURL('/portal/snags');
     await expect(page.locator('h1')).toBeVisible();
     await expect(page.locator('body')).not.toContainText('500');
   });
 
   test('HT-E03: snags list or empty state is visible without server error', async ({ page }) => {
-    await page.goto('/portal/hoto/snags');
+    await page.goto('/portal/snags');
     await page.waitForTimeout(2000);
 
     await expect(page.locator('body')).not.toContainText('500');
@@ -49,8 +49,8 @@ test.describe('HOTO / Snags – executive', () => {
       await expect(page.locator('body')).not.toContainText('500');
     } else {
       // Navigate directly if no link found on the main page
-      await page.goto('/portal/hoto/snags');
-      await expect(page).toHaveURL('/portal/hoto/snags');
+      await page.goto('/portal/snags');
+      await expect(page).toHaveURL('/portal/snags');
       await expect(page.locator('body')).not.toContainText('500');
     }
   });

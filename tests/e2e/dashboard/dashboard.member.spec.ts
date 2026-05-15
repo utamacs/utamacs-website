@@ -30,7 +30,13 @@ test.describe('Dashboard – member role', () => {
 
   test('D-05: nav link to complaints navigates correctly', async ({ page }) => {
     await page.goto('/portal');
-    await page.click('nav a[href="/portal/complaints"]');
+    // Nav groups collapse by default on the dashboard — expand Community first
+    const communityBtn = page.locator('button.nav-group-btn[data-group-key="community"]');
+    if (await communityBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      const expanded = await communityBtn.getAttribute('aria-expanded');
+      if (expanded === 'false') await communityBtn.click();
+    }
+    await page.locator('nav a[href="/portal/complaints"]').click();
     await expect(page).toHaveURL('/portal/complaints');
   });
 
