@@ -101,11 +101,19 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
       <h1 class="text-2xl font-bold text-text-primary">Snag List</h1>
       <p class="text-sm text-text-secondary mt-1">Track defects and builder rectification status.</p>
     </div>
-    {canCreate && (
-      <button id="create-btn" class="btn-primary text-sm flex items-center gap-2">
-        <i class="fas fa-plus" aria-hidden="true"></i> New Snag
-      </button>
-    )}
+    <div class="flex items-center gap-2">
+      {canCreate && (
+        <a id="snags-export-btn" href="/api/v1/hoto/snags/export" target="_blank"
+           class="btn-ghost text-sm flex items-center gap-1.5">
+          <i class="fas fa-download" aria-hidden="true"></i>Export CSV
+        </a>
+      )}
+      {canCreate && (
+        <button id="create-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-plus" aria-hidden="true"></i> New Snag
+        </button>
+      )}
+    </div>
   </div>
 
   <!-- Stats bar -->
@@ -324,8 +332,20 @@ const canCreate = ['executive','secretary','president'].includes(user.portalRole
       document.getElementById(id)?.addEventListener('change', () => {
         const f = getFilters();
         loadItems(f.q, f.status, f.severity, f.scope, f.category);
+        updateExportUrl(f);
       });
     });
+
+    function updateExportUrl(f) {
+      const btn = document.getElementById('snags-export-btn');
+      if (!btn) return;
+      const params = new URLSearchParams();
+      if (f.status)   params.set('status', f.status);
+      if (f.severity) params.set('severity', f.severity);
+      if (f.scope)    params.set('snag_scope', f.scope);
+      if (f.category) params.set('category', f.category);
+      btn.href = `/api/v1/hoto/snags/export${params.toString() ? '?' + params.toString() : ''}`;
+    }
 
     // Show/hide flat number field based on scope
     document.getElementById('new-scope')?.addEventListener('change', e => {

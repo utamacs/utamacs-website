@@ -125,6 +125,20 @@ const isAdmin = user.isAdmin;
     ))}
   </div>
 
+  <!-- SLA Alert Banner (populated by JS) -->
+  <div id="sla-alert-banner" class="hidden mb-5 rounded-xl border border-red-200 bg-red-50 p-4">
+    <div class="flex items-start gap-3">
+      <i class="fas fa-exclamation-triangle text-red-500 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-red-800 mb-1.5">Builder SLA Expiring Soon</p>
+        <div id="sla-alert-items" class="space-y-1"></div>
+      </div>
+      <button id="sla-alert-dismiss" class="text-red-400 hover:text-red-600 flex-shrink-0" aria-label="Dismiss">
+        <i class="fas fa-times text-sm" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+
   <!-- Filters -->
   <div class="mb-5 flex flex-wrap gap-3">
     <div class="relative flex-1 min-w-[180px] max-w-xs">
@@ -232,12 +246,20 @@ const isAdmin = user.isAdmin;
     </div>
   )}
 
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
     <div id="item-count" class="text-xs text-text-secondary">Loading…</div>
-    <label class="flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer">
-      <input type="checkbox" id="show-closed" class="rounded accent-primary-600" />
-      Show closed
-    </label>
+    <div class="flex items-center gap-3">
+      {canCreate && (
+        <a id="export-csv-btn" href="/api/v1/hoto/items/export" target="_blank"
+           class="btn-ghost text-xs py-1.5 px-3 flex items-center gap-1.5">
+          <i class="fas fa-download" aria-hidden="true"></i>Export CSV
+        </a>
+      )}
+      <label class="flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer">
+        <input type="checkbox" id="show-closed" class="rounded accent-primary-600" />
+        Show closed
+      </label>
+    </div>
   </div>
   <div id="items-list" class="space-y-3">
     {Array.from({length: 4}).map(() => (
@@ -437,5 +459,57 @@ const isAdmin = user.isAdmin;
     }
 
     loadItems(0);
+
+    // Keep export URL in sync with active filters
+    function updateExportUrl() {
+      const exportBtn = document.getElementById('export-csv-btn');
+      if (!exportBtn) return;
+      const { status, category, includeClosed } = getFilters();
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      if (category) params.set('category', category);
+      if (includeClosed) params.set('include_closed', 'true');
+      exportBtn.href = `/api/v1/hoto/items/export${params.toString() ? '?' + params.toString() : ''}`;
+    }
+    ['status-filter','category-filter','show-closed'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', updateExportUrl);
+    });
+    updateExportUrl();
+
+    // SLA alert banner — show items whose builder_sla_date is within SLA_ALERT_DAYS
+    const SLA_ALERT_DAYS = 14;
+    async function loadSlaAlerts() {
+      const res = await fetch('/api/v1/hoto/items?sort=sla&limit=200', { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = (data.items ?? data) as any[];
+      const now = Date.now();
+      const threshold = SLA_ALERT_DAYS * 24 * 60 * 60 * 1000;
+      const alertItems = items.filter((i: any) => {
+        if (!i.builder_sla_date) return false;
+        if (['APPROVED','CLOSED','REJECTED'].includes(i.status)) return false;
+        const slaMs = new Date(i.builder_sla_date).getTime();
+        return slaMs - now <= threshold; // includes overdue
+      }).slice(0, 5);
+      if (!alertItems.length) return;
+      const banner = document.getElementById('sla-alert-banner')!;
+      const list   = document.getElementById('sla-alert-items')!;
+      list.innerHTML = alertItems.map((i: any) => {
+        const slaDate = new Date(i.builder_sla_date);
+        const diffDays = Math.ceil((slaDate.getTime() - now) / (24*60*60*1000));
+        const label = diffDays < 0 ? `${Math.abs(diffDays)}d overdue` : diffDays === 0 ? 'due today' : `${diffDays}d left`;
+        const cls   = diffDays < 0 ? 'text-red-700' : 'text-amber-700';
+        return `<div class="flex items-center gap-2 text-xs">
+          <span class="font-medium text-red-800 truncate max-w-xs">${i.title}</span>
+          <span class="${cls} font-semibold flex-shrink-0">(${label})</span>
+          <a href="/portal/hoto/${i.id}" class="text-primary-600 underline flex-shrink-0">View</a>
+        </div>`;
+      }).join('');
+      banner.classList.remove('hidden');
+    }
+    document.getElementById('sla-alert-dismiss')?.addEventListener('click', () => {
+      document.getElementById('sla-alert-banner')!.classList.add('hidden');
+    });
+    loadSlaAlerts();
   </script>
 </PortalLayout>

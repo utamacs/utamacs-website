@@ -59,9 +59,15 @@ if (!user) return Astro.redirect('/portal/login');
       <h1 class="text-2xl font-bold text-text-primary">HOTO Completion Progress</h1>
       <p class="text-sm text-text-secondary mt-1">Overall handover status across all system categories.</p>
     </div>
-    <a href="/portal/hoto" class="text-sm text-text-secondary hover:text-primary-600 flex items-center gap-1.5">
-      <i class="fas fa-arrow-left text-xs"></i> HOTO Tracker
-    </a>
+    <div class="flex items-center gap-3">
+      <a href="/api/v1/hoto/punch-list-pdf"
+         class="btn-primary text-sm inline-flex items-center gap-1.5">
+        <i class="fas fa-file-pdf" aria-hidden="true"></i>Punch List PDF
+      </a>
+      <a href="/portal/hoto" class="text-sm text-text-secondary hover:text-primary-600 flex items-center gap-1.5">
+        <i class="fas fa-arrow-left text-xs"></i> HOTO Tracker
+      </a>
+    </div>
   </div>
 
   <!-- Overall progress card -->
