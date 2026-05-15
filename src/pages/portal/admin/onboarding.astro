@@ -1,0 +1,425 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+
+const isPrivileged = ['executive','secretary','president'].includes(user.portalRole ?? '') || user.isAdmin;
+if (!isPrivileged) return new Response('Forbidden', { status: 403 });
+---
+
+<PortalLayout title="Onboarding Requests" user={user} activeModule="memberships">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/admin" class="hover:text-primary-600">Admin</a>
+        <span class="mx-2">›</span><span class="text-text-primary">Onboarding Requests</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Onboarding Requests</h1>
+      <p class="text-text-secondary text-sm mt-1">Review and approve new resident registration requests.</p>
+    </div>
+    <button id="refresh-btn" class="btn-outline flex items-center gap-2 text-sm">
+      <i class="fas fa-sync-alt" aria-hidden="true"></i> Refresh
+    </button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="border-b border-border-light mb-6">
+    <nav class="flex gap-1" role="tablist">
+      <button role="tab" data-tab="pending"
+        class="tab-btn active px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 border-primary-600 text-primary-600 transition-colors">
+        Pending <span id="badge-pending" class="ml-1.5 px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full">0</span>
+      </button>
+      <button role="tab" data-tab="under_review"
+        class="tab-btn px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 border-transparent text-text-secondary hover:text-text-primary transition-colors">
+        Under Review <span id="badge-under_review" class="ml-1.5 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">0</span>
+      </button>
+      <button role="tab" data-tab="resolved"
+        class="tab-btn px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 border-transparent text-text-secondary hover:text-text-primary transition-colors">
+        Resolved
+      </button>
+    </nav>
+  </div>
+
+  <!-- Type filter -->
+  <div class="flex items-center gap-3 mb-5">
+    <select id="type-filter" class="form-input max-w-[200px] text-sm py-2">
+      <option value="">All types</option>
+      <option value="owner">Owner</option>
+      <option value="tenant">Tenant</option>
+      <option value="secondary_user">Family Member</option>
+    </select>
+    <span id="result-count" class="text-sm text-text-secondary"></span>
+  </div>
+
+  <!-- List -->
+  <div id="request-list" class="space-y-3">
+    <div class="text-center py-12 text-text-secondary text-sm">Loading…</div>
+  </div>
+
+  <!-- Pagination -->
+  <div id="pagination" class="hidden mt-6 flex items-center justify-between text-sm text-text-secondary">
+    <button id="prev-btn" class="btn-ghost text-sm px-3 py-1.5 disabled:opacity-40" disabled>
+      <i class="fas fa-chevron-left mr-1" aria-hidden="true"></i> Previous
+    </button>
+    <span id="page-info"></span>
+    <button id="next-btn" class="btn-ghost text-sm px-3 py-1.5 disabled:opacity-40" disabled>
+      Next <i class="fas fa-chevron-right ml-1" aria-hidden="true"></i>
+    </button>
+  </div>
+</PortalLayout>
+
+<!-- Detail Drawer -->
+<div id="detail-panel"
+  class="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-large z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+  <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+    <h2 class="text-lg font-semibold text-primary-600">Review Request</h2>
+    <button id="close-panel" class="text-text-secondary hover:text-text-primary" aria-label="Close panel">
+      <i class="fas fa-times text-xl" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div id="panel-content" class="p-5 space-y-5">
+    <!-- populated by JS -->
+  </div>
+</div>
+<div id="panel-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+
+<script>
+  // ─── State ───────────────────────────────────────────────────────────────────
+  let currentTab: string  = 'pending';
+  let currentPage: number = 1;
+  let totalPages: number  = 1;
+  let typeFilter: string  = '';
+  let openRequest: Record<string, unknown> | null = null;
+
+  const LIMIT = 20;
+
+  // ─── Elements ────────────────────────────────────────────────────────────────
+  const listEl      = document.getElementById('request-list')!;
+  const countEl     = document.getElementById('result-count')!;
+  const pagEl       = document.getElementById('pagination')!;
+  const pageInfo    = document.getElementById('page-info')!;
+  const prevBtn     = document.getElementById('prev-btn') as HTMLButtonElement;
+  const nextBtn     = document.getElementById('next-btn') as HTMLButtonElement;
+  const typeFilter$ = document.getElementById('type-filter') as HTMLSelectElement;
+
+  const panel       = document.getElementById('detail-panel')!;
+  const backdrop    = document.getElementById('panel-backdrop')!;
+  const panelBody   = document.getElementById('panel-content')!;
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
+  function typeLabel(t: string) {
+    return t === 'owner' ? 'Owner' : t === 'tenant' ? 'Tenant' : 'Family Member';
+  }
+  function typeColor(t: string) {
+    return t === 'owner' ? 'bg-primary-100 text-primary-700'
+         : t === 'tenant' ? 'bg-green-100 text-green-700'
+         : 'bg-purple-100 text-purple-700';
+  }
+  function statusColor(s: string) {
+    return s === 'pending'      ? 'bg-amber-100 text-amber-700'
+         : s === 'under_review' ? 'bg-blue-100 text-blue-700'
+         : s === 'approved'     ? 'bg-green-100 text-green-700'
+         : s === 'rejected'     ? 'bg-red-100 text-red-700'
+         : 'bg-gray-100 text-gray-600';
+  }
+  function fmt(iso: string | null) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function showToast(msg: string, type = 'success') {
+    const t = document.createElement('div');
+    t.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.remove('translate-y-4', 'opacity-0'));
+    setTimeout(() => { t.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => t.remove(), 300); }, 3200);
+  }
+
+  // ─── Fetch ───────────────────────────────────────────────────────────────────
+  async function loadRequests() {
+    listEl.innerHTML = '<div class="text-center py-12 text-text-secondary text-sm">Loading…</div>';
+    const params = new URLSearchParams({
+      status: currentTab === 'resolved' ? '' : currentTab,
+      page: String(currentPage),
+      limit: String(LIMIT),
+    });
+    if (currentTab === 'resolved') params.set('resolved', '1');
+    if (typeFilter) params.set('type', typeFilter);
+
+    try {
+      const res  = await fetch(`/api/v1/admin/onboarding?${params}`, { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) { listEl.innerHTML = `<div class="text-center py-12 text-red-500 text-sm">${data.message ?? 'Failed to load'}</div>`; return; }
+
+      const { requests, total } = data;
+      totalPages = Math.max(1, Math.ceil(total / LIMIT));
+      countEl.textContent = `${total} request${total !== 1 ? 's' : ''}`;
+
+      // Update badges for pending/under_review tabs
+      if (currentTab === 'pending') updateBadge('pending', total);
+      if (currentTab === 'under_review') updateBadge('under_review', total);
+
+      renderList(requests);
+      renderPagination();
+    } catch {
+      listEl.innerHTML = '<div class="text-center py-12 text-red-500 text-sm">Network error.</div>';
+    }
+  }
+
+  function updateBadge(tab: string, count: number) {
+    const el = document.getElementById(`badge-${tab}`);
+    if (el) el.textContent = String(count);
+  }
+
+  function renderList(items: Record<string, unknown>[]) {
+    if (!items.length) {
+      listEl.innerHTML = `
+        <div class="text-center py-16">
+          <i class="fas fa-inbox text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+          <h3 class="text-lg font-semibold text-text-primary mb-2">No requests</h3>
+          <p class="text-text-secondary text-sm">No ${currentTab.replace('_',' ')} registration requests.</p>
+        </div>`;
+      return;
+    }
+    listEl.innerHTML = items.map(r => `
+      <div class="bg-white rounded-xl border border-border-light p-5 hover:shadow-medium transition-shadow cursor-pointer"
+           data-id="${r.id}" onclick="openDrawer('${r.id}')">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <span class="font-semibold text-text-primary truncate">${esc(r.applicant_name as string)}</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${typeColor(r.request_type as string)}">${typeLabel(r.request_type as string)}</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(r.status as string)}">${(r.status as string).replace('_',' ')}</span>
+            </div>
+            <p class="text-sm text-text-secondary truncate">${esc(r.applicant_email as string)}</p>
+            <div class="flex items-center gap-4 mt-2 text-xs text-text-secondary">
+              <span><i class="fas fa-building mr-1" aria-hidden="true"></i>Flat ${esc(r.block ? `${r.block}-${r.unit_number}` : r.unit_number as string)}</span>
+              <span><i class="fas fa-clock mr-1" aria-hidden="true"></i>${fmt(r.created_at as string)}</span>
+              ${r.ownership_doc_key || r.lease_doc_key ? `<span class="text-blue-600"><i class="fas fa-paperclip mr-1" aria-hidden="true"></i>Doc attached</span>` : ''}
+            </div>
+          </div>
+          <i class="fas fa-chevron-right text-text-secondary text-sm flex-shrink-0 mt-1" aria-hidden="true"></i>
+        </div>
+      </div>`).join('');
+
+    // store items in a map for quick drawer access
+    (window as unknown as Record<string, unknown>)._onboardingItems = Object.fromEntries(items.map(r => [r.id, r]));
+  }
+
+  function renderPagination() {
+    if (totalPages <= 1) { pagEl.classList.add('hidden'); return; }
+    pagEl.classList.remove('hidden');
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+  }
+
+  function esc(s: string) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ─── Drawer ───────────────────────────────────────────────────────────────────
+  function openDrawer(id: string) {
+    const items = (window as unknown as Record<string, Record<string, unknown>>)._onboardingItems ?? {};
+    const r = items[id];
+    if (!r) return;
+    openRequest = r;
+
+    const canAct = ['pending','under_review'].includes(r.status as string);
+    panelBody.innerHTML = `
+      <div class="space-y-4">
+        <!-- Identity -->
+        <div class="bg-gray-50 rounded-xl p-4 space-y-2.5">
+          <h3 class="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">Applicant</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <span class="text-text-secondary">Name</span><span class="font-medium text-text-primary">${esc(r.applicant_name as string)}</span>
+            <span class="text-text-secondary">Email</span><span class="font-medium text-text-primary break-all">${esc(r.applicant_email as string)}</span>
+            <span class="text-text-secondary">Phone</span><span class="font-medium text-text-primary">${esc(r.applicant_phone as string)}</span>
+            <span class="text-text-secondary">Type</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit ${typeColor(r.request_type as string)}">${typeLabel(r.request_type as string)}</span>
+            <span class="text-text-secondary">Status</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit ${statusColor(r.status as string)}">${(r.status as string).replace('_',' ')}</span>
+          </div>
+        </div>
+
+        <!-- Unit -->
+        <div class="bg-gray-50 rounded-xl p-4 space-y-2.5">
+          <h3 class="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">Unit Details</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <span class="text-text-secondary">Flat</span><span class="font-medium text-text-primary">${esc(r.block ? `${r.block}-${r.unit_number}` : r.unit_number as string)}</span>
+            ${r.lease_start ? `<span class="text-text-secondary">Lease Start</span><span class="font-medium text-text-primary">${fmt(r.lease_start as string)}</span>` : ''}
+            ${r.lease_end   ? `<span class="text-text-secondary">Lease End</span><span class="font-medium text-text-primary">${fmt(r.lease_end as string)}</span>` : ''}
+            ${r.relationship ? `<span class="text-text-secondary">Relationship</span><span class="font-medium text-text-primary">${esc(r.relationship as string)}</span>` : ''}
+          </div>
+        </div>
+
+        <!-- Document -->
+        ${(r.ownership_doc_key || r.lease_doc_key) ? `
+        <div class="bg-gray-50 rounded-xl p-4">
+          <h3 class="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">Document</h3>
+          <button onclick="fetchDoc('${r.id}', '${r.ownership_doc_key ? 'ownership' : 'lease'}')"
+            class="btn-outline text-sm flex items-center gap-2">
+            <i class="fas fa-file-download" aria-hidden="true"></i> View / Download
+          </button>
+        </div>` : ''}
+
+        <!-- Submitted -->
+        <div class="text-xs text-text-secondary">
+          Submitted ${fmt(r.created_at as string)} · Expires ${fmt(r.expires_at as string)}
+          ${r.reviewed_at ? `<br>Reviewed ${fmt(r.reviewed_at as string)}` : ''}
+          ${r.rejection_reason ? `<br><span class="text-red-600 font-medium">Rejection: ${esc(r.rejection_reason as string)}</span>` : ''}
+          ${r.notes ? `<br>Notes: ${esc(r.notes as string)}` : ''}
+        </div>
+
+        ${canAct ? `
+        <!-- Actions -->
+        <div class="border-t border-border-light pt-4 space-y-3">
+          <div id="action-error" class="hidden p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+          <div>
+            <label class="form-label">Internal Notes</label>
+            <textarea id="notes-input" rows="2" maxlength="500" placeholder="Optional notes for the committee…"
+              class="form-input text-sm">${esc((r.notes as string) ?? '')}</textarea>
+          </div>
+          <div id="reject-reason-wrap" class="hidden">
+            <label class="form-label">Rejection Reason <span class="text-red-500">*</span></label>
+            <input type="text" id="reject-reason-input" maxlength="255" placeholder="Reason for rejection"
+              class="form-input text-sm" />
+          </div>
+          <div class="flex gap-3">
+            ${r.status === 'pending' ? `
+            <button onclick="setStatus('under_review')" class="btn-outline flex-1 text-sm flex items-center justify-center gap-1.5">
+              <i class="fas fa-search" aria-hidden="true"></i> Mark Under Review
+            </button>` : ''}
+            <button onclick="toggleReject()" id="reject-toggle-btn"
+              class="btn-outline border-red-300 text-red-600 hover:bg-red-50 flex-1 text-sm flex items-center justify-center gap-1.5">
+              <i class="fas fa-times-circle" aria-hidden="true"></i> Reject
+            </button>
+            <button onclick="setStatus('approved')" id="approve-btn"
+              class="btn-primary flex-1 text-sm flex items-center justify-center gap-1.5">
+              <i class="fas fa-check-circle" aria-hidden="true"></i> Approve
+            </button>
+          </div>
+          <div id="confirm-reject-wrap" class="hidden">
+            <button onclick="setStatus('rejected')"
+              class="btn-primary bg-red-600 hover:bg-red-700 w-full text-sm flex items-center justify-center gap-2">
+              <i class="fas fa-ban" aria-hidden="true"></i> Confirm Rejection
+            </button>
+          </div>
+        </div>` : ''}
+      </div>`;
+
+    panel.classList.remove('translate-x-full');
+    backdrop.classList.remove('hidden');
+  }
+
+  function closeDrawer() {
+    panel.classList.add('translate-x-full');
+    backdrop.classList.add('hidden');
+    openRequest = null;
+  }
+
+  function toggleReject() {
+    const wrap  = document.getElementById('reject-reason-wrap')!;
+    const confirm = document.getElementById('confirm-reject-wrap')!;
+    const toggleBtn = document.getElementById('reject-toggle-btn')!;
+    const showing = !wrap.classList.contains('hidden');
+    wrap.classList.toggle('hidden', showing);
+    confirm.classList.toggle('hidden', showing);
+    toggleBtn.textContent = showing ? '✕ Reject' : '↩ Cancel';
+  }
+
+  async function fetchDoc(id: string, docType: string) {
+    try {
+      const res  = await fetch(`/api/v1/admin/onboarding/${id}/doc?type=${docType}`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && data.url) { window.open(data.url, '_blank'); }
+      else { showToast(data.message ?? 'Could not load document', 'error'); }
+    } catch { showToast('Network error', 'error'); }
+  }
+
+  async function setStatus(newStatus: string) {
+    if (!openRequest) return;
+    const errorEl  = document.getElementById('action-error')!;
+    const notesEl  = document.getElementById('notes-input') as HTMLTextAreaElement | null;
+    const reasonEl = document.getElementById('reject-reason-input') as HTMLInputElement | null;
+
+    if (newStatus === 'rejected' && (!reasonEl?.value.trim())) {
+      errorEl.textContent = 'Please provide a rejection reason.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    const approveBtn = document.getElementById('approve-btn') as HTMLButtonElement | null;
+    if (approveBtn) { approveBtn.disabled = true; approveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+
+    const body: Record<string, string> = { status: newStatus };
+    if (notesEl?.value.trim()) body.notes = notesEl.value.trim();
+    if (reasonEl?.value.trim()) body.rejection_reason = reasonEl.value.trim();
+
+    try {
+      const res  = await fetch(`/api/v1/admin/onboarding?id=${openRequest.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(newStatus === 'approved' ? 'Approved — invite sent!' : newStatus === 'rejected' ? 'Request rejected.' : 'Status updated.');
+        closeDrawer();
+        loadRequests();
+      } else {
+        errorEl.textContent = data.message ?? data.error ?? 'Update failed.';
+        errorEl.classList.remove('hidden');
+        if (approveBtn) { approveBtn.disabled = false; approveBtn.innerHTML = '<i class="fas fa-check-circle"></i> Approve'; }
+      }
+    } catch {
+      errorEl.textContent = 'Network error.';
+      errorEl.classList.remove('hidden');
+      if (approveBtn) { approveBtn.disabled = false; approveBtn.innerHTML = '<i class="fas fa-check-circle"></i> Approve'; }
+    }
+  }
+
+  // expose to inline handlers
+  (window as unknown as Record<string, unknown>).openDrawer   = openDrawer;
+  (window as unknown as Record<string, unknown>).setStatus    = setStatus;
+  (window as unknown as Record<string, unknown>).toggleReject = toggleReject;
+  (window as unknown as Record<string, unknown>).fetchDoc     = fetchDoc;
+
+  // ─── Tab switching ────────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('active','border-primary-600','text-primary-600');
+        b.classList.add('border-transparent','text-text-secondary');
+      });
+      btn.classList.add('active','border-primary-600','text-primary-600');
+      btn.classList.remove('border-transparent','text-text-secondary');
+      currentTab = (btn as HTMLElement).dataset.tab!;
+      currentPage = 1;
+      loadRequests();
+    });
+  });
+
+  // ─── Filters / pagination ─────────────────────────────────────────────────────
+  typeFilter$.addEventListener('change', () => { typeFilter = typeFilter$.value; currentPage = 1; loadRequests(); });
+  prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; loadRequests(); } });
+  nextBtn.addEventListener('click', () => { if (currentPage < totalPages) { currentPage++; loadRequests(); } });
+  document.getElementById('refresh-btn')!.addEventListener('click', loadRequests);
+
+  // ─── Drawer close ─────────────────────────────────────────────────────────────
+  document.getElementById('close-panel')!.addEventListener('click', closeDrawer);
+  backdrop.addEventListener('click', closeDrawer);
+
+  // ─── Init ─────────────────────────────────────────────────────────────────────
+  loadRequests();
+
+  // also load under_review badge
+  fetch('/api/v1/admin/onboarding?status=under_review&limit=1', { credentials: 'include' })
+    .then(r => r.json()).then(d => updateBadge('under_review', d.total ?? 0)).catch(() => {});
+</script>
+</PortalLayout>
