@@ -16,11 +16,30 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
       <h1 class="text-2xl font-bold text-primary-600 font-poppins">Water Management</h1>
       <p class="text-text-secondary text-sm mt-1">Track tanker deliveries, usage, and monthly costs.</p>
     </div>
-    {isPrivileged && (
-      <button id="log-btn" class="btn-primary text-sm flex items-center gap-2">
-        <i class="fas fa-plus" aria-hidden="true"></i> Log Delivery
+    <div class="flex items-center gap-2">
+      {isPrivileged && (
+        <a id="export-csv-btn" href="/api/v1/water-tankers/export" target="_blank"
+           class="btn-ghost text-sm flex items-center gap-1.5">
+          <i class="fas fa-download" aria-hidden="true"></i>Export CSV
+        </a>
+      )}
+      {isPrivileged && (
+        <button id="log-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-plus" aria-hidden="true"></i> Log Delivery
+        </button>
+      )}
+    </div>
+  </div>
+
+  <!-- Cost / delivery alert banner (populated by JS) -->
+  <div id="tanker-alert-banner" class="hidden mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+    <div class="flex items-start gap-3">
+      <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+      <div id="tanker-alert-content" class="flex-1 space-y-1.5 min-w-0"></div>
+      <button id="tanker-alert-dismiss" class="text-amber-400 hover:text-amber-600 flex-shrink-0" aria-label="Dismiss">
+        <i class="fas fa-times text-sm" aria-hidden="true"></i>
       </button>
-    )}
+    </div>
   </div>
 
   <!-- Summary stats -->
@@ -224,7 +243,39 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
       }).join('');
     }
 
-    document.getElementById('month-picker').addEventListener('change', loadDeliveries);
+    async function loadCostAlerts() {
+      try {
+        const res = await fetch('/api/v1/water-tankers/cost-alert', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.alerts?.length) return;
+        const content = document.getElementById('tanker-alert-content');
+        const banner  = document.getElementById('tanker-alert-banner');
+        content.innerHTML = data.alerts.map(a => `
+          <div>
+            <p class="text-sm font-medium text-amber-800">${a.message}</p>
+            <p class="text-xs text-amber-700 mt-0.5">${a.detail}</p>
+          </div>
+        `).join('');
+        banner.classList.remove('hidden');
+      } catch (_) { /* non-critical */ }
+    }
+
+    document.getElementById('tanker-alert-dismiss')?.addEventListener('click', () => {
+      document.getElementById('tanker-alert-banner').classList.add('hidden');
+    });
+
+    function syncExportUrl() {
+      const btn = document.getElementById('export-csv-btn');
+      if (!btn) return;
+      const month = document.getElementById('month-picker').value;
+      if (!month) return;
+      const [y, m] = month.split('-').map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      btn.href = `/api/v1/water-tankers/export?from=${month}-01&to=${month}-${String(lastDay).padStart(2, '0')}`;
+    }
+
+    document.getElementById('month-picker').addEventListener('change', () => { loadDeliveries(); syncExportUrl(); });
 
     // Modal
     if (isPrivileged) {
@@ -302,5 +353,7 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
 
     loadDeliveries();
     loadSummary();
+    loadCostAlerts();
+    syncExportUrl();
   </script>
 </PortalLayout>
