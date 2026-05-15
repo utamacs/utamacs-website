@@ -26,7 +26,7 @@ export const GET: APIRoute = async ({ request }) => {
       .from('maids')
       .select(`
         id, full_name, phone, work_type, agency_name,
-        is_active, police_verified, verification_date,
+        is_active, police_verified, verification_date, kyc_expires_at,
         photo_key, id_type, registered_at,
         maid_unit_approvals!inner(unit_id, is_active)
       `)

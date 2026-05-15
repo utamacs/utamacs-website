@@ -125,6 +125,13 @@ const isExec = ['executive', 'admin'].includes(user.role);
         Audit Log
       </button>
     )}
+    {isExec && (
+      <button onclick="switchTab('transfers')" id="tab-transfers"
+        class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+        Transfers
+        <span id="transfers-badge" class="hidden ml-1.5 px-1.5 py-0.5 bg-amber-500 text-white text-xs rounded-full"></span>
+      </button>
+    )}
   </div>
 
   <!-- Slot Grid Panel -->
@@ -189,6 +196,26 @@ const isExec = ['executive', 'admin'].includes(user.role);
       <div id="audit-container">
         <div class="text-center text-text-secondary py-12">
           <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading audit log…
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Transfers Panel (exec only) -->
+  {isExec && (
+    <div id="panel-transfers" class="hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-semibold text-text-primary">Slot Transfer Requests</h2>
+        <select id="transfer-status-filter" onchange="loadTransfers()" class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="">All</option>
+        </select>
+      </div>
+      <div id="transfers-container">
+        <div class="text-center text-text-secondary py-12">
+          <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading transfers…
         </div>
       </div>
     </div>
@@ -430,7 +457,7 @@ const isExec = ['executive', 'admin'].includes(user.role);
 
     function switchTab(tab) {
       currentTab = tab;
-      const panels = ['slots', 'my', 'waitlist', 'audit'];
+      const panels = ['slots', 'my', 'waitlist', 'audit', 'transfers'];
       panels.forEach(p => {
         const el = document.getElementById(`panel-${p}`);
         if (el) el.classList.toggle('hidden', p !== tab);
@@ -448,6 +475,171 @@ const isExec = ['executive', 'admin'].includes(user.role);
       if (tab === 'my') loadMyAllocation();
       if (tab === 'waitlist') loadWaitlist();
       if (tab === 'audit' && isExec) loadAudit();
+      if (tab === 'transfers' && isExec) loadTransfers();
+    }
+
+    async function loadTransfers() {
+      const container = document.getElementById('transfers-container');
+      if (!container) return;
+      const statusFilter = (document.getElementById('transfer-status-filter') as HTMLSelectElement)?.value ?? 'pending';
+      try {
+        const res  = await fetch('/api/v1/parking/transfers', { credentials: 'include' });
+        let list   = await res.json();
+        if (!Array.isArray(list)) list = [];
+        if (statusFilter) list = list.filter((t: any) => t.status === statusFilter);
+
+        // update pending badge
+        const pending = list.filter((t: any) => t.status === 'pending');
+        const badge = document.getElementById('transfers-badge');
+        if (badge) {
+          badge.textContent = String(pending.length);
+          badge.classList.toggle('hidden', pending.length === 0);
+        }
+
+        if (!list.length) {
+          container.innerHTML = `<div class="text-center py-12 text-text-secondary text-sm">No ${statusFilter || ''} transfer requests.</div>`;
+          return;
+        }
+
+        const STATUS_BADGE: Record<string, string> = {
+          pending:  'bg-amber-100 text-amber-700',
+          approved: 'bg-green-100 text-green-700',
+          rejected: 'bg-red-100 text-red-700',
+        };
+
+        const rows = list.map((t: any) => {
+          const badge = STATUS_BADGE[t.status] ?? 'bg-gray-100 text-gray-600';
+          const actionCell = t.status === 'pending'
+            ? `<div class="flex gap-2">
+                <button onclick="approveTransfer('${t.id}','approve')"
+                  class="text-xs bg-secondary-500 text-white px-3 py-1 rounded-lg hover:bg-green-600">Approve</button>
+                <button onclick="openRejectTransfer('${t.id}')"
+                  class="text-xs border border-red-300 text-red-600 px-3 py-1 rounded-lg hover:bg-red-50">Reject</button>
+              </div>`
+            : `<span class="text-xs text-text-secondary">${t.approved_at ? new Date(t.approved_at).toLocaleDateString('en-IN') : '—'}</span>`;
+          return `
+          <tr class="border-b border-border-light hover:bg-gray-50">
+            <td class="py-3 px-4 text-sm font-medium">${t.parking_slots?.slot_number ?? '—'}</td>
+            <td class="py-3 px-4 text-sm text-text-secondary">${t.from_unit?.unit_number ?? '—'}</td>
+            <td class="py-3 px-4 text-sm text-text-secondary">${t.to_unit?.unit_number ?? '—'}</td>
+            <td class="py-3 px-4 text-sm text-text-secondary">${t.reason ? t.reason.slice(0,60) : '—'}</td>
+            <td class="py-3 px-4 text-sm">${new Date(t.created_at).toLocaleDateString('en-IN')}</td>
+            <td class="py-3 px-4"><span class="px-2 py-1 text-xs rounded-full font-medium capitalize ${badge}">${t.status}</span></td>
+            <td class="py-3 px-4">${actionCell}</td>
+          </tr>`;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="bg-white rounded-2xl border border-border-light overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-border-light">
+                <tr>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Slot</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">From Unit</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">To Unit</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Reason</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Requested</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Status</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      } catch {
+        container.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load transfers.</div>`;
+      }
+    }
+
+    let rejectingTransferId: string = '';
+    function openRejectTransfer(id: string) {
+      rejectingTransferId = id;
+      const note = prompt('Rejection reason (required):');
+      if (note === null) return; // cancelled
+      if (!note.trim()) { alert('Please provide a rejection reason.'); return; }
+      approveTransfer(id, 'reject', note.trim());
+    }
+
+    async function approveTransfer(id: string, action: 'approve'|'reject', rejectionNote?: string) {
+      try {
+        const body: Record<string, string> = { action };
+        if (rejectionNote) body.rejection_note = rejectionNote;
+        const res  = await fetch(`/api/v1/parking/transfers/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(action === 'approve' ? 'Transfer approved.' : 'Transfer rejected.');
+          loadTransfers();
+        } else {
+          showToast(data.message ?? 'Action failed.', 'error');
+        }
+      } catch {
+        showToast('Network error.', 'error');
+      }
+    }
+
+    async function viewInsuranceDoc(allocId: string) {
+      try {
+        const res  = await fetch(`/api/v1/parking/allocations/${allocId}/insurance`, { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok && data.url) { window.open(data.url, '_blank'); }
+        else { showToast(data.message ?? 'Document not available.', 'error'); }
+      } catch {
+        showToast('Network error.', 'error');
+      }
+    }
+
+    // Insurance file upload — delegated listener on dynamically rendered content
+    document.addEventListener('change', async (e) => {
+      const input = (e.target as HTMLElement).closest('.insurance-file-input') as HTMLInputElement | null;
+      if (!input) return;
+      const file = input.files?.[0];
+      if (!file) return;
+      const allocId  = input.dataset.allocId!;
+      const expiryEl = document.getElementById(`insurance-expiry-${allocId}`) as HTMLInputElement | null;
+      const statusEl = document.getElementById(`insurance-status-${allocId}`)!;
+
+      statusEl.textContent = 'Uploading…';
+      statusEl.className   = 'text-xs mt-1 text-blue-600';
+      statusEl.classList.remove('hidden');
+
+      const fd = new FormData();
+      fd.append('file', file);
+      if (expiryEl?.value) fd.append('insurance_expiry', expiryEl.value);
+
+      try {
+        const res  = await fetch(`/api/v1/parking/allocations/${allocId}/insurance`, {
+          method: 'POST',
+          credentials: 'include',
+          body: fd,
+        });
+        const data = await res.json();
+        if (res.ok) {
+          statusEl.textContent = 'Insurance document saved.';
+          statusEl.className   = 'text-xs mt-1 text-secondary-500';
+          showToast('Insurance document uploaded.');
+          loadMyAllocation();
+        } else {
+          statusEl.textContent = data.message ?? 'Upload failed.';
+          statusEl.className   = 'text-xs mt-1 text-red-600';
+        }
+      } catch {
+        statusEl.textContent = 'Network error.';
+        statusEl.className   = 'text-xs mt-1 text-red-600';
+      }
+    });
+
+    function showToast(message: string, type = 'success') {
+      const t = document.createElement('div');
+      t.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
+      t.textContent = message;
+      document.body.appendChild(t);
+      requestAnimationFrame(() => t.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { t.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => t.remove(), 300); }, 3200);
     }
 
     async function loadSlots() {
@@ -568,7 +760,28 @@ const isExec = ['executive', 'admin'].includes(user.role);
               </div>
             </div>
             ${activeAlloc.notes ? `<p class="text-xs text-text-secondary mt-4 bg-gray-50 rounded-lg p-3">${activeAlloc.notes}</p>` : ''}
-            <div class="mt-4 pt-4 border-t border-border-light">
+            <div class="mt-4 pt-4 border-t border-border-light space-y-4">
+              <!-- Insurance document -->
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium text-text-primary">Vehicle Insurance</span>
+                  ${activeAlloc.insurance_expiry
+                    ? `<span class="text-xs px-2 py-0.5 rounded-full ${new Date(activeAlloc.insurance_expiry) < new Date() ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">
+                        ${new Date(activeAlloc.insurance_expiry) < new Date() ? 'Expired' : 'Valid'} · Expiry: ${new Date(activeAlloc.insurance_expiry).toLocaleDateString('en-IN')}</span>`
+                    : '<span class="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Not uploaded</span>'}
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                  ${activeAlloc.insurance_key ? `<button onclick="viewInsuranceDoc('${activeAlloc.id}')" class="btn-ghost text-sm px-3 py-1.5"><i class="fas fa-file-alt mr-1" aria-hidden="true"></i>View</button>` : ''}
+                  <label class="btn-outline text-sm px-3 py-1.5 cursor-pointer">
+                    <i class="fas fa-upload mr-1" aria-hidden="true"></i>${activeAlloc.insurance_key ? 'Replace' : 'Upload Insurance'}
+                    <input type="file" class="hidden insurance-file-input" data-alloc-id="${activeAlloc.id}" accept="image/jpeg,image/png,application/pdf" />
+                  </label>
+                  <input type="date" id="insurance-expiry-${activeAlloc.id}" placeholder="Expiry date"
+                    value="${activeAlloc.insurance_expiry ?? ''}"
+                    class="text-sm border border-border-light rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-600" />
+                </div>
+                <p id="insurance-status-${activeAlloc.id}" class="text-xs mt-1 hidden"></p>
+              </div>
               <button onclick="openTransferModal('${activeAlloc.slot_id}','${slot?.slot_number ?? ''}')"
                 class="btn-outline text-sm">
                 <i class="fas fa-exchange-alt mr-2" aria-hidden="true"></i>Request Slot Transfer
@@ -1052,5 +1265,16 @@ const isExec = ['executive', 'admin'].includes(user.role);
 
     // Initialize
     loadSlots();
+    // Pre-load pending transfers badge for exec
+    if (isExec) {
+      fetch('/api/v1/parking/transfers', { credentials: 'include' })
+        .then(r => r.json())
+        .then((list: any[]) => {
+          const pending = Array.isArray(list) ? list.filter(t => t.status === 'pending').length : 0;
+          const badge = document.getElementById('transfers-badge');
+          if (badge) { badge.textContent = String(pending); badge.classList.toggle('hidden', pending === 0); }
+        })
+        .catch(() => {});
+    }
   </script>
 </PortalLayout>
