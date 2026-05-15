@@ -1,3 +1,27 @@
+-- ── Rules table INSERT compatibility trigger ────────────────────────────────
+-- Makes rule_category, label, and default_value optional in INSERT statements
+-- by filling defaults from the row itself. getRules() only reads rule_code +
+-- current_value, so these columns are admin-display only.
+CREATE OR REPLACE FUNCTION rules_insert_defaults()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.rule_category IS NULL OR NEW.rule_category = '' THEN
+    NEW.rule_category := 'PARAMETER';
+  END IF;
+  IF NEW.label IS NULL OR NEW.label = '' THEN
+    NEW.label := NEW.rule_code;
+  END IF;
+  IF NEW.default_value IS NULL THEN
+    NEW.default_value := NEW.current_value;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS rules_insert_defaults_trig ON rules;
+CREATE TRIGGER rules_insert_defaults_trig
+  BEFORE INSERT ON rules
+  FOR EACH ROW EXECUTE FUNCTION rules_insert_defaults();
+
 -- Migration 094: Finance enhancements — invoice line items, late fee charges,
 --                partial payments, member credits, billing period extensions
 --
@@ -207,8 +231,8 @@ SELECT
     'Whether the daily late fee cron job is active'
   ]),
   unnest(ARRAY['int','decimal','decimal','boolean']),
-  unnest(ARRAY['5','18.00','5000.00','true']),
-  unnest(ARRAY['5','18.00','5000.00','true']),
+  unnest(ARRAY['5'::jsonb,'18.00'::jsonb,'5000.00'::jsonb,'true'::jsonb]),
+  unnest(ARRAY['5'::jsonb,'18.00'::jsonb,'5000.00'::jsonb,'true'::jsonb]),
   unnest(ARRAY[false,false,false,false])
 FROM societies
 ON CONFLICT (society_id, rule_code) DO NOTHING;
