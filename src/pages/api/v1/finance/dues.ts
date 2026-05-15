@@ -4,6 +4,7 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 import { validateJWT } from '@lib/middleware/jwtValidator';
 import { normalizeError } from '@lib/middleware/errorNormalizer';
 import { writeAuditLog, extractClientIP } from '@lib/middleware/auditLogger';
+import { getRules, ruleInt } from '@lib/utils/getRules';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
 
@@ -63,6 +64,16 @@ export const POST: APIRoute = async ({ request }) => {
 
     const sb = getSupabaseServiceClient();
 
+    // Enforce GST: if gst_rate not provided and base_amount exceeds threshold, apply maintenance GST rate
+    const rules = await getRules(sb, SOCIETY_ID, ['GST_THRESHOLD_MONTHLY', 'GST_RATE_MAINTENANCE']);
+    const gstThreshold = ruleInt(rules, 'GST_THRESHOLD_MONTHLY', 7500);
+    const gstRateDefault = ruleInt(rules, 'GST_RATE_MAINTENANCE', 18);
+    const gstRate = body.gst_rate != null
+      ? body.gst_rate
+      : (body.base_amount! > gstThreshold ? gstRateDefault : 0);
+    const gstAmount = Math.round(body.base_amount! * (gstRate / 100) * 100) / 100;
+    const penaltyAmount = body.penalty_amount ?? 0;
+
     // Create billing period
     const { data: period, error: periodErr } = await sb
       .from('billing_periods')
@@ -102,10 +113,6 @@ export const POST: APIRoute = async ({ request }) => {
       if (!unitToUser[p.unit_id]) unitToUser[p.unit_id] = p.id;
     }
 
-    const gstRate = body.gst_rate ?? 0;
-    const gstAmount = Math.round(body.base_amount * (gstRate / 100) * 100) / 100;
-    const penaltyAmount = body.penalty_amount ?? 0;
-
     const dueRecords = (units ?? [])
       .filter((u: any) => unitToUser[u.id])
       .map((u: any) => ({
@@ -133,10 +140,10 @@ export const POST: APIRoute = async ({ request }) => {
       societyId: SOCIETY_ID, userId: user.id,
       action: 'CREATE', resourceType: 'billing_periods', resourceId: period.id,
       ip: extractClientIP(request),
-      newValues: { name: body.name, dues_created: dueRecords.length, base_amount: body.base_amount },
+      newValues: { name: body.name, dues_created: dueRecords.length, base_amount: body.base_amount, gst_rate: gstRate, gst_amount: gstAmount },
     });
 
-    return new Response(JSON.stringify({ period, dues_created: dueRecords.length }), {
+    return new Response(JSON.stringify({ period, dues_created: dueRecords.length, gst_rate: gstRate, gst_amount: gstAmount }), {
       status: 201, headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
