@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface ExecKPIs {
@@ -12,11 +12,23 @@ interface ExecKPIs {
   pending_bookings: number;
 }
 
+interface CollectionMonth {
+  month: string;
+  total: number;
+  paid: number;
+  rate: number;
+}
+
+interface AnalyticsData {
+  collection_efficiency: CollectionMonth[];
+}
+
 interface Props {
   role: string;
 }
 
 const COLORS = ['#1E3A8A', '#10B981', '#F59E0B', '#EF4444'];
+const PIE_COLORS = ['#10B981', '#F59E0B'];
 
 async function apiFetch<T>(path: string): Promise<T> {
   const res = await fetch(path, { credentials: 'include' });
@@ -24,15 +36,39 @@ async function apiFetch<T>(path: string): Promise<T> {
   return res.json();
 }
 
+function formatMonth(ym: string) {
+  const [y, m] = ym.split('-');
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleString('default', { month: 'short', year: '2-digit' });
+}
+
 export default function ExecutiveDashboard({ role }: Props) {
   const [kpis, setKpis] = useState<ExecKPIs | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lookbackMonths, setLookbackMonths] = useState(3);
 
   useEffect(() => {
-    apiFetch<ExecKPIs>('/api/v1/admin/kpis')
-      .then(setKpis)
-      .finally(() => setLoading(false));
+    Promise.all([
+      apiFetch<ExecKPIs>('/api/v1/admin/kpis'),
+      apiFetch<AnalyticsData>('/api/v1/admin/analytics'),
+    ]).then(([k, a]) => {
+      setKpis(k);
+      setAnalytics(a);
+    }).finally(() => setLoading(false));
   }, []);
+
+  const collectionSlice = useMemo(() => {
+    if (!analytics?.collection_efficiency) return [];
+    return analytics.collection_efficiency.slice(-lookbackMonths);
+  }, [analytics, lookbackMonths]);
+
+  const collectionPieData = useMemo(() => {
+    const totals = collectionSlice.reduce((acc, m) => ({ paid: acc.paid + m.paid, pending: acc.pending + (m.total - m.paid) }), { paid: 0, pending: 0 });
+    return [
+      { name: 'Collected', value: totals.paid },
+      { name: 'Pending', value: totals.pending },
+    ].filter(d => d.value > 0);
+  }, [collectionSlice]);
 
   if (loading) {
     return (
@@ -91,6 +127,24 @@ export default function ExecutiveDashboard({ role }: Props) {
         ))}
       </div>
 
+      {/* Date-range selector */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-sm text-text-secondary font-medium">Period:</span>
+        {([3, 6] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setLookbackMonths(m)}
+            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
+              lookbackMonths === m
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600'
+            }`}
+          >
+            {m === 3 ? 'Last 3 months' : 'Last 6 months'}
+          </button>
+        ))}
+      </div>
+
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Complaint Status Pie */}
@@ -123,24 +177,55 @@ export default function ExecutiveDashboard({ role }: Props) {
           )}
         </div>
 
-        {/* Dues Collection */}
+        {/* Monthly Collection Pie */}
         <div className="bg-white rounded-xl border border-border-light p-5">
-          <h2 className="font-semibold text-text-primary mb-4">Dues Collection Rate</h2>
-          <div className="flex items-center justify-center h-[200px]">
-            <div className="text-center">
-              <div className="text-5xl font-bold text-primary-600">{kpis?.collection_rate ?? 0}%</div>
-              <p className="text-sm text-text-secondary mt-2">of dues collected this period</p>
-              <div className="mt-4 w-48 bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-primary-600 h-3 rounded-full transition-all duration-500"
-                  style={{ width: `${kpis?.collection_rate ?? 0}%` }}
-                />
+          <h2 className="font-semibold text-text-primary mb-1">Dues Collection</h2>
+          <p className="text-xs text-text-secondary mb-3">
+            Last {lookbackMonths} months — collected vs pending
+          </p>
+          {collectionPieData.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie
+                    data={collectionPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={70}
+                    dataKey="value"
+                    paddingAngle={3}
+                  >
+                    {collectionPieData.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => `₹${(v / 1000).toFixed(1)}K`} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-2">
+                <ResponsiveContainer width="100%" height={80}>
+                  <BarChart
+                    data={collectionSlice.map(m => ({ ...m, pending: m.total - m.paid }))}
+                    margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+                  >
+                    <XAxis dataKey="month" tickFormatter={formatMonth} tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      labelFormatter={formatMonth}
+                      formatter={(v: number, name: string) => [`₹${(v / 1000).toFixed(1)}K`, name]}
+                    />
+                    <Bar dataKey="paid" name="Collected" stackId="a" fill="#10B981" />
+                    <Bar dataKey="pending" name="Pending" stackId="a" fill="#F59E0B" />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-              <p className="text-xs text-text-secondary mt-2">
-                Pending: ₹{((kpis?.pending_dues_total ?? 0) / 1000).toFixed(1)}K
-              </p>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-48 text-text-secondary text-sm">
+              No collection data available.
             </div>
-          </div>
+          )}
         </div>
       </div>
 

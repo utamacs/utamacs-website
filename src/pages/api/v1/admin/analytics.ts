@@ -10,7 +10,11 @@ const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000
 export const GET: APIRoute = async ({ request }) => {
   try {
     const user = await validateJWT(request);
-    if (!['executive', 'admin'].includes(user.role)) {
+    const canViewAnalytics =
+      ['executive', 'admin'].includes(user.role) ||
+      ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') ||
+      user.isAdmin;
+    if (!canViewAnalytics) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403, headers: { 'Content-Type': 'application/json' },
       });

@@ -1,0 +1,317 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+const isExec = user.isAdmin ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') ||
+  ['executive', 'admin'].includes(user.role);
+if (!isExec) return new Response('Forbidden', { status: 403 });
+
+const currentYear = new Date().getFullYear();
+---
+
+<PortalLayout title="Holiday Calendar" user={user} activeModule="admin_holidays">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Holiday Calendar</h1>
+      <p class="text-text-secondary text-sm mt-1">Manage public holidays — used for SLA exclusion in complaint tracking.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <select id="year-select"
+        class="px-3 py-2 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+        {[currentYear - 1, currentYear, currentYear + 1].map(y => (
+          <option value={y} selected={y === currentYear}>{y}</option>
+        ))}
+      </select>
+      <button id="seed-btn" class="btn-outline text-sm">
+        <i class="fas fa-magic mr-1.5" aria-hidden="true"></i>Seed National Holidays
+      </button>
+      <button id="add-btn" class="btn-primary text-sm">
+        <i class="fas fa-plus mr-1.5" aria-hidden="true"></i>Add Holiday
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary stats -->
+  <div id="stats-row" class="grid grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+      <div id="total-count" class="text-2xl font-bold text-primary-600">—</div>
+      <div class="text-xs text-text-secondary mt-0.5">Total Holidays</div>
+    </div>
+    <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+      <div id="national-count" class="text-2xl font-bold text-secondary-500">—</div>
+      <div class="text-xs text-text-secondary mt-0.5">National</div>
+    </div>
+    <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+      <div id="local-count" class="text-2xl font-bold text-accent-500">—</div>
+      <div class="text-xs text-text-secondary mt-0.5">Local / Society</div>
+    </div>
+  </div>
+
+  <!-- Calendar grid (12 months) -->
+  <div id="calendar-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+    <div class="col-span-full text-center py-12 text-text-secondary">
+      <i class="fas fa-spinner fa-spin text-2xl mb-3" aria-hidden="true"></i>
+      <p class="text-sm">Loading calendar…</p>
+    </div>
+  </div>
+
+  <!-- Holiday list table -->
+  <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+    <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
+      <h2 class="font-semibold text-text-primary">Holiday List</h2>
+      <span id="list-count" class="text-xs text-text-secondary"></span>
+    </div>
+    <div id="holiday-table-body" class="divide-y divide-border-light">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+
+  <!-- Add Holiday Modal -->
+  <div id="add-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-md mx-4 p-6">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-lg font-semibold text-primary-600">Add Holiday</h2>
+        <button id="modal-close" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+          <i class="fas fa-times text-lg" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="modal-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Date <span class="text-red-500">*</span></label>
+          <input type="date" id="modal-date"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Holiday Name <span class="text-red-500">*</span></label>
+          <input type="text" id="modal-name" maxlength="100" placeholder="e.g. Diwali"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" id="modal-national" class="rounded border-border-light text-primary-600" />
+            <span>National holiday</span>
+          </label>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button id="modal-save" class="btn-primary flex-1">Save</button>
+        <button id="modal-cancel" class="btn-outline flex-1">Cancel</button>
+      </div>
+    </div>
+  </div>
+</PortalLayout>
+
+<script>
+  type Holiday = { id: string; date: string; name: string; is_national: boolean };
+
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTH_FULL  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  let holidays: Holiday[] = [];
+  let currentYear = new Date().getFullYear();
+
+  const calendarGrid   = document.getElementById('calendar-grid')!;
+  const tableBody      = document.getElementById('holiday-table-body')!;
+  const yearSelect     = document.getElementById('year-select') as HTMLSelectElement;
+  const totalCount     = document.getElementById('total-count')!;
+  const nationalCount  = document.getElementById('national-count')!;
+  const localCount     = document.getElementById('local-count')!;
+  const listCount      = document.getElementById('list-count')!;
+
+  async function loadHolidays(year: number) {
+    calendarGrid.innerHTML = `<div class="col-span-full text-center py-12 text-text-secondary">
+      <i class="fas fa-spinner fa-spin text-2xl mb-3"></i><p class="text-sm">Loading…</p></div>`;
+    try {
+      const res = await fetch(`/api/v1/admin/holidays?year=${year}`, { credentials: 'include' });
+      if (!res.ok) throw new Error();
+      holidays = await res.json();
+      renderAll();
+    } catch {
+      calendarGrid.innerHTML = `<div class="col-span-full text-center py-12 text-red-600 text-sm">Failed to load holidays.</div>`;
+    }
+  }
+
+  function renderAll() {
+    const national = holidays.filter(h => h.is_national).length;
+    totalCount.textContent    = String(holidays.length);
+    nationalCount.textContent = String(national);
+    localCount.textContent    = String(holidays.length - national);
+    listCount.textContent     = `${holidays.length} holiday${holidays.length !== 1 ? 's' : ''}`;
+    renderCalendar();
+    renderTable();
+  }
+
+  function renderCalendar() {
+    const byDate = new Map(holidays.map(h => [h.date, h]));
+    let html = '';
+    for (let m = 0; m < 12; m++) {
+      const firstDay = new Date(currentYear, m, 1).getDay(); // 0=Sun
+      const daysInMonth = new Date(currentYear, m + 1, 0).getDate();
+      html += `<div class="bg-white rounded-xl border border-border-light overflow-hidden">
+        <div class="bg-primary-600 text-white text-xs font-semibold px-3 py-2">${MONTH_FULL[m]} ${currentYear}</div>
+        <div class="p-2">
+          <div class="grid grid-cols-7 text-center mb-1">
+            ${['S','M','T','W','T','F','S'].map(d => `<div class="text-[9px] font-bold text-text-secondary">${d}</div>`).join('')}
+          </div>
+          <div class="grid grid-cols-7 gap-0.5">
+            ${'<div></div>'.repeat(firstDay)}
+            ${Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const dateStr = `${currentYear}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+              const holiday = byDate.get(dateStr);
+              const isSun = (firstDay + i) % 7 === 0;
+              const base  = 'w-full aspect-square flex items-center justify-center text-[10px] rounded-md cursor-pointer transition-colors';
+              if (holiday) {
+                const bg = holiday.is_national ? 'bg-secondary-500 text-white font-bold' : 'bg-accent-500 text-white font-bold';
+                return `<div class="${base} ${bg}" title="${holiday.name}" data-id="${holiday.id}" data-date="${dateStr}" onclick="removeHoliday('${holiday.id}')">${day}</div>`;
+              }
+              if (isSun) return `<div class="${base} text-red-400">${day}</div>`;
+              return `<div class="${base} hover:bg-primary-50 text-text-secondary" data-date="${dateStr}" onclick="openAddModal('${dateStr}')">${day}</div>`;
+            }).join('')}
+          </div>
+          <div class="mt-1 text-[9px] text-text-secondary">Click date to add/remove</div>
+        </div>
+      </div>`;
+    }
+    calendarGrid.innerHTML = html;
+  }
+
+  function renderTable() {
+    if (!holidays.length) {
+      tableBody.innerHTML = `<div class="text-center py-12 text-text-secondary text-sm">No holidays added for ${currentYear}.</div>`;
+      return;
+    }
+    tableBody.innerHTML = holidays.map(h => {
+      const d = new Date(h.date + 'T00:00:00');
+      const dayName = d.toLocaleDateString('en-IN', { weekday: 'short' });
+      const display = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const badge   = h.is_national
+        ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">National</span>'
+        : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Local</span>';
+      return `<div class="flex items-center gap-4 px-5 py-3 hover:bg-gray-50">
+        <div class="w-12 text-center flex-shrink-0">
+          <div class="text-xs font-bold text-primary-600">${dayName}</div>
+          <div class="text-[11px] text-text-secondary">${MONTH_NAMES[d.getMonth()]}</div>
+        </div>
+        <div class="w-8 h-8 rounded-lg ${h.is_national ? 'bg-green-100' : 'bg-amber-100'} flex items-center justify-center flex-shrink-0">
+          <span class="text-sm font-bold ${h.is_national ? 'text-green-700' : 'text-amber-700'}">${d.getDate()}</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-text-primary">${h.name}</div>
+          <div class="text-xs text-text-secondary">${display}</div>
+        </div>
+        ${badge}
+        <button onclick="removeHoliday('${h.id}')"
+          class="text-text-secondary hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors ml-2"
+          aria-label="Remove holiday">
+          <i class="fas fa-trash-alt text-xs"></i>
+        </button>
+      </div>`;
+    }).join('');
+  }
+
+  async function removeHoliday(id: string) {
+    if (!confirm('Remove this holiday?')) return;
+    const res = await fetch(`/api/v1/admin/holidays/${id}`, { method: 'DELETE', credentials: 'include' });
+    if (res.ok || res.status === 204) {
+      holidays = holidays.filter(h => h.id !== id);
+      renderAll();
+    } else {
+      alert('Failed to remove holiday.');
+    }
+  }
+
+  // ── Add holiday modal ────────────────────────────────────────────────────────
+  const modal       = document.getElementById('add-modal')!;
+  const modalDate   = document.getElementById('modal-date') as HTMLInputElement;
+  const modalName   = document.getElementById('modal-name') as HTMLInputElement;
+  const modalNat    = document.getElementById('modal-national') as HTMLInputElement;
+  const modalError  = document.getElementById('modal-error')!;
+  const modalSave   = document.getElementById('modal-save') as HTMLButtonElement;
+
+  function openAddModal(date?: string) {
+    modalDate.value = date ?? '';
+    modalName.value = '';
+    modalNat.checked = false;
+    modalError.classList.add('hidden');
+    modal.classList.remove('hidden');
+    modalName.focus();
+  }
+
+  function closeModal() { modal.classList.add('hidden'); }
+
+  document.getElementById('add-btn')?.addEventListener('click', () => openAddModal());
+  document.getElementById('modal-close')?.addEventListener('click', closeModal);
+  document.getElementById('modal-cancel')?.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  modalSave.addEventListener('click', async () => {
+    modalError.classList.add('hidden');
+    if (!modalDate.value || !modalName.value.trim()) {
+      modalError.textContent = 'Date and name are required.';
+      modalError.classList.remove('hidden');
+      return;
+    }
+    modalSave.disabled = true;
+    const res = await fetch('/api/v1/admin/holidays', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: modalDate.value, name: modalName.value.trim(), is_national: modalNat.checked }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      modalError.textContent = data.message ?? data.error ?? 'Failed to add holiday.';
+      modalError.classList.remove('hidden');
+      modalSave.disabled = false;
+      return;
+    }
+    holidays = [...holidays, data].sort((a, b) => a.date.localeCompare(b.date));
+    renderAll();
+    closeModal();
+    modalSave.disabled = false;
+  });
+
+  // ── Seed national holidays ───────────────────────────────────────────────────
+  document.getElementById('seed-btn')?.addEventListener('click', async () => {
+    if (!confirm(`Seed standard Indian national holidays for ${currentYear}? Existing holidays on those dates will be skipped.`)) return;
+    const btn = document.getElementById('seed-btn') as HTMLButtonElement;
+    btn.disabled = true;
+    const NATIONAL_HOLIDAYS: Array<[string, string]> = [
+      [`${currentYear}-01-26`, 'Republic Day'],
+      [`${currentYear}-03-14`, 'Holi'],
+      [`${currentYear}-04-14`, 'Dr. Ambedkar Jayanti'],
+      [`${currentYear}-08-15`, 'Independence Day'],
+      [`${currentYear}-10-02`, 'Gandhi Jayanti'],
+      [`${currentYear}-10-20`, 'Diwali'],
+      [`${currentYear}-11-05`, 'Guru Nanak Jayanti'],
+      [`${currentYear}-12-25`, 'Christmas Day'],
+    ];
+    let added = 0;
+    for (const [date, name] of NATIONAL_HOLIDAYS) {
+      const res = await fetch('/api/v1/admin/holidays', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, name, is_national: true }),
+      });
+      if (res.ok || res.status === 201) added++;
+    }
+    alert(`Seeded ${added} holidays.`);
+    await loadHolidays(currentYear);
+    btn.disabled = false;
+  });
+
+  yearSelect.addEventListener('change', () => {
+    currentYear = parseInt(yearSelect.value, 10);
+    loadHolidays(currentYear);
+  });
+
+  // Expose to inline onclick
+  (window as any).removeHoliday = removeHoliday;
+  (window as any).openAddModal  = openAddModal;
+
+  loadHolidays(currentYear);
+</script>
