@@ -81,8 +81,8 @@ CREATE POLICY "member_view_own_secondary" ON onboarding_requests FOR SELECT
 CREATE POLICY "public_insert_onboarding" ON onboarding_requests FOR INSERT
   WITH CHECK (true);
 
--- ─── Feature flag seed ──────────────────────────────────────────
-INSERT INTO feature_flags (society_id, module_key, is_active, display_order)
-SELECT id, 'onboarding', true, 97
+-- ─── Module configuration seed ──────────────────────────────────
+INSERT INTO module_configurations (society_id, module_key, display_name, display_order, is_active)
+SELECT id, 'onboarding', 'Member Onboarding', 97, true
 FROM societies
 ON CONFLICT (society_id, module_key) DO NOTHING;
