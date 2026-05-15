@@ -107,6 +107,15 @@ const MODULE_PATHS: Record<string, string> = {
   admin_consent:    '/portal/admin/consent',
 };
 
+// Maps nav item activeKey → badge count key returned by /api/v1/nav/badges
+const NAV_BADGE_KEYS: Record<string, string> = {
+  notifications: 'unread_notifications',
+  notices:       'unread_notices',
+  complaints:    'open_complaints',
+  analytics:     'onboarding_pending',
+  feedback:      'unread_feedback',
+};
+
 type ActiveModule = { moduleKey: string; displayName: string; icon: string | null; navGroup: string; minNavRole: string; isActive?: boolean };
 
 let allModules: ActiveModule[] = FALLBACK_MODULES;
@@ -382,13 +391,7 @@ if (navRole === 'guard') {
               <div class="nav-group-items">
                 {group.items.map((item) => {
                   const isActive = activeModule === item.activeKey;
-                  const badgeKey: string | undefined = ({
-                    notifications: 'unread_notifications',
-                    notices:        'unread_notices',
-                    complaints:     'open_complaints',
-                    analytics:      'onboarding_pending',
-                    feedback:       'unread_feedback',
-                  } as Record<string, string>)[item.activeKey];
+                  const badgeKey = NAV_BADGE_KEYS[item.activeKey];
                   return (
                     <a
                       href={item.href}
