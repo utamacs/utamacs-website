@@ -136,11 +136,18 @@ export const GET: APIRoute = async ({ request }) => {
     results.digest_emails = { error: err instanceof Error ? err.message : String(err) };
   }
 
-  // ── 15. Late fee application (overdue maintenance dues) ───────────────────
+  // ── 15. Late fee application ───────────────────────────────────────────────
   try {
     results.late_fees = await runLateFeeApplication(sb, now, todayStr);
   } catch (err) {
     results.late_fees = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // ── 16. Notice acknowledgement reminders ──────────────────────────────────
+  try {
+    results.notice_ack_reminders = await runNoticeAckReminders(sb, nowIso, todayStr);
+  } catch (err) {
+    results.notice_ack_reminders = { error: err instanceof Error ? err.message : String(err) };
   }
 
   // ── Write master heartbeat ─────────────────────────────────────────────────
@@ -872,4 +879,92 @@ async function alertCommittee(sb: ReturnType<typeof getSupabaseServiceClient>, s
       });
     } catch { /* non-fatal */ }
   }
+}
+
+// ── Task 16: Notice Acknowledgement Reminders ─────────────────────────────────
+// For notices with requires_acknowledgement=true published >= NOTICE_ACK_REMINDER_DAYS days ago,
+// sends an in-app notification to every active member who has not yet acknowledged.
+// Rate-limited: only sends once per member per notice via a unique notification check.
+async function runNoticeAckReminders(
+  sb: ReturnType<typeof getSupabaseServiceClient>,
+  nowIso: string,
+  todayStr: string,
+) {
+  const rules = await loadRules(SOCIETY_ID);
+  const reminderDays = r<number>(rules, 'NOTICE_ACK_REMINDER_DAYS', 3);
+
+  const cutoff = new Date(nowIso);
+  cutoff.setDate(cutoff.getDate() - reminderDays);
+  const cutoffIso = cutoff.toISOString();
+
+  // Notices that require ack, published at least reminderDays ago, not expired
+  const { data: notices } = await sb
+    .from('notices')
+    .select('id, title')
+    .eq('society_id', SOCIETY_ID)
+    .eq('requires_acknowledgement', true)
+    .eq('is_published', true)
+    .lte('published_at', cutoffIso)
+    .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+    .limit(10);
+
+  if (!notices?.length) return { reminded: 0 };
+
+  let reminded = 0;
+
+  for (const notice of notices) {
+    // Get all active members
+    const { data: members } = await sb
+      .from('profiles')
+      .select('id')
+      .eq('society_id', SOCIETY_ID)
+      .eq('is_active', true);
+
+    // Get who already acked
+    const { data: acks } = await sb
+      .from('notice_acknowledgements')
+      .select('user_id')
+      .eq('notice_id', notice.id);
+
+    const ackedSet = new Set((acks ?? []).map((a: any) => a.user_id));
+
+    // Get who already received a reminder notification for this notice
+    const { data: existingNotifs } = await sb
+      .from('notifications')
+      .select('user_id')
+      .eq('society_id', SOCIETY_ID)
+      .eq('reference_table', 'notices')
+      .eq('reference_id', notice.id)
+      .eq('type', 'notice')
+      .ilike('title', '%reminder%');
+
+    const alreadyRemindedSet = new Set((existingNotifs ?? []).map((n: any) => n.user_id));
+
+    const pending = (members ?? []).filter(
+      (m: any) => !ackedSet.has(m.id) && !alreadyRemindedSet.has(m.id),
+    );
+
+    if (!pending.length) continue;
+
+    // Batch insert notifications (up to 50 per notice per run)
+    const notifBatch = pending.slice(0, 50).map((m: any) => ({
+      society_id:      SOCIETY_ID,
+      user_id:         m.id,
+      title:           `Reminder: Please acknowledge notice`,
+      body:            `"${notice.title}" requires your acknowledgement. Please open the notice and confirm you have read it.`,
+      type:            'notice',
+      reference_table: 'notices',
+      reference_id:    notice.id,
+      is_read:         false,
+      channel:         'in_app',
+      status:          'sent',
+    }));
+
+    try {
+      await sb.from('notifications').insert(notifBatch);
+      reminded += notifBatch.length;
+    } catch { /* non-fatal */ }
+  }
+
+  return { reminded, notices_processed: notices.length };
 }
