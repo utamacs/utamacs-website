@@ -237,6 +237,18 @@ const canUpload = canEdit;
       </div>
     )}
 
+    <!-- Linked HOTO Items -->
+      <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light">
+          <h2 class="text-base font-semibold text-text-primary flex items-center gap-2">
+            <i class="fas fa-link text-amber-600 text-sm" aria-hidden="true"></i> HOTO Coverage
+          </h2>
+        </div>
+        <div id="hoto-links-content" class="p-4">
+          <div class="text-xs text-text-secondary">Loading…</div>
+        </div>
+      </div>
+
     <!-- Metadata -->
       <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
@@ -890,9 +902,9 @@ const canUpload = canEdit;
         const errEl = document.getElementById('comment-error');
         if (!body) return;
         e.target.disabled = true;
-        const res = await fetch(`/api/v1/hoto/items/${snagId}/comments`, {
+        const res = await fetch(`/api/v1/hoto/snags/${snagId}/comments`, {
           method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ item_type: 'snag_item', body }),
+          body: JSON.stringify({ body }),
         });
         e.target.disabled = false;
         if (res.ok) {
@@ -906,6 +918,50 @@ const canUpload = canEdit;
         }
       }
     });
+
+    // ── HOTO Coverage Links ───────────────────────────────────────────────────
+    const HOTO_STATUS_CLS = {
+      NOT_STARTED:'bg-gray-100 text-gray-600', IN_PROGRESS:'bg-blue-100 text-blue-700',
+      UNDER_REVIEW:'bg-indigo-100 text-indigo-700',
+      PENDING_PRESIDENT:'bg-amber-100 text-amber-700', PENDING_SECRETARY:'bg-orange-100 text-orange-700',
+      APPROVED:'bg-green-100 text-green-700', REJECTED:'bg-red-100 text-red-700',
+      CLOSED:'bg-gray-200 text-gray-600',
+    };
+    const HOTO_STATUS_LABEL = {
+      NOT_STARTED:'Not Started', IN_PROGRESS:'In Progress', UNDER_REVIEW:'Under Review',
+      PENDING_PRESIDENT:'Pending President', PENDING_SECRETARY:'Pending Secretary',
+      APPROVED:'Approved', REJECTED:'Rejected', CLOSED:'Closed',
+    };
+
+    async function loadHotoLinks() {
+      const res = await fetch(`/api/v1/hoto/snags/${snagId}/hoto-links`, { credentials: 'include' });
+      const links = res.ok ? await res.json() : [];
+      const container = document.getElementById('hoto-links-content');
+      if (!container) return;
+
+      if (!links.length) {
+        container.innerHTML = '<p class="text-xs text-text-secondary">This snag is not linked to any HOTO item.</p>';
+        return;
+      }
+
+      container.innerHTML = links.map(l => {
+        const h = l.hoto_item;
+        const sc = HOTO_STATUS_CLS[h?.status] ?? 'bg-gray-100 text-gray-600';
+        const sl = HOTO_STATUS_LABEL[h?.status] ?? h?.status ?? '—';
+        return `
+          <div class="mb-3 last:mb-0">
+            <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
+              <span class="text-xs px-1.5 py-0.5 rounded-full font-medium ${sc}">${sl}</span>
+              <span class="text-xs text-text-secondary">${h?.hoto_category ?? ''}</span>
+            </div>
+            <a href="/portal/hoto/${h?.id}" class="text-sm text-primary-600 hover:underline font-medium">${h?.title ?? h?.id ?? '—'}</a>
+            ${l.notes ? `<p class="text-xs text-amber-700 mt-0.5 italic">${l.notes}</p>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    loadHotoLinks();
 
     loadData();
 

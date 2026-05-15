@@ -110,6 +110,45 @@ const canBypass  = user.isAdmin || ['secretary','president'].includes(user.porta
         )}
       </div>
 
+      <!-- Linked Snags panel -->
+      <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+        <div class="px-5 py-4 border-b border-border-light flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-text-primary flex items-center gap-2">
+            <i class="fas fa-link text-amber-600" aria-hidden="true"></i> Linked Snags
+            <span id="snag-links-count" class="hidden text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium"></span>
+          </h2>
+          {canCreate && (
+            <button id="link-snag-btn" class="text-xs text-primary-600 hover:text-primary-700 font-medium">
+              + Link Snag
+            </button>
+          )}
+        </div>
+        <div id="snag-links-list" class="divide-y divide-border-light">
+          <div class="px-5 py-3 text-sm text-text-secondary">Loading…</div>
+        </div>
+        {canCreate && (
+          <div id="link-snag-form" class="hidden px-5 py-4 bg-gray-50 border-t border-border-light">
+            <div id="link-snag-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-text-primary mb-1">Snag ID <span class="text-red-500">*</span></label>
+                <input type="text" id="link-snag-id" placeholder="Paste snag UUID…"
+                  class="w-full px-3 py-2 border border-border-light rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-600" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-text-primary mb-1">Notes (optional)</label>
+                <input type="text" id="link-snag-notes" placeholder="Why this snag is linked…"
+                  class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+              </div>
+              <div class="flex gap-2">
+                <button id="link-snag-submit" class="btn-primary text-xs py-2 px-4">Link</button>
+                <button id="link-snag-cancel" class="btn-outline text-xs py-2 px-4">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <!-- Comment thread -->
       <div class="bg-white rounded-xl border border-border-light overflow-hidden">
         <div class="px-5 py-4 border-b border-border-light">
@@ -252,6 +291,7 @@ const canBypass  = user.isAdmin || ['secretary','president'].includes(user.porta
         ],
         APPROVED: [
           { to:'CLOSED', label:'Close Item', ok: canAdvance && canApproveSecretary },
+          { to:'IN_PROGRESS', label:'Send Back for Corrections', ok: canBypass, requiresNotes: true },
           { to:'REJECTED', label:'Dispute / Reject', ok: canBypass, requiresNotes: true },
         ],
         REJECTED: [{ to:'IN_PROGRESS', label:'Reopen', ok: canAdvance }],
@@ -660,5 +700,117 @@ const canBypass  = user.isAdmin || ['secretary','president'].includes(user.porta
     }
 
     loadPage();
+
+    // ── Linked Snags ──────────────────────────────────────────────────────────
+    const SNAG_STATUS_CLS = {
+      OPEN:'bg-red-100 text-red-700', IN_PROGRESS:'bg-blue-100 text-blue-700',
+      RESOLVED:'bg-indigo-100 text-indigo-700', VERIFIED_CLOSED:'bg-green-100 text-green-700',
+      REOPENED:'bg-orange-100 text-orange-700',
+    };
+    const SNAG_STATUS_LABEL = {
+      OPEN:'Open', IN_PROGRESS:'In Progress', RESOLVED:'Resolved',
+      VERIFIED_CLOSED:'Verified Closed', REOPENED:'Reopened',
+    };
+
+    async function loadSnagLinks() {
+      const res = await fetch(`/api/v1/hoto/items/${itemId}/snag-links`, { credentials: 'include' });
+      const links = res.ok ? await res.json() : [];
+      const container = document.getElementById('snag-links-list');
+      const badge = document.getElementById('snag-links-count');
+
+      if (!links.length) {
+        container.innerHTML = '<div class="px-5 py-4 text-sm text-text-secondary">No snags linked yet.</div>';
+        badge?.classList.add('hidden');
+        return;
+      }
+
+      badge.textContent = String(links.length);
+      badge.classList.remove('hidden');
+
+      container.innerHTML = links.map(l => {
+        const s = l.snag;
+        const statusCls = SNAG_STATUS_CLS[s?.status] ?? 'bg-gray-100 text-gray-600';
+        const statusLbl = SNAG_STATUS_LABEL[s?.status] ?? s?.status ?? '—';
+        return `
+          <div class="px-5 py-3 flex items-start gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-0.5">
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium ${statusCls}">${statusLbl}</span>
+                <span class="text-xs text-text-secondary truncate">${s?.category ?? '—'}${s?.subcategory ? ' / ' + s.subcategory : ''}</span>
+              </div>
+              <a href="/portal/snags/${s?.id}" class="text-sm text-primary-600 hover:underline font-medium">${s?.location ?? s?.id ?? '—'}</a>
+              ${s?.description ? `<p class="text-xs text-text-secondary mt-0.5 line-clamp-2">${s.description}</p>` : ''}
+              ${l.notes ? `<p class="text-xs text-amber-700 mt-1 italic">${l.notes}</p>` : ''}
+            </div>
+            ${canCreate ? `
+              <button onclick="unlinkSnag('${s?.id}')" title="Unlink snag"
+                class="text-xs text-red-500 hover:text-red-700 flex-shrink-0 mt-0.5">
+                <i class="fas fa-unlink" aria-hidden="true"></i>
+              </button>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.unlinkSnag = async function(snagId) {
+      if (!confirm('Remove this snag link?')) return;
+      const res = await fetch(`/api/v1/hoto/items/${itemId}/snag-links?snag_id=${snagId}`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      if (res.ok || res.status === 204) {
+        await loadSnagLinks();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.message ?? 'Failed to unlink snag.');
+      }
+    };
+
+    if (canCreate) {
+      document.getElementById('link-snag-btn')?.addEventListener('click', () => {
+        document.getElementById('link-snag-form')?.classList.toggle('hidden');
+        document.getElementById('link-snag-error')?.classList.add('hidden');
+        document.getElementById('link-snag-id')?.focus();
+      });
+
+      document.getElementById('link-snag-cancel')?.addEventListener('click', () => {
+        document.getElementById('link-snag-form')?.classList.add('hidden');
+      });
+
+      document.getElementById('link-snag-submit')?.addEventListener('click', async () => {
+        const snagId = (document.getElementById('link-snag-id')).value.trim();
+        const notes  = (document.getElementById('link-snag-notes')).value.trim();
+        const errEl  = document.getElementById('link-snag-error');
+        errEl.classList.add('hidden');
+
+        if (!snagId) {
+          errEl.textContent = 'Snag ID is required.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+
+        const btn = document.getElementById('link-snag-submit');
+        btn.disabled = true; btn.textContent = 'Linking…';
+
+        const res = await fetch(`/api/v1/hoto/items/${itemId}/snag-links`, {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ snag_id: snagId, ...(notes ? { notes } : {}) }),
+        });
+
+        btn.disabled = false; btn.textContent = 'Link';
+
+        if (res.ok) {
+          (document.getElementById('link-snag-id')).value = '';
+          (document.getElementById('link-snag-notes')).value = '';
+          document.getElementById('link-snag-form')?.classList.add('hidden');
+          await loadSnagLinks();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          errEl.textContent = d.message ?? d.error ?? 'Failed to link snag.';
+          errEl.classList.remove('hidden');
+        }
+      });
+    }
+
+    loadSnagLinks();
   </script>
 </PortalLayout>

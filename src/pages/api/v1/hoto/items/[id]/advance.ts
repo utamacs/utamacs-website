@@ -25,6 +25,8 @@ const TRANSITIONS: Record<string, {
   'PENDING_PRESIDENT:PENDING_SECRETARY':  { feature: 'hoto.approve_president', recordPresidentApproval: true },
   'PENDING_SECRETARY:APPROVED':           { feature: 'hoto.approve_secretary', differentFromPresidentApprover: true, recordSecretaryApproval: true },
   'APPROVED:CLOSED':                      { feature: 'hoto.advance_status', secretaryPlus: true },
+  // Send back from APPROVED to IN_PROGRESS (secretary/president can reopen for corrections)
+  'APPROVED:IN_PROGRESS':                 { feature: 'hoto.advance_status', secretaryPlus: true, requireGovernanceNotes: true },
   // Dispute path (from any reviewable state back to disputed)
   'UNDER_REVIEW:REJECTED':                { feature: 'hoto.advance_status', secretaryPlus: true, requireGovernanceNotes: true },
   'PENDING_PRESIDENT:REJECTED':           { feature: 'hoto.advance_status', secretaryPlus: true, requireGovernanceNotes: true },
