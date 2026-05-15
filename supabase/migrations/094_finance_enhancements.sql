@@ -184,7 +184,7 @@ CREATE POLICY "exec_manage_credits" ON member_credits FOR ALL
 
 -- ── Rules engine seeds for late fee defaults ──────────────────────────────────
 
-INSERT INTO rules (society_id, rule_code, display_name, description, value_type, current_value, is_locked)
+INSERT INTO rules (society_id, rule_code, rule_category, label, description, value_type, current_value, default_value, is_locked)
 SELECT
   id,
   unnest(ARRAY[
@@ -193,6 +193,7 @@ SELECT
     'LATE_FEE_MAX_CAP_AMOUNT',
     'LATE_FEE_CRON_ENABLED'
   ]),
+  'PARAMETER',
   unnest(ARRAY[
     'Late Fee Grace Period (days)',
     'Late Fee Default Rate (%)',
@@ -206,6 +207,7 @@ SELECT
     'Whether the daily late fee cron job is active'
   ]),
   unnest(ARRAY['int','decimal','decimal','boolean']),
+  unnest(ARRAY['5','18.00','5000.00','true']),
   unnest(ARRAY['5','18.00','5000.00','true']),
   unnest(ARRAY[false,false,false,false])
 FROM societies
