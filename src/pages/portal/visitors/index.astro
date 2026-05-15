@@ -2,15 +2,15 @@
 export const prerender = false;
 import PortalLayout from '@portal/PortalLayout.astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+import { resolveFromRequest } from '@lib/permissions';
 
-const user = Astro.locals.user;
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
 if (!user) return Astro.redirect('/portal/login');
 
 const isGuard = user.role === 'security_guard';
-const isExec  = ['executive', 'admin'].includes(user.role) || user.isAdmin ||
-                ['executive','secretary','president'].includes((user as any).portalRole ?? '');
-
-const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const isExec  = user.isAdmin || ['executive','secretary','president'].includes(user.portalRole ?? '');
 const sb = getSupabaseServiceClient();
 
 // Resident's unit (for pre-fills and gate approval scoping)
@@ -397,6 +397,20 @@ const VISITOR_TYPES = [
     </div>
   )}
 
+  <!-- ── RESIDENT: Frequent Visitor Shortcuts ─────────────────────────────── -->
+  {!isGuard && (
+    <div id="frequent-visitors-section" class="hidden mb-6">
+      <div class="card-premium p-5">
+        <div class="flex items-center gap-2 mb-3">
+          <i class="fas fa-history text-primary-400" aria-hidden="true"></i>
+          <h2 class="font-semibold text-text-primary">Frequent Visitors</h2>
+          <span class="text-xs text-text-secondary ml-auto">Quick pass</span>
+        </div>
+        <div id="frequent-visitors-list" class="flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+  )}
+
   <!-- ── RESIDENT: My Visitor Passes ──────────────────────────────────────── -->
   {!isGuard && (
     <div id="pre-approvals-panel" class="bg-white rounded-xl border border-border-light overflow-hidden mb-6">
@@ -701,6 +715,40 @@ const VISITOR_TYPES = [
           </div>
         </div>`;
     }).join('')}</div>`;
+  }
+
+  // ── Frequent Visitor Shortcuts (resident) ──────────────────────────────────
+  async function loadFrequentVisitors() {
+    if (isGuard) return;
+    const section = document.getElementById('frequent-visitors-section');
+    const listEl  = document.getElementById('frequent-visitors-list');
+    if (!section || !listEl) return;
+
+    try {
+      const res = await fetch('/api/v1/visitors/frequent', { credentials: 'include' });
+      if (!res.ok) return;
+      const { frequent } = await res.json();
+      if (!frequent?.length) return;
+
+      section.classList.remove('hidden');
+      listEl.innerHTML = frequent.map(v => {
+        const params = new URLSearchParams({ name: v.visitor_name });
+        if (v.vehicle_number) params.set('vehicle', v.vehicle_number);
+        const href = `/portal/visitors/new?${params}`;
+        const typeLabel = v.visitor_type ? v.visitor_type.replace(/_/g, ' ') : '';
+        return `
+          <a href="${href}"
+             class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-border-light
+                    bg-primary-50 hover:bg-primary-100 hover:border-primary-300
+                    text-sm text-primary-700 font-medium transition-colors group">
+            <i class="fas fa-user-clock text-primary-400 text-xs" aria-hidden="true"></i>
+            <span>${v.visitor_name}</span>
+            ${typeLabel ? `<span class="text-xs text-primary-500 capitalize">${typeLabel}</span>` : ''}
+            <span class="text-xs text-primary-400 bg-white border border-primary-200 rounded-full px-1.5 py-0.5">${v.count}×</span>
+            <i class="fas fa-plus text-[10px] text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true"></i>
+          </a>`;
+      }).join('');
+    } catch (_) { /* non-critical */ }
   }
 
   // ── Active Visitors (guard) ─────────────────────────────────────────────────
@@ -1269,6 +1317,7 @@ const VISITOR_TYPES = [
 
   // ── Init ────────────────────────────────────────────────────────────────────
   loadGates().then(() => loadAll());
+  loadFrequentVisitors();
 
   // Resident: poll for new gate requests every 30 seconds while page is open
   if (!isGuard) {
