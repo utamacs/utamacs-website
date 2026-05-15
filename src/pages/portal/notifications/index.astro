@@ -1,9 +1,13 @@
 ---
 export const prerender = false;
 import PortalLayout from '@portal/PortalLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
 
-const user = Astro.locals.user;
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
 if (!user) return Astro.redirect('/portal/login');
+
+const isExec = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
 ---
 
 <PortalLayout title="Notifications" user={user} activeModule="notifications">
@@ -20,8 +24,16 @@ if (!user) return Astro.redirect('/portal/login');
 
   <!-- Main tabs -->
   <div class="flex gap-2 mb-5 border-b border-border-light">
-    <button id="tab-feed" class="main-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px">Feed</button>
+    <button id="tab-feed" class="main-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px">
+      Feed <span id="unread-badge" class="hidden ml-1 bg-primary-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full"></span>
+    </button>
     <button id="tab-prefs" class="main-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Preferences</button>
+    {isExec && (
+      <button id="tab-email-queue" class="main-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">
+        Email Queue
+        <span id="queue-badge" class="hidden ml-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full"></span>
+      </button>
+    )}
   </div>
 
   <!-- Feed panel -->
@@ -45,6 +57,46 @@ if (!user) return Astro.redirect('/portal/login');
       </div>
     </div>
   </div>
+
+  <!-- Email Queue panel (exec only) -->
+  {isExec && (
+    <div id="panel-email-queue" class="hidden">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-semibold text-text-primary">Outbound Email Queue</h2>
+          <p class="text-xs text-text-secondary mt-0.5">Pending and recently sent emails. Enable email via the Rules admin page (NOTIFICATION_EMAIL_ENABLED).</p>
+        </div>
+        <div class="flex gap-2">
+          <button id="process-queue-btn" class="btn-primary text-sm flex items-center gap-1.5 px-3 py-2">
+            <i class="fas fa-paper-plane text-xs" aria-hidden="true"></i> Process Queue
+          </button>
+          <button id="send-digest-btn" class="btn-outline text-sm flex items-center gap-1.5 px-3 py-2">
+            <i class="fas fa-newspaper text-xs" aria-hidden="true"></i> Send Digests
+          </button>
+        </div>
+      </div>
+
+      <div class="card-premium overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-border-light bg-section-alt text-xs font-medium text-text-secondary">
+                <th class="px-4 py-2 text-left">To</th>
+                <th class="px-4 py-2 text-left">Subject</th>
+                <th class="px-4 py-2 text-center">Status</th>
+                <th class="px-4 py-2 text-center">Retries</th>
+                <th class="px-4 py-2 text-left">Scheduled</th>
+                <th class="px-4 py-2 text-left">Sent At</th>
+              </tr>
+            </thead>
+            <tbody id="email-queue-rows">
+              <tr><td colspan="6" class="py-10 text-center text-text-secondary text-sm">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )}
 
   <!-- Preferences panel -->
   <div id="panel-prefs" class="hidden">
@@ -128,6 +180,16 @@ if (!user) return Astro.redirect('/portal/login');
         return;
       }
 
+      const unreadCount = items.filter((n: any) => !n.is_read).length;
+      const badge = document.getElementById('unread-badge');
+      if (unreadCount > 0 && badge) {
+        badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+        badge.classList.remove('hidden');
+      } else if (badge) {
+        badge.classList.add('hidden');
+      }
+      document.title = unreadCount > 0 ? `(${unreadCount}) Notifications — UTA MACS` : 'Notifications — UTA MACS';
+
       container.innerHTML = items.map((n: any) => {
         const icon = TYPE_ICONS[n.type] ?? 'fa-bell text-gray-400';
         const linkFn = TYPE_LINKS[n.type];
@@ -145,14 +207,20 @@ if (!user) return Astro.redirect('/portal/login');
                   <div class="text-sm font-medium text-text-primary">${n.title}</div>
                   <div class="text-sm text-text-secondary mt-0.5">${n.body}</div>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex items-center gap-2 flex-shrink-0">
                   ${!n.is_read ? '<div class="w-2 h-2 rounded-full bg-primary-600 mt-1"></div>' : ''}
+                  <button onclick="deleteNotification('${n.id}')" title="Delete notification"
+                    class="text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1"
+                    aria-label="Delete notification">
+                    <i class="fas fa-trash-alt text-xs" aria-hidden="true"></i>
+                  </button>
                 </div>
               </div>
               <div class="flex items-center gap-3 mt-2">
                 <span class="text-xs text-text-secondary">${timeAgo}</span>
                 ${link ? `<a href="${link}" class="text-xs text-primary-600 hover:underline">View →</a>` : ''}
                 ${!n.is_read ? `<button onclick="markRead('${n.id}')" class="text-xs text-text-secondary hover:text-primary-600">Mark read</button>` : ''}
+                <button onclick="deleteNotification('${n.id}')" class="text-xs text-red-400 hover:text-red-600">Delete</button>
               </div>
             </div>
           </div>
@@ -210,20 +278,39 @@ if (!user) return Astro.redirect('/portal/login');
       });
     });
 
-    // ── Main tab switching ────────────────────────────────────────────────────
-    document.getElementById('tab-feed')!.addEventListener('click', () => {
-      document.getElementById('panel-feed')!.classList.remove('hidden');
-      document.getElementById('panel-prefs')!.classList.add('hidden');
-      document.getElementById('tab-feed')!.className = 'main-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
-      document.getElementById('tab-prefs')!.className = 'main-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
-    });
+    async function deleteNotification(id: string) {
+      if (!confirm('Delete this notification?')) return;
+      const res = await fetch(`/api/v1/notifications?id=${id}`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      if (res.ok) loadNotifications();
+    }
+    (window as any).deleteNotification = deleteNotification;
 
+    // ── Main tab switching ────────────────────────────────────────────────────
+    const ACTIVE_TAB = 'main-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
+    const INACT_TAB  = 'main-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
+
+    function switchTab(active: string) {
+      const panels = ['feed', 'prefs', 'email-queue'];
+      panels.forEach(p => {
+        document.getElementById(`panel-${p}`)?.classList.add('hidden');
+        const tab = document.getElementById(`tab-${p}`);
+        if (tab) tab.className = INACT_TAB;
+      });
+      document.getElementById(`panel-${active}`)?.classList.remove('hidden');
+      const activeTab = document.getElementById(`tab-${active}`);
+      if (activeTab) activeTab.className = ACTIVE_TAB;
+    }
+
+    document.getElementById('tab-feed')!.addEventListener('click', () => switchTab('feed'));
     document.getElementById('tab-prefs')!.addEventListener('click', () => {
-      document.getElementById('panel-feed')!.classList.add('hidden');
-      document.getElementById('panel-prefs')!.classList.remove('hidden');
-      document.getElementById('tab-prefs')!.className = 'main-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
-      document.getElementById('tab-feed')!.className = 'main-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
+      switchTab('prefs');
       if (!prefsLoaded) loadPrefs();
+    });
+    document.getElementById('tab-email-queue')?.addEventListener('click', () => {
+      switchTab('email-queue');
+      loadEmailQueue();
     });
 
     // ── Preferences ───────────────────────────────────────────────────────────
@@ -312,6 +399,74 @@ if (!user) return Astro.redirect('/portal/login');
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-save" aria-hidden="true"></i> Save Preferences';
       }
+    });
+
+    // ── Email Queue (exec only) ───────────────────────────────────────────────
+    async function loadEmailQueue() {
+      const tbody = document.getElementById('email-queue-rows');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</td></tr>';
+
+      const res = await fetch('/api/v1/notifications/email-queue', { credentials: 'include' });
+      if (!res.ok) { tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-red-600 text-sm">Failed to load.</td></tr>'; return; }
+      const data = await res.json();
+      const rows: unknown[] = data.rows ?? [];
+
+      const badge = document.getElementById('queue-badge');
+      const pending = rows.filter((r: any) => r.status === 'pending').length;
+      if (pending > 0 && badge) { badge.textContent = String(pending); badge.classList.remove('hidden'); }
+      else if (badge) badge.classList.add('hidden');
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-10 text-center text-text-secondary text-sm">Email queue is empty.</td></tr>';
+        return;
+      }
+
+      const statusCls: Record<string, string> = {
+        pending: 'bg-amber-100 text-amber-700',
+        sent:    'bg-green-100 text-green-700',
+        failed:  'bg-red-100 text-red-700',
+        cancelled: 'bg-gray-100 text-gray-500',
+      };
+
+      tbody.innerHTML = rows.map((r: any) => `
+        <tr class="border-b border-border-light hover:bg-section-alt text-xs">
+          <td class="px-4 py-2 text-text-secondary">${r.to_email}</td>
+          <td class="px-4 py-2 text-text-primary max-w-[240px] truncate" title="${r.subject}">${r.subject}</td>
+          <td class="px-4 py-2 text-center">
+            <span class="inline-flex px-2 py-0.5 rounded-full font-medium ${statusCls[r.status] ?? ''}">${r.status}</span>
+          </td>
+          <td class="px-4 py-2 text-center text-text-secondary">${r.retry_count ?? 0}/${r.max_retries ?? 3}</td>
+          <td class="px-4 py-2 text-text-secondary">${r.scheduled_for ? new Date(r.scheduled_for).toLocaleString('en-IN') : '—'}</td>
+          <td class="px-4 py-2 text-text-secondary">${r.sent_at ? new Date(r.sent_at).toLocaleString('en-IN') : '—'}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('process-queue-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('process-queue-btn') as HTMLButtonElement;
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing…';
+      const res = await fetch('/api/v1/notifications/process-email-queue', { method: 'POST', credentials: 'include' });
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Process Queue';
+      const data = await res.json();
+      if (res.ok) {
+        const msg = data.skipped ? 'Email disabled (check NOTIFICATION_EMAIL_ENABLED rule).' :
+                    `Sent: ${data.sent}, Failed: ${data.transient_failed}, Permanent: ${data.permanent_failed}`;
+        alert(msg);
+        loadEmailQueue();
+      } else { alert(data.message ?? 'Failed.'); }
+    });
+
+    document.getElementById('send-digest-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('send-digest-btn') as HTMLButtonElement;
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending…';
+      const res = await fetch('/api/v1/notifications/send-digest', { method: 'POST', credentials: 'include' });
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-newspaper mr-2"></i>Send Digests';
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Digests enqueued: ${data.enqueued}. Skipped (no notifs): ${data.skipped_no_notifs}. Skipped (no email): ${data.skipped_no_email}.`);
+        loadEmailQueue();
+      } else { alert(data.message ?? 'Failed.'); }
     });
 
     (window as any).markRead = markRead;
