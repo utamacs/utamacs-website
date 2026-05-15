@@ -11,19 +11,22 @@ AuthRepository authRepository(AuthRepositoryRef ref) => AuthRepository();
 class AuthRepository {
   final _client = Supabase.instance.client;
 
-  Future<void> signInWithOtp(String phone) async {
-    await _client.auth.signInWithOtp(phone: phone);
-  }
-
-  Future<void> verifyOtp(String phone, String token) async {
-    await _client.auth.verifyOTP(
-      phone: phone,
-      token: token,
-      type: OtpType.sms,
+  Future<void> sendEmailOtp(String email) async {
+    await _client.auth.signInWithOtp(
+      email: email,
+      shouldCreateUser: false, // only allow existing portal members
     );
   }
 
-  Future<void> signInWithEmail(String email, String password) async {
+  Future<void> verifyEmailOtp(String email, String token) async {
+    await _client.auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.email,
+    );
+  }
+
+  Future<void> signInWithPassword(String email, String password) async {
     await _client.auth.signInWithPassword(email: email, password: password);
   }
 

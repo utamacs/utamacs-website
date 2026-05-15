@@ -12,47 +12,50 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _phoneCtrl = TextEditingController();
-  final _otpCtrl = TextEditingController();
-  bool _otpSent = false;
-  bool _loading = false;
+  final _emailCtrl = TextEditingController();
+  final _otpCtrl   = TextEditingController();
+  bool _otpSent  = false;
+  bool _loading  = false;
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
+    _emailCtrl.dispose();
     _otpCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _sendOtp() async {
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) return;
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      _showError('Enter a valid email address.');
+      return;
+    }
     setState(() => _loading = true);
     try {
-      // Normalise to E.164: assume India +91 if no country code
-      final normalised = phone.startsWith('+') ? phone : '+91$phone';
-      await ref.read(authNotifierProvider.notifier).sendOtp(normalised);
-      setState(() => _otpSent = true);
+      await ref.read(authNotifierProvider.notifier).sendEmailOtp(email);
+      if (mounted) setState(() => _otpSent = true);
     } catch (e) {
-      _showError('Could not send OTP. Check your phone number.');
+      _showError('Could not send OTP. Make sure your email is registered on the portal.');
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _verifyOtp() async {
-    final phone = _phoneCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
     final token = _otpCtrl.text.trim();
-    if (token.length != 6) return;
+    if (token.length != 6) {
+      _showError('Enter the 6-digit code from your email.');
+      return;
+    }
     setState(() => _loading = true);
     try {
-      final normalised = phone.startsWith('+') ? phone : '+91$phone';
-      await ref.read(authNotifierProvider.notifier).verifyOtp(normalised, token);
+      await ref.read(authNotifierProvider.notifier).verifyEmailOtp(email, token);
       if (mounted) context.go('/');
     } catch (e) {
-      _showError('Invalid or expired OTP. Please try again.');
+      _showError('Invalid or expired code. Check your email and try again.');
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -73,7 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Spacer(),
-              // Logo / branding
+              // Branding
               Container(
                 width: 56,
                 height: 56,
@@ -87,25 +90,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Text('UTA MACS',
                   style: Theme.of(context).textTheme.headlineLarge),
               const SizedBox(height: 6),
-              Text(
-                'Resident Portal',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyLarge
-                    ?.copyWith(color: kTextSecondary),
-              ),
+              Text('Resident Portal',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyLarge
+                      ?.copyWith(color: kTextSecondary)),
               const SizedBox(height: 48),
               if (!_otpSent) ...[
-                Text('Enter your mobile number',
+                Text('Sign in with your email',
                     style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 16),
+                const SizedBox(height: 6),
+                Text('Use the same email address registered on the portal.',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: kTextSecondary)),
+                const SizedBox(height: 20),
                 TextFormField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
                   decoration: const InputDecoration(
-                    prefixText: '+91  ',
-                    hintText: '98765 43210',
-                    labelText: 'Mobile number',
+                    labelText: 'Email address',
+                    prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -113,29 +120,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: _loading ? null : _sendOtp,
                   child: _loading
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
+                          height: 20, width: 20,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text('Send OTP'),
+                              color: Colors.white, strokeWidth: 2))
+                      : const Text('Send sign-in code'),
                 ),
               ] else ...[
-                Text('Enter the 6-digit OTP',
+                Text('Enter the 6-digit code',
                     style: Theme.of(context).textTheme.titleLarge),
-                Text('Sent to +91 ${_phoneCtrl.text}',
+                const SizedBox(height: 6),
+                Text('Sent to ${_emailCtrl.text}',
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
                         ?.copyWith(color: kTextSecondary)),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 TextFormField(
                   controller: _otpCtrl,
                   keyboardType: TextInputType.number,
                   maxLength: 6,
                   decoration: const InputDecoration(
-                    hintText: '• • • • • •',
-                    labelText: 'OTP',
+                    labelText: 'Sign-in code',
+                    prefixIcon: Icon(Icons.lock_outline),
                     counterText: '',
                   ),
                 ),
@@ -144,12 +150,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: _loading ? null : _verifyOtp,
                   child: _loading
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
+                          height: 20, width: 20,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text('Verify & Sign In'),
+                              color: Colors.white, strokeWidth: 2))
+                      : const Text('Sign in'),
                 ),
                 const SizedBox(height: 12),
                 TextButton(
@@ -159,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             _otpSent = false;
                             _otpCtrl.clear();
                           }),
-                  child: const Text('Change number'),
+                  child: const Text('Use a different email'),
                 ),
               ],
               const Spacer(flex: 2),

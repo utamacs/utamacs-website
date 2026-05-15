@@ -61,14 +61,14 @@ class AuthNotifier extends _$AuthNotifier {
     }
   }
 
-  Future<void> sendOtp(String phone) async {
+  Future<void> sendEmailOtp(String email) async {
     final repo = ref.read(authRepositoryProvider);
-    await repo.signInWithOtp(phone);
+    await repo.sendEmailOtp(email);
   }
 
-  Future<void> verifyOtp(String phone, String token) async {
+  Future<void> verifyEmailOtp(String email, String token) async {
     final repo = ref.read(authRepositoryProvider);
-    await repo.verifyOtp(phone, token);
+    await repo.verifyEmailOtp(email, token);
   }
 
   Future<void> signOut() async {
