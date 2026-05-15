@@ -84,9 +84,11 @@ CREATE INDEX IF NOT EXISTS idx_invoice_line_items_dues ON invoice_line_items(due
 
 ALTER TABLE invoice_line_items ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "member_read_own_line_items" ON invoice_line_items;
 CREATE POLICY "member_read_own_line_items" ON invoice_line_items FOR SELECT
   USING (dues_id IN (SELECT id FROM maintenance_dues WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "exec_manage_line_items" ON invoice_line_items;
 CREATE POLICY "exec_manage_line_items" ON invoice_line_items FOR ALL
   USING (EXISTS (
     SELECT 1 FROM profiles WHERE id = auth.uid()
@@ -112,9 +114,13 @@ CREATE INDEX IF NOT EXISTS idx_late_fee_charges_date ON late_fee_charges(society
 
 ALTER TABLE late_fee_charges ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "member_read_own_late_fees" ON late_fee_charges;
+DROP POLICY IF EXISTS "member_read_own_late_fee_charges" ON late_fee_charges;
 CREATE POLICY "member_read_own_late_fees" ON late_fee_charges FOR SELECT
   USING (dues_id IN (SELECT id FROM maintenance_dues WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "exec_manage_late_fees" ON late_fee_charges;
+DROP POLICY IF EXISTS "exec_manage_late_fee_charges" ON late_fee_charges;
 CREATE POLICY "exec_manage_late_fees" ON late_fee_charges FOR ALL
   USING (EXISTS (
     SELECT 1 FROM profiles WHERE id = auth.uid()
@@ -138,9 +144,12 @@ CREATE INDEX IF NOT EXISTS idx_payment_allocations_payment ON payment_allocation
 
 ALTER TABLE payment_allocations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "member_read_own_allocations" ON payment_allocations;
 CREATE POLICY "member_read_own_allocations" ON payment_allocations FOR SELECT
   USING (dues_id IN (SELECT id FROM maintenance_dues WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "exec_read_allocations" ON payment_allocations;
+DROP POLICY IF EXISTS "exec_manage_allocations" ON payment_allocations;
 CREATE POLICY "exec_read_allocations" ON payment_allocations FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM profiles WHERE id = auth.uid()
@@ -170,19 +179,24 @@ CREATE INDEX IF NOT EXISTS idx_member_credits_user ON member_credits(society_id,
 
 ALTER TABLE member_credits ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "member_read_own_credits" ON member_credits;
 CREATE POLICY "member_read_own_credits" ON member_credits FOR SELECT
   USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "exec_read_credits" ON member_credits;
+DROP POLICY IF EXISTS "exec_manage_credits" ON member_credits;
 CREATE POLICY "exec_read_credits" ON member_credits FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM profiles WHERE id = auth.uid()
     AND (portal_role IN ('executive','secretary','president') OR is_admin)
   ));
 
+DROP POLICY IF EXISTS "system_insert_credits" ON member_credits;
 CREATE POLICY "system_insert_credits" ON member_credits FOR INSERT
   WITH CHECK (society_id = (SELECT society_id FROM profiles WHERE id = auth.uid() LIMIT 1));
 
 -- Exec can update status (to 'refunded' or 'applied')
+DROP POLICY IF EXISTS "exec_update_credits" ON member_credits;
 CREATE POLICY "exec_update_credits" ON member_credits FOR UPDATE
   USING (EXISTS (
     SELECT 1 FROM profiles WHERE id = auth.uid()
