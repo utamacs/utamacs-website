@@ -17,7 +17,7 @@ export const GET: APIRoute = async ({ request }) => {
       .from('maintenance_dues')
       .select(`
         id, unit_id, user_id, billing_period_id, base_amount, penalty_amount,
-        gst_amount, total_amount, status, due_date, paid_at,
+        gst_amount, total_amount, amount_paid, status, due_date, paid_at,
         billing_periods(name, start_date, end_date),
         units(unit_number)
       `)

@@ -104,7 +104,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Notify owner in-portal (fire-and-forget) asking for consent
     if (ownerUserId) {
-      sb.from('notifications').insert({
+      void Promise.resolve(sb.from('notifications').insert({
         society_id:      SOCIETY_ID,
         user_id:         ownerUserId,
         title:           `Tenant consent required for Flat ${unit}`,
@@ -112,7 +112,7 @@ export const POST: APIRoute = async ({ request }) => {
         type:            'onboarding',
         reference_table: 'onboarding_requests',
         reference_id:    data.id,
-      }).then(() => {}).catch(() => {});
+      })).catch(() => {});
     }
 
     return Response.json({ id: data.id, status: 'pending', owner_notified: !!ownerUserId }, { status: 201 });

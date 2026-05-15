@@ -1,17 +1,15 @@
 ---
 export const prerender = false;
-import PortalLayout from '@portal/PortalLayout.astro';
+import PortalLayout from '@components/portal/PortalLayout.astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-
-const user = Astro.locals.user;
-const isPrivileged = user && (
-  ['executive','admin'].includes(user.role) ||
-  ['executive','secretary','president'].includes(user.portalRole ?? '') ||
-  user.isAdmin
-);
-if (!isPrivileged) return Astro.redirect('/portal/admin');
+import { resolveFromRequest } from '@lib/permissions';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+const isPrivileged = user.isAdmin || ['executive', 'secretary', 'president'].includes(user.portalRole ?? '');
+if (!isPrivileged) return Astro.redirect('/portal/admin');
+
 const sb = getSupabaseServiceClient();
 
 const [{ data: assets }, { data: locations }, { data: vendors }] = await Promise.all([
@@ -101,9 +99,15 @@ const locationsJson = JSON.stringify(allLocations);
       <h1 class="text-2xl font-bold text-primary-600 font-poppins">Asset Register</h1>
       <p class="text-text-secondary text-sm mt-1">{allAssets.length} assets · property equipment &amp; AMC tracking</p>
     </div>
-    <button id="add-asset-btn" class="btn-primary flex items-center gap-2">
-      <i class="fas fa-plus" aria-hidden="true"></i>Add Asset
-    </button>
+    <div class="flex items-center gap-2">
+      <a id="export-csv-btn" href="/api/v1/admin/assets/export" target="_blank"
+         class="btn-ghost text-sm flex items-center gap-1.5">
+        <i class="fas fa-download" aria-hidden="true"></i>Export CSV
+      </a>
+      <button id="add-asset-btn" class="btn-primary flex items-center gap-2">
+        <i class="fas fa-plus" aria-hidden="true"></i>Add Asset
+      </button>
+    </div>
   </div>
 
   <!-- Stats row -->
@@ -479,6 +483,17 @@ function applyFilters() {
   if (es) es.classList.toggle('hidden', shown > 0);
 }
 
+function syncExportUrl() {
+  const btn = document.getElementById('export-csv-btn') as HTMLAnchorElement | null;
+  if (!btn) return;
+  const params = new URLSearchParams();
+  if (activeCat   && activeCat !== 'all') params.set('category', activeCat);
+  if (activeStatus) params.set('status',   activeStatus);
+  if (activeExpiry) params.set('expiry',   activeExpiry);
+  const qs = params.toString();
+  btn.href = `/api/v1/admin/assets/export${qs ? '?' + qs : ''}`;
+}
+
 document.querySelectorAll('.cat-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     activeCat = btn.getAttribute('data-cat') ?? 'all';
@@ -489,10 +504,11 @@ document.querySelectorAll('.cat-tab').forEach(btn => {
       b.classList.toggle('text-text-secondary', b !== btn);
     });
     applyFilters();
+    syncExportUrl();
   });
 });
-document.getElementById('status-filter')?.addEventListener('change', e => { activeStatus = (e.target as HTMLSelectElement).value; applyFilters(); });
-document.getElementById('expiry-filter')?.addEventListener('change', e => { activeExpiry = (e.target as HTMLSelectElement).value; applyFilters(); });
+document.getElementById('status-filter')?.addEventListener('change', e => { activeStatus = (e.target as HTMLSelectElement).value; applyFilters(); syncExportUrl(); });
+document.getElementById('expiry-filter')?.addEventListener('change', e => { activeExpiry = (e.target as HTMLSelectElement).value; applyFilters(); syncExportUrl(); });
 let sTimer = 0;
 document.getElementById('asset-search')?.addEventListener('input', e => {
   clearTimeout(sTimer);

@@ -18,11 +18,19 @@ const canLog = isGuard || isPrivileged;
       <h1 class="text-2xl font-bold text-primary-600 font-poppins">Security Patrol Log</h1>
       <p class="text-text-secondary text-sm mt-1">Daily patrol records and incident reports.</p>
     </div>
-    {canLog && (
-      <button id="log-btn" class="btn-primary text-sm flex items-center gap-2">
-        <i class="fas fa-plus" aria-hidden="true"></i> Log Patrol
-      </button>
-    )}
+    <div class="flex items-center gap-2">
+      {isPrivileged && (
+        <a id="export-csv-btn" href="/api/v1/security-patrol/export" target="_blank"
+           class="btn-ghost text-sm flex items-center gap-1.5">
+          <i class="fas fa-download" aria-hidden="true"></i>Export CSV
+        </a>
+      )}
+      {canLog && (
+        <button id="log-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-plus" aria-hidden="true"></i> Log Patrol
+        </button>
+      )}
+    </div>
   </div>
 
   <!-- Exec summary stats panel (hidden until loaded) -->
@@ -43,6 +51,9 @@ const canLog = isGuard || isPrivileged;
     )}
     {isPrivileged && (
       <button data-tab="schedules" class="tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Schedules</button>
+    )}
+    {isPrivileged && (
+      <button data-tab="attendance" class="tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Guard Attendance</button>
     )}
   </div>
 
@@ -88,6 +99,30 @@ const canLog = isGuard || isPrivileged;
       </div>
       <div class="bg-white rounded-xl border border-border-light overflow-hidden">
         <div id="schedules-list">
+          <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Guard Attendance tab -->
+  {isPrivileged && (
+    <div id="panel-attendance" class="hidden">
+      <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <label class="text-sm text-text-secondary">Window (days):</label>
+        <select id="attendance-days" class="form-input py-1.5 text-sm" style="width:110px">
+          <option value="7">Last 7</option>
+          <option value="30" selected>Last 30</option>
+          <option value="60">Last 60</option>
+          <option value="90">Last 90</option>
+        </select>
+        <button id="attendance-refresh" class="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5">
+          <i class="fas fa-sync-alt" aria-hidden="true"></i>Refresh
+        </button>
+      </div>
+      <div id="attendance-kpis" class="grid grid-cols-3 gap-4 mb-5"></div>
+      <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+        <div id="attendance-list">
           <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
         </div>
       </div>
@@ -279,7 +314,7 @@ const canLog = isGuard || isPrivileged;
     // ── Tabs ────────────────────────────────────────────────────────────────────
     function switchTab(tab) {
       activeTab = tab;
-      ['logs','incidents','schedules'].forEach(t => {
+      ['logs','incidents','schedules','attendance'].forEach(t => {
         const panel = document.getElementById(`panel-${t}`);
         const btn   = document.querySelector(`[data-tab="${t}"]`);
         if (panel) panel.classList.toggle('hidden', t !== tab);
@@ -292,6 +327,7 @@ const canLog = isGuard || isPrivileged;
       });
       if (tab === 'incidents') loadOpenIncidents();
       if (tab === 'schedules') loadSchedules();
+      if (tab === 'attendance') loadAttendance();
     }
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -540,6 +576,100 @@ const canLog = isGuard || isPrivileged;
       });
     }
 
+    // ── Guard Attendance ─────────────────────────────────────────────────────────
+    let attendanceLoaded = false;
+
+    async function loadAttendance(force = false) {
+      if (attendanceLoaded && !force) return;
+      attendanceLoaded = true;
+      const days = document.getElementById('attendance-days')?.value ?? '30';
+      const listEl = document.getElementById('attendance-list');
+      const kpisEl = document.getElementById('attendance-kpis');
+      if (listEl) listEl.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+
+      try {
+        const res = await fetch(`/api/v1/security-patrol/attendance?days=${days}`, { credentials: 'include' });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        // KPI strip
+        if (kpisEl) {
+          kpisEl.innerHTML = [
+            { icon: 'fa-shield-alt', color: 'text-primary-600 bg-primary-50', label: `Shifts (${data.window_days}d)`, value: data.total_shifts },
+            { icon: 'fa-user-shield', color: 'text-secondary-500 bg-green-50', label: 'Guards tracked', value: data.guard_count },
+            { icon: 'fa-exclamation-triangle', color: 'text-red-600 bg-red-50', label: 'Open incidents', value: data.open_incidents },
+          ].map(c => `
+            <div class="bg-white rounded-xl border border-border-light p-4 flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl ${c.color} flex items-center justify-center flex-shrink-0">
+                <i class="fas ${c.icon} text-sm" aria-hidden="true"></i>
+              </div>
+              <div>
+                <div class="text-xl font-bold text-text-primary">${c.value}</div>
+                <div class="text-xs text-text-secondary">${c.label}</div>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        if (!data.attendance?.length) {
+          if (listEl) listEl.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No patrol records in this window.</div>';
+          return;
+        }
+
+        const SHIFT_SHORT = { morning:'M', afternoon:'A', evening:'E', night:'N', full_day:'FD' };
+
+        if (listEl) listEl.innerHTML = `
+          <div class="grid text-xs font-medium text-text-secondary px-5 py-3 border-b border-border-light bg-gray-50"
+               style="grid-template-columns:1fr 80px 80px 80px 80px 120px">
+            <span>Guard</span><span class="text-right">Shifts</span><span class="text-right">Incidents</span>
+            <span class="text-right">Open</span><span class="text-right">Avg CPs</span><span class="text-right">Last Active</span>
+          </div>
+          ${data.attendance.map(g => {
+            const shiftBreak = Object.entries(g.shift_breakdown ?? {})
+              .map(([sh, cnt]) => `${SHIFT_SHORT[sh] ?? sh}:${cnt}`).join(' ');
+            const lastActive = g.last_active
+              ? new Date(g.last_active + 'T00:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short' })
+              : '—';
+            const staleCls = (g.days_since_last ?? 0) > 7 ? 'text-amber-600' : 'text-text-secondary';
+            return `
+              <div class="grid text-sm px-5 py-3 border-b border-border-light last:border-b-0 hover:bg-gray-50"
+                   style="grid-template-columns:1fr 80px 80px 80px 80px 120px">
+                <div>
+                  <span class="font-medium text-text-primary">${g.guard_name}</span>
+                  ${shiftBreak ? `<span class="ml-2 text-xs text-text-secondary">(${shiftBreak})</span>` : ''}
+                </div>
+                <span class="text-right font-medium text-primary-600">${g.total_shifts}</span>
+                <span class="text-right ${g.total_incidents > 0 ? 'text-red-600 font-medium' : 'text-text-secondary'}">${g.total_incidents}</span>
+                <span class="text-right ${g.open_incidents > 0 ? 'text-red-600 font-bold' : 'text-text-secondary'}">${g.open_incidents}</span>
+                <span class="text-right text-text-secondary">${g.avg_checkpoints}</span>
+                <span class="text-right ${staleCls}">${lastActive}${g.days_since_last != null ? ` <span class="text-xs">(${g.days_since_last}d)</span>` : ''}</span>
+              </div>
+            `;
+          }).join('')}
+        `;
+      } catch (_) {
+        if (listEl) listEl.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">Could not load attendance data.</div>';
+      }
+    }
+
+    document.getElementById('attendance-days')?.addEventListener('change', () => {
+      attendanceLoaded = false;
+      loadAttendance();
+    });
+    document.getElementById('attendance-refresh')?.addEventListener('click', () => loadAttendance(true));
+
+    // ── Export URL sync ───────────────────────────────────────────────────────────
+    function syncExportUrl() {
+      const btn = document.getElementById('export-csv-btn');
+      if (!btn) return;
+      const params = new URLSearchParams();
+      if (dateFrom) params.set('from', dateFrom);
+      if (dateTo)   params.set('to', dateTo);
+      if (incidentFilter) params.set('incidents_only', 'true');
+      const qs = params.toString();
+      btn.href = `/api/v1/security-patrol/export${qs ? '?' + qs : ''}`;
+    }
+
     // ── Filters ──────────────────────────────────────────────────────────────────
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -551,11 +681,12 @@ const canLog = isGuard || isPrivileged;
         btn.classList.remove('bg-white', 'text-text-secondary', 'border-border-light');
         incidentFilter = btn.dataset.filter === 'incidents';
         load();
+        syncExportUrl();
       });
     });
 
-    document.getElementById('date-from')?.addEventListener('change', e => { dateFrom = e.target.value; load(); });
-    document.getElementById('date-to')?.addEventListener('change',   e => { dateTo   = e.target.value; load(); });
+    document.getElementById('date-from')?.addEventListener('change', e => { dateFrom = e.target.value; load(); syncExportUrl(); });
+    document.getElementById('date-to')?.addEventListener('change',   e => { dateTo   = e.target.value; load(); syncExportUrl(); });
 
     // ── Patrol modal ─────────────────────────────────────────────────────────────
     if (canLog) {

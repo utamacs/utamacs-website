@@ -2,11 +2,12 @@
 export const prerender = false;
 import PortalLayout from '@portal/PortalLayout.astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
-
-const user = Astro.locals.user;
-if (!user || user.role === 'security_guard') return Astro.redirect('/portal/visitors');
+import { resolveFromRequest } from '@lib/permissions';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user || user.role === 'security_guard') return Astro.redirect('/portal/visitors');
+
 const sb = getSupabaseServiceClient();
 const { data: units } = await sb.from('units').select('id, unit_number, block').eq('society_id', SOCIETY_ID).order('unit_number');
 
@@ -181,6 +182,19 @@ document.querySelectorAll<HTMLButtonElement>('.preset-btn').forEach(btn => {
     // For "Custom" (hours=0) just leave the fields as-is for manual edit
   });
 });
+
+// Pre-fill from URL query params (frequent visitor shortcuts)
+const urlParams = new URLSearchParams(window.location.search);
+const prefillName    = urlParams.get('name');
+const prefillVehicle = urlParams.get('vehicle');
+if (prefillName) {
+  const nameInput = document.getElementById('visitor_name') as HTMLInputElement | null;
+  if (nameInput) nameInput.value = prefillName;
+}
+if (prefillVehicle) {
+  const vehicleInput = document.getElementById('vehicle_number') as HTMLInputElement | null;
+  if (vehicleInput) vehicleInput.value = prefillVehicle.toUpperCase();
+}
 
 // Select 24h preset by default
 document.querySelector<HTMLButtonElement>('[data-hours="24"]')?.click();
