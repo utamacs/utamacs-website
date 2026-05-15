@@ -23,7 +23,7 @@ export const GET: APIRoute = async ({ request, url }) => {
     let query = sb
       .from('community_posts')
       .select(`
-        id, title, body, category, is_pinned, created_at, updated_at,
+        id, title, body, category, is_pinned, created_at, updated_at, image_count,
         author_id, profiles(full_name, avatar_storage_key), units(unit_number),
         post_reactions(reaction_type), post_comments(id)
       `)

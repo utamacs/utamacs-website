@@ -116,13 +116,45 @@ if (!user) return Astro.redirect('/portal/login');
       }, 3000);
     }
 
-    function renderResultBars(options, results) {
+    function renderResultBars(options, results, pollType) {
+      const isRating = pollType === 'rating';
+      const votedIds = new Set(results.voted_option_ids ?? (results.voted_option_id ? [results.voted_option_id] : []));
+
+      if (isRating && results.avg_rating != null) {
+        // For rating polls: avg score + per-star distribution
+        const starsHTML = options
+          .slice()
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((opt) => {
+            const r = (results.options ?? []).find((o) => o.id === opt.id) ?? { vote_count: 0, percentage: 0 };
+            const stars = parseInt(opt.option_text) || opt.order_index;
+            return `
+              <div class="flex items-center gap-2 mb-1.5 text-sm">
+                <span class="w-6 text-right text-text-secondary text-xs">${stars}★</span>
+                <div class="flex-1 bg-gray-100 rounded-full h-2">
+                  <div class="h-2 rounded-full bg-amber-400 transition-all duration-500" style="width:${r.percentage}%"></div>
+                </div>
+                <span class="w-10 text-right text-xs text-text-secondary">${r.vote_count}</span>
+              </div>`;
+          })
+          .join('');
+        return `
+          <div class="mb-3 flex items-center gap-3">
+            <span class="text-3xl font-bold text-amber-500">${results.avg_rating}</span>
+            <div>
+              <div class="flex gap-0.5">${[1,2,3,4,5].map(n => `<i class="fas fa-star text-sm ${n <= Math.round(results.avg_rating) ? 'text-amber-400' : 'text-gray-200'}"></i>`).join('')}</div>
+              <p class="text-xs text-text-secondary mt-0.5">Average rating</p>
+            </div>
+          </div>
+          <div class="mt-2">${starsHTML}</div>`;
+      }
+
       return options
         .slice()
         .sort((a, b) => a.order_index - b.order_index)
         .map((opt) => {
           const r = (results.options ?? []).find((o) => o.id === opt.id) ?? { vote_count: 0, percentage: 0 };
-          const isMyVote = opt.id === results.voted_option_id;
+          const isMyVote = votedIds.has(opt.id);
           return `
             <div class="mb-3">
               <div class="flex items-center justify-between text-sm mb-1.5">
@@ -135,26 +167,58 @@ if (!user) return Astro.redirect('/portal/login');
               <div class="w-full bg-gray-100 rounded-full h-2">
                 <div class="h-2 rounded-full transition-all duration-500 ${isMyVote ? 'bg-primary-600' : 'bg-primary-300'}" style="width:${r.percentage}%"></div>
               </div>
-            </div>
-          `;
+            </div>`;
         })
         .join('');
     }
 
-    function renderVoteButtons(options, pollId, isOpen) {
-      return options
-        .slice()
-        .sort((a, b) => a.order_index - b.order_index)
-        .map((opt) => `
-          <button
-            onclick="castVote('${pollId}', '${opt.id}')"
-            class="w-full text-left px-4 py-3 rounded-lg border border-border-light hover:border-primary-600 hover:bg-primary-50 transition-colors text-sm font-medium text-text-primary mb-2 last:mb-0"
-            ${!isOpen ? 'disabled' : ''}
-          >
-            ${opt.option_text}
-          </button>
-        `)
-        .join('');
+    function renderVoteButtons(options, pollId, pollType, maxChoices, isOpen) {
+      const sorted = options.slice().sort((a, b) => a.order_index - b.order_index);
+
+      if (pollType === 'rating') {
+        // Star widget — clicking a star submits immediately
+        return `
+          <div class="flex items-center gap-1 py-2" id="stars-${pollId}">
+            ${sorted.map((opt) => {
+              const val = parseInt(opt.option_text) || opt.order_index;
+              return `<button type="button" onclick="castRatingVote('${pollId}', ${val})"
+                data-val="${val}"
+                class="star-btn text-3xl text-gray-300 hover:text-amber-400 transition-colors focus:outline-none"
+                aria-label="${val} star${val > 1 ? 's' : ''}"
+                ${!isOpen ? 'disabled' : ''}>★</button>`;
+            }).join('')}
+          </div>
+          <p class="text-xs text-text-secondary mt-1">Click a star to submit your rating.</p>`;
+      }
+
+      if (pollType === 'multiple_choice') {
+        const hint = maxChoices > 1 ? `Select up to ${maxChoices} options.` : '';
+        return `
+          <div class="space-y-2" id="multi-options-${pollId}">
+            ${sorted.map((opt) => `
+              <label class="flex items-center gap-3 px-4 py-3 rounded-lg border border-border-light hover:border-primary-600 hover:bg-primary-50 transition-colors text-sm cursor-pointer">
+                <input type="checkbox" name="multi_opt_${pollId}" value="${opt.id}" class="rounded border-gray-300 text-primary-600"
+                  onchange="onMultiChange('${pollId}', ${maxChoices})" ${!isOpen ? 'disabled' : ''} />
+                <span class="font-medium text-text-primary">${opt.option_text}</span>
+              </label>`).join('')}
+          </div>
+          ${hint ? `<p class="text-xs text-text-secondary mt-2">${hint}</p>` : ''}
+          <button onclick="submitMultiVote('${pollId}')"
+            id="multi-submit-${pollId}"
+            class="mt-3 btn-primary text-sm px-4 py-2 opacity-50 cursor-not-allowed"
+            disabled ${!isOpen ? 'style="display:none"' : ''}>
+            Submit votes
+          </button>`;
+      }
+
+      // single_choice / yes_no
+      return sorted.map((opt) => `
+        <button
+          onclick="castVote('${pollId}', '${opt.id}')"
+          class="w-full text-left px-4 py-3 rounded-lg border border-border-light hover:border-primary-600 hover:bg-primary-50 transition-colors text-sm font-medium text-text-primary mb-2 last:mb-0"
+          ${!isOpen ? 'disabled' : ''}>
+          ${opt.option_text}
+        </button>`).join('');
     }
 
     function renderPollCard(p, results) {
@@ -162,19 +226,23 @@ if (!user) return Astro.redirect('/portal/login');
       const options = p.poll_options ?? [];
       const hasVoted = results?.has_voted;
       const resultsAvailable = results?.results_available;
+      const pollType = p.poll_type ?? 'single_choice';
+      const maxChoices = p.max_choices ?? 1;
 
-      // Show results if available; if voted but results blocked, show a placeholder
       let optionsHTML;
       if (resultsAvailable) {
-        optionsHTML = hasVoted
-          ? renderResultBars(options, results)
-          : renderResultBars(options, results); // 'always' visibility — show to all
+        optionsHTML = renderResultBars(options, results, pollType);
       } else if (hasVoted) {
-        // voted but result_visibility = 'after_close' and poll still open
         optionsHTML = `<p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-2"><i class="fas fa-clock"></i>${results?.reason ?? 'Results will be visible after the poll closes.'}</p>`;
       } else {
-        optionsHTML = renderVoteButtons(options, p.id, isOpen);
+        optionsHTML = renderVoteButtons(options, p.id, pollType, maxChoices, isOpen);
       }
+
+      const typeBadge = pollType === 'multiple_choice'
+        ? `<span class="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700 mr-1">Multi-choice</span>`
+        : pollType === 'rating'
+        ? `<span class="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700 mr-1">Rating</span>`
+        : '';
 
       return `
         <div class="bg-white rounded-xl border border-border-light p-5" id="poll-${p.id}">
@@ -184,6 +252,7 @@ if (!user) return Astro.redirect('/portal/login');
               ${p.description ? `<p class="text-sm text-text-secondary mt-1">${p.description}</p>` : ''}
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
+              ${typeBadge}
               <span class="text-xs px-2 py-1 rounded-full font-medium ${isOpen ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">
                 ${isOpen ? 'Active' : 'Closed'}
               </span>
@@ -195,7 +264,7 @@ if (!user) return Astro.redirect('/portal/login');
             ${optionsHTML}
           </div>
           ${resultsAvailable
-            ? `<p class="text-xs text-text-secondary mt-3 text-center">${results.total_votes} vote${results.total_votes !== 1 ? 's' : ''} total</p>`
+            ? `<p class="text-xs text-text-secondary mt-3 text-center">${results.total_votes} voter${results.total_votes !== 1 ? 's' : ''} total</p>`
             : ''}
           ${hasVoted && !isOpen
             ? `<p class="text-xs text-amber-600 mt-2 text-center"><i class="fas fa-lock mr-1"></i>Poll closed</p>`
@@ -207,8 +276,7 @@ if (!user) return Astro.redirect('/portal/login');
                  </button>
                </div>`
             : ''}
-        </div>
-      `;
+        </div>`;
     }
 
     async function loadPolls() {
@@ -241,7 +309,6 @@ if (!user) return Astro.redirect('/portal/login');
     }
 
     async function castVote(pollId, optionId) {
-      // Disable all vote buttons in this poll while submitting
       const pollEl = document.getElementById(`poll-${pollId}`);
       pollEl?.querySelectorAll('button[onclick^="castVote"]').forEach((b) => { b.disabled = true; });
 
@@ -255,27 +322,98 @@ if (!user) return Astro.redirect('/portal/login');
 
       if (res.ok) {
         showToast('Your vote has been recorded. Thank you!');
-        // Fetch results and show bars
-        try {
-          const rRes = await fetch(`/api/v1/polls/${pollId}/results`, { credentials: 'include' });
-          if (rRes.ok) {
-            const results = await rRes.json();
-            const optionsEl = document.getElementById(`poll-options-${pollId}`);
-            if (optionsEl && results.results_available) {
-              const poll = pollsStore[pollId];
-              optionsEl.innerHTML = renderResultBars(poll?.poll_options ?? [], results);
-              // Append vote total below options
-              const totalEl = document.createElement('p');
-              totalEl.className = 'text-xs text-text-secondary mt-3 text-center';
-              totalEl.textContent = `${results.total_votes} vote${results.total_votes !== 1 ? 's' : ''} total`;
-              optionsEl.after(totalEl);
-            }
-          }
-        } catch {}
+        await refreshPollResults(pollId);
       } else {
         showToast(data.detail ?? data.error ?? 'Voting failed.', 'error');
         pollEl?.querySelectorAll('button[onclick^="castVote"]').forEach((b) => { b.disabled = false; });
       }
+    }
+
+    async function castRatingVote(pollId, value) {
+      const starsEl = document.getElementById(`stars-${pollId}`);
+      starsEl?.querySelectorAll('.star-btn').forEach((b) => { b.disabled = true; });
+
+      const res = await fetch(`/api/v1/polls/${pollId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ vote_value: value }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        showToast('Your rating has been recorded. Thank you!');
+        await refreshPollResults(pollId);
+      } else {
+        showToast(data.detail ?? data.error ?? 'Rating failed.', 'error');
+        starsEl?.querySelectorAll('.star-btn').forEach((b) => { b.disabled = false; });
+      }
+    }
+
+    function onMultiChange(pollId, maxChoices) {
+      const checkboxes = Array.from(document.querySelectorAll(`input[name="multi_opt_${pollId}"]`));
+      const checked = checkboxes.filter((c) => c.checked);
+      const submitBtn = document.getElementById(`multi-submit-${pollId}`);
+
+      // Disable unchecked if at max
+      if (checked.length >= maxChoices) {
+        checkboxes.forEach((c) => {
+          if (!c.checked) { c.disabled = true; }
+        });
+      } else {
+        checkboxes.forEach((c) => { c.disabled = false; });
+      }
+
+      if (submitBtn) {
+        const canSubmit = checked.length > 0;
+        submitBtn.disabled = !canSubmit;
+        submitBtn.className = `mt-3 btn-primary text-sm px-4 py-2 ${canSubmit ? '' : 'opacity-50 cursor-not-allowed'}`;
+      }
+    }
+
+    async function submitMultiVote(pollId) {
+      const checkboxes = Array.from(document.querySelectorAll(`input[name="multi_opt_${pollId}"]:checked`));
+      const optionIds = checkboxes.map((c) => c.value);
+      if (!optionIds.length) return;
+
+      const submitBtn = document.getElementById(`multi-submit-${pollId}`);
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
+
+      const res = await fetch(`/api/v1/polls/${pollId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ option_ids: optionIds }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        showToast('Your votes have been recorded. Thank you!');
+        await refreshPollResults(pollId);
+      } else {
+        showToast(data.detail ?? data.error ?? 'Voting failed.', 'error');
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit votes'; }
+      }
+    }
+
+    async function refreshPollResults(pollId) {
+      try {
+        const rRes = await fetch(`/api/v1/polls/${pollId}/results`, { credentials: 'include' });
+        if (rRes.ok) {
+          const results = await rRes.json();
+          const optionsEl = document.getElementById(`poll-options-${pollId}`);
+          const poll = pollsStore[pollId];
+          if (optionsEl && results.results_available) {
+            optionsEl.innerHTML = renderResultBars(poll?.poll_options ?? [], results, poll?.poll_type ?? 'single_choice');
+            const totalEl = document.createElement('p');
+            totalEl.className = 'text-xs text-text-secondary mt-3 text-center';
+            totalEl.textContent = `${results.total_votes} voter${results.total_votes !== 1 ? 's' : ''} total`;
+            optionsEl.after(totalEl);
+          } else if (optionsEl && !results.results_available && results.has_voted) {
+            optionsEl.innerHTML = `<p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-2"><i class="fas fa-clock"></i>${results.reason ?? 'Results will be visible after the poll closes.'}</p>`;
+          }
+        }
+      } catch {}
     }
 
     async function closePoll(pollId) {
@@ -308,6 +446,9 @@ if (!user) return Astro.redirect('/portal/login');
     }
 
     window.castVote = castVote;
+    window.castRatingVote = castRatingVote;
+    window.onMultiChange = onMultiChange;
+    window.submitMultiVote = submitMultiVote;
     window.closePoll = closePoll;
     window.exportPoll = exportPoll;
     loadPolls();

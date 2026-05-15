@@ -123,7 +123,7 @@ const CATEGORIES = ['Cultural','Sports','Governance','Social','Educational','Rel
 
       const data = await res.json();
       if (res.ok) {
-        window.location.href = '/portal/events';
+        window.location.href = `/portal/events/${data.id}`;
       } else {
         errorBanner.textContent = data.detail ?? data.error ?? 'Failed to create event.';
         errorBanner.classList.remove('hidden');

@@ -15,7 +15,7 @@ if (!id || !UUID_RE.test(id)) return Astro.redirect('/portal/events');
 const sb = getSupabaseServiceClient();
 const { data: event } = await sb
   .from('events')
-  .select('id, title, description, category, starts_at, ends_at, location, capacity, is_paid, ticket_price, registration_deadline, is_published, created_at')
+  .select('id, title, description, category, starts_at, ends_at, location, capacity, is_paid, ticket_price, registration_deadline, is_published, banner_key, created_at')
   .eq('id', id)
   .eq('society_id', SOCIETY_ID)
   .single();
@@ -55,6 +55,31 @@ function fmtTime(d: Date) {
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Left: main content -->
     <div class="lg:col-span-2 space-y-5">
+      <!-- Banner image (if uploaded) -->
+      {event.banner_key && (
+        <div class="rounded-xl overflow-hidden bg-gray-100" id="banner-container">
+          <img id="banner-img" src="" alt={`${event.title} banner`} class="w-full max-h-64 object-cover" />
+        </div>
+      )}
+
+      <!-- Exec: banner upload panel -->
+      {isExec && (
+        <div class="card-premium p-4" id="banner-upload-panel">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-text-primary">{event.banner_key ? 'Replace banner image' : 'Add a banner image'}</p>
+              <p class="text-xs text-text-secondary mt-0.5">JPEG / PNG / WebP, up to 5 MB</p>
+            </div>
+            <label class="btn-outline text-sm cursor-pointer flex items-center gap-2" for="banner-file-input">
+              <i class="fas fa-image" aria-hidden="true"></i>
+              {event.banner_key ? 'Replace' : 'Upload Banner'}
+            </label>
+          </div>
+          <input type="file" id="banner-file-input" accept="image/jpeg,image/png,image/webp" class="hidden" />
+          <p id="banner-upload-status" class="text-xs mt-2 hidden"></p>
+        </div>
+      )}
+
       <!-- Hero card -->
       <div class="card-premium overflow-hidden">
         <div class="bg-primary-600 px-6 py-4 flex items-center gap-3">
@@ -438,5 +463,86 @@ function fmtTime(d: Date) {
 
     loadRsvp();
     if (isExec) loadAttendees();
+
+    // ── Banner ────────────────────────────────────────────────────────────────
+    (async function initBanner() {
+      // Load existing banner URL if banner_key is present
+      const bannerImg = document.getElementById('banner-img');
+      if (bannerImg) {
+        try {
+          const res = await fetch(`/api/v1/events/${eventId}/banner`, { credentials: 'include' });
+          if (res.ok) {
+            const d = await res.json();
+            bannerImg.src = d.url;
+          }
+        } catch {}
+      }
+
+      const fileInput = document.getElementById('banner-file-input');
+      const statusEl  = document.getElementById('banner-upload-status');
+
+      fileInput?.addEventListener('change', async () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+
+        if (statusEl) {
+          statusEl.textContent = 'Uploading…';
+          statusEl.className = 'text-xs mt-2 text-text-secondary';
+          statusEl.classList.remove('hidden');
+        }
+
+        const fd = new FormData();
+        fd.append('file', file);
+
+        try {
+          const res = await fetch(`/api/v1/events/${eventId}/banner`, {
+            method: 'POST', credentials: 'include', body: fd,
+          });
+          const data = await res.json();
+          if (res.ok) {
+            if (statusEl) {
+              statusEl.textContent = 'Banner uploaded successfully.';
+              statusEl.className = 'text-xs mt-2 text-secondary-500';
+            }
+            // Show the banner immediately using the returned URL
+            const container = document.getElementById('banner-container');
+            if (container) {
+              container.classList.remove('hidden');
+              const img = container.querySelector('img') ?? document.createElement('img');
+              img.src = data.url;
+              img.className = 'w-full max-h-64 object-cover';
+              if (!container.contains(img)) container.appendChild(img);
+            } else {
+              // First upload — create container above the hero card
+              const heroCard = document.querySelector('.card-premium');
+              if (heroCard) {
+                const wrap = document.createElement('div');
+                wrap.id = 'banner-container';
+                wrap.className = 'rounded-xl overflow-hidden bg-gray-100 mb-4';
+                const img = document.createElement('img');
+                img.src = data.url;
+                img.alt = 'Event banner';
+                img.className = 'w-full max-h-64 object-cover';
+                wrap.appendChild(img);
+                heroCard.parentElement?.insertBefore(wrap, heroCard);
+              }
+            }
+            showToast('Banner image uploaded.');
+          } else {
+            if (statusEl) {
+              statusEl.textContent = data.message ?? data.error ?? 'Upload failed.';
+              statusEl.className = 'text-xs mt-2 text-red-600';
+            }
+          }
+        } catch {
+          if (statusEl) {
+            statusEl.textContent = 'Upload failed. Please try again.';
+            statusEl.className = 'text-xs mt-2 text-red-600';
+          }
+        }
+
+        fileInput.value = '';
+      });
+    })();
   </script>
 </PortalLayout>
