@@ -1,10 +1,8 @@
 ---
 export const prerender = false;
-import PortalLayout from '@components/portal/PortalLayout.astro';
-import { resolveFromRequest } from '@lib/permissions';
+import PortalLayout from '@portal/PortalLayout.astro';
 
-const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
 
 const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;

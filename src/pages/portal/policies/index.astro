@@ -1,34 +1,25 @@
 ---
 export const prerender = false;
-import PortalLayout from '@components/portal/PortalLayout.astro';
-import { resolveFromRequest } from '@lib/permissions';
+import PortalLayout from '@portal/PortalLayout.astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+const user = Astro.locals.user;
 if (!user) return Astro.redirect('/portal/login');
 
 const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
 
 const sb = getSupabaseServiceClient();
-const { data: policies } = await sb
-  .from('policies')
-  .select('id, title, description, policy_type, version, effective_date, acknowledgement_required, gate_portal_access, status, created_at')
-  .eq('society_id', SOCIETY_ID)
-  .eq('status', isPrivileged ? '' : 'active')  // will override below
-  .order('effective_date', { ascending: false });
 
-// Requery without status filter for exec, with filter for members
 const { data: policiesData } = isPrivileged
   ? await sb.from('policies').select('id, title, description, policy_type, version, effective_date, acknowledgement_required, gate_portal_access, status, created_at').eq('society_id', SOCIETY_ID).order('effective_date', { ascending: false })
   : await sb.from('policies').select('id, title, description, policy_type, version, effective_date, acknowledgement_required, gate_portal_access, status, created_at').eq('society_id', SOCIETY_ID).eq('status', 'active').order('effective_date', { ascending: false });
 
-// Fetch user's acknowledgements
-const { data: acks } = await sb
-  .from('policy_acknowledgements')
-  .select('policy_id')
-  .eq('user_id', user.id)
-  .in('policy_id', (policiesData ?? []).map((p: any) => p.id));
+// Fetch user's acknowledgements — skip if no policies to avoid empty .in() crash
+const policyIds = (policiesData ?? []).map((p: any) => p.id);
+const { data: acks } = policyIds.length > 0
+  ? await sb.from('policy_acknowledgements').select('policy_id').eq('user_id', user.id).in('policy_id', policyIds)
+  : { data: [] };
 
 const ackedSet = new Set((acks ?? []).map((a: any) => a.policy_id));
 
