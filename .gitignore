@@ -34,6 +34,12 @@ tests/.auth/
 playwright-report/
 test-results/
 
+# ─── Local tooling / build output ───────────────────────────────────────────
+.vercel/
+.claude/worktrees/
+capture/
+UTA MACS - COS/
+
 # ─── Upload safety net ──────────────────────────────────────────────────────
 # All user-uploaded files MUST go to Supabase Storage via SupabaseStorageService.
 # The HOTO governance upload is the only exception and it goes to a SEPARATE
