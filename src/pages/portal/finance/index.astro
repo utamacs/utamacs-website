@@ -192,6 +192,17 @@ const razorpayEnabled = ruleBool(rules, 'RAZORPAY_ENABLED', false);
       <i class="fas fa-coins mr-1.5 text-xs" aria-hidden="true"></i>Credits
       <span id="credits-badge" class="hidden ml-1 bg-secondary-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full"></span>
     </button>
+    {isExec && (
+      <button id="tab-aging" class="main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">
+        <i class="fas fa-clock mr-1.5 text-xs" aria-hidden="true"></i>Aging
+        <span id="aging-badge" class="hidden ml-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full"></span>
+      </button>
+    )}
+    {isExec && (
+      <button id="tab-reconcile" class="main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">
+        <i class="fas fa-sync-alt mr-1.5 text-xs" aria-hidden="true"></i>Reconcile
+      </button>
+    )}
   </div>
 
   <!-- Dues panel -->
@@ -262,6 +273,37 @@ const razorpayEnabled = ruleBool(rules, 'RAZORPAY_ENABLED', false);
       <div id="expenses-list" class="space-y-3">
         <div class="text-center py-10 text-text-secondary text-sm">
           <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
+        </div>
+      </div>
+
+      <!-- TDS Certificate download -->
+      <div class="mt-6 card-premium p-4">
+        <h3 class="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+          <i class="fas fa-file-certificate text-primary-600" aria-hidden="true"></i> TDS Certificates (Form 16A)
+        </h3>
+        <div class="flex flex-wrap gap-3 items-end">
+          <div>
+            <label class="form-label" for="tds-cert-vendor">Vendor</label>
+            <select id="tds-cert-vendor" class="form-input text-sm" style="width:220px">
+              <option value="">Select vendor…</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="tds-cert-fy">Financial Year</label>
+            <select id="tds-cert-fy" class="form-input text-sm" style="width:130px">
+              {(() => {
+                const now = new Date();
+                const cur = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+                return [cur, cur - 1, cur - 2].map(y =>
+                  `<option value="${y}">${y}-${String(y+1).slice(2)}</option>`
+                ).join('');
+              })()}
+            </select>
+          </div>
+          <button id="tds-cert-download-btn" class="btn-outline text-sm flex items-center gap-1.5 px-3 py-2">
+            <i class="fas fa-download text-xs" aria-hidden="true"></i> Download PDF
+          </button>
+          <span id="tds-cert-status" class="text-xs text-text-secondary hidden"></span>
         </div>
       </div>
 
@@ -428,6 +470,126 @@ const razorpayEnabled = ruleBool(rules, 'RAZORPAY_ENABLED', false);
             <button type="button" id="cancel-refund-btn" class="btn-outline flex-1">Cancel</button>
           </div>
         </form>
+      </div>
+    </div>
+  )}
+
+  <!-- Aging Report panel (exec only) -->
+  {isExec && (
+    <div id="panel-aging" class="hidden">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-semibold text-text-primary">Overdue Aging Report</h2>
+          <p id="aging-as-of" class="text-xs text-text-secondary mt-0.5"></p>
+        </div>
+        <button id="send-reminders-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-bell" aria-hidden="true"></i> Send Reminders
+        </button>
+      </div>
+
+      <!-- Bucket summary cards -->
+      <div id="aging-buckets" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></div>
+
+      <!-- Dry-run preview -->
+      <div id="reminder-preview" class="hidden mb-4 card-premium p-4 border border-accent-500">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-text-primary flex items-center gap-2">
+            <i class="fas fa-eye text-accent-500" aria-hidden="true"></i>
+            Reminder Preview — <span id="reminder-eligible-count">0</span> eligible units
+          </h3>
+          <div class="flex gap-2">
+            <button id="confirm-reminders-btn" class="btn-primary text-xs px-3 py-1.5">Confirm &amp; Send</button>
+            <button id="cancel-reminders-btn" class="btn-ghost text-xs px-3 py-1.5">Cancel</button>
+          </div>
+        </div>
+        <p class="text-xs text-text-secondary mb-2">
+          <span id="reminder-skipped-count">0</span> units skipped (cooldown / max sends reached).
+          Sending to <span id="reminder-send-count">0</span> units now.
+        </p>
+        <div id="reminder-eligible-list" class="max-h-48 overflow-y-auto space-y-1 text-xs"></div>
+      </div>
+
+      <!-- Aging rows table -->
+      <div class="card-premium overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-border-light bg-section-alt text-xs font-medium text-text-secondary">
+                <th class="px-4 py-2 text-left">Unit</th>
+                <th class="px-4 py-2 text-left">Billing Period</th>
+                <th class="px-4 py-2 text-left">Due Date</th>
+                <th class="px-4 py-2 text-right">Outstanding (₹)</th>
+                <th class="px-4 py-2 text-center">Days Overdue</th>
+                <th class="px-4 py-2 text-center">Reminders Sent</th>
+                <th class="px-4 py-2 text-center">Bucket</th>
+              </tr>
+            </thead>
+            <tbody id="aging-rows">
+              <tr><td colspan="7" class="py-10 text-center text-text-secondary text-sm">
+                <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Reconcile panel (exec only) -->
+  {isExec && (
+    <div id="panel-reconcile" class="hidden">
+      <div class="mb-4">
+        <h2 class="text-lg font-semibold text-text-primary">Bulk Payment Reconciliation</h2>
+        <p class="text-xs text-text-secondary mt-0.5">Paste a JSON array of payment entries to match and record against pending dues.</p>
+      </div>
+
+      <div class="card-premium p-5 mb-4">
+        <label class="form-label" for="reconcile-json">
+          JSON Array of Payment Entries
+        </label>
+        <p class="text-xs text-text-secondary mb-2">
+          Each entry: <code class="bg-gray-100 px-1 rounded">&#123;"unit_number","amount","payment_date","payment_mode","reference_no?"&#125;</code>
+        </p>
+        <textarea id="reconcile-json" class="form-input font-mono text-xs" rows="8"
+          placeholder='[
+  {"unit_number":"A101","amount":3500,"payment_date":"2025-05-10","payment_mode":"upi","reference_no":"UPI12345"},
+  {"unit_number":"B204","amount":3500,"payment_date":"2025-05-11","payment_mode":"neft","reference_no":"NEFT98765"}
+]'></textarea>
+
+        <div class="flex gap-3 mt-3">
+          <button id="reconcile-preview-btn" class="btn-outline text-sm flex items-center gap-1.5 px-4 py-2">
+            <i class="fas fa-search text-xs" aria-hidden="true"></i> Preview (Dry Run)
+          </button>
+          <button id="reconcile-commit-btn" class="btn-primary text-sm flex items-center gap-1.5 px-4 py-2 hidden">
+            <i class="fas fa-check text-xs" aria-hidden="true"></i> Confirm &amp; Commit
+          </button>
+          <button id="reconcile-reset-btn" class="btn-ghost text-sm hidden">Reset</button>
+        </div>
+      </div>
+
+      <!-- Preview result -->
+      <div id="reconcile-preview-result" class="hidden card-premium p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-text-primary">Preview Results</h3>
+          <div id="reconcile-summary-chips" class="flex gap-2 text-xs"></div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-border-light text-text-secondary font-medium">
+                <th class="px-3 py-2 text-left">#</th>
+                <th class="px-3 py-2 text-left">Unit</th>
+                <th class="px-3 py-2 text-left">Billing Period</th>
+                <th class="px-3 py-2 text-right">Amount (₹)</th>
+                <th class="px-3 py-2 text-center">Mode</th>
+                <th class="px-3 py-2 text-left">Reference</th>
+                <th class="px-3 py-2 text-center">Status</th>
+                <th class="px-3 py-2 text-left">Note</th>
+              </tr>
+            </thead>
+            <tbody id="reconcile-rows-body"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   )}
@@ -675,40 +837,50 @@ const razorpayEnabled = ruleBool(rules, 'RAZORPAY_ENABLED', false);
     window.handlePay = handlePay;
     window.generateGstInvoice = generateGstInvoice;
 
-    // ── Tab switching (Dues / Ledger / Expenses) ─────────────────────────────
-    let expensesLoaded = false;
-    let ledgerLoaded   = false;
-    const tabDues     = document.getElementById('tab-dues');
-    const tabLedger   = document.getElementById('tab-ledger');
-    const tabExpenses = document.getElementById('tab-expenses');
-    const panelDues   = document.getElementById('panel-dues');
-    const panelLedger = document.getElementById('panel-ledger');
-    const panelExp    = document.getElementById('panel-expenses');
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    let expensesLoaded  = false;
+    let ledgerLoaded    = false;
+    let agingLoaded     = false;
+    let reconcileLoaded = false;
+    const tabDues       = document.getElementById('tab-dues');
+    const tabLedger     = document.getElementById('tab-ledger');
+    const tabExpenses   = document.getElementById('tab-expenses');
+    const panelDues     = document.getElementById('panel-dues');
+    const panelLedger   = document.getElementById('panel-ledger');
+    const panelExp      = document.getElementById('panel-expenses');
 
     const ACTIVE_CLS   = 'main-fin-tab px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600 -mb-px';
     const INACTIVE_CLS = 'main-fin-tab px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent';
 
-    const tabCredits  = document.getElementById('tab-credits');
+    const tabCredits   = document.getElementById('tab-credits');
     const panelCredits = document.getElementById('panel-credits');
-    let creditsLoaded = false;
+    let creditsLoaded  = false;
 
     function activateTab(which) {
       [tabDues, tabLedger, tabExpenses, tabCredits,
-       document.getElementById('tab-approvals')]
+       document.getElementById('tab-approvals'),
+       document.getElementById('tab-aging'),
+       document.getElementById('tab-reconcile')]
         .forEach(t => t?.setAttribute('class', INACTIVE_CLS));
       [panelDues, panelLedger, panelExp, panelCredits,
-       document.getElementById('panel-approvals')]
+       document.getElementById('panel-approvals'),
+       document.getElementById('panel-aging'),
+       document.getElementById('panel-reconcile')]
         .forEach(p => p?.classList.add('hidden'));
-      if (which === 'dues')     { tabDues?.setAttribute('class', ACTIVE_CLS);     panelDues?.classList.remove('hidden'); }
-      if (which === 'ledger')   { tabLedger?.setAttribute('class', ACTIVE_CLS);   panelLedger?.classList.remove('hidden'); if (!ledgerLoaded)   { ledgerLoaded   = true; loadLedger();   } }
-      if (which === 'expenses') { tabExpenses?.setAttribute('class', ACTIVE_CLS); panelExp?.classList.remove('hidden');    if (!expensesLoaded) { expensesLoaded = true; loadExpenses(); } }
-      if (which === 'credits')  { tabCredits?.setAttribute('class', ACTIVE_CLS);  panelCredits?.classList.remove('hidden'); if (!creditsLoaded)  { creditsLoaded  = true; loadCredits();  } }
+      if (which === 'dues')      { tabDues?.setAttribute('class', ACTIVE_CLS);     panelDues?.classList.remove('hidden'); }
+      if (which === 'ledger')    { tabLedger?.setAttribute('class', ACTIVE_CLS);   panelLedger?.classList.remove('hidden');  if (!ledgerLoaded)    { ledgerLoaded    = true; loadLedger();      } }
+      if (which === 'expenses')  { tabExpenses?.setAttribute('class', ACTIVE_CLS); panelExp?.classList.remove('hidden');      if (!expensesLoaded)  { expensesLoaded  = true; loadExpenses();    } }
+      if (which === 'credits')   { tabCredits?.setAttribute('class', ACTIVE_CLS);  panelCredits?.classList.remove('hidden');  if (!creditsLoaded)   { creditsLoaded   = true; loadCredits();     } }
+      if (which === 'aging')     { document.getElementById('tab-aging')?.setAttribute('class', ACTIVE_CLS);     document.getElementById('panel-aging')?.classList.remove('hidden');     if (!agingLoaded)     { agingLoaded     = true; loadAging();       } }
+      if (which === 'reconcile') { document.getElementById('tab-reconcile')?.setAttribute('class', ACTIVE_CLS); document.getElementById('panel-reconcile')?.classList.remove('hidden'); if (!reconcileLoaded) { reconcileLoaded  = true; initReconcile();   } }
     }
 
     tabDues?.addEventListener('click', () => activateTab('dues'));
     tabLedger?.addEventListener('click', () => activateTab('ledger'));
     tabExpenses?.addEventListener('click', () => activateTab('expenses'));
     tabCredits?.addEventListener('click', () => activateTab('credits'));
+    document.getElementById('tab-aging')?.addEventListener('click', () => activateTab('aging'));
+    document.getElementById('tab-reconcile')?.addEventListener('click', () => activateTab('reconcile'));
 
     // ── Member Ledger ─────────────────────────────────────────────────────────
     async function loadLedger() {
@@ -1177,6 +1349,271 @@ const razorpayEnabled = ruleBool(rules, 'RAZORPAY_ENABLED', false);
         btn.textContent = 'Confirm Refund';
       });
     }
+
+    // ── Aging Report ──────────────────────────────────────────────────────────
+    async function loadAging() {
+      document.getElementById('aging-rows').innerHTML =
+        '<tr><td colspan="7" class="py-10 text-center text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</td></tr>';
+
+      const res = await fetch('/api/v1/finance/dues/aging', { credentials: 'include' });
+      if (!res.ok) {
+        document.getElementById('aging-rows').innerHTML =
+          '<tr><td colspan="7" class="py-10 text-center text-red-600 text-sm">Failed to load aging report.</td></tr>';
+        return;
+      }
+      const data = await res.json();
+      document.getElementById('aging-as-of').textContent = `As of ${data.as_of}`;
+
+      const fmt = n => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+      const buckets = data.summary.buckets;
+      const b1 = data.bucket_labels.b1, b2 = data.bucket_labels.b2, b3 = data.bucket_labels.b3;
+
+      const bucketCfg = [
+        { key: '1_30',    label: `1–${b1} days`,   color: 'text-amber-600',  bg: 'bg-amber-50'  },
+        { key: '31_60',   label: `${b1+1}–${b2} days`, color: 'text-orange-600', bg: 'bg-orange-50' },
+        { key: '61_90',   label: `${b2+1}–${b3} days`, color: 'text-red-600',    bg: 'bg-red-50'    },
+        { key: '90_plus', label: `${b3}+ days`,   color: 'text-red-800',    bg: 'bg-red-100'   },
+      ];
+
+      document.getElementById('aging-buckets').innerHTML = bucketCfg.map(b => `
+        <div class="card-premium p-4">
+          <p class="text-xs text-text-secondary">${b.label}</p>
+          <p class="text-xl font-bold ${b.color} mt-1">${fmt(buckets[b.key]?.total ?? 0)}</p>
+          <p class="text-xs text-text-secondary mt-0.5">${buckets[b.key]?.count ?? 0} unit${(buckets[b.key]?.count ?? 0) !== 1 ? 's' : ''}</p>
+        </div>
+      `).join('');
+
+      const badge = document.getElementById('aging-badge');
+      if (data.summary.total_overdue_units > 0) {
+        badge?.classList.remove('hidden');
+        if (badge) badge.textContent = String(data.summary.total_overdue_units);
+      }
+
+      const bucketColor = { '1_30': 'text-amber-600', '31_60': 'text-orange-600', '61_90': 'text-red-600', '90_plus': 'text-red-800' };
+      const bucketLabel = (key) => ({ '1_30': '1–30d', '31_60': '31–60d', '61_90': '61–90d', '90_plus': '90d+' }[key] ?? key);
+
+      if (!data.rows.length) {
+        document.getElementById('aging-rows').innerHTML =
+          '<tr><td colspan="7" class="py-10 text-center text-text-secondary text-sm">No overdue dues. All units are up to date.</td></tr>';
+        return;
+      }
+
+      document.getElementById('aging-rows').innerHTML = data.rows.map(r => `
+        <tr class="border-b border-border-light hover:bg-section-alt">
+          <td class="px-4 py-2 font-medium text-text-primary">${r.block ? `${r.block} ` : ''}${r.unit_number}</td>
+          <td class="px-4 py-2 text-text-secondary">${r.billing_period || '—'}</td>
+          <td class="px-4 py-2 text-text-secondary">${r.due_date}</td>
+          <td class="px-4 py-2 text-right font-semibold text-red-600">${fmt(r.outstanding)}</td>
+          <td class="px-4 py-2 text-center font-medium ${bucketColor[r.bucket]}">${r.days_overdue}</td>
+          <td class="px-4 py-2 text-center text-text-secondary">${r.reminder_sent_count}</td>
+          <td class="px-4 py-2 text-center">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 ${bucketColor[r.bucket]}">${bucketLabel(r.bucket)}</span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Send reminders flow (dry-run preview → confirm)
+    let _reminderDryRunData = null;
+    document.getElementById('send-reminders-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('send-reminders-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Previewing…';
+      const res = await fetch('/api/v1/finance/dues/reminders', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dry_run: true }),
+      });
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-bell mr-2"></i>Send Reminders';
+      if (!res.ok) { showToast('Failed to preview reminders.', 'error'); return; }
+      _reminderDryRunData = await res.json();
+      document.getElementById('reminder-eligible-count').textContent = _reminderDryRunData.eligible_count;
+      document.getElementById('reminder-skipped-count').textContent  = _reminderDryRunData.skipped_count;
+      document.getElementById('reminder-send-count').textContent     = _reminderDryRunData.eligible_count;
+      document.getElementById('reminder-eligible-list').innerHTML = (_reminderDryRunData.eligible ?? []).slice(0, 20).map(e =>
+        `<div class="flex justify-between px-2 py-1 rounded bg-section-alt">
+          <span class="font-medium">${e.unit_number}${e.block ? ` (${e.block})` : ''}</span>
+          <span class="text-text-secondary">${e.billing_period}</span>
+          <span class="text-red-600 font-semibold">₹${Number(e.outstanding).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+        </div>`
+      ).join('') + (_reminderDryRunData.eligible?.length > 20 ? `<p class="text-center text-text-secondary py-1">…and ${_reminderDryRunData.eligible.length - 20} more</p>` : '');
+      document.getElementById('reminder-preview').classList.remove('hidden');
+    });
+
+    document.getElementById('cancel-reminders-btn')?.addEventListener('click', () =>
+      document.getElementById('reminder-preview').classList.add('hidden'));
+
+    document.getElementById('confirm-reminders-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('confirm-reminders-btn');
+      btn.disabled = true; btn.textContent = 'Sending…';
+      const res = await fetch('/api/v1/finance/dues/reminders', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dry_run: false }),
+      });
+      btn.disabled = false; btn.textContent = 'Confirm & Send';
+      const data = await res.json();
+      document.getElementById('reminder-preview').classList.add('hidden');
+      if (res.ok) {
+        showToast(`Reminders sent to ${data.sent} unit${data.sent !== 1 ? 's' : ''}.`, 'success');
+        agingLoaded = false;
+        loadAging();
+      } else {
+        showToast(data.message ?? 'Failed to send reminders.', 'error');
+      }
+    });
+
+    // ── Reconcile ─────────────────────────────────────────────────────────────
+    function initReconcile() {
+      // Nothing to preload
+    }
+
+    document.getElementById('reconcile-preview-btn')?.addEventListener('click', async () => {
+      const jsonEl = document.getElementById('reconcile-json');
+      let entries;
+      try { entries = JSON.parse(jsonEl.value.trim()); }
+      catch { showToast('Invalid JSON — please check your input.', 'error'); return; }
+      const btn = document.getElementById('reconcile-preview-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Previewing…';
+      const res = await fetch('/api/v1/finance/payments/bulk-reconcile', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries, dry_run: true }),
+      });
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-search mr-2"></i>Preview (Dry Run)';
+      if (!res.ok) { showToast('Preview failed.', 'error'); return; }
+      const data = await res.json();
+      renderReconcilePreview(data, true);
+    });
+
+    document.getElementById('reconcile-commit-btn')?.addEventListener('click', async () => {
+      const jsonEl = document.getElementById('reconcile-json');
+      let entries;
+      try { entries = JSON.parse(jsonEl.value.trim()); }
+      catch { showToast('Invalid JSON.', 'error'); return; }
+      const btn = document.getElementById('reconcile-commit-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Committing…';
+      const res = await fetch('/api/v1/finance/payments/bulk-reconcile', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries, dry_run: false }),
+      });
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirm & Commit';
+      const data = await res.json();
+      if (res.ok) {
+        renderReconcilePreview(data, false);
+        showToast(`Committed ${data.summary.committed} payment${data.summary.committed !== 1 ? 's' : ''}.`, 'success');
+        document.getElementById('reconcile-commit-btn').classList.add('hidden');
+        document.getElementById('reconcile-reset-btn').classList.remove('hidden');
+      } else {
+        showToast(data.message ?? 'Commit failed.', 'error');
+      }
+    });
+
+    document.getElementById('reconcile-reset-btn')?.addEventListener('click', () => {
+      document.getElementById('reconcile-json').value = '';
+      document.getElementById('reconcile-preview-result').classList.add('hidden');
+      document.getElementById('reconcile-commit-btn').classList.add('hidden');
+      document.getElementById('reconcile-reset-btn').classList.add('hidden');
+      document.getElementById('reconcile-preview-btn').classList.remove('hidden');
+    });
+
+    function renderReconcilePreview(data, showCommitBtn) {
+      const s = data.summary;
+      document.getElementById('reconcile-summary-chips').innerHTML = [
+        `<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">${s.total} total</span>`,
+        `<span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700">${s.matched} matched</span>`,
+        `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">${s.skipped} skipped</span>`,
+        `<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700">${s.failed} failed</span>`,
+      ].join('');
+
+      const statusCls = { matched: 'bg-green-100 text-green-700', skipped: 'bg-amber-100 text-amber-700', failed: 'bg-red-100 text-red-700' };
+      document.getElementById('reconcile-rows-body').innerHTML = (data.rows ?? []).map(r => `
+        <tr class="border-b border-border-light hover:bg-section-alt">
+          <td class="px-3 py-2 text-text-secondary">${r.row_index + 1}</td>
+          <td class="px-3 py-2 font-medium">${r.unit_number}</td>
+          <td class="px-3 py-2 text-text-secondary">${r.billing_period ?? '—'}</td>
+          <td class="px-3 py-2 text-right">₹${Number(r.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="px-3 py-2 text-center text-text-secondary">${r.payment_mode}</td>
+          <td class="px-3 py-2 text-text-secondary">${r.reference_no ?? '—'}</td>
+          <td class="px-3 py-2 text-center">
+            <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${statusCls[r.status] ?? ''}">${r.status}</span>
+          </td>
+          <td class="px-3 py-2 text-text-secondary">${r.error_message ?? ''}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('reconcile-preview-result').classList.remove('hidden');
+      if (showCommitBtn && s.matched > 0) {
+        document.getElementById('reconcile-commit-btn').classList.remove('hidden');
+      }
+    }
+
+    // ── TDS Certificate download ──────────────────────────────────────────────
+    async function loadVendorsForTdsCert() {
+      const sel = document.getElementById('tds-cert-vendor');
+      if (!sel) return;
+      try {
+        const res = await fetch('/api/v1/finance/expenses?vendors=1', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const vendors = (data.vendors ?? []);
+        if (!vendors.length) return;
+        sel.innerHTML = '<option value="">Select vendor…</option>' +
+          vendors.map(v => `<option value="${v.id}">${v.name}${v.pan ? ` (${v.pan})` : ''}</option>`).join('');
+      } catch { /* non-fatal */ }
+    }
+    loadVendorsForTdsCert();
+
+    // Populate FY select dynamically
+    (function() {
+      const fyEl = document.getElementById('tds-cert-fy');
+      if (!fyEl) return;
+      const now = new Date();
+      const cur = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      fyEl.innerHTML = [cur, cur - 1, cur - 2].map(y =>
+        `<option value="${y}">${y}-${String(y + 1).slice(2)}</option>`
+      ).join('');
+    })();
+
+    document.getElementById('tds-cert-download-btn')?.addEventListener('click', async () => {
+      const vendorId = document.getElementById('tds-cert-vendor')?.value;
+      const fy       = document.getElementById('tds-cert-fy')?.value;
+      const statusEl = document.getElementById('tds-cert-status');
+      if (!vendorId) { showToast('Please select a vendor.', 'error'); return; }
+      const btn = document.getElementById('tds-cert-download-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating…';
+      if (statusEl) { statusEl.textContent = 'Generating certificate…'; statusEl.classList.remove('hidden'); }
+      try {
+        const res = await fetch(`/api/v1/finance/tds-report/certificate?vendor_id=${vendorId}&fy=${fy}`, { credentials: 'include' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          showToast(err.message ?? 'Failed to generate TDS certificate.', 'error');
+          if (statusEl) statusEl.classList.add('hidden');
+        } else {
+          const blob = await res.blob();
+          const url  = URL.createObjectURL(blob);
+          const a    = document.createElement('a');
+          const vendorName = document.getElementById('tds-cert-vendor')?.selectedOptions[0]?.text ?? 'vendor';
+          a.href     = url;
+          a.download = `TDS-Certificate-${vendorName.replace(/\s+/g, '-')}-FY${fy}-${parseInt(fy)+1}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('TDS certificate downloaded.', 'success');
+          if (statusEl) statusEl.classList.add('hidden');
+        }
+      } catch { showToast('Network error.', 'error'); if (statusEl) statusEl.classList.add('hidden'); }
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-download mr-2"></i>Download PDF';
+    });
 
     loadDues();
   </script>
