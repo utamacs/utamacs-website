@@ -59,9 +59,9 @@ export const GET: APIRoute = async ({ request }) => {
       return {
         id: d.id,
         unit_id: d.unit_id,
-        unit_number: (d.units as { unit_number: string; block: string } | null)?.unit_number ?? '',
-        block: (d.units as { unit_number: string; block: string } | null)?.block ?? '',
-        billing_period: (d.billing_periods as { name: string } | null)?.name ?? '',
+        unit_number: (d.units as any)?.unit_number ?? '',
+        block: (d.units as any)?.block ?? '',
+        billing_period: (d.billing_periods as any)?.name ?? '',
         due_date: d.due_date,
         total_amount: d.total_amount ?? 0,
         amount_paid: d.amount_paid ?? 0,

@@ -76,14 +76,14 @@ export const GET: APIRoute = async ({ request, url }) => {
       rows = rows.filter((r: any) => linked.has(r.id));
     }
 
-    await writeAuditLog(sb, {
+    await writeAuditLog({
       societyId:    SOCIETY_ID,
-      actorId:      user.id,
+      userId:       user.id,
       action:       'EXPORT',
       resourceType: 'snag_items',
       resourceId:   SOCIETY_ID,
       newValues:    { row_count: rows.length, filters: { status, category, severity, snagScope, hotoItemId, includeClosed } },
-      ipAddress:    extractClientIP(request),
+      ip:           extractClientIP(request),
     });
 
     const header = csvRow([

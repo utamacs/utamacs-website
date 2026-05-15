@@ -75,14 +75,14 @@ export const POST: APIRoute = async ({ request, params }) => {
 
     if (updateErr) throw Object.assign(new Error(updateErr.message), { status: 500 });
 
-    await writeAuditLog(sb, {
+    await writeAuditLog({
       societyId:    SOCIETY_ID,
-      actorId:      user.id,
+      userId:       user.id,
       action:       'UPDATE',
       resourceType: 'ppm_schedules',
       resourceId:   scheduleId,
       newValues:    { completed_on: completedOn, next_due_date: nextDue, cost },
-      ipAddress:    extractClientIP(request),
+      ip:           extractClientIP(request),
     });
 
     return Response.json({ completion_id: completion!.id, next_due_date: nextDue });

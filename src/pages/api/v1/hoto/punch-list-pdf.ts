@@ -364,14 +364,14 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     // Audit log + record in hoto_completion_reports
     await Promise.all([
-      writeAuditLog(sb, {
+      writeAuditLog({
         societyId:    SOCIETY_ID,
-        actorId:      user.id,
+        userId:       user.id,
         action:       'EXPORT',
         resourceType: 'hoto_punch_list_pdf',
         resourceId:   SOCIETY_ID,
         newValues:    { total_items: totalItems, closed_items: closedItems, open_snags: openSnags, category_filter: categoryFilter || null },
-        ipAddress:    extractClientIP(request),
+        ip:           extractClientIP(request),
       }),
       sb.from('hoto_completion_reports').insert({
         society_id:      SOCIETY_ID,

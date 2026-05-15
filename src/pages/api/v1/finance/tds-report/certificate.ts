@@ -93,7 +93,7 @@ export const GET: APIRoute = async ({ request, url }) => {
       ...rows.map(e => [
         { text: new Date(e.payment_date).toLocaleDateString('en-IN'), fontSize: 9 },
         { text: `${e.description ?? '—'}\n${e.bill_number ? `Bill: ${e.bill_number}` : ''}`, fontSize: 9 },
-        { text: (e.expense_categories as { name: string } | null)?.name ?? '—', fontSize: 9 },
+        { text: (e.expense_categories as any)?.name ?? '—', fontSize: 9 },
         { text: fmt2(Number(e.amount ?? 0)), alignment: 'right', fontSize: 9 },
         { text: fmt2(Number(e.tds_deducted ?? 0)), alignment: 'right', fontSize: 9 },
       ]),
@@ -294,7 +294,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     await writeAuditLog({
       societyId: SOCIETY_ID, userId: user.id,
-      action: 'READ', resourceType: 'tds_certificate', resourceId: vendorId,
+      action: 'EXPORT', resourceType: 'tds_certificate', resourceId: vendorId,
       ip: extractClientIP(request),
       newValues: { vendor_id: vendorId, fy: fyLabel, total_tds: totalTds },
     });

@@ -124,12 +124,12 @@ export const POST: APIRoute = async ({ request }) => {
 
       // Find matching due
       const unitDues = duesByUnit.get(unit.id) ?? [];
-      let matchedDue: (typeof allDues)[number] | null = null;
+      let matchedDue: NonNullable<typeof allDues>[number] | null = null;
 
       if (raw.billing_period_name) {
         const bpLower = raw.billing_period_name.toLowerCase();
         matchedDue = unitDues.find(d =>
-          ((d.billing_periods as { name: string } | null)?.name ?? '').toLowerCase() === bpLower
+          ((d.billing_periods as any)?.name ?? '').toLowerCase() === bpLower
         ) ?? null;
       } else {
         // Match oldest pending due for this unit
@@ -141,7 +141,7 @@ export const POST: APIRoute = async ({ request }) => {
         continue;
       }
 
-      const bpName = (matchedDue.billing_periods as { name: string } | null)?.name ?? null;
+      const bpName = (matchedDue.billing_periods as any)?.name ?? null;
       results.push({ ...rowBase, status: 'matched', matched_due_id: matchedDue.id, billing_period: bpName, error_message: null });
     }
 

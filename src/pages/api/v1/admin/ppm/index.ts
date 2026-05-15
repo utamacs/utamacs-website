@@ -122,14 +122,14 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
-    await writeAuditLog(sb, {
+    await writeAuditLog({
       societyId:    SOCIETY_ID,
-      actorId:      user.id,
+      userId:       user.id,
       action:       'CREATE',
       resourceType: 'ppm_schedules',
       resourceId:   data!.id,
       newValues:    { title, frequency, asset_id: assetId },
-      ipAddress:    extractClientIP(request),
+      ip:           extractClientIP(request),
     });
 
     return Response.json(data, { status: 201 });

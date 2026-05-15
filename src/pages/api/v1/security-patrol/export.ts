@@ -57,14 +57,14 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     const rows = (data ?? []) as any[];
 
-    await writeAuditLog(sb, {
+    await writeAuditLog({
       societyId:    SOCIETY_ID,
-      actorId:      user.id,
+      userId:       user.id,
       action:       'EXPORT',
       resourceType: 'patrol_logs',
       resourceId:   SOCIETY_ID,
       newValues:    { row_count: rows.length, from, to, incidentsOnly },
-      ipAddress:    extractClientIP(request),
+      ip:           extractClientIP(request),
     });
 
     const header = csvRow([

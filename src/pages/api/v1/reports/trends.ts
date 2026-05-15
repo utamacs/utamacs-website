@@ -51,7 +51,7 @@ export const GET: APIRoute = async ({ request }) => {
     }> = {};
 
     for (const d of duePeriods ?? []) {
-      const bp = d.billing_periods as { name: string; due_date: string } | null;
+      const bp = d.billing_periods as any;
       const pid = d.billing_period_id as string;
       if (!pid) continue;
       if (!periodMap[pid]) {

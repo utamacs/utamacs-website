@@ -39,7 +39,7 @@ export const POST: APIRoute = async ({ request }) => {
     await writeAuditLog({
       userId: session.user.id,
       societyId: SOCIETY_ID,
-      action: 'LOGIN_OTP',
+      action: 'LOGIN',
       resourceType: 'auth',
       ip: extractClientIP(request),
       userAgent: request.headers.get('user-agent') ?? undefined,

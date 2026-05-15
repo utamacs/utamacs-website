@@ -330,7 +330,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
     await writeAuditLog({
       societyId: SOCIETY_ID, userId: user.id,
-      action: 'READ', resourceType: 'executive_report', resourceId: SOCIETY_ID,
+      action: 'EXPORT', resourceType: 'executive_report', resourceId: SOCIETY_ID,
       ip: extractClientIP(request),
       newValues: { trend_months: trendMonths, generated_at: new Date().toISOString() },
     });

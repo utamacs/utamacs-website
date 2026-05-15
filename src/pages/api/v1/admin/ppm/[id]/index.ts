@@ -59,14 +59,14 @@ export const PATCH: APIRoute = async ({ request, params }) => {
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
     if (!data) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
 
-    await writeAuditLog(sb, {
+    await writeAuditLog({
       societyId:    SOCIETY_ID,
-      actorId:      user.id,
+      userId:       user.id,
       action:       'UPDATE',
       resourceType: 'ppm_schedules',
       resourceId:   scheduleId,
       newValues:    patch,
-      ipAddress:    extractClientIP(request),
+      ip:           extractClientIP(request),
     });
 
     return Response.json(data);
@@ -95,14 +95,14 @@ export const DELETE: APIRoute = async ({ request, params }) => {
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
-    await writeAuditLog(sb, {
+    await writeAuditLog({
       societyId:    SOCIETY_ID,
-      actorId:      user.id,
+      userId:       user.id,
       action:       'DELETE',
       resourceType: 'ppm_schedules',
       resourceId:   scheduleId,
       newValues:    { is_active: false },
-      ipAddress:    extractClientIP(request),
+      ip:           extractClientIP(request),
     });
 
     return Response.json({ ok: true });
