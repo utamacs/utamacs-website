@@ -39,6 +39,7 @@ test-results/
 .claude/worktrees/
 capture/
 UTA MACS - COS/
+.env.test
 
 # ─── Upload safety net ──────────────────────────────────────────────────────
 # All user-uploaded files MUST go to Supabase Storage via SupabaseStorageService.
