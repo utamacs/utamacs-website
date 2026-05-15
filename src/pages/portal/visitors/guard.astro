@@ -1,0 +1,416 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+
+// Guard screen: guards + exec can access
+const isGuard = user.role === 'security_guard';
+const isExec  = ['executive','secretary','president'].includes((user as any).portalRole ?? '') || user.isAdmin;
+if (!isGuard && !isExec) return new Response('Forbidden', { status: 403 });
+---
+
+<PortalLayout title="Gate — Visitor Screen" user={user} activeModule="visitor_mgmt">
+  <div class="mb-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Gate Control</h1>
+      <p class="text-text-secondary text-sm mt-1">Verify passes, log walk-ins and deliveries.</p>
+    </div>
+    <a href="/portal/visitors" class="text-sm text-text-secondary hover:text-primary-600 flex items-center gap-1.5">
+      <i class="fas fa-arrow-left text-xs"></i> Full View
+    </a>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-5 border-b border-border-light">
+    <button data-tab="verify"   class="tab-btn px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600">Verify Pass / OTP</button>
+    <button data-tab="expected" class="tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">
+      Expected Today
+      <span id="expected-count" class="hidden ml-1.5 text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded-full font-medium"></span>
+    </button>
+    <button data-tab="walkin"   class="tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Log Walk-in</button>
+    <button data-tab="log"      class="tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Today's Log</button>
+  </div>
+
+  <!-- Verify Pass / OTP -->
+  <div id="panel-verify">
+    <div class="max-w-md mx-auto">
+      <div class="bg-white rounded-2xl border border-border-light p-6 mb-5">
+        <h2 class="text-base font-semibold text-text-primary mb-4">Enter OTP or Scan Pass</h2>
+        <div class="flex gap-2">
+          <input id="otp-input" type="text" maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+            placeholder="6-digit OTP"
+            class="form-input flex-1 text-2xl font-mono text-center tracking-widest" />
+          <button id="otp-verify-btn" class="btn-primary px-5">Verify</button>
+        </div>
+        <p class="text-xs text-text-secondary mt-2 text-center">Resident shares OTP with visitor. Guard enters it here.</p>
+      </div>
+
+      <!-- Result card -->
+      <div id="verify-result" class="hidden"></div>
+
+      <!-- Admit button (shown after positive verify) -->
+      <div id="admit-section" class="hidden mt-4">
+        <div id="admit-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <button id="admit-btn" class="btn-primary w-full text-sm flex items-center justify-center gap-2">
+          <i class="fas fa-door-open"></i> Record Entry (Admit)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expected Today -->
+  <div id="panel-expected" class="hidden">
+    <div id="expected-list" class="bg-white rounded-2xl border border-border-light overflow-hidden">
+      <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Log Walk-in -->
+  <div id="panel-walkin" class="hidden">
+    <div class="max-w-lg mx-auto bg-white rounded-2xl border border-border-light p-6">
+      <h2 class="text-base font-semibold text-text-primary mb-4">Log Walk-in Visitor</h2>
+      <div id="walkin-success" class="hidden mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700"></div>
+      <div id="walkin-error"   class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label">Visitor name <span class="text-red-500">*</span></label>
+            <input id="wi-name" type="text" maxlength="100" class="form-input" placeholder="Full name" />
+          </div>
+          <div>
+            <label class="form-label">Visitor type</label>
+            <select id="wi-type" class="form-input bg-white">
+              <option value="guest">Guest</option>
+              <option value="domestic_help">Domestic Help</option>
+              <option value="courier">Courier</option>
+              <option value="food_delivery">Food Delivery</option>
+              <option value="ecommerce_delivery">E-commerce Delivery</option>
+              <option value="plumber">Plumber</option>
+              <option value="electrician">Electrician</option>
+              <option value="maintenance_staff">Maintenance Staff</option>
+              <option value="cab_driver">Cab Driver</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Flat / Unit <span class="text-red-500">*</span></label>
+          <div class="flex gap-2">
+            <input id="wi-unit-search" type="text" placeholder="Type flat number…" class="form-input flex-1" />
+            <button id="wi-unit-lookup" class="btn-outline text-sm px-3">Find</button>
+          </div>
+          <input type="hidden" id="wi-unit-id" />
+          <p id="wi-unit-found" class="text-xs text-secondary-500 mt-1 hidden"></p>
+        </div>
+        <div>
+          <label class="form-label">Vehicle number <span class="text-xs text-text-secondary">(optional)</span></label>
+          <input id="wi-vehicle" type="text" maxlength="20" class="form-input" placeholder="e.g. TS09EF1234" />
+        </div>
+        <button id="wi-submit" class="btn-primary w-full text-sm flex items-center justify-center gap-2">
+          <i class="fas fa-sign-in-alt"></i> Log Entry
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Today's Log -->
+  <div id="panel-log" class="hidden">
+    <div id="today-log-list" class="bg-white rounded-2xl border border-border-light overflow-hidden">
+      <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+    </div>
+  </div>
+
+  <script>
+    // ── Tab switching ──────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      ['verify','expected','walkin','log'].forEach(t => {
+        const panel = document.getElementById(`panel-${t}`);
+        const btn   = document.querySelector(`[data-tab="${t}"]`);
+        if (panel) panel.classList.toggle('hidden', t !== tab);
+        if (btn) {
+          btn.classList.toggle('text-primary-600', t === tab);
+          btn.classList.toggle('border-primary-600', t === tab);
+          btn.classList.toggle('text-text-secondary', t !== tab);
+          btn.classList.toggle('border-transparent', t !== tab);
+        }
+      });
+      if (tab === 'expected') loadExpected();
+      if (tab === 'log')      loadTodayLog();
+    }
+    document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+    function showToast(msg, type = 'success') {
+      const t = document.createElement('div');
+      t.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
+      t.textContent = msg;
+      document.body.appendChild(t);
+      requestAnimationFrame(() => t.classList.remove('translate-y-4', 'opacity-0'));
+      setTimeout(() => { t.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => t.remove(), 300); }, 3500);
+    }
+
+    // ── OTP Verify ─────────────────────────────────────────────────────────────
+    let currentPass = null;
+
+    async function verifyOtp(otp) {
+      const resultEl  = document.getElementById('verify-result');
+      const admitSec  = document.getElementById('admit-section');
+      resultEl.innerHTML = '<div class="text-sm text-text-secondary text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i>Verifying…</div>';
+      resultEl.classList.remove('hidden');
+      admitSec.classList.add('hidden');
+      currentPass = null;
+
+      const res = await fetch(`/api/v1/visitors/verify?otp_code=${encodeURIComponent(otp.trim())}`, { credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data) {
+        resultEl.innerHTML = `<div class="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm"><i class="fas fa-times-circle mr-2"></i>${data?.message ?? 'OTP not found or expired.'}</div>`;
+        return;
+      }
+
+      const pass = data;
+      const isValid = pass.status === 'approved' && pass.scan_count < pass.max_uses && new Date(pass.expires_at) > new Date();
+      const unit = pass.units ? `${pass.units.block ? pass.units.block + '-' : ''}${pass.units.unit_number}` : '—';
+      const host = pass.profiles?.display_name ?? '—';
+      const timeFrom = pass.expected_time_from ? new Date(pass.expected_time_from).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '—';
+      const timeTo   = pass.expected_time_to   ? new Date(pass.expected_time_to).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '—';
+
+      resultEl.innerHTML = `
+        <div class="p-5 rounded-2xl border-2 ${isValid ? 'border-green-400 bg-green-50' : 'border-red-400 bg-red-50'}">
+          <div class="flex items-center gap-3 mb-3">
+            <i class="fas fa-${isValid ? 'check-circle text-green-600' : 'times-circle text-red-600'} text-2xl"></i>
+            <div>
+              <div class="font-bold text-lg text-text-primary">${pass.visitor_name}</div>
+              <div class="text-sm ${isValid ? 'text-green-700' : 'text-red-700'} font-medium">${isValid ? 'VALID — Allow Entry' : 'INVALID — Do Not Admit'}</div>
+            </div>
+          </div>
+          <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div><dt class="text-xs text-text-secondary">Purpose</dt><dd class="font-medium">${pass.purpose ?? '—'}</dd></div>
+            <div><dt class="text-xs text-text-secondary">Flat</dt><dd class="font-medium">${unit}</dd></div>
+            <div><dt class="text-xs text-text-secondary">Host</dt><dd class="font-medium">${host}</dd></div>
+            <div><dt class="text-xs text-text-secondary">Vehicle</dt><dd class="font-medium">${pass.vehicle_number ?? '—'}</dd></div>
+            <div><dt class="text-xs text-text-secondary">Valid from</dt><dd class="font-medium">${timeFrom}</dd></div>
+            <div><dt class="text-xs text-text-secondary">Valid until</dt><dd class="font-medium">${timeTo}</dd></div>
+            <div><dt class="text-xs text-text-secondary">Uses</dt><dd class="font-medium">${pass.scan_count} / ${pass.max_uses}</dd></div>
+            ${pass.guard_note ? `<div class="col-span-2"><dt class="text-xs text-text-secondary">Guard note</dt><dd class="font-medium text-amber-700">${pass.guard_note}</dd></div>` : ''}
+          </dl>
+        </div>
+      `;
+
+      if (isValid) {
+        currentPass = pass;
+        admitSec.classList.remove('hidden');
+        document.getElementById('admit-error').classList.add('hidden');
+      }
+    }
+
+    document.getElementById('otp-verify-btn')?.addEventListener('click', () => {
+      const otp = (document.getElementById('otp-input')).value.trim();
+      if (!otp) return;
+      verifyOtp(otp);
+    });
+    document.getElementById('otp-input')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('otp-verify-btn').click();
+    });
+
+    document.getElementById('admit-btn')?.addEventListener('click', async () => {
+      if (!currentPass) return;
+      const errEl = document.getElementById('admit-error');
+      errEl.classList.add('hidden');
+      const btn = document.getElementById('admit-btn');
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Recording…';
+
+      const res = await fetch('/api/v1/visitors/verify', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pass_token: currentPass.pass_token }),
+      });
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-door-open"></i> Record Entry (Admit)';
+
+      if (res.ok) {
+        showToast(`Entry recorded for ${currentPass.visitor_name}.`);
+        document.getElementById('otp-input').value = '';
+        document.getElementById('verify-result').classList.add('hidden');
+        document.getElementById('admit-section').classList.add('hidden');
+        currentPass = null;
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? 'Failed to record entry.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // ── Expected Today ─────────────────────────────────────────────────────────
+    async function loadExpected() {
+      const container = document.getElementById('expected-list');
+      const today = new Date().toISOString().slice(0, 10);
+
+      const res = await fetch('/api/v1/visitors/passes', { credentials: 'include' });
+      const passes = res.ok ? await res.json() : [];
+
+      // Today's valid passes (includes recurring passes valid on today's day of week)
+      const todayDow = new Date().getDay(); // 0=Sun
+      const todayPasses = passes.filter(p => {
+        if (p.status !== 'approved') return false;
+        if (new Date(p.expires_at) < new Date()) return false;
+        if (p.is_recurring) {
+          return Array.isArray(p.recurring_days) && p.recurring_days.includes(todayDow);
+        }
+        return p.expected_date === today;
+      });
+
+      const badge = document.getElementById('expected-count');
+      if (todayPasses.length > 0) {
+        badge.textContent = String(todayPasses.length);
+        badge.classList.remove('hidden');
+      }
+
+      if (!todayPasses.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No pre-approved visitors expected today.</div>';
+        return;
+      }
+
+      const DOW_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      container.innerHTML = todayPasses.map(p => {
+        const unit = p.units ? `${p.units.block ? p.units.block + '-' : ''}${p.units.unit_number}` : '—';
+        const timeFrom = p.expected_time_from ? new Date(p.expected_time_from).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) : '—';
+        const timeTo   = p.expected_time_to   ? new Date(p.expected_time_to).toLocaleTimeString('en-IN',   { hour:'2-digit', minute:'2-digit' }) : '—';
+        const recurringBadge = p.is_recurring
+          ? `<span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium"><i class="fas fa-repeat mr-1"></i>Recurring (${(p.recurring_days ?? []).map(d => DOW_LABELS[d]).join(',')})</span>`
+          : '';
+        return `
+          <div class="px-5 py-4 border-b border-border-light last:border-b-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <span class="text-sm font-semibold text-text-primary">${p.visitor_name}</span>
+              ${recurringBadge}
+            </div>
+            <div class="text-xs text-text-secondary flex gap-3 flex-wrap">
+              <span><i class="fas fa-home mr-1"></i>Flat ${unit}</span>
+              <span><i class="fas fa-clock mr-1"></i>${timeFrom} – ${timeTo}</span>
+              ${p.purpose ? `<span><i class="fas fa-tag mr-1"></i>${p.purpose}</span>` : ''}
+              ${p.vehicle_number ? `<span><i class="fas fa-car mr-1"></i>${p.vehicle_number}</span>` : ''}
+            </div>
+            ${p.guard_note ? `<div class="text-xs text-amber-700 mt-1 italic"><i class="fas fa-sticky-note mr-1"></i>${p.guard_note}</div>` : ''}
+            <div class="mt-2 text-xs text-text-secondary font-mono">OTP: <span class="font-bold text-primary-600 text-base tracking-widest">${p.otp_code}</span></div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── Walk-in log ────────────────────────────────────────────────────────────
+    document.getElementById('wi-unit-lookup')?.addEventListener('click', async () => {
+      const q = (document.getElementById('wi-unit-search')).value.trim();
+      if (!q) return;
+      const res = await fetch(`/api/v1/visitors/lookup-unit?q=${encodeURIComponent(q)}`, { credentials: 'include' });
+      const units = res.ok ? await res.json() : [];
+      if (!units.length) {
+        document.getElementById('wi-unit-found').textContent = 'No flat found.';
+        document.getElementById('wi-unit-found').className = 'text-xs text-red-500 mt-1';
+        document.getElementById('wi-unit-found').classList.remove('hidden');
+        document.getElementById('wi-unit-id').value = '';
+        return;
+      }
+      const u = units[0];
+      document.getElementById('wi-unit-id').value = u.id;
+      document.getElementById('wi-unit-found').textContent = `✓ Found: ${u.block ? u.block + '-' : ''}${u.unit_number}`;
+      document.getElementById('wi-unit-found').className = 'text-xs text-secondary-500 mt-1';
+      document.getElementById('wi-unit-found').classList.remove('hidden');
+    });
+
+    document.getElementById('wi-submit')?.addEventListener('click', async () => {
+      const name    = (document.getElementById('wi-name')).value.trim();
+      const unitId  = (document.getElementById('wi-unit-id')).value;
+      const type    = (document.getElementById('wi-type')).value;
+      const vehicle = (document.getElementById('wi-vehicle')).value.trim();
+      const errEl   = document.getElementById('walkin-error');
+      const succEl  = document.getElementById('walkin-success');
+      errEl.classList.add('hidden'); succEl.classList.add('hidden');
+
+      if (!name) { errEl.textContent = 'Visitor name is required.'; errEl.classList.remove('hidden'); return; }
+      if (!unitId) { errEl.textContent = 'Please look up and confirm the flat first.'; errEl.classList.remove('hidden'); return; }
+
+      const btn = document.getElementById('wi-submit');
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Logging…';
+
+      const res = await fetch('/api/v1/visitors/logs', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitor_name: name, host_unit_id: unitId, entry_type: 'walk_in', visitor_type: type, vehicle_number: vehicle || undefined }),
+      });
+
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Log Entry';
+
+      if (res.ok) {
+        succEl.textContent = `Entry logged for ${name}.`;
+        succEl.classList.remove('hidden');
+        (document.getElementById('wi-name')).value = '';
+        (document.getElementById('wi-vehicle')).value = '';
+        (document.getElementById('wi-unit-id')).value = '';
+        (document.getElementById('wi-unit-search')).value = '';
+        document.getElementById('wi-unit-found').classList.add('hidden');
+      } else {
+        const d = await res.json().catch(() => ({}));
+        errEl.textContent = d.message ?? 'Failed to log entry.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // ── Today's visitor log ────────────────────────────────────────────────────
+    async function loadTodayLog() {
+      const container = document.getElementById('today-log-list');
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await fetch(`/api/v1/visitors/logs?date_from=${today}&date_to=${today}&limit=100`, { credentials: 'include' });
+      const logs = res.ok ? await res.json() : [];
+
+      if (!logs.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No visitors logged today.</div>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="px-5 py-3 border-b border-border-light bg-gray-50 text-xs font-medium text-text-secondary uppercase tracking-wide">
+          ${logs.length} visitor${logs.length !== 1 ? 's' : ''} today
+        </div>
+        ${logs.map(l => {
+          const unit = l.units ? l.units.unit_number : '—';
+          const entry = new Date(l.entry_time).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+          const exit  = l.exit_time ? new Date(l.exit_time).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) : null;
+          return `
+            <div class="px-5 py-3 border-b border-border-light last:border-b-0 flex items-center gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-text-primary">${l.visitor_name}</div>
+                <div class="text-xs text-text-secondary flex gap-3 flex-wrap mt-0.5">
+                  <span>Flat ${unit}</span>
+                  <span><i class="fas fa-sign-in-alt mr-0.5 text-green-500"></i>${entry}</span>
+                  ${exit ? `<span><i class="fas fa-sign-out-alt mr-0.5 text-red-400"></i>${exit}</span>` : '<span class="text-amber-600 font-medium">Still inside</span>'}
+                  ${l.vehicle_number ? `<span><i class="fas fa-car mr-0.5"></i>${l.vehicle_number}</span>` : ''}
+                </div>
+              </div>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600 flex-shrink-0">${l.entry_type?.replace('_',' ') ?? '—'}</span>
+            </div>
+          `;
+        }).join('')}
+      `;
+    }
+
+    // Load expected count on init
+    fetch('/api/v1/visitors/passes', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(passes => {
+        const today = new Date().toISOString().slice(0, 10);
+        const todayDow = new Date().getDay();
+        const count = passes.filter(p => {
+          if (p.status !== 'approved') return false;
+          if (new Date(p.expires_at) < new Date()) return false;
+          return p.is_recurring
+            ? Array.isArray(p.recurring_days) && p.recurring_days.includes(todayDow)
+            : p.expected_date === today;
+        }).length;
+        if (count > 0) {
+          const badge = document.getElementById('expected-count');
+          badge.textContent = String(count);
+          badge.classList.remove('hidden');
+        }
+      }).catch(() => {});
+  </script>
+</PortalLayout>

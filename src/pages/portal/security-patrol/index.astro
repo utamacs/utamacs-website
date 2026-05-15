@@ -25,25 +25,74 @@ const canLog = isGuard || isPrivileged;
     )}
   </div>
 
-  <!-- Filters -->
-  <div class="flex gap-3 mb-5 flex-wrap">
-    <button data-filter="all" class="filter-btn text-xs px-3 py-1.5 rounded-full font-medium border bg-primary-600 text-white border-primary-600">All</button>
-    <button data-filter="incidents" class="filter-btn text-xs px-3 py-1.5 rounded-full font-medium border bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600">
-      <i class="fas fa-exclamation-triangle mr-1 text-amber-500" aria-hidden="true"></i>Incidents only
-    </button>
-    <div class="flex items-center gap-2 ml-auto">
-      <label class="text-xs text-text-secondary">From</label>
-      <input id="date-from" type="date" class="form-input py-1.5 text-xs" style="width:130px" />
-      <label class="text-xs text-text-secondary">To</label>
-      <input id="date-to" type="date" class="form-input py-1.5 text-xs" style="width:130px" />
+  <!-- Exec summary stats panel (hidden until loaded) -->
+  {isPrivileged && (
+    <div id="summary-panel" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 hidden">
+      <!-- filled by JS -->
+    </div>
+  )}
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-5 border-b border-border-light">
+    <button data-tab="logs" class="tab-btn px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600">Patrol Logs</button>
+    {isPrivileged && (
+      <button data-tab="incidents" class="tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">
+        Open Incidents
+        <span id="open-incident-count" class="hidden ml-1.5 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium"></span>
+      </button>
+    )}
+    {isPrivileged && (
+      <button data-tab="schedules" class="tab-btn px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary-600 border-b-2 border-transparent">Schedules</button>
+    )}
+  </div>
+
+  <!-- Logs tab -->
+  <div id="panel-logs">
+    <div class="flex gap-3 mb-5 flex-wrap items-center">
+      <button data-filter="all" class="filter-btn text-xs px-3 py-1.5 rounded-full font-medium border bg-primary-600 text-white border-primary-600">All</button>
+      <button data-filter="incidents" class="filter-btn text-xs px-3 py-1.5 rounded-full font-medium border bg-white text-text-secondary border-border-light hover:border-primary-600 hover:text-primary-600">
+        <i class="fas fa-exclamation-triangle mr-1 text-amber-500" aria-hidden="true"></i>Incidents only
+      </button>
+      <div class="flex items-center gap-2 ml-auto">
+        <label class="text-xs text-text-secondary">From</label>
+        <input id="date-from" type="date" class="form-input py-1.5 text-xs" style="width:130px" />
+        <label class="text-xs text-text-secondary">To</label>
+        <input id="date-to" type="date" class="form-input py-1.5 text-xs" style="width:130px" />
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+      <div id="patrol-list">
+        <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+      </div>
     </div>
   </div>
 
-  <div class="bg-white rounded-xl border border-border-light overflow-hidden">
-    <div id="patrol-list">
-      <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+  <!-- Open Incidents tab -->
+  {isPrivileged && (
+    <div id="panel-incidents" class="hidden">
+      <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+        <div id="incidents-list">
+          <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+        </div>
+      </div>
     </div>
-  </div>
+  )}
+
+  <!-- Schedules tab -->
+  {isPrivileged && (
+    <div id="panel-schedules" class="hidden">
+      <div class="mb-4 flex justify-end">
+        <button id="add-schedule-btn" class="btn-primary text-sm flex items-center gap-2">
+          <i class="fas fa-plus" aria-hidden="true"></i> Add Schedule
+        </button>
+      </div>
+      <div class="bg-white rounded-xl border border-border-light overflow-hidden">
+        <div id="schedules-list">
+          <div class="text-sm text-text-secondary text-center py-10">Loading…</div>
+        </div>
+      </div>
+    </div>
+  )}
 
   <!-- Log patrol modal -->
   {canLog && (
@@ -127,7 +176,86 @@ const canLog = isGuard || isPrivileged;
     </div>
   )}
 
+  <!-- Resolve incident modal -->
+  {isPrivileged && (
+    <div id="resolve-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-primary-600 mb-4">Mark Incident Resolved</h3>
+        <div id="resolve-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <input type="hidden" id="resolve-id" />
+        <div class="mb-4">
+          <label class="form-label" for="resolve-note">Resolution note <span class="text-red-500">*</span></label>
+          <textarea id="resolve-note" rows="3" maxlength="500" class="form-input resize-none"
+            placeholder="Describe how the incident was handled…"></textarea>
+        </div>
+        <div class="flex gap-3">
+          <button id="resolve-submit" class="btn-primary flex-1 text-sm">Confirm Resolved</button>
+          <button id="resolve-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Add Schedule modal -->
+  {isPrivileged && (
+    <div id="schedule-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog">
+      <div class="bg-white rounded-2xl shadow-large w-full max-w-lg p-6">
+        <h3 class="text-lg font-semibold text-primary-600 mb-4">Add Guard Schedule</h3>
+        <div id="sched-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="sched-guard">Guard name <span class="text-red-500">*</span></label>
+              <input id="sched-guard" type="text" maxlength="200" class="form-input" placeholder="e.g. Suresh Kumar" />
+            </div>
+            <div>
+              <label class="form-label" for="sched-shift">Shift <span class="text-red-500">*</span></label>
+              <select id="sched-shift" class="form-input bg-white">
+                <option value="">Select shift</option>
+                <option value="morning">Morning (6am–2pm)</option>
+                <option value="afternoon">Afternoon (2pm–10pm)</option>
+                <option value="evening">Evening (6pm–10pm)</option>
+                <option value="night">Night (10pm–6am)</option>
+                <option value="full_day">Full Day</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Days of week <span class="text-red-500">*</span></label>
+            <div class="flex gap-2 flex-wrap mt-1">
+              {[['Sun',0],['Mon',1],['Tue',2],['Wed',3],['Thu',4],['Fri',5],['Sat',6]].map(([lbl, val]) => (
+                <label class="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+                  <input type="checkbox" value={val} class="dow-cb w-4 h-4 accent-primary-600" />
+                  {lbl}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="form-label" for="sched-from">Effective from <span class="text-red-500">*</span></label>
+              <input id="sched-from" type="date" class="form-input" />
+            </div>
+            <div>
+              <label class="form-label" for="sched-to">Effective to <span class="text-text-secondary text-xs">(leave blank = indefinite)</span></label>
+              <input id="sched-to" type="date" class="form-input" />
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="sched-notes">Notes</label>
+            <input id="sched-notes" type="text" maxlength="300" class="form-input" placeholder="Any additional notes" />
+          </div>
+        </div>
+        <div class="flex gap-3 mt-5">
+          <button id="sched-submit" class="btn-primary flex-1 text-sm">Save Schedule</button>
+          <button id="sched-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+        </div>
+      </div>
+    </div>
+  )}
+
   <script define:vars={{ canLog, isPrivileged }}>
+    let activeTab = 'logs';
     let incidentFilter = false;
     let dateFrom = '';
     let dateTo = '';
@@ -141,17 +269,71 @@ const canLog = isGuard || isPrivileged;
       setTimeout(() => { toast.classList.add('translate-y-4', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3500);
     }
 
-    const SHIFT_LABELS = {
-      morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', night: 'Night', full_day: 'Full Day'
-    };
+    const SHIFT_LABELS = { morning:'Morning', afternoon:'Afternoon', evening:'Evening', night:'Night', full_day:'Full Day' };
     const SHIFT_COLORS = {
-      morning: 'bg-yellow-100 text-yellow-700',
-      afternoon: 'bg-orange-100 text-orange-700',
-      evening: 'bg-purple-100 text-purple-700',
-      night: 'bg-blue-100 text-blue-700',
-      full_day: 'bg-gray-100 text-gray-700',
+      morning:'bg-yellow-100 text-yellow-700', afternoon:'bg-orange-100 text-orange-700',
+      evening:'bg-purple-100 text-purple-700', night:'bg-blue-100 text-blue-700', full_day:'bg-gray-100 text-gray-700',
     };
+    const DOW_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
+    // ── Tabs ────────────────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      activeTab = tab;
+      ['logs','incidents','schedules'].forEach(t => {
+        const panel = document.getElementById(`panel-${t}`);
+        const btn   = document.querySelector(`[data-tab="${t}"]`);
+        if (panel) panel.classList.toggle('hidden', t !== tab);
+        if (btn) {
+          btn.classList.toggle('text-primary-600', t === tab);
+          btn.classList.toggle('border-primary-600', t === tab);
+          btn.classList.toggle('text-text-secondary', t !== tab);
+          btn.classList.toggle('border-transparent', t !== tab);
+        }
+      });
+      if (tab === 'incidents') loadOpenIncidents();
+      if (tab === 'schedules') loadSchedules();
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    // ── Summary stats ───────────────────────────────────────────────────────────
+    if (isPrivileged) {
+      fetch('/api/v1/security-patrol/summary', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : null)
+        .then(s => {
+          if (!s) return;
+          const panel = document.getElementById('summary-panel');
+          panel.innerHTML = [
+            { icon: 'fa-shield-alt', color: 'text-primary-600 bg-primary-50', label: 'Shifts this week', value: s.shifts_this_week },
+            { icon: 'fa-exclamation-triangle', color: 'text-red-600 bg-red-50', label: 'Open incidents', value: s.open_incidents,
+              extra: s.overdue_incidents > 0 ? `<span class="text-xs text-red-600 font-medium">${s.overdue_incidents} overdue</span>` : '' },
+            { icon: 'fa-calendar-alt', color: 'text-blue-600 bg-blue-50', label: `Shifts (${s.window_days}d)`, value: s.total_shifts },
+            { icon: 'fa-map-marker-check', color: 'text-green-600 bg-green-50', label: 'Avg checkpoints/shift', value: s.avg_checkpoints },
+          ].map(c => `
+            <div class="bg-white rounded-xl border border-border-light p-4 flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl ${c.color} flex items-center justify-center flex-shrink-0">
+                <i class="fas ${c.icon}" aria-hidden="true"></i>
+              </div>
+              <div>
+                <div class="text-xl font-bold text-text-primary">${c.value}</div>
+                <div class="text-xs text-text-secondary">${c.label}</div>
+                ${c.extra ?? ''}
+              </div>
+            </div>
+          `).join('');
+          panel.classList.remove('hidden');
+
+          // Badge on incidents tab
+          if (s.open_incidents > 0) {
+            const badge = document.getElementById('open-incident-count');
+            if (badge) { badge.textContent = String(s.open_incidents); badge.classList.remove('hidden'); }
+          }
+        }).catch(() => {});
+    }
+
+    // ── Patrol Logs ─────────────────────────────────────────────────────────────
     async function load() {
       const container = document.getElementById('patrol-list');
       container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
@@ -167,46 +349,198 @@ const canLog = isGuard || isPrivileged;
         return;
       }
 
-      container.innerHTML = logs.map(l => {
-        const shiftBadge = `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${SHIFT_COLORS[l.shift] ?? 'bg-gray-100 text-gray-700'}">${SHIFT_LABELS[l.shift] ?? l.shift}</span>`;
-        const incidentBadge = l.is_incident ? '<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium"><i class="fas fa-exclamation-triangle mr-1"></i>Incident</span>' : '';
-        const timeRange = (l.start_time || l.end_time) ? `${l.start_time ?? '?'} – ${l.end_time ?? '?'}` : '';
-        const cps = Array.isArray(l.checkpoints) && l.checkpoints.length ? l.checkpoints.join(' · ') : null;
+      container.innerHTML = logs.map(l => renderLogRow(l, true)).join('');
+    }
 
-        return `
-          <div class="px-5 py-4 border-b border-border-light last:border-b-0 ${l.is_incident ? 'bg-red-50/40' : 'hover:bg-gray-50'} transition-colors">
-            <div class="flex items-start justify-between gap-3">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap mb-1">
-                  <span class="text-sm font-semibold text-text-primary">${new Date(l.patrol_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                  ${shiftBadge}
-                  ${incidentBadge}
-                </div>
-                <div class="text-xs text-text-secondary flex items-center gap-3 flex-wrap">
-                  <span><i class="fas fa-user-shield mr-1 text-primary-300" aria-hidden="true"></i>${l.guard_name}</span>
-                  ${timeRange ? `<span><i class="fas fa-clock mr-1 text-primary-300" aria-hidden="true"></i>${timeRange}</span>` : ''}
-                </div>
-                ${cps ? `<div class="text-xs text-text-secondary mt-1.5"><i class="fas fa-map-marker-alt mr-1 text-primary-300" aria-hidden="true"></i>${cps}</div>` : ''}
-                ${l.incidents ? `<div class="text-xs text-red-600 mt-1.5 font-medium"><i class="fas fa-exclamation-circle mr-1" aria-hidden="true"></i>${l.incidents}</div>` : ''}
-                ${l.remarks ? `<div class="text-xs text-text-secondary mt-1 italic">${l.remarks}</div>` : ''}
+    function renderLogRow(l, showDelete = false) {
+      const shiftBadge = `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${SHIFT_COLORS[l.shift] ?? 'bg-gray-100 text-gray-700'}">${SHIFT_LABELS[l.shift] ?? l.shift}</span>`;
+      const incidentBadge = l.is_incident ? '<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium"><i class="fas fa-exclamation-triangle mr-1"></i>Incident</span>' : '';
+      const resolvedBadge = l.resolved_at ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium"><i class="fas fa-check mr-1"></i>Resolved</span>' : '';
+      const timeRange = (l.start_time || l.end_time) ? `${l.start_time ?? '?'} – ${l.end_time ?? '?'}` : '';
+      const cps = Array.isArray(l.checkpoints) && l.checkpoints.length ? l.checkpoints.join(' · ') : null;
+
+      const actions = isPrivileged ? `
+        <div class="flex items-center gap-1 flex-shrink-0">
+          ${l.is_incident && !l.resolved_at ? `<button onclick="openResolve('${l.id}')" class="text-xs px-2 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 font-medium">Resolve</button>` : ''}
+          ${showDelete ? `<button onclick="deleteLog('${l.id}')" class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-red-600"><i class="fas fa-trash text-xs"></i></button>` : ''}
+        </div>` : '';
+
+      return `
+        <div class="px-5 py-4 border-b border-border-light last:border-b-0 ${l.is_incident && !l.resolved_at ? 'bg-red-50/40' : 'hover:bg-gray-50'} transition-colors">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-sm font-semibold text-text-primary">${new Date(l.patrol_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short', year:'numeric' })}</span>
+                ${shiftBadge}${incidentBadge}${resolvedBadge}
               </div>
-              ${isPrivileged ? `<button onclick="deleteLog('${l.id}')" class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-red-600 flex-shrink-0">
-                <i class="fas fa-trash text-xs" aria-hidden="true"></i>
-              </button>` : ''}
+              <div class="text-xs text-text-secondary flex items-center gap-3 flex-wrap">
+                <span><i class="fas fa-user-shield mr-1 text-primary-300"></i>${l.guard_name}</span>
+                ${timeRange ? `<span><i class="fas fa-clock mr-1 text-primary-300"></i>${timeRange}</span>` : ''}
+              </div>
+              ${cps ? `<div class="text-xs text-text-secondary mt-1.5"><i class="fas fa-map-marker-alt mr-1 text-primary-300"></i>${cps}</div>` : ''}
+              ${l.incidents ? `<div class="text-xs text-red-600 mt-1.5 font-medium"><i class="fas fa-exclamation-circle mr-1"></i>${l.incidents}</div>` : ''}
+              ${l.resolution_note ? `<div class="text-xs text-green-700 mt-1 italic"><i class="fas fa-check-circle mr-1"></i>${l.resolution_note}</div>` : ''}
+              ${l.remarks ? `<div class="text-xs text-text-secondary mt-1 italic">${l.remarks}</div>` : ''}
             </div>
+            ${actions}
           </div>
-        `;
-      }).join('');
+        </div>
+      `;
+    }
+
+    async function loadOpenIncidents() {
+      const container = document.getElementById('incidents-list');
+      if (!container) return;
+      container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+      const res = await fetch('/api/v1/security-patrol?incidents=true', { credentials: 'include' });
+      const logs = res.ok ? (await res.json()).filter(l => !l.resolved_at) : [];
+
+      if (!logs.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-check-circle text-green-500 mr-2"></i>No open incidents — all clear!</div>';
+        return;
+      }
+      container.innerHTML = logs.map(l => renderLogRow(l, false)).join('');
+    }
+
+    window.openResolve = function(id) {
+      document.getElementById('resolve-id').value = id;
+      document.getElementById('resolve-note').value = '';
+      document.getElementById('resolve-error').classList.add('hidden');
+      document.getElementById('resolve-modal').classList.remove('hidden');
+    };
+
+    if (isPrivileged) {
+      document.getElementById('resolve-cancel')?.addEventListener('click', () => {
+        document.getElementById('resolve-modal').classList.add('hidden');
+      });
+      document.getElementById('resolve-submit')?.addEventListener('click', async () => {
+        const id   = document.getElementById('resolve-id').value;
+        const note = document.getElementById('resolve-note').value.trim();
+        const errEl = document.getElementById('resolve-error');
+        errEl.classList.add('hidden');
+        if (!note) { errEl.textContent = 'Resolution note is required.'; errEl.classList.remove('hidden'); return; }
+        const btn = document.getElementById('resolve-submit');
+        btn.disabled = true; btn.textContent = 'Saving…';
+        const res = await fetch(`/api/v1/security-patrol?id=${id}`, {
+          method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resolution_note: note }),
+        });
+        btn.disabled = false; btn.textContent = 'Confirm Resolved';
+        if (res.ok) {
+          document.getElementById('resolve-modal').classList.add('hidden');
+          showToast('Incident marked resolved.');
+          await load();
+          if (activeTab === 'incidents') await loadOpenIncidents();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          errEl.textContent = d.message ?? 'Failed to resolve.';
+          errEl.classList.remove('hidden');
+        }
+      });
     }
 
     async function deleteLog(id) {
       if (!confirm('Delete this patrol log?')) return;
       const res = await fetch(`/api/v1/security-patrol?id=${id}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) { showToast('Log deleted.'); load(); }
-      else { showToast('Failed to delete log.', 'error'); }
+      else showToast('Failed to delete log.', 'error');
     }
 
-    // Filters
+    // ── Schedules ───────────────────────────────────────────────────────────────
+    async function loadSchedules() {
+      const container = document.getElementById('schedules-list');
+      if (!container) return;
+      container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+      const res = await fetch('/api/v1/security-patrol/schedules', { credentials: 'include' });
+      const schedules = res.ok ? await res.json() : [];
+
+      if (!schedules.length) {
+        container.innerHTML = '<div class="text-sm text-text-secondary text-center py-10">No schedules defined yet.</div>';
+        return;
+      }
+
+      container.innerHTML = schedules.map(s => {
+        const days = (s.days_of_week ?? []).map(d => DOW_LABELS[d] ?? d).join(', ');
+        const from = s.effective_from ? new Date(s.effective_from + 'T00:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—';
+        const to   = s.effective_to   ? new Date(s.effective_to   + 'T00:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'Ongoing';
+        return `
+          <div class="px-5 py-4 border-b border-border-light last:border-b-0 flex items-start gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-sm font-semibold text-text-primary">${s.guard_name}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium ${SHIFT_COLORS[s.shift] ?? 'bg-gray-100 text-gray-700'}">${SHIFT_LABELS[s.shift] ?? s.shift}</span>
+              </div>
+              <div class="text-xs text-text-secondary flex gap-3 flex-wrap">
+                <span><i class="fas fa-calendar-week mr-1"></i>${days}</span>
+                <span><i class="fas fa-calendar-alt mr-1"></i>${from} → ${to}</span>
+              </div>
+              ${s.notes ? `<div class="text-xs text-text-secondary mt-1 italic">${s.notes}</div>` : ''}
+            </div>
+            <button onclick="deleteSchedule('${s.id}')" class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-red-600 flex-shrink-0">
+              <i class="fas fa-trash text-xs"></i>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.deleteSchedule = async function(id) {
+      if (!confirm('Remove this schedule entry?')) return;
+      const res = await fetch(`/api/v1/security-patrol/schedules?id=${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) { showToast('Schedule removed.'); loadSchedules(); }
+      else showToast('Failed to remove schedule.', 'error');
+    };
+
+    if (isPrivileged) {
+      document.getElementById('add-schedule-btn')?.addEventListener('click', () => {
+        document.getElementById('sched-guard').value = '';
+        document.getElementById('sched-shift').value = '';
+        document.querySelectorAll('.dow-cb').forEach(cb => { cb.checked = false; });
+        document.getElementById('sched-from').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('sched-to').value = '';
+        document.getElementById('sched-notes').value = '';
+        document.getElementById('sched-error').classList.add('hidden');
+        document.getElementById('schedule-modal').classList.remove('hidden');
+      });
+      document.getElementById('sched-cancel')?.addEventListener('click', () => {
+        document.getElementById('schedule-modal').classList.add('hidden');
+      });
+      document.getElementById('sched-submit')?.addEventListener('click', async () => {
+        const guard_name = document.getElementById('sched-guard').value.trim();
+        const shift      = document.getElementById('sched-shift').value;
+        const days_of_week = [...document.querySelectorAll('.dow-cb:checked')].map(c => parseInt(c.value));
+        const from = document.getElementById('sched-from').value;
+        const to   = document.getElementById('sched-to').value || undefined;
+        const notes = document.getElementById('sched-notes').value.trim() || undefined;
+        const errEl = document.getElementById('sched-error');
+        errEl.classList.add('hidden');
+
+        if (!guard_name) { errEl.textContent = 'Guard name is required.'; errEl.classList.remove('hidden'); return; }
+        if (!shift) { errEl.textContent = 'Shift is required.'; errEl.classList.remove('hidden'); return; }
+        if (!days_of_week.length) { errEl.textContent = 'At least one day of week is required.'; errEl.classList.remove('hidden'); return; }
+        if (!from) { errEl.textContent = 'Effective from date is required.'; errEl.classList.remove('hidden'); return; }
+
+        const btn = document.getElementById('sched-submit');
+        btn.disabled = true; btn.textContent = 'Saving…';
+
+        const res = await fetch('/api/v1/security-patrol/schedules', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ guard_name, shift, days_of_week, effective_from: from, effective_to: to, notes }),
+        });
+        btn.disabled = false; btn.textContent = 'Save Schedule';
+        if (res.ok) {
+          document.getElementById('schedule-modal').classList.add('hidden');
+          showToast('Schedule saved.');
+          loadSchedules();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          errEl.textContent = d.message ?? 'Failed to save schedule.';
+          errEl.classList.remove('hidden');
+        }
+      });
+    }
+
+    // ── Filters ──────────────────────────────────────────────────────────────────
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.filter-btn').forEach(b => {
@@ -220,21 +554,21 @@ const canLog = isGuard || isPrivileged;
       });
     });
 
-    document.getElementById('date-from').addEventListener('change', (e) => { dateFrom = e.target.value; load(); });
-    document.getElementById('date-to').addEventListener('change',   (e) => { dateTo   = e.target.value; load(); });
+    document.getElementById('date-from')?.addEventListener('change', e => { dateFrom = e.target.value; load(); });
+    document.getElementById('date-to')?.addEventListener('change',   e => { dateTo   = e.target.value; load(); });
 
-    // Patrol modal
+    // ── Patrol modal ─────────────────────────────────────────────────────────────
     if (canLog) {
-      const modal = document.getElementById('patrol-modal');
-      const errEl = document.getElementById('pm-error');
-      const submitBtn = document.getElementById('pm-submit');
-      const submitLbl = document.getElementById('pm-submit-label');
+      const modal  = document.getElementById('patrol-modal');
+      const errEl  = document.getElementById('pm-error');
+      const submitBtn  = document.getElementById('pm-submit');
+      const submitLbl  = document.getElementById('pm-submit-label');
 
       function openModal() {
         modal.classList.remove('hidden');
         errEl.classList.add('hidden');
         document.getElementById('pm-date').value = new Date().toISOString().slice(0, 10);
-        document.querySelectorAll('.checkpoint-cb').forEach((cb) => { cb.checked = false; });
+        document.querySelectorAll('.checkpoint-cb').forEach(cb => { cb.checked = false; });
         document.getElementById('pm-incident').checked = false;
       }
       function closeModal() { modal.classList.add('hidden'); }
@@ -242,13 +576,13 @@ const canLog = isGuard || isPrivileged;
       document.getElementById('log-btn').addEventListener('click', openModal);
       document.getElementById('pm-close').addEventListener('click', closeModal);
       document.getElementById('pm-cancel').addEventListener('click', closeModal);
-      modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
 
       submitBtn.addEventListener('click', async () => {
         errEl.classList.add('hidden');
         const patrol_date = document.getElementById('pm-date').value;
-        const shift = document.getElementById('pm-shift').value;
-        const guard_name = document.getElementById('pm-guard').value.trim();
+        const shift       = document.getElementById('pm-shift').value;
+        const guard_name  = document.getElementById('pm-guard').value.trim();
 
         if (!patrol_date || !shift || !guard_name) {
           errEl.textContent = 'Date, shift and guard name are required.';
@@ -257,7 +591,7 @@ const canLog = isGuard || isPrivileged;
         }
 
         const is_incident = document.getElementById('pm-incident').checked;
-        const incidents = document.getElementById('pm-incidents').value.trim();
+        const incidents   = document.getElementById('pm-incidents').value.trim();
         if (is_incident && !incidents) {
           errEl.textContent = 'Please describe the incident.';
           errEl.classList.remove('hidden');
@@ -267,33 +601,31 @@ const canLog = isGuard || isPrivileged;
         submitBtn.disabled = true; submitLbl.textContent = 'Saving…';
 
         const checkpoints = [];
-        document.querySelectorAll('.checkpoint-cb').forEach((cb) => { if (cb.checked) checkpoints.push(cb.value); });
-
-        const body = {
-          patrol_date, shift, guard_name,
-          start_time: document.getElementById('pm-start').value || undefined,
-          end_time: document.getElementById('pm-end').value || undefined,
-          checkpoints: checkpoints.length ? checkpoints : undefined,
-          is_incident,
-          incidents: incidents || undefined,
-          remarks: document.getElementById('pm-remarks').value.trim() || undefined,
-        };
+        document.querySelectorAll('.checkpoint-cb').forEach(cb => { if (cb.checked) checkpoints.push(cb.value); });
 
         const res = await fetch('/api/v1/security-patrol', {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patrol_date, shift, guard_name,
+            start_time: document.getElementById('pm-start').value || undefined,
+            end_time:   document.getElementById('pm-end').value   || undefined,
+            checkpoints: checkpoints.length ? checkpoints : undefined,
+            is_incident,
+            incidents:  incidents || undefined,
+            remarks:    document.getElementById('pm-remarks').value.trim() || undefined,
+          }),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          errEl.textContent = data.message ?? data.error ?? 'Save failed';
-          errEl.classList.remove('hidden');
-        } else {
+        submitBtn.disabled = false; submitLbl.textContent = 'Save Patrol Log';
+
+        if (res.ok) {
           showToast(is_incident ? 'Incident logged and saved.' : 'Patrol log saved.');
           closeModal();
           load();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          errEl.textContent = d.message ?? d.error ?? 'Save failed';
+          errEl.classList.remove('hidden');
         }
-        submitBtn.disabled = false; submitLbl.textContent = 'Save Patrol Log';
       });
     }
 
