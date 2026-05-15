@@ -150,6 +150,7 @@ const canPost = ['member', 'executive', 'admin'].includes(user.role);
             <p class="text-sm text-text-secondary line-clamp-2">${p.body.replace(/<[^>]*>/g,'')}</p>
           </a>
           <div class="mt-3 flex items-center gap-4 text-xs text-text-secondary">
+            ${p.image_count > 0 ? `<span class="flex items-center gap-1 text-primary-500"><i class="fas fa-image text-xs"></i>${p.image_count}</span>` : ''}
             <button onclick="react('${p.id}','like',this)" class="flex items-center gap-1 hover:text-primary-600 transition-colors reaction-btn" data-post="${p.id}" data-type="like">
               <i class="fas fa-thumbs-up"></i>
               <span class="like-count">${p.like_count}</span>

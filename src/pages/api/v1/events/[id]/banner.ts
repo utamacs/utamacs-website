@@ -16,6 +16,33 @@ const ALLOWED_MIME: Record<string, string> = {
   'image/webp': 'webp',
 };
 
+// GET — return a signed download URL for the event banner (all authenticated members)
+export const GET: APIRoute = async ({ request, params }) => {
+  try {
+    await validateJWT(request);
+    const eventId = params.id!;
+    if (!UUID_RE.test(eventId)) {
+      return Response.json({ error: 'INVALID_ID' }, { status: 400 });
+    }
+    const sb = getSupabaseServiceClient();
+    const { data: event } = await sb
+      .from('events')
+      .select('banner_key')
+      .eq('id', eventId)
+      .eq('society_id', SOCIETY_ID)
+      .maybeSingle();
+
+    if (!event?.banner_key) {
+      return Response.json({ error: 'NOT_FOUND', message: 'No banner image uploaded.' }, { status: 404 });
+    }
+
+    const url = await getDocumentDownloadUrl(event.banner_key);
+    return Response.json({ url }, { status: 200 });
+  } catch (err) {
+    return normalizeError(err, request.url);
+  }
+};
+
 // POST (exec only) — upload banner image for an event
 export const POST: APIRoute = async ({ request, params }) => {
   try {

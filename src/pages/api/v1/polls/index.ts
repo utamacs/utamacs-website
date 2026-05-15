@@ -16,7 +16,7 @@ export const GET: APIRoute = async ({ request }) => {
 
     const { data, error } = await sb
       .from('polls')
-      .select('id, title, description, poll_type, is_anonymous, one_vote_per_unit, starts_at, ends_at, is_published, result_visibility, created_at, poll_options(id, option_text, order_index)')
+      .select('id, title, description, poll_type, max_choices, is_anonymous, one_vote_per_unit, starts_at, ends_at, is_published, result_visibility, created_at, poll_options(id, option_text, order_index)')
       .eq('society_id', SOCIETY_ID)
       .eq('is_published', true)
       .order('created_at', { ascending: false });
@@ -37,11 +37,20 @@ export const POST: APIRoute = async ({ request }) => {
     );
 
     const body = await request.json() as Record<string, unknown>;
-    const { title, description, poll_type, options, is_anonymous, one_vote_per_unit, starts_at, ends_at } = body;
+    const { title, description, poll_type, options, is_anonymous, one_vote_per_unit, starts_at, ends_at,
+            result_visibility, max_choices } = body;
 
     const VALID_POLL_TYPES = ['single_choice', 'multiple_choice', 'yes_no', 'rating'];
-    if (!title || !poll_type || !Array.isArray(options) || options.length < 2) {
-      return new Response(JSON.stringify({ error: 'title, poll_type and at least 2 options are required' }), {
+    const VALID_VISIBILITIES = ['after_vote', 'after_close', 'executive_only'];
+    const isRating = poll_type === 'rating';
+
+    if (!title || !poll_type) {
+      return new Response(JSON.stringify({ error: 'title and poll_type are required' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (!isRating && (!Array.isArray(options) || (options as string[]).length < 2)) {
+      return new Response(JSON.stringify({ error: 'At least 2 options are required for non-rating polls' }), {
         status: 400, headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -51,6 +60,14 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    const resolvedVisibility = result_visibility && VALID_VISIBILITIES.includes(String(result_visibility))
+      ? String(result_visibility)
+      : 'after_close';
+
+    const resolvedMaxChoices = poll_type === 'multiple_choice' && typeof max_choices === 'number' && max_choices >= 2
+      ? Math.min(max_choices, 20)
+      : 1;
+
     const sb = getSupabaseServiceClient();
     const { data: poll, error } = await sb
       .from('polls')
@@ -59,12 +76,13 @@ export const POST: APIRoute = async ({ request }) => {
         title: sanitizePlainText(String(title)),
         description: description ? sanitizePlainText(String(description)) : null,
         poll_type,
+        max_choices: resolvedMaxChoices,
         is_anonymous: is_anonymous ?? false,
         one_vote_per_unit: one_vote_per_unit ?? false,
         starts_at: starts_at ?? new Date().toISOString(),
         ends_at: ends_at ?? null,
         is_published: true,
-        result_visibility: 'after_close',
+        result_visibility: resolvedVisibility,
         created_by: user.id,
       })
       .select()
@@ -72,9 +90,14 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
 
-    const optionRows = (options as string[]).map((text: string, i: number) => ({
+    // For rating polls, auto-generate 5 options labelled "1"–"5"
+    const optionTexts: string[] = isRating
+      ? ['1', '2', '3', '4', '5']
+      : (options as string[]);
+
+    const optionRows = optionTexts.map((text: string, i: number) => ({
       poll_id: poll.id,
-      option_text: sanitizePlainText(text),
+      option_text: isRating ? text : sanitizePlainText(text),
       order_index: i + 1,
     }));
     await sb.from('poll_options').insert(optionRows);
@@ -84,7 +107,9 @@ export const POST: APIRoute = async ({ request }) => {
       excludeUserId: user.id,
       preferenceKey: 'polls',
       title: `New poll: ${sanitizePlainText(String(title))}`,
-      body: `Cast your vote — ${(options as string[]).slice(0, 3).map((o) => sanitizePlainText(String(o))).join(', ')}${(options as string[]).length > 3 ? '…' : ''}`,
+      body: isRating
+        ? `Rate on a scale of 1–5`
+        : `Cast your vote — ${(options as string[]).slice(0, 3).map((o) => sanitizePlainText(String(o))).join(', ')}${(options as string[]).length > 3 ? '…' : ''}`,
       type: 'poll',
       referenceTable: 'polls',
       referenceId: poll.id,

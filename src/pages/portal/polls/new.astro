@@ -43,17 +43,36 @@ if (!isPrivileged) return Astro.redirect('/portal/polls');
             <option value="single_choice">Single Choice</option>
             <option value="multiple_choice">Multiple Choice</option>
             <option value="yes_no">Yes / No</option>
+            <option value="rating">Rating (1–5 stars)</option>
           </select>
         </div>
         <div>
-          <label for="ends_at" class="block text-sm font-medium text-text-primary mb-1.5">Closing Date & Time</label>
-          <input type="datetime-local" id="ends_at" name="ends_at"
-            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <label for="result_visibility" class="block text-sm font-medium text-text-primary mb-1.5">Show Results</label>
+          <select id="result_visibility" name="result_visibility"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="after_close">After poll closes</option>
+            <option value="after_vote">After member votes</option>
+            <option value="executive_only">Exec only</option>
+          </select>
         </div>
       </div>
 
-      <!-- Options builder -->
+      <!-- max_choices — only shown for multiple_choice -->
+      <div id="max-choices-row" class="hidden">
+        <label for="max_choices" class="block text-sm font-medium text-text-primary mb-1.5">Max choices per member</label>
+        <input type="number" id="max_choices" name="max_choices" min="2" max="20" value="2"
+          class="w-40 px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        <p class="text-xs text-text-secondary mt-1">Members may select up to this many options.</p>
+      </div>
+
       <div>
+        <label for="ends_at" class="block text-sm font-medium text-text-primary mb-1.5">Closing Date & Time</label>
+        <input type="datetime-local" id="ends_at" name="ends_at"
+          class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+      </div>
+
+      <!-- Options builder — hidden for rating type -->
+      <div id="options-section">
         <div class="flex items-center justify-between mb-2">
           <label class="text-sm font-medium text-text-primary">Options <span class="text-red-500">*</span></label>
           <button type="button" id="add-option" class="text-xs text-primary-600 hover:underline flex items-center gap-1">
@@ -76,6 +95,12 @@ if (!isPrivileged) return Astro.redirect('/portal/polls');
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Rating type hint — shown instead of options builder -->
+      <div id="rating-hint" class="hidden p-4 bg-blue-50 border border-primary-100 rounded-xl text-sm text-primary-700">
+        <i class="fas fa-star mr-2 text-amber-400" aria-hidden="true"></i>
+        Rating options 1–5 will be auto-generated. Members select one star value.
       </div>
 
       <div class="flex items-center gap-6">
@@ -101,6 +126,30 @@ if (!isPrivileged) return Astro.redirect('/portal/polls');
   </div>
 
   <script>
+    const pollTypeEl = document.getElementById('poll_type') as HTMLSelectElement;
+    const optionsSection = document.getElementById('options-section')!;
+    const ratingHint = document.getElementById('rating-hint')!;
+    const maxChoicesRow = document.getElementById('max-choices-row')!;
+
+    function onTypeChange() {
+      const type = pollTypeEl.value;
+      const isRating = type === 'rating';
+      const isMulti = type === 'multiple_choice';
+      const isYesNo = type === 'yes_no';
+
+      optionsSection.classList.toggle('hidden', isRating);
+      ratingHint.classList.toggle('hidden', !isRating);
+      maxChoicesRow.classList.toggle('hidden', !isMulti);
+
+      if (isYesNo) {
+        const inputs = document.querySelectorAll<HTMLInputElement>('input[name="option"]');
+        if (inputs[0]) inputs[0].value = 'Yes';
+        if (inputs[1]) inputs[1].value = 'No';
+      }
+    }
+
+    pollTypeEl?.addEventListener('change', onTypeChange);
+
     document.getElementById('add-option')?.addEventListener('click', () => {
       const list = document.getElementById('options-list')!;
       const count = list.querySelectorAll('input[name="option"]').length + 1;
@@ -115,15 +164,6 @@ if (!isPrivileged) return Astro.redirect('/portal/polls');
       list.appendChild(div);
     });
 
-    // Pre-fill yes/no options when type changes
-    document.getElementById('poll_type')?.addEventListener('change', (e) => {
-      if ((e.target as HTMLSelectElement).value === 'yes_no') {
-        const inputs = document.querySelectorAll<HTMLInputElement>('input[name="option"]');
-        if (inputs[0]) inputs[0].value = 'Yes';
-        if (inputs[1]) inputs[1].value = 'No';
-      }
-    });
-
     const form = document.getElementById('poll-form') as HTMLFormElement;
     const errorBanner = document.getElementById('error-banner')!;
     const btnText = document.getElementById('btn-text')!;
@@ -133,13 +173,18 @@ if (!isPrivileged) return Astro.redirect('/portal/polls');
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      const options = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="option"]'))
-        .map(i => i.value.trim()).filter(Boolean);
+      const pollType = fd.get('poll_type') as string;
+      const isRating = pollType === 'rating';
 
-      if (options.length < 2) {
-        errorBanner.textContent = 'Please provide at least 2 options.';
-        errorBanner.classList.remove('hidden');
-        return;
+      let options: string[] = [];
+      if (!isRating) {
+        options = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="option"]'))
+          .map(i => i.value.trim()).filter(Boolean);
+        if (options.length < 2) {
+          errorBanner.textContent = 'Please provide at least 2 options.';
+          errorBanner.classList.remove('hidden');
+          return;
+        }
       }
 
       errorBanner.classList.add('hidden');
@@ -148,14 +193,18 @@ if (!isPrivileged) return Astro.redirect('/portal/polls');
       submitBtn.disabled = true;
 
       const endsAt = fd.get('ends_at') as string;
+      const maxChoicesRaw = fd.get('max_choices');
+      const maxChoices = maxChoicesRaw ? parseInt(String(maxChoicesRaw)) : 1;
 
       const res = await fetch('/api/v1/polls', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({
           title: fd.get('title'),
           description: fd.get('description') || null,
-          poll_type: fd.get('poll_type'),
-          options,
+          poll_type: pollType,
+          options: isRating ? [] : options,
+          result_visibility: fd.get('result_visibility'),
+          max_choices: pollType === 'multiple_choice' ? maxChoices : 1,
           is_anonymous: (document.getElementById('is_anonymous') as HTMLInputElement).checked,
           one_vote_per_unit: (document.getElementById('one_vote_per_unit') as HTMLInputElement).checked,
           ends_at: endsAt ? new Date(endsAt).toISOString() : null,
