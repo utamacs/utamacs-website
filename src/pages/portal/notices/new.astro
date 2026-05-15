@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 
 const user = Astro.locals.user;
 const isPrivileged = user && (['executive', 'admin'].includes(user.role) ||
@@ -8,6 +9,10 @@ const isPrivileged = user && (['executive', 'admin'].includes(user.role) ||
 if (!isPrivileged) return Astro.redirect('/portal/notices');
 
 const CATEGORIES = ['General','Urgent','Maintenance','Financial','Events','Governance'];
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+const { data: blockRows } = await sb.from('units').select('block').eq('society_id', SOCIETY_ID).not('block', 'is', null);
+const BLOCKS = [...new Set((blockRows ?? []).map((u: any) => u.block as string).filter(Boolean))].sort();
 ---
 
 <PortalLayout title="New Notice" user={user} activeModule="notices">
@@ -54,6 +59,33 @@ const CATEGORIES = ['General','Urgent','Maintenance','Financial','Events','Gover
             <option value="tenants">Tenants Only</option>
           </select>
         </div>
+      </div>
+
+      <!-- Wing / Block targeting -->
+      {BLOCKS.length > 0 && (
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">
+            Target Wings / Blocks <span class="text-text-secondary font-normal">(optional — leave blank for all)</span>
+          </label>
+          <div class="flex flex-wrap gap-2" id="block-checkboxes">
+            {BLOCKS.map(b => (
+              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" name="target_blocks" value={b}
+                  class="rounded border-border-light text-primary-600" />
+                <span>Block {b}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <!-- Expiry date -->
+      <div>
+        <label for="expires_at" class="block text-sm font-medium text-text-primary mb-1.5">
+          Expiry Date <span class="text-text-secondary font-normal">(optional — notice auto-hides after this date)</span>
+        </label>
+        <input type="date" id="expires_at" name="expires_at"
+          class="text-sm border border-border-light rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-600" />
       </div>
 
       <!-- Body -->
@@ -214,6 +246,10 @@ const CATEGORIES = ['General','Urgent','Maintenance','Financial','Events','Gover
       const mode = (document.querySelector('input[name="pub_mode"]:checked') as HTMLInputElement).value;
       const statusMap: Record<string, string> = { publish: 'published', schedule: 'scheduled', draft: 'draft' };
 
+      const checkedBlocks = [...document.querySelectorAll<HTMLInputElement>('input[name="target_blocks"]:checked')]
+        .map(cb => cb.value).filter(Boolean);
+      const expiresAt = (fd.get('expires_at') as string)?.trim() || null;
+
       const payload: Record<string, unknown> = {
         title:                    fd.get('title'),
         body:                     fd.get('body'),
@@ -223,6 +259,8 @@ const CATEGORIES = ['General','Urgent','Maintenance','Financial','Events','Gover
         requires_acknowledgement: (document.getElementById('requires_acknowledgement') as HTMLInputElement).checked,
         status:                   statusMap[mode],
         video_url:                (fd.get('video_url') as string)?.trim() || undefined,
+        target_blocks:            checkedBlocks.length ? checkedBlocks : undefined,
+        expires_at:               expiresAt || undefined,
       };
 
       if (mode === 'schedule') {

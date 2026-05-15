@@ -28,13 +28,15 @@ export const GET: APIRoute = async ({ request, url }) => {
       return new Response(JSON.stringify(data ?? []), { headers: { 'Content-Type': 'application/json' } });
     }
 
+    const now = new Date().toISOString();
     const { data, error } = await sb
       .from('notices')
-      .select('id, title, body, category, target_audience, is_pinned, requires_acknowledgement, published_at, expires_at, created_at, attachment_storage_key, attachment_type')
+      .select('id, title, body, category, target_audience, target_blocks, is_pinned, requires_acknowledgement, published_at, expires_at, created_at, attachment_storage_key, attachment_type')
       .eq('society_id', SOCIETY_ID)
       .eq('is_published', true)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
       .order('is_pinned', { ascending: false })
-      .order('created_at', { ascending: false });
+      .order('published_at', { ascending: false });
 
     if (error) throw Object.assign(new Error(error.message), { status: 500 });
     return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
@@ -53,9 +55,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     const body = await request.json() as Record<string, unknown>;
     const {
-      title, body: noticeBody, category, target_audience,
+      title, body: noticeBody, category, target_audience, target_blocks,
       is_pinned, requires_acknowledgement,
-      status, scheduled_at, video_url, attachment_type,
+      status, scheduled_at, expires_at, video_url, attachment_type,
     } = body;
 
     const VALID_CATEGORIES = ['Urgent', 'General', 'Maintenance', 'Financial', 'Events', 'Governance'];
@@ -82,10 +84,12 @@ export const POST: APIRoute = async ({ request }) => {
         body:                      noticeBody ? sanitizeHTML(String(noticeBody)) : null,
         category,
         target_audience:           target_audience ?? 'all',
+        target_blocks:             Array.isArray(target_blocks) && target_blocks.length ? target_blocks : null,
         is_pinned:                 is_pinned ?? false,
         requires_acknowledgement:  requires_acknowledgement ?? false,
         status:                    noticeStatus,
         scheduled_at:              noticeStatus === 'scheduled' && scheduled_at ? String(scheduled_at) : null,
+        expires_at:                expires_at ? String(expires_at) : null,
         video_url:                 video_url ? String(video_url).slice(0, 500) : null,
         attachment_type:           attachment_type ?? null,
         created_by:                user.id,

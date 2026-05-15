@@ -48,6 +48,18 @@ const FALLBACK_MODULES: FallbackModule[] = [
   { moduleKey: 'staff_kyc',        displayName: 'Staff & Maid KYC',       icon: 'fa-user-check',         navGroup: 'Administration', minNavRole: 'admin'     },
   { moduleKey: 'staff_management', displayName: 'Staff Management',       icon: 'fa-users-cog',          navGroup: 'Administration', minNavRole: 'executive' },
   { moduleKey: 'register',         displayName: 'Society Membership',     icon: 'fa-certificate',        navGroup: 'Governance',     minNavRole: 'member'    },
+  // Admin tools — registered in module_configurations via migration 092
+  { moduleKey: 'admin_society',    displayName: 'Society Profile',        icon: 'fa-building',           navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_holidays',   displayName: 'Holiday Calendar',       icon: 'fa-calendar-day',       navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_audit',      displayName: 'Audit Logs',             icon: 'fa-shield-alt',         navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_assets',     displayName: 'Asset Register',         icon: 'fa-cogs',               navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_rules',      displayName: 'Rules Engine',           icon: 'fa-sliders-h',          navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_rbac',       displayName: 'RBAC & Permissions',     icon: 'fa-lock',               navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_email',      displayName: 'Email Drafts',           icon: 'fa-envelope-open-text', navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_features',   displayName: 'Feature Config',         icon: 'fa-toggle-on',          navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_staff',      displayName: 'Staff Attendance',       icon: 'fa-user-clock',         navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_tds',        displayName: 'TDS Tracking',           icon: 'fa-file-invoice',       navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_consent',    displayName: 'Consent Mgmt',           icon: 'fa-user-shield',        navGroup: 'Administration', minNavRole: 'admin'     },
 ];
 
 // Canonical path for each module key. DB never stores this — it's tied to code.
@@ -81,6 +93,27 @@ const MODULE_PATHS: Record<string, string> = {
   staff_kyc:        '/portal/admin/staff-kyc',
   staff_management: '/portal/staff-management',
   register:         '/portal/register/membership',
+  // Admin tools (module_configurations, migration 092)
+  admin_society:    '/portal/admin/society-profile',
+  admin_holidays:   '/portal/admin/holidays',
+  admin_audit:      '/portal/admin/audit',
+  admin_assets:     '/portal/admin/assets',
+  admin_rules:      '/portal/admin/rules',
+  admin_rbac:       '/portal/admin/rbac',
+  admin_email:      '/portal/admin/email-drafts',
+  admin_features:   '/portal/admin/features',
+  admin_staff:      '/portal/admin/staff',
+  admin_tds:        '/portal/admin/tds',
+  admin_consent:    '/portal/admin/consent',
+};
+
+// Maps nav item activeKey → badge count key returned by /api/v1/nav/badges
+const NAV_BADGE_KEYS: Record<string, string> = {
+  notifications: 'unread_notifications',
+  notices:       'unread_notices',
+  complaints:    'open_complaints',
+  analytics:     'onboarding_pending',
+  feedback:      'unread_feedback',
 };
 
 type ActiveModule = { moduleKey: string; displayName: string; icon: string | null; navGroup: string; minNavRole: string; isActive?: boolean };
@@ -205,23 +238,6 @@ if (navRole === 'guard') {
     } else {
       adminItems.push(link('Staff Management', '/portal/staff-management', 'fa-users-cog', 'staff_management'), ...smLinks);
     }
-    groupMap.set('Administration', adminItems);
-  }
-
-  // 4b. Prepend hardcoded admin tool links to the Administration group.
-  if (user.isAdmin) {
-    const adminItems = groupMap.get('Administration') ?? [];
-    adminItems.unshift(
-      link('Audit Logs',         '/portal/admin/audit',         'fa-shield-alt',        'admin_audit'),
-      link('Asset Register',      '/portal/admin/assets',        'fa-cogs',              'admin_assets'),
-      link('Rules Engine',       '/portal/admin/rules',         'fa-sliders-h',         'admin_rules'),
-      link('RBAC & Permissions', '/portal/admin/rbac',          'fa-lock',              'admin_rbac'),
-      link('Email Drafts',       '/portal/admin/email-drafts',  'fa-envelope-open-text','admin_email'),
-      link('Feature Config',     '/portal/admin/features',      'fa-toggle-on',         'admin_features'),
-      link('Staff Attendance',   '/portal/admin/staff',         'fa-user-clock',        'admin_staff'),
-      link('TDS Tracking',       '/portal/admin/tds',           'fa-file-invoice',      'admin_tds'),
-      link('Consent Mgmt',       '/portal/admin/consent',       'fa-user-shield',       'admin_consent'),
-    );
     groupMap.set('Administration', adminItems);
   }
 
@@ -375,6 +391,7 @@ if (navRole === 'guard') {
               <div class="nav-group-items">
                 {group.items.map((item) => {
                   const isActive = activeModule === item.activeKey;
+                  const badgeKey = NAV_BADGE_KEYS[item.activeKey];
                   return (
                     <a
                       href={item.href}
@@ -383,15 +400,14 @@ if (navRole === 'guard') {
                           ? 'bg-primary-50 text-primary-600'
                           : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
                       }`}
-                      {...(item.activeKey === 'notifications' ? { id: 'notif-nav-link' } : {})}
+                      {...(badgeKey ? { 'data-badge-key': badgeKey } : {})}
                     >
                       <i class={`fas ${item.icon} w-4 text-center text-[13px]`} aria-hidden="true"></i>
                       {item.label}
-                      {item.activeKey === 'notifications' && (
+                      {badgeKey && (
                         <span
-                          id="notif-badge"
-                          class="hidden ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none"
-                          aria-label="Unread notifications"
+                          class="nav-badge hidden ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none"
+                          aria-label="Unread count"
                         ></span>
                       )}
                     </a>
@@ -716,19 +732,23 @@ if (navRole === 'guard') {
       });
     })();
 
-    // ── Notification unread badge ─────────────────────────────────────────────
+    // ── Nav badges (unread counts) ────────────────────────────────────────────
     (async function () {
-      const badge = document.getElementById('notif-badge');
-      if (!badge) return;
       try {
-        const res = await fetch('/api/v1/notifications?unread=true&limit=50', { credentials: 'include' });
+        const res = await fetch('/api/v1/nav/badges', { credentials: 'include' });
         if (!res.ok) return;
-        const items: unknown[] = await res.json();
-        const count = Array.isArray(items) ? items.length : 0;
-        if (count > 0) {
-          badge.textContent = count > 99 ? '99+' : String(count);
-          badge.classList.remove('hidden');
-        }
+        const counts = await res.json() as Record<string, number>;
+        document.querySelectorAll<HTMLElement>('[data-badge-key]').forEach((link) => {
+          const key = link.getAttribute('data-badge-key')!;
+          const count = counts[key] ?? 0;
+          if (count > 0) {
+            const badge = link.querySelector<HTMLElement>('.nav-badge');
+            if (badge) {
+              badge.textContent = count > 99 ? '99+' : String(count);
+              badge.classList.remove('hidden');
+            }
+          }
+        });
       } catch { /* non-critical */ }
     })();
   </script>

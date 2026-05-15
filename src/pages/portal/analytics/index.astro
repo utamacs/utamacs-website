@@ -1,286 +1,818 @@
 ---
 export const prerender = false;
 import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 
 const user = Astro.locals.user;
-if (!user || !['executive', 'admin'].includes(user.role)) {
-  return Astro.redirect('/portal');
-}
+const canViewAnalytics = user && (
+  ['executive', 'admin'].includes(user.role) ||
+  ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') ||
+  user.isAdmin
+);
+if (!canViewAnalytics) return Astro.redirect('/portal');
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+
+// Fetch distinct wings for filter dropdowns
+const { data: blockRows } = await sb
+  .from('units')
+  .select('block')
+  .eq('society_id', SOCIETY_ID)
+  .not('block', 'is', null);
+const WINGS = [...new Set((blockRows ?? []).map((u: any) => u.block as string).filter(Boolean))].sort();
+
+// Fetch billing periods for dues filter
+const { data: periodRows } = await sb
+  .from('billing_periods')
+  .select('id, name')
+  .eq('society_id', SOCIETY_ID)
+  .order('created_at', { ascending: false })
+  .limit(24);
+const PERIODS = (periodRows ?? []) as { id: string; name: string }[];
 ---
 
 <PortalLayout title="Analytics & Reports" user={user} activeModule="analytics">
-  <div class="mb-6">
-    <h1 class="text-2xl font-bold text-text-primary">Analytics & Reports</h1>
-    <p class="text-sm text-text-secondary mt-1">Society performance overview and operational metrics.</p>
-  </div>
-
-  <!-- Loading skeleton -->
-  <div id="loading-state" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    {Array.from({length: 4}).map(() => (
-      <div class="bg-white rounded-xl border border-border-light p-5 animate-pulse">
-        <div class="h-3 bg-gray-200 rounded w-20 mb-3"></div>
-        <div class="h-7 bg-gray-200 rounded w-16"></div>
-      </div>
-    ))}
-  </div>
-
-  <div id="analytics-content" class="hidden space-y-6">
-    <!-- KPI cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="kpi-cards"></div>
-
-    <!-- Charts row -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Complaints by status -->
-      <div class="bg-white rounded-xl border border-border-light p-5">
-        <h2 class="text-lg font-semibold text-text-primary mb-4">Complaints by Status</h2>
-        <div id="complaint-chart" class="space-y-2.5"></div>
-      </div>
-
-      <!-- Finance collection -->
-      <div class="bg-white rounded-xl border border-border-light p-5">
-        <h2 class="text-lg font-semibold text-text-primary mb-4">Finance Collection</h2>
-        <div id="finance-chart"></div>
-      </div>
-    </div>
-
-    <!-- Visitor trend -->
-    <div class="bg-white rounded-xl border border-border-light p-5">
-      <h2 class="text-lg font-semibold text-text-primary mb-1">Visitor Traffic (Last 14 Days)</h2>
-      <p class="text-xs text-text-secondary mb-4">Daily entry count across all visitor types.</p>
-      <div id="visitor-trend" class="flex items-end gap-1 h-32"></div>
-      <div id="visitor-dates" class="flex gap-1 mt-1"></div>
-    </div>
-
-    <!-- Visitor types -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="bg-white rounded-xl border border-border-light p-5">
-        <h2 class="text-lg font-semibold text-text-primary mb-4">Visitor Types (Last 30 Days)</h2>
-        <div id="visitor-types" class="space-y-2.5"></div>
-      </div>
-
-      <!-- Members overview -->
-      <div class="bg-white rounded-xl border border-border-light p-5">
-        <h2 class="text-lg font-semibold text-text-primary mb-4">Member Composition</h2>
-        <div id="member-composition"></div>
-      </div>
-    </div>
-
-    <!-- Occupancy report -->
-    <div class="bg-white rounded-xl border border-border-light p-5">
-      <h2 class="text-lg font-semibold text-text-primary mb-1">Unit Occupancy</h2>
-      <p class="text-xs text-text-secondary mb-4">Owner-occupied vs rented vs vacant across all active member units.</p>
-      <div id="occupancy-chart"></div>
-    </div>
-
-    <!-- Monthly P&L -->
-    <div class="bg-white rounded-xl border border-border-light p-5">
-      <h2 class="text-lg font-semibold text-text-primary mb-1">Monthly P&amp;L (Last 6 Months)</h2>
-      <p class="text-xs text-text-secondary mb-4">Collections (income) vs expenses per month.</p>
-      <div id="monthly-pl" class="space-y-3"></div>
-    </div>
-
-    <!-- Collection efficiency -->
-    <div class="bg-white rounded-xl border border-border-light p-5">
-      <h2 class="text-lg font-semibold text-text-primary mb-1">Collection Efficiency by Month</h2>
-      <p class="text-xs text-text-secondary mb-4">Percentage of dues collected relative to total billed per month.</p>
-      <div id="collection-efficiency" class="space-y-2.5"></div>
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Analytics & Reports</h1>
+      <p class="text-text-secondary text-sm mt-1">Society performance overview and operational reports.</p>
     </div>
   </div>
 
-  <script>
-    const STATUS_COLORS: Record<string, string> = {
-      Open: '#1E3A8A', Assigned: '#7C3AED', In_Progress: '#F59E0B',
-      Resolved: '#10B981', Closed: '#6B7280', Waiting_for_User: '#EF4444',
-    };
+  <div class="flex gap-6 items-start">
 
-    function bar(label: string, value: number, max: number, color: string, suffix = '') {
-      const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
-      return `
-        <div>
-          <div class="flex items-center justify-between text-xs text-text-secondary mb-1">
-            <span>${label}</span><span class="font-medium text-text-primary">${value}${suffix}</span>
-          </div>
-          <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div class="h-full rounded-full transition-all" style="width:${pct}%;background:${color}"></div>
-          </div>
-        </div>`;
-    }
+    <!-- Sidebar -->
+    <div class="w-56 shrink-0 hidden lg:block">
+      <div class="bg-white rounded-xl border border-border-light p-3 sticky top-4">
+        <p class="text-xs font-semibold text-text-secondary uppercase tracking-wide px-2 py-1.5 mb-1">Reports</p>
+        <nav id="report-nav" class="space-y-0.5">
+          {[
+            { id: 'overview',    label: 'Overview',             icon: 'fa-tachometer-alt' },
+            { id: 'collection',  label: 'Collection Report',    icon: 'fa-rupee-sign'     },
+            { id: 'dues',        label: 'Pending Dues',         icon: 'fa-exclamation-circle' },
+            { id: 'complaints',  label: 'Complaint Resolution', icon: 'fa-tools'          },
+            { id: 'facilities',  label: 'Facility Utilisation', icon: 'fa-building'       },
+            { id: 'visitors',    label: 'Visitor Log',          icon: 'fa-user-check'     },
+            { id: 'tenants',     label: 'Tenant Expiry',        icon: 'fa-key'            },
+            { id: 'members',     label: 'Member Directory',     icon: 'fa-users'          },
+          ].map(({ id, label, icon }) => (
+            <button
+              data-report={id}
+              class={`report-nav-btn w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${id === 'overview' ? 'bg-primary-100 text-primary-700 font-medium' : 'text-text-secondary hover:bg-primary-50 hover:text-primary-700'}`}
+            >
+              <i class={`fas ${icon} w-4 text-center text-[12px]`} aria-hidden="true"></i>
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
+    </div>
 
-    function fmt(n: number) {
-      return n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : n >= 1000 ? `₹${(n / 1000).toFixed(1)}K` : `₹${n}`;
-    }
+    <!-- Mobile report selector -->
+    <div class="lg:hidden w-full mb-4">
+      <select id="mobile-report-select" class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+        <option value="overview">Overview</option>
+        <option value="collection">Collection Report</option>
+        <option value="dues">Pending Dues</option>
+        <option value="complaints">Complaint Resolution</option>
+        <option value="facilities">Facility Utilisation</option>
+        <option value="visitors">Visitor Log</option>
+        <option value="tenants">Tenant Expiry</option>
+        <option value="members">Member Directory</option>
+      </select>
+    </div>
 
-    async function loadAnalytics() {
-      const res = await fetch('/api/v1/admin/analytics', { credentials: 'include' });
-      if (!res.ok) {
-        document.getElementById('loading-state').innerHTML = '<div class="col-span-4 text-center py-6 text-red-500 text-sm">Failed to load analytics.</div>';
-        return;
-      }
-      const d = await res.json();
+    <!-- Report panels -->
+    <div class="flex-1 min-w-0 space-y-0">
 
-      document.getElementById('loading-state').classList.add('hidden');
-      document.getElementById('analytics-content').classList.remove('hidden');
-
-      // KPIs
-      const kpis = [
-        { label: 'Open Complaints', value: d.complaints.open, sub: `of ${d.complaints.total} total`, color: 'text-orange-600' },
-        { label: 'Collection Rate', value: `${d.finance.collection_rate}%`, sub: `${fmt(d.finance.paid)} collected`, color: d.finance.collection_rate >= 80 ? 'text-green-600' : 'text-red-600' },
-        { label: 'Visitors (30d)', value: d.visitors.last_30d, sub: 'entries logged', color: 'text-blue-600' },
-        { label: 'Active Members', value: d.members.total, sub: `${d.members.owners} owners · ${d.members.tenants} tenants`, color: 'text-primary-600' },
-      ];
-
-      document.getElementById('kpi-cards')!.innerHTML = kpis.map(k => `
-        <div class="bg-white rounded-xl border border-border-light p-5">
-          <div class="text-xs font-medium text-text-secondary mb-2">${k.label}</div>
-          <div class="text-2xl font-bold ${k.color}">${k.value}</div>
-          <div class="text-xs text-text-secondary mt-1">${k.sub}</div>
+      <!-- ── OVERVIEW ─────────────────────────────────────────────────────── -->
+      <div id="panel-overview" class="report-panel space-y-6">
+        <div id="ov-loading" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map(() => (
+            <div class="bg-white rounded-xl border border-border-light p-5 animate-pulse">
+              <div class="h-3 bg-gray-200 rounded w-20 mb-3"></div>
+              <div class="h-7 bg-gray-200 rounded w-16"></div>
+            </div>
+          ))}
         </div>
-      `).join('');
-
-      // Complaint status bars
-      const statusEntries = Object.entries(d.complaints.by_status as Record<string, number>).sort((a, b) => b[1] - a[1]);
-      const maxStatus = Math.max(...statusEntries.map(([, v]) => v), 1);
-      document.getElementById('complaint-chart')!.innerHTML = statusEntries.map(([status, count]) =>
-        bar(status.replace('_', ' '), count, maxStatus, STATUS_COLORS[status] ?? '#9CA3AF')
-      ).join('');
-
-      // Finance donut-style summary
-      const { paid, pending, total_dues } = d.finance;
-      const paidPct = total_dues > 0 ? Math.round((paid / total_dues) * 100) : 0;
-      document.getElementById('finance-chart')!.innerHTML = `
-        <div class="flex items-center gap-4 mb-4">
-          <div class="relative w-24 h-24 flex-shrink-0">
-            <svg viewBox="0 0 36 36" class="w-24 h-24 -rotate-90">
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#E5E7EB" stroke-width="3"/>
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#10B981" stroke-width="3"
-                stroke-dasharray="${paidPct} ${100 - paidPct}" stroke-linecap="round"/>
-            </svg>
-            <div class="absolute inset-0 flex items-center justify-center">
-              <span class="text-sm font-bold text-text-primary">${paidPct}%</span>
+        <div id="ov-content" class="hidden space-y-6">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="kpi-cards"></div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl border border-border-light p-5">
+              <h2 class="font-semibold text-text-primary mb-4">Complaints by Status</h2>
+              <div id="complaint-chart" class="space-y-2.5"></div>
+            </div>
+            <div class="bg-white rounded-xl border border-border-light p-5">
+              <h2 class="font-semibold text-text-primary mb-4">Finance Collection</h2>
+              <div id="finance-chart"></div>
             </div>
           </div>
-          <div class="space-y-2 text-sm">
-            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-green-500"></div><span class="text-text-secondary">Collected:</span><span class="font-medium">${fmt(paid)}</span></div>
-            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-400"></div><span class="text-text-secondary">Pending:</span><span class="font-medium">${fmt(pending)}</span></div>
-            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-gray-300"></div><span class="text-text-secondary">Total:</span><span class="font-medium">${fmt(total_dues)}</span></div>
+          <div class="bg-white rounded-xl border border-border-light p-5">
+            <h2 class="font-semibold text-text-primary mb-1">Visitor Traffic (Last 14 Days)</h2>
+            <div id="visitor-trend" class="flex items-end gap-1 h-24 mt-3"></div>
+            <div id="visitor-dates" class="flex gap-1 mt-1"></div>
           </div>
-        </div>
-        ${Object.entries(d.finance.by_status as Record<string,number>).map(([status, count]) =>
-          bar(status, count, Object.values(d.finance.by_status as Record<string,number>).reduce((a,b) => a+b, 0), status === 'paid' ? '#10B981' : '#EF4444')
-        ).join('')}
-      `;
-
-      // Visitor daily trend bar chart
-      const trend = d.visitors.daily_trend as { date: string; count: number }[];
-      const maxVisitors = Math.max(...trend.map(t => t.count), 1);
-      const trendEl = document.getElementById('visitor-trend')!;
-      const datesEl = document.getElementById('visitor-dates')!;
-      trendEl.innerHTML = trend.map(t => {
-        const h = Math.max(4, Math.round((t.count / maxVisitors) * 128));
-        return `<div class="flex-1 bg-primary-600 rounded-t opacity-80 hover:opacity-100 transition-opacity" style="height:${h}px" title="${t.date}: ${t.count} visitors"></div>`;
-      }).join('');
-      datesEl.innerHTML = trend.map((t, i) => {
-        const show = i === 0 || i === 6 || i === 13;
-        const label = show ? new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
-        return `<div class="flex-1 text-center text-xs text-text-secondary truncate">${label}</div>`;
-      }).join('');
-
-      // Visitor types
-      const typeEntries = Object.entries(d.visitors.by_type as Record<string, number>).sort((a, b) => b[1] - a[1]);
-      const maxType = Math.max(...typeEntries.map(([, v]) => v), 1);
-      document.getElementById('visitor-types')!.innerHTML = typeEntries.length
-        ? typeEntries.map(([type, count]) => bar(type.replace('_', ' '), count, maxType, '#1E3A8A')).join('')
-        : '<div class="text-sm text-text-secondary text-center py-4">No visitor data.</div>';
-
-      // Member composition
-      const { owners, tenants, total } = d.members;
-      const ownerPct = total > 0 ? Math.round((owners / total) * 100) : 0;
-      document.getElementById('member-composition')!.innerHTML = `
-        <div class="flex items-center gap-3 mb-4">
-          <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden flex">
-            <div class="h-full bg-primary-600" style="width:${ownerPct}%"></div>
-            <div class="h-full bg-green-500" style="width:${100 - ownerPct}%"></div>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-4 text-center">
-          <div class="p-4 bg-blue-50 rounded-xl">
-            <div class="text-2xl font-bold text-primary-600">${owners}</div>
-            <div class="text-xs text-text-secondary mt-1">Owners (${ownerPct}%)</div>
-          </div>
-          <div class="p-4 bg-green-50 rounded-xl">
-            <div class="text-2xl font-bold text-green-600">${tenants}</div>
-            <div class="text-xs text-text-secondary mt-1">Tenants (${100 - ownerPct}%)</div>
-          </div>
-        </div>
-      `;
-
-      // Occupancy report
-      const occ = d.occupancy;
-      const occTotal = occ.total || 1;
-      const occItems = [
-        { label: 'Owner Occupied', count: occ.owner_occupied, color: '#1E3A8A' },
-        { label: 'Rented', count: occ.rented, color: '#10B981' },
-        { label: 'Vacant', count: occ.vacant, color: '#F59E0B' },
-        ...Object.entries(occ.by_type as Record<string, number>)
-          .filter(([k]) => !['owner_occupied','rented','vacant'].includes(k))
-          .map(([k, v]) => ({ label: k.replace('_', ' '), count: v, color: '#9CA3AF' })),
-      ];
-      const maxOcc = Math.max(...occItems.map(o => o.count), 1);
-      document.getElementById('occupancy-chart')!.innerHTML = `
-        <div class="space-y-2.5 mb-4">
-          ${occItems.map(o => bar(o.label, o.count, maxOcc, o.color, ` (${occTotal > 0 ? Math.round((o.count/occTotal)*100) : 0}%)`)).join('')}
-        </div>
-        <div class="grid grid-cols-3 gap-3 text-center">
-          ${occItems.slice(0,3).map(o => `
-            <div class="p-3 bg-gray-50 rounded-lg">
-              <div class="text-xl font-bold" style="color:${o.color}">${o.count}</div>
-              <div class="text-xs text-text-secondary">${o.label}</div>
-            </div>`).join('')}
-        </div>`;
-
-      // Monthly P&L
-      type MonthlyPL = { month: string; income: number; expenses: number; net: number };
-      const pl = (d.monthly_pl as MonthlyPL[]);
-      const plMax = Math.max(...pl.flatMap(m => [m.income, m.expenses]), 1);
-      document.getElementById('monthly-pl')!.innerHTML = pl.map(m => {
-        const [yr, mo] = m.month.split('-');
-        const label = new Date(Number(yr), Number(mo) - 1).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
-        const netColor = m.net >= 0 ? 'text-green-600' : 'text-red-600';
-        const netSign = m.net >= 0 ? '+' : '';
-        return `
-          <div class="flex items-center gap-3">
-            <div class="w-14 text-xs text-text-secondary flex-shrink-0">${label}</div>
-            <div class="flex-1">
-              <div class="flex gap-1 mb-1">
-                <div class="h-2 rounded bg-green-500" style="width:${Math.round((m.income/plMax)*100)}%;min-width:${m.income > 0 ? 4 : 0}px"></div>
-              </div>
-              <div class="flex gap-1">
-                <div class="h-2 rounded bg-red-400" style="width:${Math.round((m.expenses/plMax)*100)}%;min-width:${m.expenses > 0 ? 4 : 0}px"></div>
-              </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl border border-border-light p-5">
+              <h2 class="font-semibold text-text-primary mb-4">Visitor Types (Last 30 Days)</h2>
+              <div id="visitor-types" class="space-y-2.5"></div>
             </div>
-            <div class="text-right flex-shrink-0 min-w-20">
-              <div class="text-xs text-green-600">${fmt(m.income)}</div>
-              <div class="text-xs text-red-500">${fmt(m.expenses)}</div>
+            <div class="bg-white rounded-xl border border-border-light p-5">
+              <h2 class="font-semibold text-text-primary mb-4">Member Composition</h2>
+              <div id="member-composition"></div>
             </div>
-            <div class="text-xs font-semibold ${netColor} min-w-14 text-right">${netSign}${fmt(m.net)}</div>
-          </div>`;
-      }).join('') + `
-        <div class="flex items-center gap-2 mt-1 pt-2 border-t border-border-light">
-          <div class="w-3 h-2 rounded bg-green-500"></div><span class="text-xs text-text-secondary">Income</span>
-          <div class="w-3 h-2 rounded bg-red-400 ml-3"></div><span class="text-xs text-text-secondary">Expenses</span>
-        </div>`;
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-5">
+            <h2 class="font-semibold text-text-primary mb-1">Monthly P&amp;L (Last 6 Months)</h2>
+            <div id="monthly-pl" class="space-y-3 mt-3"></div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-5">
+            <h2 class="font-semibold text-text-primary mb-1">Collection Efficiency by Month</h2>
+            <div id="collection-efficiency" class="space-y-2.5 mt-3"></div>
+          </div>
+        </div>
+      </div>
 
-      // Collection efficiency
-      type CollEff = { month: string; total: number; paid: number; rate: number };
-      const eff = (d.collection_efficiency as CollEff[]);
-      document.getElementById('collection-efficiency')!.innerHTML = eff.map(e => {
-        const [yr, mo] = e.month.split('-');
-        const label = new Date(Number(yr), Number(mo) - 1).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
-        const rateColor = e.rate >= 80 ? '#10B981' : e.rate >= 60 ? '#F59E0B' : '#EF4444';
-        return bar(`${label} — ${fmt(e.paid)} / ${fmt(e.total)}`, e.rate, 100, rateColor, '%');
-      }).join('') || '<div class="text-sm text-text-secondary text-center py-4">No dues data for the period.</div>';
-    }
+      <!-- ── COLLECTION REPORT ─────────────────────────────────────────────── -->
+      <div id="panel-collection" class="report-panel hidden">
+        <div class="bg-white rounded-xl border border-border-light p-5 mb-4">
+          <h2 class="font-semibold text-text-primary mb-4">Collection Report</h2>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">From</label>
+              <input type="date" id="col-from" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">To</label>
+              <input type="date" id="col-to" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Wing / Block</label>
+              <select id="col-wing" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="">All Wings</option>
+                {WINGS.map(w => <option value={w}>Block {w}</option>)}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Payment Mode</label>
+              <select id="col-mode" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="">All Modes</option>
+                {['cash','upi','cheque','neft','rtgs','online'].map(m => <option value={m} class="capitalize">{m.toUpperCase()}</option>)}
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mt-3">
+            <button id="col-generate" class="btn-primary text-sm">
+              <i class="fas fa-play mr-1.5" aria-hidden="true"></i>Generate
+            </button>
+            <a id="col-export" href="#" class="btn-outline text-sm hidden">
+              <i class="fas fa-download mr-1.5" aria-hidden="true"></i>Export CSV
+            </a>
+          </div>
+        </div>
+        <div id="col-summary" class="hidden grid grid-cols-3 gap-4 mb-4">
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="col-total" class="text-2xl font-bold text-primary-600">—</div>
+            <div class="text-xs text-text-secondary">Total Collected</div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="col-count" class="text-2xl font-bold text-secondary-500">—</div>
+            <div class="text-xs text-text-secondary">Payments</div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="col-avg" class="text-2xl font-bold text-accent-500">—</div>
+            <div class="text-xs text-text-secondary">Avg per Payment</div>
+          </div>
+        </div>
+        <div id="col-table" class="bg-white rounded-xl border border-border-light overflow-hidden"></div>
+      </div>
 
-    loadAnalytics();
-  </script>
+      <!-- ── PENDING DUES ───────────────────────────────────────────────────── -->
+      <div id="panel-dues" class="report-panel hidden">
+        <div class="bg-white rounded-xl border border-border-light p-5 mb-4">
+          <h2 class="font-semibold text-text-primary mb-4">Pending Dues Report</h2>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Wing / Block</label>
+              <select id="dues-wing" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="">All Wings</option>
+                {WINGS.map(w => <option value={w}>Block {w}</option>)}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Overdue by</label>
+              <select id="dues-overdue" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="">All</option>
+                <option value="30">&gt; 30 days</option>
+                <option value="60">&gt; 60 days</option>
+                <option value="90">&gt; 90 days</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Billing Period</label>
+              <select id="dues-period" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="">All Periods</option>
+                {PERIODS.map(p => <option value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mt-3">
+            <button id="dues-generate" class="btn-primary text-sm">
+              <i class="fas fa-play mr-1.5" aria-hidden="true"></i>Generate
+            </button>
+            <a id="dues-export" href="#" class="btn-outline text-sm hidden">
+              <i class="fas fa-download mr-1.5" aria-hidden="true"></i>Export CSV
+            </a>
+          </div>
+        </div>
+        <div id="dues-summary" class="hidden grid grid-cols-3 gap-4 mb-4">
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="dues-total" class="text-2xl font-bold text-red-600">—</div>
+            <div class="text-xs text-text-secondary">Total Pending</div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="dues-count" class="text-2xl font-bold text-amber-600">—</div>
+            <div class="text-xs text-text-secondary">Units with Dues</div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="dues-avg-days" class="text-2xl font-bold text-orange-600">—</div>
+            <div class="text-xs text-text-secondary">Avg Overdue Days</div>
+          </div>
+        </div>
+        <div id="dues-table" class="bg-white rounded-xl border border-border-light overflow-hidden"></div>
+      </div>
+
+      <!-- ── COMPLAINTS ────────────────────────────────────────────────────── -->
+      <div id="panel-complaints" class="report-panel hidden">
+        <div class="bg-white rounded-xl border border-border-light p-5 mb-4">
+          <h2 class="font-semibold text-text-primary mb-4">Complaint Resolution Report</h2>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">From</label>
+              <input type="date" id="cmp-from" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">To</label>
+              <input type="date" id="cmp-to" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Priority</label>
+              <select id="cmp-priority" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="">All Priorities</option>
+                {['Low','Medium','High','Critical'].map(p => <option value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Category</label>
+              <select id="cmp-category" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="">All Categories</option>
+                {['Plumbing','Electrical','Civil','Housekeeping','Security','Other'].map(c => <option value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mt-3">
+            <button id="cmp-generate" class="btn-primary text-sm">
+              <i class="fas fa-play mr-1.5" aria-hidden="true"></i>Generate
+            </button>
+            <a id="cmp-export" href="#" class="btn-outline text-sm hidden">
+              <i class="fas fa-download mr-1.5" aria-hidden="true"></i>Export CSV
+            </a>
+          </div>
+        </div>
+        <div id="cmp-summary" class="hidden grid grid-cols-4 gap-4 mb-4">
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="cmp-total" class="text-2xl font-bold text-primary-600">—</div>
+            <div class="text-xs text-text-secondary">Total Raised</div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="cmp-resolved" class="text-2xl font-bold text-green-600">—</div>
+            <div class="text-xs text-text-secondary">Resolved</div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="cmp-sla" class="text-2xl font-bold text-red-600">—</div>
+            <div class="text-xs text-text-secondary">SLA Breached</div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="cmp-avg-hrs" class="text-2xl font-bold text-amber-600">—</div>
+            <div class="text-xs text-text-secondary">Avg Hours to Resolve</div>
+          </div>
+        </div>
+        <div id="cmp-table" class="bg-white rounded-xl border border-border-light overflow-hidden"></div>
+      </div>
+
+      <!-- ── FACILITIES ────────────────────────────────────────────────────── -->
+      <div id="panel-facilities" class="report-panel hidden">
+        <div class="bg-white rounded-xl border border-border-light p-5 mb-4">
+          <h2 class="font-semibold text-text-primary mb-4">Facility Utilisation Report</h2>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">From</label>
+              <input type="date" id="fac-from" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">To</label>
+              <input type="date" id="fac-to" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600" />
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mt-3">
+            <button id="fac-generate" class="btn-primary text-sm">
+              <i class="fas fa-play mr-1.5" aria-hidden="true"></i>Generate
+            </button>
+            <a id="fac-export" href="#" class="btn-outline text-sm hidden">
+              <i class="fas fa-download mr-1.5" aria-hidden="true"></i>Export CSV
+            </a>
+          </div>
+        </div>
+        <div id="fac-summary" class="hidden grid grid-cols-2 gap-4 mb-4">
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="fac-count" class="text-2xl font-bold text-primary-600">—</div>
+            <div class="text-xs text-text-secondary">Total Bookings</div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="fac-revenue" class="text-2xl font-bold text-secondary-500">—</div>
+            <div class="text-xs text-text-secondary">Total Revenue</div>
+          </div>
+        </div>
+        <div id="fac-table" class="bg-white rounded-xl border border-border-light overflow-hidden"></div>
+      </div>
+
+      <!-- ── VISITORS ──────────────────────────────────────────────────────── -->
+      <div id="panel-visitors" class="report-panel hidden">
+        <div class="bg-white rounded-xl border border-border-light p-5 mb-4">
+          <h2 class="font-semibold text-text-primary mb-4">Visitor Log Report</h2>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">From</label>
+              <input type="date" id="vis-from" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">To</label>
+              <input type="date" id="vis-to" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Type</label>
+              <select id="vis-type" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="">All Types</option>
+                {['visitor','delivery','service','guest','cab'].map(t => <option value={t} class="capitalize">{t}</option>)}
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mt-3">
+            <button id="vis-generate" class="btn-primary text-sm">
+              <i class="fas fa-play mr-1.5" aria-hidden="true"></i>Generate
+            </button>
+            <a id="vis-export" href="#" class="btn-outline text-sm hidden">
+              <i class="fas fa-download mr-1.5" aria-hidden="true"></i>Export CSV
+            </a>
+          </div>
+        </div>
+        <div id="vis-table" class="bg-white rounded-xl border border-border-light overflow-hidden"></div>
+      </div>
+
+      <!-- ── TENANT EXPIRY ─────────────────────────────────────────────────── -->
+      <div id="panel-tenants" class="report-panel hidden">
+        <div class="bg-white rounded-xl border border-border-light p-5 mb-4">
+          <h2 class="font-semibold text-text-primary mb-4">Tenant Agreement Expiry Report</h2>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Wing / Block</label>
+              <select id="ten-wing" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="">All Wings</option>
+                {WINGS.map(w => <option value={w}>Block {w}</option>)}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-text-secondary mb-1">Expiring within</label>
+              <select id="ten-days" class="w-full px-3 py-2 border border-border-light rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white">
+                <option value="30">30 days</option>
+                <option value="60">60 days</option>
+                <option value="90" selected>90 days</option>
+                <option value="180">180 days</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mt-3">
+            <button id="ten-generate" class="btn-primary text-sm">
+              <i class="fas fa-play mr-1.5" aria-hidden="true"></i>Generate
+            </button>
+            <a id="ten-export" href="#" class="btn-outline text-sm hidden">
+              <i class="fas fa-download mr-1.5" aria-hidden="true"></i>Export CSV
+            </a>
+          </div>
+        </div>
+        <div id="ten-summary" class="hidden grid grid-cols-2 gap-4 mb-4">
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="ten-expired" class="text-2xl font-bold text-red-600">—</div>
+            <div class="text-xs text-text-secondary">Already Expired</div>
+          </div>
+          <div class="bg-white rounded-xl border border-border-light p-4 text-center">
+            <div id="ten-soon" class="text-2xl font-bold text-amber-600">—</div>
+            <div class="text-xs text-text-secondary">Expiring Soon</div>
+          </div>
+        </div>
+        <div id="ten-table" class="bg-white rounded-xl border border-border-light overflow-hidden"></div>
+      </div>
+
+      <!-- ── MEMBER DIRECTORY ──────────────────────────────────────────────── -->
+      <div id="panel-members" class="report-panel hidden">
+        <div class="bg-white rounded-xl border border-border-light p-8 text-center">
+          <i class="fas fa-users text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+          <h2 class="text-lg font-semibold text-text-primary mb-2">Member Directory Export</h2>
+          <p class="text-text-secondary text-sm mb-6 max-w-sm mx-auto">
+            Download a CSV of all active members including unit, residency type, and portal role.
+            Access is logged in the audit trail.
+          </p>
+          <a href="/api/v1/reports/members" class="btn-primary inline-flex items-center gap-2">
+            <i class="fas fa-download" aria-hidden="true"></i>
+            Download CSV
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
 </PortalLayout>
+
+<script>
+  // ── Helper utilities ─────────────────────────────────────────────────────────
+  function fmt(n: number) {
+    return n >= 100000 ? `₹${(n/100000).toFixed(1)}L` : n >= 1000 ? `₹${(n/1000).toFixed(1)}K` : `₹${n}`;
+  }
+  function bar(label: string, value: number, max: number, color: string, suffix = '') {
+    const pct = max > 0 ? Math.max(2, (value/max)*100) : 0;
+    return `<div><div class="flex items-center justify-between text-xs text-text-secondary mb-1">
+      <span>${label}</span><span class="font-medium text-text-primary">${value}${suffix}</span></div>
+      <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div class="h-full rounded-full" style="width:${pct}%;background:${color}"></div>
+      </div></div>`;
+  }
+  function tbl(headers: string[], rows: (string|number)[][], colClass?: string[]) {
+    const hdr = headers.map((h, i) => `<th class="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wide whitespace-nowrap ${colClass?.[i] ?? ''}">${h}</th>`).join('');
+    const bdy = rows.map(r =>
+      `<tr class="hover:bg-gray-50 border-t border-border-light">${r.map((c, i) =>
+        `<td class="px-4 py-3 text-sm text-text-primary whitespace-nowrap ${colClass?.[i] ?? ''}">${c}</td>`
+      ).join('')}</tr>`
+    ).join('');
+    return `<div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50"><tr>${hdr}</tr></thead><tbody>${bdy}</tbody></table></div>`;
+  }
+  function emptyState(msg: string) {
+    return `<div class="text-center py-12 text-text-secondary text-sm">${msg}</div>`;
+  }
+  function fmtDate(d: string|null) {
+    return d ? new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+  }
+
+  // ── Nav routing ──────────────────────────────────────────────────────────────
+  let activeReport = 'overview';
+
+  function showReport(id: string) {
+    activeReport = id;
+    document.querySelectorAll<HTMLElement>('.report-panel').forEach(p => p.classList.add('hidden'));
+    const panel = document.getElementById(`panel-${id}`);
+    if (panel) panel.classList.remove('hidden');
+    document.querySelectorAll<HTMLButtonElement>('.report-nav-btn').forEach(btn => {
+      const isActive = btn.getAttribute('data-report') === id;
+      btn.className = `report-nav-btn w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+        isActive ? 'bg-primary-100 text-primary-700 font-medium' : 'text-text-secondary hover:bg-primary-50 hover:text-primary-700'
+      }`;
+    });
+    (document.getElementById('mobile-report-select') as HTMLSelectElement).value = id;
+    if (id === 'overview' && !overviewLoaded) loadOverview();
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.report-nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => showReport(btn.getAttribute('data-report')!));
+  });
+  document.getElementById('mobile-report-select')?.addEventListener('change', (e) => {
+    showReport((e.target as HTMLSelectElement).value);
+  });
+
+  // ── Overview ─────────────────────────────────────────────────────────────────
+  let overviewLoaded = false;
+  const STATUS_COLORS: Record<string,string> = {
+    Open:'#1E3A8A', Assigned:'#7C3AED', In_Progress:'#F59E0B',
+    Resolved:'#10B981', Closed:'#6B7280', Waiting_for_User:'#EF4444',
+  };
+
+  async function loadOverview() {
+    overviewLoaded = true;
+    const res = await fetch('/api/v1/admin/analytics', { credentials: 'include' });
+    if (!res.ok) {
+      document.getElementById('ov-loading')!.innerHTML = '<div class="col-span-4 text-center py-6 text-red-500 text-sm">Failed to load analytics.</div>';
+      return;
+    }
+    const d = await res.json();
+    document.getElementById('ov-loading')!.classList.add('hidden');
+    document.getElementById('ov-content')!.classList.remove('hidden');
+
+    const kpis = [
+      { label:'Open Complaints', value:d.complaints.open, sub:`of ${d.complaints.total} total`, color:'text-orange-600' },
+      { label:'Collection Rate',  value:`${d.finance.collection_rate}%`, sub:`${fmt(d.finance.paid)} collected`, color: d.finance.collection_rate >= 80 ? 'text-green-600' : 'text-red-600' },
+      { label:'Visitors (30d)',   value:d.visitors.last_30d, sub:'entries logged', color:'text-blue-600' },
+      { label:'Active Members',   value:d.members.total, sub:`${d.members.owners} owners · ${d.members.tenants} tenants`, color:'text-primary-600' },
+    ];
+    document.getElementById('kpi-cards')!.innerHTML = kpis.map(k =>
+      `<div class="bg-white rounded-xl border border-border-light p-5">
+        <div class="text-xs font-medium text-text-secondary mb-2">${k.label}</div>
+        <div class="text-2xl font-bold ${k.color}">${k.value}</div>
+        <div class="text-xs text-text-secondary mt-1">${k.sub}</div>
+      </div>`
+    ).join('');
+
+    const statusEntries = Object.entries(d.complaints.by_status as Record<string,number>).sort((a,b) => b[1]-a[1]);
+    const maxS = Math.max(...statusEntries.map(([,v]) => v), 1);
+    document.getElementById('complaint-chart')!.innerHTML = statusEntries.map(([s,c]) =>
+      bar(s.replace('_',' '), c, maxS, STATUS_COLORS[s] ?? '#9CA3AF')
+    ).join('');
+
+    const { paid, pending, total_dues } = d.finance;
+    const paidPct = total_dues > 0 ? Math.round((paid/total_dues)*100) : 0;
+    document.getElementById('finance-chart')!.innerHTML = `
+      <div class="flex items-center gap-4 mb-4">
+        <div class="relative w-20 h-20 flex-shrink-0">
+          <svg viewBox="0 0 36 36" class="w-20 h-20 -rotate-90">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#E5E7EB" stroke-width="3"/>
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#10B981" stroke-width="3"
+              stroke-dasharray="${paidPct} ${100-paidPct}" stroke-linecap="round"/>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="text-sm font-bold text-text-primary">${paidPct}%</span>
+          </div>
+        </div>
+        <div class="space-y-1.5 text-sm">
+          <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-green-500"></div>
+            <span class="text-text-secondary">Collected:</span><span class="font-medium">${fmt(paid)}</span></div>
+          <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-400"></div>
+            <span class="text-text-secondary">Pending:</span><span class="font-medium">${fmt(pending)}</span></div>
+          <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-gray-300"></div>
+            <span class="text-text-secondary">Total:</span><span class="font-medium">${fmt(total_dues)}</span></div>
+        </div>
+      </div>`;
+
+    const trend = d.visitors.daily_trend as { date:string; count:number }[];
+    const maxV = Math.max(...trend.map(t => t.count), 1);
+    document.getElementById('visitor-trend')!.innerHTML = trend.map(t => {
+      const h = Math.max(4, Math.round((t.count/maxV)*96));
+      return `<div class="flex-1 bg-primary-600 rounded-t opacity-75 hover:opacity-100 transition-opacity" style="height:${h}px" title="${t.date}: ${t.count}"></div>`;
+    }).join('');
+    document.getElementById('visitor-dates')!.innerHTML = trend.map((t,i) => {
+      const show = i === 0 || i === 6 || i === 13;
+      return `<div class="flex-1 text-center text-xs text-text-secondary truncate">${show ? new Date(t.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : ''}</div>`;
+    }).join('');
+
+    const typeEntries = Object.entries(d.visitors.by_type as Record<string,number>).sort((a,b) => b[1]-a[1]);
+    const maxT = Math.max(...typeEntries.map(([,v]) => v), 1);
+    document.getElementById('visitor-types')!.innerHTML = typeEntries.length
+      ? typeEntries.map(([t,c]) => bar(t.replace('_',' '), c, maxT, '#1E3A8A')).join('')
+      : emptyState('No visitor data.');
+
+    const { owners, tenants, total } = d.members;
+    const ownerPct = total > 0 ? Math.round((owners/total)*100) : 0;
+    document.getElementById('member-composition')!.innerHTML = `
+      <div class="flex h-4 bg-gray-100 rounded-full overflow-hidden mb-3">
+        <div class="h-full bg-primary-600" style="width:${ownerPct}%"></div>
+        <div class="h-full bg-secondary-500" style="width:${100-ownerPct}%"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-4 text-center">
+        <div class="p-4 bg-blue-50 rounded-xl"><div class="text-2xl font-bold text-primary-600">${owners}</div><div class="text-xs text-text-secondary mt-1">Owners (${ownerPct}%)</div></div>
+        <div class="p-4 bg-green-50 rounded-xl"><div class="text-2xl font-bold text-green-600">${tenants}</div><div class="text-xs text-text-secondary mt-1">Tenants (${100-ownerPct}%)</div></div>
+      </div>`;
+
+    type MonthPL = { month:string; income:number; expenses:number; net:number };
+    const pl = d.monthly_pl as MonthPL[];
+    const plMax = Math.max(...pl.flatMap(m => [m.income, m.expenses]), 1);
+    document.getElementById('monthly-pl')!.innerHTML = pl.map(m => {
+      const [yr,mo] = m.month.split('-');
+      const lbl = new Date(Number(yr),Number(mo)-1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});
+      const nc = m.net >= 0 ? 'text-green-600' : 'text-red-600';
+      return `<div class="flex items-center gap-3">
+        <div class="w-12 text-xs text-text-secondary flex-shrink-0">${lbl}</div>
+        <div class="flex-1">
+          <div class="flex gap-1 mb-1"><div class="h-2 rounded bg-green-500" style="width:${Math.round((m.income/plMax)*100)}%"></div></div>
+          <div class="flex gap-1"><div class="h-2 rounded bg-red-400" style="width:${Math.round((m.expenses/plMax)*100)}%"></div></div>
+        </div>
+        <div class="text-right flex-shrink-0 w-20">
+          <div class="text-xs text-green-600">${fmt(m.income)}</div>
+          <div class="text-xs text-red-500">${fmt(m.expenses)}</div>
+        </div>
+        <div class="text-xs font-semibold ${nc} w-14 text-right">${m.net>=0?'+':''}${fmt(m.net)}</div>
+      </div>`;
+    }).join('') + `<div class="flex items-center gap-2 mt-1 pt-2 border-t border-border-light">
+      <div class="w-3 h-2 rounded bg-green-500"></div><span class="text-xs text-text-secondary">Income</span>
+      <div class="w-3 h-2 rounded bg-red-400 ml-3"></div><span class="text-xs text-text-secondary">Expenses</span></div>`;
+
+    type CollEff = { month:string; total:number; paid:number; rate:number };
+    const eff = d.collection_efficiency as CollEff[];
+    document.getElementById('collection-efficiency')!.innerHTML = eff.map(e => {
+      const [yr,mo] = e.month.split('-');
+      const lbl = new Date(Number(yr),Number(mo)-1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});
+      const color = e.rate >= 80 ? '#10B981' : e.rate >= 60 ? '#F59E0B' : '#EF4444';
+      return bar(`${lbl} — ${fmt(e.paid)} / ${fmt(e.total)}`, e.rate, 100, color, '%');
+    }).join('') || emptyState('No dues data.');
+  }
+
+  // ── Collection report ─────────────────────────────────────────────────────────
+  document.getElementById('col-generate')?.addEventListener('click', async () => {
+    const from = (document.getElementById('col-from') as HTMLInputElement).value;
+    const to   = (document.getElementById('col-to')   as HTMLInputElement).value;
+    const wing = (document.getElementById('col-wing') as HTMLSelectElement).value;
+    const mode = (document.getElementById('col-mode') as HTMLSelectElement).value;
+    const params = new URLSearchParams({ from, to, wing, mode });
+    document.getElementById('col-table')!.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+    const res = await fetch(`/api/v1/reports/collection?${params}`, { credentials: 'include' });
+    if (!res.ok) { document.getElementById('col-table')!.innerHTML = emptyState('Failed to load.'); return; }
+    const { rows, total, count }: any = await res.json();
+    document.getElementById('col-summary')!.classList.remove('hidden');
+    document.getElementById('col-total')!.textContent = fmt(total);
+    document.getElementById('col-count')!.textContent = String(count);
+    document.getElementById('col-avg')!.textContent = count > 0 ? fmt(Math.round(total/count)) : '₹0';
+    const exportEl = document.getElementById('col-export') as HTMLAnchorElement;
+    exportEl.href = `/api/v1/reports/collection?${params}&format=csv`;
+    exportEl.classList.remove('hidden');
+    if (!rows.length) { document.getElementById('col-table')!.innerHTML = emptyState('No payments found.'); return; }
+    document.getElementById('col-table')!.innerHTML = tbl(
+      ['Date','Receipt No.','Flat','Block','Member','Mode','Reference','Amount'],
+      rows.map((r: any) => [
+        fmtDate(r.paid_at),
+        r.receipt_number ?? '—',
+        r.maintenance_dues?.units?.unit_number ?? '—',
+        r.maintenance_dues?.units?.block ?? '—',
+        r.maintenance_dues?.profiles?.full_name ?? '—',
+        (r.payment_mode ?? '').toUpperCase(),
+        r.transaction_ref ?? '—',
+        fmt(r.amount ?? 0),
+      ]),
+    );
+  });
+
+  // ── Dues report ───────────────────────────────────────────────────────────────
+  document.getElementById('dues-generate')?.addEventListener('click', async () => {
+    const wing   = (document.getElementById('dues-wing')    as HTMLSelectElement).value;
+    const overdue = (document.getElementById('dues-overdue') as HTMLSelectElement).value;
+    const period  = (document.getElementById('dues-period')  as HTMLSelectElement).value;
+    const params = new URLSearchParams({ wing, overdue, period });
+    document.getElementById('dues-table')!.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+    const res = await fetch(`/api/v1/reports/dues?${params}`, { credentials: 'include' });
+    if (!res.ok) { document.getElementById('dues-table')!.innerHTML = emptyState('Failed to load.'); return; }
+    const { rows, total, count, avg_overdue_days }: any = await res.json();
+    document.getElementById('dues-summary')!.classList.remove('hidden');
+    document.getElementById('dues-total')!.textContent = fmt(total);
+    document.getElementById('dues-count')!.textContent = String(count);
+    document.getElementById('dues-avg-days')!.textContent = String(avg_overdue_days) + 'd';
+    const exportEl = document.getElementById('dues-export') as HTMLAnchorElement;
+    exportEl.href = `/api/v1/reports/dues?${params}&format=csv`;
+    exportEl.classList.remove('hidden');
+    if (!rows.length) { document.getElementById('dues-table')!.innerHTML = emptyState('No pending dues found.'); return; }
+    document.getElementById('dues-table')!.innerHTML = tbl(
+      ['Flat','Block','Owner','Billing Period','Due Date','Base','Late Fee','Total','Overdue Days'],
+      rows.map((r: any) => {
+        const od = r.overdue_days;
+        const odClass = od > 90 ? 'text-red-600 font-semibold' : od > 60 ? 'text-orange-500' : od > 30 ? 'text-amber-600' : '';
+        return [
+          r.units?.unit_number ?? '—',
+          r.units?.block ?? '—',
+          r.profiles?.full_name ?? '—',
+          r.billing_periods?.name ?? '—',
+          fmtDate(r.due_date),
+          fmt(r.base_amount ?? 0),
+          fmt(r.penalty_amount ?? 0),
+          fmt(r.total_amount ?? 0),
+          `<span class="${odClass}">${od}d</span>`,
+        ];
+      }),
+    );
+  });
+
+  // ── Complaints report ─────────────────────────────────────────────────────────
+  document.getElementById('cmp-generate')?.addEventListener('click', async () => {
+    const from     = (document.getElementById('cmp-from')     as HTMLInputElement).value;
+    const to       = (document.getElementById('cmp-to')       as HTMLInputElement).value;
+    const priority = (document.getElementById('cmp-priority') as HTMLSelectElement).value;
+    const category = (document.getElementById('cmp-category') as HTMLSelectElement).value;
+    const params = new URLSearchParams({ from, to, priority, category });
+    document.getElementById('cmp-table')!.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+    const res = await fetch(`/api/v1/reports/complaints?${params}`, { credentials: 'include' });
+    if (!res.ok) { document.getElementById('cmp-table')!.innerHTML = emptyState('Failed to load.'); return; }
+    const { rows, summary }: any = await res.json();
+    document.getElementById('cmp-summary')!.classList.remove('hidden');
+    document.getElementById('cmp-total')!.textContent    = String(summary.total);
+    document.getElementById('cmp-resolved')!.textContent = String(summary.resolved);
+    document.getElementById('cmp-sla')!.textContent      = String(summary.sla_breached);
+    document.getElementById('cmp-avg-hrs')!.textContent  = summary.avg_resolution_hours + 'h';
+    const exportEl = document.getElementById('cmp-export') as HTMLAnchorElement;
+    exportEl.href = `/api/v1/reports/complaints?${params}&format=csv`;
+    exportEl.classList.remove('hidden');
+    if (!rows.length) { document.getElementById('cmp-table')!.innerHTML = emptyState('No complaints found.'); return; }
+    document.getElementById('cmp-table')!.innerHTML = tbl(
+      ['ID','Title','Category','Priority','Status','SLA','Raised By','Created','Hrs to Resolve'],
+      rows.map((r: any) => [
+        r.id.slice(-8).toUpperCase(),
+        r.title ?? '—',
+        r.category ?? '—',
+        r.priority ?? '—',
+        r.status ?? '—',
+        r.sla_breached ? '<span class="text-red-600 font-medium">Breached</span>' : '<span class="text-green-600">OK</span>',
+        r.profiles?.full_name ?? '—',
+        fmtDate(r.created_at),
+        r.resolution_hours != null ? `${r.resolution_hours}h` : '—',
+      ]),
+    );
+  });
+
+  // ── Facilities report ─────────────────────────────────────────────────────────
+  document.getElementById('fac-generate')?.addEventListener('click', async () => {
+    const from = (document.getElementById('fac-from') as HTMLInputElement).value;
+    const to   = (document.getElementById('fac-to')   as HTMLInputElement).value;
+    const params = new URLSearchParams({ from, to });
+    document.getElementById('fac-table')!.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+    const res = await fetch(`/api/v1/reports/facilities?${params}`, { credentials: 'include' });
+    if (!res.ok) { document.getElementById('fac-table')!.innerHTML = emptyState('Failed to load.'); return; }
+    const { rows, count, total_revenue }: any = await res.json();
+    document.getElementById('fac-summary')!.classList.remove('hidden');
+    document.getElementById('fac-count')!.textContent   = String(count);
+    document.getElementById('fac-revenue')!.textContent = fmt(total_revenue);
+    const exportEl = document.getElementById('fac-export') as HTMLAnchorElement;
+    exportEl.href = `/api/v1/reports/facilities?${params}&format=csv`;
+    exportEl.classList.remove('hidden');
+    if (!rows.length) { document.getElementById('fac-table')!.innerHTML = emptyState('No bookings found.'); return; }
+    document.getElementById('fac-table')!.innerHTML = tbl(
+      ['Facility','Date','Start','End','Member','Flat','Status','Amount'],
+      rows.map((r: any) => [
+        r.facilities?.name ?? '—',
+        fmtDate(r.start_time),
+        r.start_time ? new Date(r.start_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '—',
+        r.end_time   ? new Date(r.end_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '—',
+        r.profiles?.full_name ?? '—',
+        `${r.units?.block ?? ''}${r.units?.unit_number ?? ''}`,
+        r.status ?? '—',
+        fmt(r.total_amount ?? 0),
+      ]),
+    );
+  });
+
+  // ── Visitors report ───────────────────────────────────────────────────────────
+  document.getElementById('vis-generate')?.addEventListener('click', async () => {
+    const from = (document.getElementById('vis-from') as HTMLInputElement).value;
+    const to   = (document.getElementById('vis-to')   as HTMLInputElement).value;
+    const type = (document.getElementById('vis-type') as HTMLSelectElement).value;
+    const params = new URLSearchParams({ from, to, type });
+    document.getElementById('vis-table')!.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+    const res = await fetch(`/api/v1/reports/visitors?${params}`, { credentials: 'include' });
+    if (!res.ok) { document.getElementById('vis-table')!.innerHTML = emptyState('Failed to load.'); return; }
+    const { rows }: any = await res.json();
+    const exportEl = document.getElementById('vis-export') as HTMLAnchorElement;
+    exportEl.href = `/api/v1/reports/visitors?${params}&format=csv`;
+    exportEl.classList.remove('hidden');
+    if (!rows.length) { document.getElementById('vis-table')!.innerHTML = emptyState('No visitor records found.'); return; }
+    document.getElementById('vis-table')!.innerHTML = tbl(
+      ['Date','Time','Visitor Name','Type','Purpose','Host Flat','Block','Exit'],
+      rows.map((r: any) => [
+        fmtDate(r.entry_time),
+        r.entry_time ? new Date(r.entry_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '—',
+        r.visitor_name ?? '—',
+        (r.entry_type ?? '').replace('_',' '),
+        r.purpose ?? '—',
+        r.units?.unit_number ?? '—',
+        r.units?.block ?? '—',
+        r.exit_time ? new Date(r.exit_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '—',
+      ]),
+    );
+  });
+
+  // ── Tenant expiry report ───────────────────────────────────────────────────────
+  document.getElementById('ten-generate')?.addEventListener('click', async () => {
+    const wing = (document.getElementById('ten-wing') as HTMLSelectElement).value;
+    const days = (document.getElementById('ten-days') as HTMLSelectElement).value;
+    const params = new URLSearchParams({ wing, within_days: days });
+    document.getElementById('ten-table')!.innerHTML = '<div class="text-center py-8 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+    const res = await fetch(`/api/v1/reports/tenant-expiry?${params}`, { credentials: 'include' });
+    if (!res.ok) { document.getElementById('ten-table')!.innerHTML = emptyState('Failed to load.'); return; }
+    const { rows, expired, expiring_soon }: any = await res.json();
+    document.getElementById('ten-summary')!.classList.remove('hidden');
+    document.getElementById('ten-expired')!.textContent = String(expired);
+    document.getElementById('ten-soon')!.textContent    = String(expiring_soon);
+    const exportEl = document.getElementById('ten-export') as HTMLAnchorElement;
+    exportEl.href = `/api/v1/reports/tenant-expiry?${params}&format=csv`;
+    exportEl.classList.remove('hidden');
+    if (!rows.length) { document.getElementById('ten-table')!.innerHTML = emptyState('No expiring agreements found.'); return; }
+    document.getElementById('ten-table')!.innerHTML = tbl(
+      ['Tenant','Flat','Block','Agreement End','Days to Expiry','Status','KYC Status'],
+      rows.map((r: any) => {
+        const dClass = r.is_expired ? 'text-red-600 font-semibold' : r.days_to_expiry <= 30 ? 'text-amber-600' : 'text-text-primary';
+        return [
+          r.tenant_name ?? '—',
+          r.units?.unit_number ?? '—',
+          r.units?.block ?? '—',
+          fmtDate(r.agreement_end_date),
+          `<span class="${dClass}">${r.is_expired ? 'Expired' : `${r.days_to_expiry}d`}</span>`,
+          r.is_expired ? '<span class="text-red-600">Expired</span>' : '<span class="text-amber-600">Expiring</span>',
+          r.kyc_status ?? '—',
+        ];
+      }),
+    );
+  });
+
+  // Load overview on initial render
+  loadOverview();
+</script>

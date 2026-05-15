@@ -20,6 +20,7 @@ function makeUser(
     committeeTitle: null,
     isAdmin,
     societyId: '00000000-0000-0000-0000-000000000001',
+    unitId: null,
     permissions: new Set(features as any),
   };
 }
