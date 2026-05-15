@@ -12,6 +12,7 @@ const kTextSecondary = Color(0xFF4B5563);
 const kBorderLight   = Color(0xFFE5E7EB);
 const kSectionAlt    = Color(0xFFF8FAFC);
 const kRed600        = Color(0xFFDC2626);
+const kBgWarm        = Color(0xFFF5F0EB);
 
 ThemeData _buildTheme() {
   final base = ThemeData(
@@ -42,15 +43,18 @@ ThemeData _buildTheme() {
   return base.copyWith(
     textTheme: textTheme,
     appBarTheme: AppBarTheme(
-      backgroundColor: kPrimary600,
-      foregroundColor: Colors.white,
+      backgroundColor: Colors.white,
+      foregroundColor: kTextPrimary,
       elevation: 0,
+      scrolledUnderElevation: 1,
+      shadowColor: kBorderLight,
       centerTitle: false,
       titleTextStyle: GoogleFonts.poppins(
         fontWeight: FontWeight.w600,
         fontSize: 18,
-        color: Colors.white,
+        color: kTextPrimary,
       ),
+      iconTheme: const IconThemeData(color: kTextPrimary),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -102,8 +106,25 @@ ThemeData _buildTheme() {
       ),
       margin: EdgeInsets.zero,
     ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: Colors.white,
+      indicatorColor: Colors.transparent,
+      surfaceTintColor: Colors.white,
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: kPrimary600);
+        }
+        return GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w400, color: kTextSecondary);
+      }),
+      iconTheme: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return const IconThemeData(color: kPrimary600, size: 24);
+        }
+        return const IconThemeData(color: kTextSecondary, size: 24);
+      }),
+    ),
     dividerTheme: const DividerThemeData(color: kBorderLight, thickness: 1),
-    scaffoldBackgroundColor: kSectionAlt,
+    scaffoldBackgroundColor: kBgWarm,
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

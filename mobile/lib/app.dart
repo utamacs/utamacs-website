@@ -7,6 +7,8 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'features/notices/presentation/screens/notices_screen.dart';
+import 'features/profile/presentation/screens/profile_screen.dart';
+import 'features/services/presentation/screens/services_screen.dart';
 import 'features/visitors/presentation/screens/visitors_screen.dart';
 
 // Notifies GoRouter whenever the Supabase session changes.
@@ -42,25 +44,23 @@ GoRouter _buildRouter() {
     },
     routes: [
       ShellRoute(
-        builder: (context, state, child) => _AppShell(child: child),
         routes: [
+          GoRoute(path: '/', builder: (ctx, st) => const DashboardScreen()),
           GoRoute(
-            path: '/',
-            builder: (context, state) => const DashboardScreen(),
-          ),
+              path: '/notices', builder: (ctx, st) => const NoticesScreen()),
           GoRoute(
-            path: '/notices',
-            builder: (context, state) => const NoticesScreen(),
-          ),
+              path: '/visitors', builder: (ctx, st) => const VisitorsScreen()),
           GoRoute(
-            path: '/visitors',
-            builder: (context, state) => const VisitorsScreen(),
-          ),
+              path: '/services', builder: (ctx, st) => const ServicesScreen()),
+          GoRoute(
+              path: '/profile', builder: (ctx, st) => const ProfileScreen()),
         ],
+        builder: (context, state, child) =>
+            _AppShell(location: state.uri.path, child: child),
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (ctx, st) => const LoginScreen(),
       ),
     ],
   );
@@ -82,46 +82,78 @@ class UtamacsApp extends ConsumerWidget {
   }
 }
 
-class _AppShell extends StatefulWidget {
+class _AppShell extends StatelessWidget {
   final Widget child;
-  const _AppShell({required this.child});
+  final String location;
 
-  @override
-  State<_AppShell> createState() => _AppShellState();
-}
-
-class _AppShellState extends State<_AppShell> {
-  int _currentIndex = 0;
+  const _AppShell({required this.child, required this.location});
 
   static const _tabs = [
-    (path: '/', icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
-    (path: '/notices', icon: Icons.notifications_outlined, activeIcon: Icons.notifications, label: 'Notices'),
-    (path: '/visitors', icon: Icons.badge_outlined, activeIcon: Icons.badge, label: 'Visitors'),
+    (
+      path: '/',
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Home'
+    ),
+    (
+      path: '/notices',
+      icon: Icons.notifications_outlined,
+      activeIcon: Icons.notifications_rounded,
+      label: 'Notices'
+    ),
+    (
+      path: '/visitors',
+      icon: Icons.badge_outlined,
+      activeIcon: Icons.badge_rounded,
+      label: 'Visitors'
+    ),
+    (
+      path: '/services',
+      icon: Icons.grid_view_outlined,
+      activeIcon: Icons.grid_view_rounded,
+      label: 'Services'
+    ),
+    (
+      path: '/profile',
+      icon: Icons.person_outline,
+      activeIcon: Icons.person_rounded,
+      label: 'Profile'
+    ),
   ];
 
-  void switchTab(int index) {
-    setState(() => _currentIndex = index);
-    context.go(_tabs[index].path);
+  int get _currentIndex {
+    if (location.startsWith('/notices')) return 1;
+    if (location.startsWith('/visitors')) return 2;
+    if (location.startsWith('/services')) return 3;
+    if (location.startsWith('/profile')) return 4;
+    return 0;
   }
 
   @override
   Widget build(BuildContext context) {
+    final idx = _currentIndex;
     return Scaffold(
-      body: widget.child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: switchTab,
-        backgroundColor: Colors.white,
-        indicatorColor: kPrimary50,
-        destinations: _tabs
-            .map(
-              (t) => NavigationDestination(
-                icon: Icon(t.icon),
-                selectedIcon: Icon(t.activeIcon, color: kPrimary600),
-                label: t.label,
-              ),
-            )
-            .toList(),
+      body: child,
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: kBorderLight)),
+        ),
+        child: NavigationBar(
+          selectedIndex: idx,
+          onDestinationSelected: (i) => context.go(_tabs[i].path),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: List.generate(_tabs.length, (i) {
+            final t = _tabs[i];
+            return NavigationDestination(
+              icon: Icon(t.icon),
+              selectedIcon: Icon(t.activeIcon),
+              label: t.label,
+            );
+          }),
+        ),
       ),
     );
   }
