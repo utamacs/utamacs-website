@@ -63,7 +63,7 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
             purpose: _purposeCtrl.text.trim().isEmpty
                 ? null
                 : _purposeCtrl.text.trim(),
-            validFrom: _validFrom,
+            expectedDate: _validFrom,
             expiresAt: _expiresAt,
           );
       if (mounted) {
@@ -149,7 +149,7 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
               _DateTile(
                 label: 'Expires on (optional)',
                 date: _expiresAt,
-                placeholder: 'No expiry',
+                placeholder: 'Default: 24 h after visit date',
                 onTap: () => _pickDate(isExpiry: true),
                 trailing: _expiresAt != null
                     ? IconButton(

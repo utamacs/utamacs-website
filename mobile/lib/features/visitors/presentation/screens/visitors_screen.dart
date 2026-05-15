@@ -141,7 +141,7 @@ class _PreApprovalCard extends StatelessWidget {
               const Icon(Icons.schedule, size: 14, color: kTextSecondary),
               const SizedBox(width: 4),
               Text(
-                timeago.format(approval.validFrom),
+                timeago.format(approval.expectedDate),
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall

@@ -11,20 +11,19 @@ AuthRepository authRepository(AuthRepositoryRef ref) => AuthRepository();
 class AuthRepository {
   final _client = Supabase.instance.client;
 
-  Future<void> signInWithOtp(String phone) async {
-    await _client.auth.signInWithOtp(phone: phone);
-  }
-
-  Future<void> verifyOtp(String phone, String token) async {
-    await _client.auth.verifyOTP(
-      phone: phone,
-      token: token,
-      type: OtpType.sms,
+  Future<void> sendEmailOtp(String email) async {
+    await _client.auth.signInWithOtp(
+      email: email,
+      shouldCreateUser: false,
     );
   }
 
-  Future<void> signInWithEmail(String email, String password) async {
-    await _client.auth.signInWithPassword(email: email, password: password);
+  Future<void> verifyEmailOtp(String email, String token) async {
+    await _client.auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.email,
+    );
   }
 
   Future<void> signOut() async {
@@ -40,7 +39,7 @@ class AuthRepository {
     if (uid == null) return null;
     final data = await _client
         .from('profiles')
-        .select()
+        .select('*, units(unit_number, block)')
         .eq('id', uid)
         .eq('society_id', env.societyId)
         .maybeSingle();

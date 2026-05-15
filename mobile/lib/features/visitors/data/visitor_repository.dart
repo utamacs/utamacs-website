@@ -11,10 +11,11 @@ class VisitorPreApproval {
   final String? vehicleNumber;
   final String? purpose;
   final String status;
-  final DateTime validFrom;
+  final DateTime expectedDate;
   final DateTime? expiresAt;
   final bool isRecurring;
   final String? qrToken;
+  final String? otpCode;
 
   const VisitorPreApproval({
     required this.id,
@@ -23,15 +24,17 @@ class VisitorPreApproval {
     this.vehicleNumber,
     this.purpose,
     required this.status,
-    required this.validFrom,
+    required this.expectedDate,
     this.expiresAt,
     this.isRecurring = false,
     this.qrToken,
+    this.otpCode,
   });
 
   bool get isActive {
-    if (status != 'active') return false;
-    if (expiresAt != null && expiresAt!.isBefore(DateTime.now())) return false;
+    final now = DateTime.now();
+    if (status != 'approved' && status != 'pending') return false;
+    if (expiresAt != null && expiresAt!.isBefore(now)) return false;
     return true;
   }
 
@@ -39,16 +42,17 @@ class VisitorPreApproval {
       VisitorPreApproval(
         id: j['id'] as String,
         visitorName: j['visitor_name'] as String,
-        visitorPhone: j['visitor_phone'] as String?,
+        visitorPhone: j['visitor_phone_hash'] as String?,
         vehicleNumber: j['vehicle_number'] as String?,
         purpose: j['purpose'] as String?,
         status: j['status'] as String,
-        validFrom: DateTime.parse(j['valid_from'] as String),
+        expectedDate: DateTime.parse(j['expected_date'] as String),
         expiresAt: j['expires_at'] != null
             ? DateTime.parse(j['expires_at'] as String)
             : null,
         isRecurring: j['is_recurring'] as bool? ?? false,
         qrToken: j['qr_token'] as String?,
+        otpCode: j['otp_code'] as String?,
       );
 }
 
@@ -56,30 +60,29 @@ class VisitorLog {
   final String id;
   final String visitorName;
   final String? vehicleNumber;
-  final String visitType;
-  final String status;
-  final DateTime checkedInAt;
-  final DateTime? checkedOutAt;
+  final String entryType;
+  final DateTime entryTime;
+  final DateTime? exitTime;
 
   const VisitorLog({
     required this.id,
     required this.visitorName,
     this.vehicleNumber,
-    required this.visitType,
-    required this.status,
-    required this.checkedInAt,
-    this.checkedOutAt,
+    required this.entryType,
+    required this.entryTime,
+    this.exitTime,
   });
+
+  bool get isInside => exitTime == null;
 
   factory VisitorLog.fromJson(Map<String, dynamic> j) => VisitorLog(
         id: j['id'] as String,
         visitorName: j['visitor_name'] as String,
         vehicleNumber: j['vehicle_number'] as String?,
-        visitType: j['visit_type'] as String? ?? 'walk_in',
-        status: j['status'] as String,
-        checkedInAt: DateTime.parse(j['checked_in_at'] as String),
-        checkedOutAt: j['checked_out_at'] != null
-            ? DateTime.parse(j['checked_out_at'] as String)
+        entryType: j['entry_type'] as String? ?? 'walk_in',
+        entryTime: DateTime.parse(j['entry_time'] as String),
+        exitTime: j['exit_time'] != null
+            ? DateTime.parse(j['exit_time'] as String)
             : null,
       );
 }
@@ -98,7 +101,7 @@ class VisitorRepository {
         .from('visitor_pre_approvals')
         .select()
         .eq('society_id', env.societyId)
-        .eq('user_id', uid)
+        .eq('host_user_id', uid)
         .order('created_at', ascending: false)
         .limit(20);
     return (data as List).map((e) => VisitorPreApproval.fromJson(e)).toList();
@@ -109,24 +112,48 @@ class VisitorRepository {
     String? visitorPhone,
     String? vehicleNumber,
     String? purpose,
-    required DateTime validFrom,
+    required DateTime expectedDate,
     DateTime? expiresAt,
   }) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw Exception('Not authenticated');
 
+    // Fetch the resident's unit_id — required NOT NULL in visitor_pre_approvals
+    final profileRow = await _client
+        .from('profiles')
+        .select('unit_id')
+        .eq('id', uid)
+        .eq('society_id', env.societyId)
+        .maybeSingle();
+    final unitId = profileRow?['unit_id'] as String?;
+    if (unitId == null) throw Exception('No unit assigned to your profile. Contact the admin.');
+
+    // Format date as YYYY-MM-DD for the date column
+    final dateStr =
+        '${expectedDate.year.toString().padLeft(4, '0')}-'
+        '${expectedDate.month.toString().padLeft(2, '0')}-'
+        '${expectedDate.day.toString().padLeft(2, '0')}';
+
+    // 6-digit OTP the guard can type if QR scan fails (NOT NULL in schema)
+    final otp = (100000 + (DateTime.now().microsecondsSinceEpoch % 900000))
+        .toString()
+        .substring(0, 6);
+
     final data = await _client
         .from('visitor_pre_approvals')
         .insert({
           'society_id': env.societyId,
-          'user_id': uid,
+          'host_user_id': uid,
+          'host_unit_id': unitId,
           'visitor_name': visitorName,
-          'visitor_phone': visitorPhone,
+          'visitor_phone_hash': visitorPhone,
           'vehicle_number': vehicleNumber,
           'purpose': purpose,
-          'valid_from': validFrom.toIso8601String(),
-          'expires_at': expiresAt?.toIso8601String(),
-          'status': 'active',
+          'expected_date': dateStr,
+          // expires_at is NOT NULL — default to end of expected date + 24 h if unset
+          'expires_at': (expiresAt ?? expectedDate.add(const Duration(hours: 24))).toIso8601String(),
+          'status': 'pending',
+          'otp_code': otp,
         })
         .select()
         .single();
@@ -136,12 +163,23 @@ class VisitorRepository {
   Future<List<VisitorLog>> fetchRecentLogs({int limit = 30}) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) return [];
+
+    // Look up the resident's unit first
+    final profileRow = await _client
+        .from('profiles')
+        .select('unit_id')
+        .eq('id', uid)
+        .eq('society_id', env.societyId)
+        .maybeSingle();
+    final unitId = profileRow?['unit_id'] as String?;
+    if (unitId == null) return [];
+
     final data = await _client
         .from('visitor_logs')
         .select()
         .eq('society_id', env.societyId)
-        .eq('host_user_id', uid)
-        .order('checked_in_at', ascending: false)
+        .eq('host_unit_id', unitId)
+        .order('entry_time', ascending: false)
         .limit(limit);
     return (data as List).map((e) => VisitorLog.fromJson(e)).toList();
   }
