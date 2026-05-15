@@ -36,7 +36,7 @@ export const POST: APIRoute = async ({ request }) => {
     // Verify the due belongs to this society
     const { data: due, error: dueErr } = await sb
       .from('maintenance_dues')
-      .select('id, user_id, total_amount, status')
+      .select('id, user_id, total_amount, amount_paid, status')
       .eq('id', body.dues_id)
       .eq('society_id', SOCIETY_ID)
       .single();
@@ -68,9 +68,14 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (payErr) throw Object.assign(new Error(payErr.message), { status: 500 });
 
-    // Update due status
-    const newStatus = body.amount >= due.total_amount ? 'paid' : 'partially_paid';
-    await sb.from('maintenance_dues').update({ status: newStatus, paid_at: payment.paid_at }).eq('id', body.dues_id);
+    // Update due status and cumulative amount_paid
+    const newAmountPaid = Number(due.amount_paid ?? 0) + Number(body.amount);
+    const newStatus = newAmountPaid >= Number(due.total_amount) ? 'paid' : 'partially_paid';
+    await sb.from('maintenance_dues').update({
+      status: newStatus,
+      amount_paid: newAmountPaid,
+      paid_at: payment.paid_at,
+    }).eq('id', body.dues_id);
 
     await writeAuditLog({
       userId: user.id,

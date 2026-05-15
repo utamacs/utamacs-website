@@ -3,16 +3,15 @@ export const prerender = false;
 import PortalLayout from '@portal/PortalLayout.astro';
 import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
 import { getRules, ruleBool } from '@lib/utils/getRules';
+import { resolveFromRequest } from '@lib/permissions';
 
 const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
-
-const user = Astro.locals.user;
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
 if (!user) return Astro.redirect('/portal/login');
 if (user.role === 'security_guard' || user.role === 'vendor') return new Response('Forbidden', { status: 403 });
-
-const isExec = ['executive', 'admin'].includes(user.role) ||
+const isExec = user.isAdmin ||
                ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') ||
-               user.isAdmin;
+               ['executive', 'admin'].includes(user.role ?? '');
 
 const sb = getSupabaseServiceClient();
 const rules = await getRules(sb, SOCIETY_ID, ['RAZORPAY_ENABLED']);
@@ -724,8 +723,8 @@ const razorpayEnabled = ruleBool(rules, 'RAZORPAY_ENABLED', false);
               </div>
               <div class="mt-4 pt-4 border-t border-border-light flex items-center gap-3 flex-wrap">
                 ${d.status !== 'paid' && d.status !== 'waived' ? `
-                  <button onclick="handlePay('${d.id}', ${d.total_amount})" class="btn-primary text-sm">
-                    Pay ₹${Number(d.total_amount).toLocaleString('en-IN')}
+                  <button onclick="handlePay('${d.id}', ${d.total_amount}, ${d.amount_paid ?? 0})" class="btn-primary text-sm">
+                    ${d.amount_paid > 0 ? `Pay ₹${Number(d.total_amount - d.amount_paid).toLocaleString('en-IN')} (Partial)` : `Pay ₹${Number(d.total_amount).toLocaleString('en-IN')}`}
                   </button>
                   ${razorpayEnabled ? `
                   <button onclick="handlePayOnline('${d.id}')" class="btn-outline text-sm flex items-center gap-1.5">
@@ -754,17 +753,94 @@ const razorpayEnabled = ruleBool(rules, 'RAZORPAY_ENABLED', false);
       }
     }
 
-    async function handlePay(duesId, amount) {
-      const mode = prompt('Payment mode (cash/upi/cheque/neft/rtgs/online):') ?? '';
-      if (!mode.trim()) return;
-      const ref = prompt('Transaction reference (optional):') ?? undefined;
-      const res = await fetch('/api/v1/finance/payments', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ dues_id: duesId, amount, payment_mode: mode.trim(), transaction_ref: ref || undefined }),
-      });
-      if (res.ok) { loadDues(); }
-      else { const err = await res.json(); alert(`Payment failed: ${err.detail ?? err.error}`); }
+    // ── Payment modal ─────────────────────────────────────────────────────────
+    let currentDuesId = null;
+    const payModal      = document.getElementById('payment-modal');
+    const payErrEl      = document.getElementById('payment-error');
+    const payAmountEl   = document.getElementById('pay-amount');
+    const payOutstandEl = document.getElementById('pay-outstanding');
+
+    function handlePay(duesId, totalAmount, alreadyPaid = 0) {
+      currentDuesId = duesId;
+      const outstanding = Math.max(0, totalAmount - alreadyPaid);
+      document.getElementById('pay-dues-id').value = duesId;
+      document.getElementById('pay-total-due').textContent = `₹${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+      document.getElementById('pay-already-paid').textContent = `₹${Number(alreadyPaid).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+      payOutstandEl.textContent = `₹${Number(outstanding).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+      payAmountEl.value = String(outstanding.toFixed(2));
+      payAmountEl.max = String(totalAmount * 2);
+      document.getElementById('pay-date').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('pay-mode').value = '';
+      document.getElementById('pay-ref').value = '';
+      document.getElementById('partial-notice').classList.add('hidden');
+      document.getElementById('excess-notice').classList.add('hidden');
+      payErrEl.classList.add('hidden');
+      payModal.classList.remove('hidden');
     }
+
+    window.handlePay = handlePay;
+
+    document.getElementById('pay-full-btn')?.addEventListener('click', () => {
+      const outstanding = parseFloat(payOutstandEl.textContent.replace(/[₹,]/g, '')) || 0;
+      payAmountEl.value = String(outstanding.toFixed(2));
+      document.getElementById('partial-notice').classList.add('hidden');
+      document.getElementById('excess-notice').classList.add('hidden');
+    });
+
+    payAmountEl?.addEventListener('input', () => {
+      const amount      = parseFloat(payAmountEl.value) || 0;
+      const outstanding = parseFloat(payOutstandEl.textContent.replace(/[₹,]/g, '')) || 0;
+      const partial = document.getElementById('partial-notice');
+      const excess  = document.getElementById('excess-notice');
+      if (amount > 0 && amount < outstanding) {
+        document.getElementById('remaining-amount').textContent = (outstanding - amount).toFixed(2);
+        partial.classList.remove('hidden');
+        excess.classList.add('hidden');
+      } else if (amount > outstanding) {
+        document.getElementById('excess-amount').textContent = (amount - outstanding).toFixed(2);
+        excess.classList.remove('hidden');
+        partial.classList.add('hidden');
+      } else {
+        partial.classList.add('hidden');
+        excess.classList.add('hidden');
+      }
+    });
+
+    document.getElementById('close-payment-modal')?.addEventListener('click', () => payModal.classList.add('hidden'));
+    document.getElementById('cancel-payment-btn')?.addEventListener('click', () => payModal.classList.add('hidden'));
+
+    document.getElementById('payment-form')?.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!currentDuesId) return;
+      payErrEl.classList.add('hidden');
+      const btn = document.getElementById('payment-submit-btn');
+      btn.disabled = true; btn.textContent = 'Recording…';
+
+      const body = {
+        amount:          parseFloat(payAmountEl.value),
+        payment_mode:    document.getElementById('pay-mode').value,
+        transaction_ref: document.getElementById('pay-ref').value.trim() || undefined,
+        paid_at:         document.getElementById('pay-date').value || undefined,
+      };
+
+      try {
+        const res = await fetch(`/api/v1/finance/dues/${currentDuesId}/pay`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message ?? data.error ?? 'Payment failed');
+        payModal.classList.add('hidden');
+        showToast(`Payment recorded — status: ${String(data.dues_status ?? 'updated').replace('_', ' ')}.`);
+        loadDues();
+      } catch (err) {
+        payErrEl.textContent = err.message;
+        payErrEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Record Payment';
+      }
+    });
 
     // Billing period modal (exec/admin only)
     if (isExec) {
