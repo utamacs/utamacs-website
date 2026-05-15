@@ -1,0 +1,75 @@
+name: utamacs_portal
+description: UTA MACS Resident Portal — mobile app for residents and security staff.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Backend
+  supabase_flutter: ^2.9.0
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Navigation
+  go_router: ^15.1.2
+
+  # QR code
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.0.1
+
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+
+  # UI utilities
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+  intl: ^0.20.2
+  timeago: ^3.7.0
+  url_launcher: ^6.3.1
+
+  # Storage / env
+  flutter_secure_storage: ^9.2.4
+  flutter_dotenv: ^5.2.1
+
+  # Icons
+  cupertino_icons: ^1.0.8
+  font_awesome_flutter: ^10.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  riverpod_generator: ^2.6.2
+  build_runner: ^2.4.15
+  custom_lint: ^0.7.5
+  riverpod_lint: ^2.6.2
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - .env
+
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
