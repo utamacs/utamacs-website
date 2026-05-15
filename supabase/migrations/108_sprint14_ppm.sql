@@ -76,7 +76,7 @@ CREATE POLICY "ppm_completions_insert" ON ppm_completions FOR INSERT
 -- ── 3. Rules ──────────────────────────────────────────────────────────────────
 
 INSERT INTO rules (society_id, rule_code, value_type, current_value, label, description, is_locked)
-SELECT s.id, r.rule_code, r.value_type, r.current_value, r.label, r.description, r.is_locked
+SELECT s.id, r.rule_code, r.value_type, r.current_value::jsonb, r.label, r.description, r.is_locked
 FROM societies s
 CROSS JOIN (VALUES
   ('PPM_OVERDUE_ALERT_DAYS', 'integer', '7',

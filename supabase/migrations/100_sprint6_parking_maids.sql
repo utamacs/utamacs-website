@@ -55,7 +55,7 @@ SELECT
   id,
   'MAID_KYC_VALIDITY_DAYS',
   'integer',
-  '365',
+  '365'::jsonb,
   'Number of days a maid KYC verification remains valid before renewal is required',
   false
 FROM societies

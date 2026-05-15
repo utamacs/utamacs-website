@@ -60,7 +60,7 @@ SELECT
   s.id,
   r.code,
   r.vtype,
-  r.val,
+  r.val::jsonb,
   r.descr,
   false
 FROM societies s
