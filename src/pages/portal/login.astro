@@ -34,7 +34,7 @@ if (errorCode) {
 
       <div class="bg-white rounded-2xl shadow-medium p-8">
         <h1 class="text-xl font-semibold text-text-primary mb-1">Welcome back</h1>
-        <p class="text-small text-text-secondary mb-6">Sign in to your resident account</p>
+        <p class="text-small text-text-secondary mb-5">Sign in to your resident account</p>
 
         {expired && (
           <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
@@ -48,33 +48,88 @@ if (errorCode) {
           </div>
         )}
 
-        <form method="POST" action="/api/v1/auth/login" class="space-y-4">
-          <input type="hidden" name="next" value={redirectTo} />
-
-          <div>
-            <label for="email" class="block text-sm font-medium text-text-primary mb-1.5">Email Address</label>
-            <input
-              type="email" id="email" name="email" required autocomplete="email"
-              placeholder="you@example.com"
-              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label for="password" class="block text-sm font-medium text-text-primary mb-1.5">Password</label>
-            <input
-              type="password" id="password" name="password" required autocomplete="current-password"
-              placeholder="••••••••"
-              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-            />
-          </div>
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-text-secondary"></span>
-            <a href="/portal/forgot-password" class="text-primary-600 hover:underline">Forgot password?</a>
-          </div>
-          <button type="submit" class="btn-primary w-full flex items-center justify-center gap-2">
-            Sign In
+        <!-- Tabs -->
+        <div class="flex rounded-xl border border-border-light overflow-hidden mb-6">
+          <button id="tab-email" onclick="switchTab('email')"
+            class="flex-1 py-2 text-sm font-medium bg-primary-600 text-white transition-colors">
+            Email & Password
           </button>
-        </form>
+          <button id="tab-otp" onclick="switchTab('otp')"
+            class="flex-1 py-2 text-sm font-medium bg-white text-text-secondary hover:bg-gray-50 transition-colors">
+            Mobile OTP
+          </button>
+        </div>
+
+        <!-- Email / Password panel -->
+        <div id="panel-email">
+          <form method="POST" action="/api/v1/auth/login" class="space-y-4">
+            <input type="hidden" name="next" value={redirectTo} />
+            <div>
+              <label for="email" class="block text-sm font-medium text-text-primary mb-1.5">Email Address</label>
+              <input
+                type="email" id="email" name="email" required autocomplete="email"
+                placeholder="you@example.com"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label for="password" class="block text-sm font-medium text-text-primary mb-1.5">Password</label>
+              <input
+                type="password" id="password" name="password" required autocomplete="current-password"
+                placeholder="••••••••"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              />
+            </div>
+            <div class="flex items-center justify-end text-sm">
+              <a href="/portal/forgot-password" class="text-primary-600 hover:underline">Forgot password?</a>
+            </div>
+            <button type="submit" class="btn-primary w-full flex items-center justify-center gap-2">
+              Sign In
+            </button>
+          </form>
+        </div>
+
+        <!-- Mobile OTP panel -->
+        <div id="panel-otp" class="hidden">
+          <div id="otp-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+
+          <!-- Step 1: phone -->
+          <div id="otp-step-phone" class="space-y-4">
+            <div>
+              <label for="otp-phone" class="block text-sm font-medium text-text-primary mb-1.5">Mobile Number</label>
+              <div class="flex gap-2">
+                <span class="px-3 py-2.5 bg-gray-50 border border-border-light rounded-xl text-sm text-text-secondary">+91</span>
+                <input type="tel" id="otp-phone" pattern="[6-9][0-9]{9}" maxlength="10"
+                  placeholder="10-digit mobile"
+                  class="flex-1 px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent" />
+              </div>
+            </div>
+            <button id="send-otp-btn" onclick="sendOtp()"
+              class="btn-primary w-full flex items-center justify-center gap-2">
+              <span id="send-otp-text">Send OTP</span>
+              <span id="send-otp-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+            </button>
+          </div>
+
+          <!-- Step 2: token -->
+          <div id="otp-step-token" class="hidden space-y-4">
+            <p id="otp-sent-msg" class="text-sm text-secondary-500 text-center"></p>
+            <div>
+              <label for="otp-token" class="block text-sm font-medium text-text-primary mb-1.5">Enter OTP</label>
+              <input type="text" id="otp-token" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                placeholder="6-digit code"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent" />
+            </div>
+            <button id="verify-otp-btn" onclick="verifyOtp()"
+              class="btn-primary w-full flex items-center justify-center gap-2">
+              <span id="verify-otp-text">Verify & Sign In</span>
+              <span id="verify-otp-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+            </button>
+            <button onclick="resetOtp()" class="btn-ghost w-full text-sm text-text-secondary">
+              <i class="fas fa-arrow-left mr-1" aria-hidden="true"></i> Use a different number
+            </button>
+          </div>
+        </div>
 
         <p class="mt-6 text-center text-xs text-text-secondary">
           Having trouble? Contact the Management Office.
@@ -83,3 +138,128 @@ if (errorCode) {
     </div>
   </section>
 </Layout>
+
+<script>
+  const redirectTo = new URLSearchParams(window.location.search).get('next') ?? '/portal';
+  let otpPhone = '';
+
+  function switchTab(tab: string) {
+    const isOtp = tab === 'otp';
+    document.getElementById('panel-email')!.classList.toggle('hidden', isOtp);
+    document.getElementById('panel-otp')!.classList.toggle('hidden', !isOtp);
+    const emailTab = document.getElementById('tab-email')!;
+    const otpTab   = document.getElementById('tab-otp')!;
+    emailTab.classList.toggle('bg-primary-600', !isOtp);
+    emailTab.classList.toggle('text-white', !isOtp);
+    emailTab.classList.toggle('bg-white', isOtp);
+    emailTab.classList.toggle('text-text-secondary', isOtp);
+    otpTab.classList.toggle('bg-primary-600', isOtp);
+    otpTab.classList.toggle('text-white', isOtp);
+    otpTab.classList.toggle('bg-white', !isOtp);
+    otpTab.classList.toggle('text-text-secondary', !isOtp);
+  }
+
+  async function sendOtp() {
+    const phoneEl  = document.getElementById('otp-phone') as HTMLInputElement;
+    const errorEl  = document.getElementById('otp-error')!;
+    const textEl   = document.getElementById('send-otp-text')!;
+    const spinEl   = document.getElementById('send-otp-spinner')!;
+    const btn      = document.getElementById('send-otp-btn') as HTMLButtonElement;
+
+    errorEl.classList.add('hidden');
+    const phone = phoneEl.value.trim();
+    if (!/^[6-9][0-9]{9}$/.test(phone)) {
+      errorEl.textContent = 'Enter a valid 10-digit Indian mobile number.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    textEl.classList.add('hidden');
+    spinEl.classList.remove('hidden');
+    btn.disabled = true;
+
+    try {
+      const res  = await fetch('/api/v1/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        otpPhone = phone;
+        document.getElementById('otp-step-phone')!.classList.add('hidden');
+        document.getElementById('otp-step-token')!.classList.remove('hidden');
+        document.getElementById('otp-sent-msg')!.textContent = `OTP sent to +91 ${phone}`;
+        document.getElementById('otp-token')?.focus();
+      } else {
+        errorEl.textContent = data.message ?? 'Failed to send OTP. Please try again.';
+        errorEl.classList.remove('hidden');
+      }
+    } catch {
+      errorEl.textContent = 'Network error. Please check your connection.';
+      errorEl.classList.remove('hidden');
+    } finally {
+      textEl.classList.remove('hidden');
+      spinEl.classList.add('hidden');
+      btn.disabled = false;
+    }
+  }
+
+  async function verifyOtp() {
+    const tokenEl  = document.getElementById('otp-token') as HTMLInputElement;
+    const errorEl  = document.getElementById('otp-error')!;
+    const textEl   = document.getElementById('verify-otp-text')!;
+    const spinEl   = document.getElementById('verify-otp-spinner')!;
+    const btn      = document.getElementById('verify-otp-btn') as HTMLButtonElement;
+
+    errorEl.classList.add('hidden');
+    const token = tokenEl.value.trim();
+    if (!/^[0-9]{6}$/.test(token)) {
+      errorEl.textContent = 'Enter the 6-digit OTP from your SMS.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    textEl.classList.add('hidden');
+    spinEl.classList.remove('hidden');
+    btn.disabled = true;
+
+    try {
+      const res  = await fetch('/api/v1/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ phone: otpPhone, token }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = data.next ?? redirectTo;
+      } else {
+        errorEl.textContent = data.message ?? 'Invalid or expired OTP. Please try again.';
+        errorEl.classList.remove('hidden');
+      }
+    } catch {
+      errorEl.textContent = 'Network error. Please check your connection.';
+      errorEl.classList.remove('hidden');
+    } finally {
+      textEl.classList.remove('hidden');
+      spinEl.classList.add('hidden');
+      btn.disabled = false;
+    }
+  }
+
+  function resetOtp() {
+    otpPhone = '';
+    (document.getElementById('otp-phone') as HTMLInputElement).value = '';
+    (document.getElementById('otp-token') as HTMLInputElement).value = '';
+    document.getElementById('otp-step-phone')!.classList.remove('hidden');
+    document.getElementById('otp-step-token')!.classList.add('hidden');
+    document.getElementById('otp-error')!.classList.add('hidden');
+  }
+
+  // expose to inline onclick handlers
+  (window as unknown as Record<string, unknown>).switchTab = switchTab;
+  (window as unknown as Record<string, unknown>).sendOtp   = sendOtp;
+  (window as unknown as Record<string, unknown>).verifyOtp = verifyOtp;
+  (window as unknown as Record<string, unknown>).resetOtp  = resetOtp;
+</script>

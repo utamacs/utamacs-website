@@ -1,0 +1,115 @@
+---
+export const prerender = false;
+import PortalAuthLayout from '@components/layout/PortalAuthLayout.astro';
+import { resolveFromRequest } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login?next=/register/secondary');
+---
+
+<PortalAuthLayout title="Add Family Member – UTA MACS">
+  <section class="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
+    <div class="w-full max-w-lg">
+      <div class="text-center mb-8">
+        <a href="/register" class="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-primary-600 mb-4 transition-colors">
+          <i class="fas fa-arrow-left text-xs" aria-hidden="true"></i> Back
+        </a>
+        <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mx-auto mb-3">
+          <i class="fas fa-users text-purple-600 text-xl" aria-hidden="true"></i>
+        </div>
+        <h1 class="text-xl font-bold text-text-primary font-poppins">Add a Family Member</h1>
+        <p class="text-sm text-text-secondary mt-1">Add a spouse, parent, or child living in your flat. The executive committee will review and send them an invite.</p>
+      </div>
+
+      <div id="error-banner" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+      <form id="secondary-form" class="bg-white rounded-2xl shadow-medium p-8 space-y-5">
+        <div>
+          <label for="applicant_name" class="form-label">Family Member's Full Name <span class="text-red-500">*</span></label>
+          <input type="text" id="applicant_name" name="applicant_name" required maxlength="100"
+            placeholder="Full name" class="form-input" />
+        </div>
+
+        <div>
+          <label for="applicant_email" class="form-label">Family Member's Email <span class="text-red-500">*</span></label>
+          <input type="email" id="applicant_email" name="applicant_email" required maxlength="200"
+            placeholder="their@email.com" class="form-input" />
+        </div>
+
+        <div>
+          <label for="applicant_phone" class="form-label">Family Member's Mobile <span class="text-red-500">*</span></label>
+          <input type="tel" id="applicant_phone" name="applicant_phone" required
+            pattern="[6-9][0-9]{9}" maxlength="10" placeholder="10-digit mobile" class="form-input" />
+        </div>
+
+        <div>
+          <label for="relationship" class="form-label">Relationship <span class="text-red-500">*</span></label>
+          <select id="relationship" name="relationship" required class="form-input bg-white">
+            <option value="">Select relationship</option>
+            <option>Spouse</option>
+            <option>Parent</option>
+            <option>Child</option>
+            <option>Sibling</option>
+            <option>Other</option>
+          </select>
+        </div>
+
+        <label class="flex items-start gap-3 cursor-pointer pt-1">
+          <input type="checkbox" required class="mt-0.5 rounded border-gray-300 text-primary-600 flex-shrink-0" />
+          <span class="text-sm text-text-secondary">I confirm this person lives in my flat and I consent to adding them to the household register under DPDPA 2023.</span>
+        </label>
+
+        <button type="submit" id="submit-btn" class="btn-primary w-full flex items-center justify-center gap-2">
+          <span id="btn-text">Submit Request</span>
+          <span id="btn-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <script>
+    const form = document.getElementById('secondary-form') as HTMLFormElement;
+    const errorBanner = document.getElementById('error-banner')!;
+    const btnText = document.getElementById('btn-text')!;
+    const btnSpinner = document.getElementById('btn-spinner')!;
+    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBanner.classList.add('hidden');
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      submitBtn.disabled = true;
+
+      const fd = new FormData(form);
+      try {
+        const res = await fetch('/api/v1/register/secondary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            applicant_name:  fd.get('applicant_name'),
+            applicant_email: fd.get('applicant_email'),
+            applicant_phone: fd.get('applicant_phone'),
+            relationship:    fd.get('relationship'),
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          window.location.href = `/register/pending?ref=${data.id}`;
+        } else {
+          errorBanner.textContent = data.message ?? data.error ?? 'Submission failed. Please try again.';
+          errorBanner.classList.remove('hidden');
+        }
+      } catch {
+        errorBanner.textContent = 'Network error. Please check your connection and try again.';
+        errorBanner.classList.remove('hidden');
+      } finally {
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</PortalAuthLayout>

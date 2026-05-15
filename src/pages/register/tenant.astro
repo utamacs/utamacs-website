@@ -1,0 +1,135 @@
+---
+export const prerender = false;
+import PortalAuthLayout from '@components/layout/PortalAuthLayout.astro';
+---
+
+<PortalAuthLayout title="Tenant Registration – UTA MACS">
+  <section class="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
+    <div class="w-full max-w-lg">
+      <div class="text-center mb-8">
+        <a href="/register" class="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-primary-600 mb-4 transition-colors">
+          <i class="fas fa-arrow-left text-xs" aria-hidden="true"></i> Back
+        </a>
+        <div class="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mx-auto mb-3">
+          <i class="fas fa-key text-secondary-500 text-xl" aria-hidden="true"></i>
+        </div>
+        <h1 class="text-xl font-bold text-text-primary font-poppins">Tenant Registration</h1>
+        <p class="text-sm text-text-secondary mt-1">Fill in your details. We'll notify your landlord to confirm consent before the committee reviews.</p>
+      </div>
+
+      <div id="error-banner" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+      <form id="tenant-form" class="bg-white rounded-2xl shadow-medium p-8 space-y-5" enctype="multipart/form-data">
+        <div>
+          <label for="applicant_name" class="form-label">Full Name <span class="text-red-500">*</span></label>
+          <input type="text" id="applicant_name" name="applicant_name" required maxlength="100"
+            placeholder="As per rental agreement" class="form-input" />
+        </div>
+
+        <div>
+          <label for="applicant_email" class="form-label">Email Address <span class="text-red-500">*</span></label>
+          <input type="email" id="applicant_email" name="applicant_email" required maxlength="200"
+            placeholder="you@example.com" class="form-input" />
+        </div>
+
+        <div>
+          <label for="applicant_phone" class="form-label">Mobile Number <span class="text-red-500">*</span></label>
+          <input type="tel" id="applicant_phone" name="applicant_phone" required
+            pattern="[6-9][0-9]{9}" maxlength="10" placeholder="10-digit mobile" class="form-input" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="block" class="form-label">Block / Wing</label>
+            <input type="text" id="block" name="block" maxlength="20" placeholder="e.g. A" class="form-input" />
+          </div>
+          <div>
+            <label for="unit_number" class="form-label">Flat Number <span class="text-red-500">*</span></label>
+            <input type="text" id="unit_number" name="unit_number" required maxlength="20" placeholder="e.g. 301" class="form-input" />
+          </div>
+        </div>
+
+        <div>
+          <label for="owner_email" class="form-label">Owner's Registered Email</label>
+          <input type="email" id="owner_email" name="owner_email" maxlength="200"
+            placeholder="landlord@example.com — for consent notification"
+            class="form-input" />
+          <p class="text-xs text-text-secondary mt-1">If the owner is registered, they'll receive a portal notification for consent.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="lease_start" class="form-label">Lease Start Date</label>
+            <input type="date" id="lease_start" name="lease_start" class="form-input" />
+          </div>
+          <div>
+            <label for="lease_end" class="form-label">Lease End Date</label>
+            <input type="date" id="lease_end" name="lease_end" class="form-input" />
+          </div>
+        </div>
+
+        <div>
+          <label for="lease_doc" class="form-label">Rental Agreement (PDF)</label>
+          <input type="file" id="lease_doc" name="lease_doc" accept=".pdf" class="form-input text-sm py-2 cursor-pointer" />
+          <p class="text-xs text-text-secondary mt-1">PDF only · max 5 MB (optional but recommended)</p>
+        </div>
+
+        <label class="flex items-start gap-3 cursor-pointer pt-1">
+          <input type="checkbox" id="consent_dpdpa" required class="mt-0.5 rounded border-gray-300 text-primary-600 flex-shrink-0" />
+          <span class="text-sm text-text-secondary">I agree to the
+            <a href="/portal/policies" class="text-primary-600 hover:underline" target="_blank">Privacy Policy</a>
+            and consent to processing of my personal data under DPDPA 2023.
+          </span>
+        </label>
+
+        <button type="submit" id="submit-btn" class="btn-primary w-full flex items-center justify-center gap-2">
+          <span id="btn-text">Submit Registration</span>
+          <span id="btn-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <script>
+    const form = document.getElementById('tenant-form') as HTMLFormElement;
+    const errorBanner = document.getElementById('error-banner')!;
+    const btnText = document.getElementById('btn-text')!;
+    const btnSpinner = document.getElementById('btn-spinner')!;
+    const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const leaseStart = fd.get('lease_start') as string;
+      const leaseEnd   = fd.get('lease_end') as string;
+      if (leaseStart && leaseEnd && new Date(leaseStart) >= new Date(leaseEnd)) {
+        errorBanner.textContent = 'Lease end date must be after lease start date.';
+        errorBanner.classList.remove('hidden');
+        return;
+      }
+
+      errorBanner.classList.add('hidden');
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/v1/register/tenant', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (res.ok) {
+          window.location.href = `/register/pending?ref=${data.id}`;
+        } else {
+          errorBanner.textContent = data.message ?? data.error ?? 'Submission failed. Please try again.';
+          errorBanner.classList.remove('hidden');
+        }
+      } catch {
+        errorBanner.textContent = 'Network error. Please check your connection and try again.';
+        errorBanner.classList.remove('hidden');
+      } finally {
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</PortalAuthLayout>
