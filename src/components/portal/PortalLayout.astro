@@ -48,6 +48,18 @@ const FALLBACK_MODULES: FallbackModule[] = [
   { moduleKey: 'staff_kyc',        displayName: 'Staff & Maid KYC',       icon: 'fa-user-check',         navGroup: 'Administration', minNavRole: 'admin'     },
   { moduleKey: 'staff_management', displayName: 'Staff Management',       icon: 'fa-users-cog',          navGroup: 'Administration', minNavRole: 'executive' },
   { moduleKey: 'register',         displayName: 'Society Membership',     icon: 'fa-certificate',        navGroup: 'Governance',     minNavRole: 'member'    },
+  // Admin tools — registered in module_configurations via migration 092
+  { moduleKey: 'admin_society',    displayName: 'Society Profile',        icon: 'fa-building',           navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_holidays',   displayName: 'Holiday Calendar',       icon: 'fa-calendar-day',       navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_audit',      displayName: 'Audit Logs',             icon: 'fa-shield-alt',         navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_assets',     displayName: 'Asset Register',         icon: 'fa-cogs',               navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_rules',      displayName: 'Rules Engine',           icon: 'fa-sliders-h',          navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_rbac',       displayName: 'RBAC & Permissions',     icon: 'fa-lock',               navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_email',      displayName: 'Email Drafts',           icon: 'fa-envelope-open-text', navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_features',   displayName: 'Feature Config',         icon: 'fa-toggle-on',          navGroup: 'Administration', minNavRole: 'admin'     },
+  { moduleKey: 'admin_staff',      displayName: 'Staff Attendance',       icon: 'fa-user-clock',         navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_tds',        displayName: 'TDS Tracking',           icon: 'fa-file-invoice',       navGroup: 'Administration', minNavRole: 'executive' },
+  { moduleKey: 'admin_consent',    displayName: 'Consent Mgmt',           icon: 'fa-user-shield',        navGroup: 'Administration', minNavRole: 'admin'     },
 ];
 
 // Canonical path for each module key. DB never stores this — it's tied to code.
@@ -81,6 +93,18 @@ const MODULE_PATHS: Record<string, string> = {
   staff_kyc:        '/portal/admin/staff-kyc',
   staff_management: '/portal/staff-management',
   register:         '/portal/register/membership',
+  // Admin tools (module_configurations, migration 092)
+  admin_society:    '/portal/admin/society-profile',
+  admin_holidays:   '/portal/admin/holidays',
+  admin_audit:      '/portal/admin/audit',
+  admin_assets:     '/portal/admin/assets',
+  admin_rules:      '/portal/admin/rules',
+  admin_rbac:       '/portal/admin/rbac',
+  admin_email:      '/portal/admin/email-drafts',
+  admin_features:   '/portal/admin/features',
+  admin_staff:      '/portal/admin/staff',
+  admin_tds:        '/portal/admin/tds',
+  admin_consent:    '/portal/admin/consent',
 };
 
 type ActiveModule = { moduleKey: string; displayName: string; icon: string | null; navGroup: string; minNavRole: string; isActive?: boolean };
@@ -205,25 +229,6 @@ if (navRole === 'guard') {
     } else {
       adminItems.push(link('Staff Management', '/portal/staff-management', 'fa-users-cog', 'staff_management'), ...smLinks);
     }
-    groupMap.set('Administration', adminItems);
-  }
-
-  // 4b. Prepend hardcoded admin tool links to the Administration group.
-  if (user.isAdmin) {
-    const adminItems = groupMap.get('Administration') ?? [];
-    adminItems.unshift(
-      link('Society Profile',     '/portal/admin/society-profile', 'fa-building',          'admin_society'),
-      link('Holiday Calendar',   '/portal/admin/holidays',        'fa-calendar-day',      'admin_holidays'),
-      link('Audit Logs',         '/portal/admin/audit',           'fa-shield-alt',        'admin_audit'),
-      link('Asset Register',     '/portal/admin/assets',          'fa-cogs',              'admin_assets'),
-      link('Rules Engine',       '/portal/admin/rules',           'fa-sliders-h',         'admin_rules'),
-      link('RBAC & Permissions', '/portal/admin/rbac',            'fa-lock',              'admin_rbac'),
-      link('Email Drafts',       '/portal/admin/email-drafts',    'fa-envelope-open-text','admin_email'),
-      link('Feature Config',     '/portal/admin/features',        'fa-toggle-on',         'admin_features'),
-      link('Staff Attendance',   '/portal/admin/staff',           'fa-user-clock',        'admin_staff'),
-      link('TDS Tracking',       '/portal/admin/tds',             'fa-file-invoice',      'admin_tds'),
-      link('Consent Mgmt',       '/portal/admin/consent',         'fa-user-shield',       'admin_consent'),
-    );
     groupMap.set('Administration', adminItems);
   }
 
