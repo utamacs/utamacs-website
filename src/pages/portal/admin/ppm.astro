@@ -1,0 +1,490 @@
+---
+export const prerender = false;
+import PortalLayout from '@components/portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+import { resolveFromRequest } from '@lib/permissions';
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const user = await resolveFromRequest(Astro.request, SOCIETY_ID);
+if (!user) return Astro.redirect('/portal/login');
+const isPrivileged = user.isAdmin || ['executive', 'secretary', 'president'].includes(user.portalRole ?? '');
+if (!isPrivileged) return Astro.redirect('/portal/admin');
+
+const sb = getSupabaseServiceClient();
+
+const { data: assets } = await sb
+  .from('infrastructure_assets')
+  .select('id, name, asset_code, category')
+  .eq('society_id', SOCIETY_ID)
+  .eq('status', 'active')
+  .order('category').order('name');
+
+const allAssets = assets ?? [];
+const assetsJson = JSON.stringify(allAssets);
+
+const CAT_ICONS: Record<string, string> = {
+  electrical:'fa-bolt', plumbing:'fa-faucet', fire_safety:'fa-fire-extinguisher',
+  hvac:'fa-wind', mechanical:'fa-cogs', security:'fa-shield-alt',
+  civil:'fa-building', it:'fa-server', general:'fa-cube',
+};
+---
+
+<PortalLayout title="PPM Schedules" user={user} activeModule="admin_ppm">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <nav class="text-sm text-text-secondary mb-2">
+        <a href="/portal/admin" class="hover:text-primary-600">Admin</a>
+        <span class="mx-2">›</span><span class="text-text-primary">PPM Schedules</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Planned Preventive Maintenance</h1>
+      <p class="text-text-secondary text-sm mt-1">Schedule and track recurring maintenance tasks for society assets.</p>
+    </div>
+    <button id="add-ppm-btn" class="btn-primary flex items-center gap-2">
+      <i class="fas fa-plus" aria-hidden="true"></i>Add Schedule
+    </button>
+  </div>
+
+  <!-- Alert banner -->
+  <div id="ppm-alert-banner" class="hidden mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+    <div class="flex items-start gap-3">
+      <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+      <div id="ppm-alert-content" class="flex-1 min-w-0 text-sm text-amber-800"></div>
+      <button id="ppm-alert-dismiss" class="text-amber-400 hover:text-amber-600 flex-shrink-0" aria-label="Dismiss">
+        <i class="fas fa-times text-sm" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI bar -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="card-stats"><div id="kpi-total" class="number text-primary-600">—</div><div class="label">Total Schedules</div></div>
+    <div class="card-stats"><div id="kpi-overdue" class="number text-red-600">—</div><div class="label">Overdue</div></div>
+    <div class="card-stats"><div id="kpi-upcoming" class="number text-amber-600">—</div><div class="label">Due This Week</div></div>
+    <div class="card-stats"><div id="kpi-ok" class="number text-secondary-500">—</div><div class="label">On Track</div></div>
+  </div>
+
+  <!-- Filter row -->
+  <div class="flex flex-wrap items-center gap-3 mb-4">
+    <div class="flex gap-1" id="status-tabs">
+      <button data-status="all" class="status-tab px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-600 text-white">All</button>
+      <button data-status="overdue" class="status-tab px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-text-secondary hover:bg-gray-200">
+        <i class="fas fa-exclamation-circle mr-1 text-red-500" aria-hidden="true"></i>Overdue
+      </button>
+      <button data-status="upcoming" class="status-tab px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-text-secondary hover:bg-gray-200">
+        <i class="fas fa-clock mr-1 text-amber-500" aria-hidden="true"></i>Due Soon
+      </button>
+    </div>
+    <div class="ml-auto">
+      <div class="relative">
+        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-sm" aria-hidden="true"></i>
+        <input id="ppm-search" type="text" placeholder="Search tasks…"
+               class="form-input !py-1.5 !pl-8 !pr-3 text-sm w-52" />
+      </div>
+    </div>
+  </div>
+
+  <div id="ppm-list" class="space-y-3">
+    <div class="text-center py-12 text-text-secondary text-sm">
+      <i class="fas fa-spinner fa-spin mr-2"></i>Loading…
+    </div>
+  </div>
+
+  <!-- Add / Edit drawer -->
+  <div id="form-panel"
+    class="fixed inset-y-0 right-0 w-full sm:w-[520px] bg-white shadow-large z-40
+           transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-border-light p-4 flex items-center justify-between">
+      <h2 id="fp-title" class="text-lg font-semibold text-primary-600">Add PPM Schedule</h2>
+      <button id="fp-close" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <form id="ppm-form" class="p-4 space-y-4">
+      <input type="hidden" id="ppm-id" />
+      <div>
+        <label class="form-label" for="f-title">Task Title <span class="text-red-500">*</span></label>
+        <input id="f-title" type="text" maxlength="200" class="form-input" placeholder="e.g. Generator weekly run test" required />
+      </div>
+      <div>
+        <label class="form-label" for="f-asset">Linked Asset</label>
+        <select id="f-asset" class="form-input bg-white">
+          <option value="">— Not linked to specific asset —</option>
+          {allAssets.map(a => (
+            <option value={a.id}>{a.asset_code ? `[${a.asset_code}] ` : ''}{a.name}</option>
+          ))}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label" for="f-frequency">Frequency</label>
+          <select id="f-frequency" class="form-input bg-white">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly" selected>Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="half_yearly">Half-Yearly</option>
+            <option value="annual">Annual</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" for="f-freq-days">Every N days <span class="text-text-secondary text-xs">(auto-set)</span></label>
+          <input id="f-freq-days" type="number" min="1" max="730" class="form-input" value="30" />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label" for="f-start">First due date</label>
+          <input id="f-start" type="date" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label" for="f-role">Responsible role</label>
+          <input id="f-role" type="text" maxlength="100" class="form-input" placeholder="e.g. Security Guard, Exec" />
+        </div>
+      </div>
+      <div>
+        <label class="form-label" for="f-description">Description</label>
+        <textarea id="f-description" rows="2" maxlength="1000" class="form-input resize-none" placeholder="Steps, checklist notes…"></textarea>
+      </div>
+      <div>
+        <label class="form-label" for="f-notes">Notes</label>
+        <input id="f-notes" type="text" maxlength="1000" class="form-input" placeholder="Any additional notes" />
+      </div>
+      <div id="f-error" class="hidden form-error"></div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" id="f-submit" class="btn-primary flex-1">
+          <i class="fas fa-save mr-2" aria-hidden="true"></i>
+          <span id="f-submit-label">Save Schedule</span>
+        </button>
+        <button type="button" id="f-cancel" class="btn-outline flex-1">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Mark Done modal -->
+  <div id="done-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog">
+    <div class="bg-white rounded-2xl shadow-large w-full max-w-md p-6">
+      <h3 class="text-lg font-semibold text-primary-600 mb-4">Mark Task Complete</h3>
+      <div id="done-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+      <input type="hidden" id="done-id" />
+      <input type="hidden" id="done-title" />
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label" for="done-date">Completed on <span class="text-red-500">*</span></label>
+            <input id="done-date" type="date" class="form-input" />
+          </div>
+          <div>
+            <label class="form-label" for="done-cost">Cost (₹)</label>
+            <input id="done-cost" type="number" min="0" step="0.01" class="form-input" placeholder="Optional" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label" for="done-by">Completed by</label>
+          <input id="done-by" type="text" maxlength="200" class="form-input" placeholder="e.g. Suresh Kumar" />
+        </div>
+        <div>
+          <label class="form-label" for="done-notes">Notes</label>
+          <textarea id="done-notes" rows="2" maxlength="1000" class="form-input resize-none" placeholder="Observations, issues found…"></textarea>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-5">
+        <button id="done-submit" class="btn-primary flex-1 text-sm flex items-center justify-center gap-2">
+          <i class="fas fa-check" aria-hidden="true"></i>Confirm Done
+        </button>
+        <button id="done-cancel" class="btn-outline flex-1 text-sm">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-backdrop" class="fixed inset-0 bg-black/40 z-30 hidden"></div>
+
+  <script define:vars={{ assetsJson }}>
+    const ASSETS = JSON.parse(assetsJson);
+    const ASSET_MAP = ASSETS.reduce((m, a) => { m[a.id] = a; return m; }, {});
+    const FREQ_DAYS = { daily:1, weekly:7, fortnightly:14, monthly:30, quarterly:90, half_yearly:180, annual:365 };
+    const FREQ_LABELS = { daily:'Daily', weekly:'Weekly', fortnightly:'Fortnightly', monthly:'Monthly', quarterly:'Quarterly', half_yearly:'Half-Yearly', annual:'Annual' };
+
+    let allSchedules = [];
+    let activeStatus = 'all';
+    let searchTerm = '';
+    let editingId = null;
+
+    function showToast(msg, type = 'success') {
+      const t = document.createElement('div');
+      t.className = `fixed bottom-6 right-6 z-[100] px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${type === 'success' ? 'bg-secondary-500' : 'bg-red-500'}`;
+      t.textContent = msg;
+      document.body.appendChild(t);
+      requestAnimationFrame(() => t.classList.remove('translate-y-4','opacity-0'));
+      setTimeout(() => { t.classList.add('translate-y-4','opacity-0'); setTimeout(() => t.remove(), 300); }, 3500);
+    }
+
+    function fmtDate(d) {
+      return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—';
+    }
+
+    // ── Load ──────────────────────────────────────────────────────────────────
+    async function loadPPM() {
+      const res = await fetch('/api/v1/admin/ppm', { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      allSchedules = data.schedules ?? [];
+
+      document.getElementById('kpi-total').textContent   = String(allSchedules.length);
+      document.getElementById('kpi-overdue').textContent  = String(data.overdue_count ?? 0);
+      document.getElementById('kpi-upcoming').textContent = String(data.upcoming_count ?? 0);
+      document.getElementById('kpi-ok').textContent = String(allSchedules.length - (data.overdue_count ?? 0) - (data.upcoming_count ?? 0));
+
+      // Alert banner for overdue + upcoming
+      const alertItems = allSchedules.filter(s => s.is_overdue || s.is_upcoming);
+      if (alertItems.length) {
+        const overdues  = alertItems.filter(s => s.is_overdue).length;
+        const upcomings = alertItems.filter(s => s.is_upcoming).length;
+        document.getElementById('ppm-alert-content').textContent =
+          [overdues > 0  ? `${overdues} task${overdues !== 1 ? 's' : ''} overdue` : '',
+           upcomings > 0 ? `${upcomings} task${upcomings !== 1 ? 's' : ''} due within ${data.alert_days} days` : '']
+          .filter(Boolean).join(' · ');
+        document.getElementById('ppm-alert-banner').classList.remove('hidden');
+      }
+
+      renderList();
+    }
+
+    function renderList() {
+      const today = new Date().toISOString().slice(0, 10);
+      const filtered = allSchedules.filter(s => {
+        if (activeStatus === 'overdue'  && !s.is_overdue)  return false;
+        if (activeStatus === 'upcoming' && !s.is_upcoming) return false;
+        if (searchTerm && !`${s.title} ${s.responsible_role ?? ''} ${ASSET_MAP[s.asset_id]?.name ?? ''}`.toLowerCase().includes(searchTerm)) return false;
+        return true;
+      });
+
+      const container = document.getElementById('ppm-list');
+
+      if (!filtered.length) {
+        container.innerHTML = `
+          <div class="text-center py-16">
+            <i class="fas fa-clipboard-check text-5xl text-primary-200 mb-4" aria-hidden="true"></i>
+            <h3 class="text-lg font-semibold text-text-primary mb-2">No PPM schedules</h3>
+            <p class="text-text-secondary text-sm">${activeStatus === 'all' ? 'Add your first recurring maintenance task.' : 'No tasks match this filter.'}</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(s => {
+        const asset = s.asset_id ? ASSET_MAP[s.asset_id] : null;
+        const daysUntil = s.days_until;
+        let urgencyCls = 'border-border-light';
+        let dueBadge = '';
+        if (s.is_overdue) {
+          urgencyCls = 'border-l-4 border-l-red-500';
+          dueBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700"><i class="fas fa-exclamation-circle"></i>Overdue ${Math.abs(daysUntil)}d</span>`;
+        } else if (s.is_upcoming) {
+          urgencyCls = 'border-l-4 border-l-amber-400';
+          dueBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700"><i class="fas fa-clock"></i>Due in ${daysUntil}d</span>`;
+        } else if (s.next_due_date) {
+          dueBadge = `<span class="text-xs text-text-secondary">Due ${fmtDate(s.next_due_date)}</span>`;
+        }
+
+        return `
+          <div class="card-premium p-4 ${urgencyCls}">
+            <div class="flex items-start gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-start gap-2 flex-wrap mb-1.5">
+                  <span class="text-sm font-semibold text-text-primary">${s.title}</span>
+                  ${dueBadge}
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-600 font-medium">${FREQ_LABELS[s.frequency] ?? s.frequency}</span>
+                </div>
+                <div class="flex items-center gap-4 text-xs text-text-secondary flex-wrap">
+                  ${asset ? `<span><i class="fas fa-cog mr-1 text-primary-300"></i>${asset.name}</span>` : ''}
+                  ${s.responsible_role ? `<span><i class="fas fa-user mr-1 text-primary-300"></i>${s.responsible_role}</span>` : ''}
+                  ${s.last_completed_at ? `<span><i class="fas fa-check-circle mr-1 text-green-400"></i>Last done ${fmtDate(s.last_completed_at)}</span>` : '<span class="text-amber-600">Never completed</span>'}
+                </div>
+                ${s.description ? `<p class="text-xs text-text-secondary mt-1.5 line-clamp-1">${s.description}</p>` : ''}
+              </div>
+              <div class="flex items-center gap-1.5 flex-shrink-0">
+                <button onclick="openDone('${s.id}','${s.title.replace(/'/g,"\\'")}','${s.next_due_date ?? ''}')"
+                  class="btn-primary text-xs px-3 py-1.5 flex items-center gap-1">
+                  <i class="fas fa-check" aria-hidden="true"></i>Done
+                </button>
+                <button onclick="openEdit('${s.id}')"
+                  class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-primary-600">
+                  <i class="fas fa-edit" aria-hidden="true"></i>
+                </button>
+                <button onclick="deletePPM('${s.id}')"
+                  class="btn-ghost text-xs px-2 py-1.5 text-text-secondary hover:text-red-600">
+                  <i class="fas fa-trash" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── Status tabs ───────────────────────────────────────────────────────────
+    document.querySelectorAll('.status-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeStatus = btn.dataset.status;
+        document.querySelectorAll('.status-tab').forEach(b => {
+          b.classList.toggle('bg-primary-600', b === btn);
+          b.classList.toggle('text-white', b === btn);
+          b.classList.toggle('bg-gray-100', b !== btn);
+          b.classList.toggle('text-text-secondary', b !== btn);
+        });
+        renderList();
+      });
+    });
+
+    let sTimer;
+    document.getElementById('ppm-search')?.addEventListener('input', e => {
+      clearTimeout(sTimer);
+      sTimer = setTimeout(() => { searchTerm = e.target.value.trim().toLowerCase(); renderList(); }, 200);
+    });
+
+    document.getElementById('ppm-alert-dismiss')?.addEventListener('click', () => {
+      document.getElementById('ppm-alert-banner').classList.add('hidden');
+    });
+
+    // ── Panel helpers ─────────────────────────────────────────────────────────
+    const backdrop = document.getElementById('panel-backdrop');
+    function openPanel(id) { document.getElementById(id)?.classList.replace('translate-x-full','translate-x-0'); backdrop?.classList.remove('hidden'); }
+    function closePanel(id) { document.getElementById(id)?.classList.replace('translate-x-0','translate-x-full'); backdrop?.classList.add('hidden'); }
+    backdrop?.addEventListener('click', () => closePanel('form-panel'));
+    document.getElementById('fp-close')?.addEventListener('click', () => closePanel('form-panel'));
+    document.getElementById('f-cancel')?.addEventListener('click', () => closePanel('form-panel'));
+
+    // ── Frequency auto-fill ───────────────────────────────────────────────────
+    document.getElementById('f-frequency')?.addEventListener('change', e => {
+      const days = FREQ_DAYS[e.target.value];
+      if (days) document.getElementById('f-freq-days').value = String(days);
+    });
+
+    // ── Add form ──────────────────────────────────────────────────────────────
+    function openAddForm() {
+      editingId = null;
+      document.getElementById('fp-title').textContent = 'Add PPM Schedule';
+      const form = document.getElementById('ppm-form');
+      form.reset();
+      document.getElementById('ppm-id').value = '';
+      document.getElementById('f-freq-days').value = '30';
+      document.getElementById('f-start').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('f-error').classList.add('hidden');
+      openPanel('form-panel');
+    }
+
+    window.openEdit = function(id) {
+      const s = allSchedules.find(x => x.id === id);
+      if (!s) return;
+      editingId = id;
+      document.getElementById('fp-title').textContent = 'Edit PPM Schedule';
+      document.getElementById('ppm-id').value       = s.id;
+      document.getElementById('f-title').value       = s.title;
+      document.getElementById('f-asset').value       = s.asset_id ?? '';
+      document.getElementById('f-frequency').value   = s.frequency;
+      document.getElementById('f-freq-days').value   = String(s.frequency_days);
+      document.getElementById('f-start').value       = s.next_due_date ?? '';
+      document.getElementById('f-role').value        = s.responsible_role ?? '';
+      document.getElementById('f-description').value = s.description ?? '';
+      document.getElementById('f-notes').value       = s.notes ?? '';
+      document.getElementById('f-error').classList.add('hidden');
+      openPanel('form-panel');
+    };
+
+    document.getElementById('add-ppm-btn')?.addEventListener('click', openAddForm);
+
+    document.getElementById('ppm-form')?.addEventListener('submit', async e => {
+      e.preventDefault();
+      const errEl = document.getElementById('f-error');
+      const btn   = document.getElementById('f-submit');
+      const lbl   = document.getElementById('f-submit-label');
+      errEl.classList.add('hidden');
+
+      const body = {
+        title:            document.getElementById('f-title').value.trim(),
+        asset_id:         document.getElementById('f-asset').value || undefined,
+        frequency:        document.getElementById('f-frequency').value,
+        frequency_days:   parseInt(document.getElementById('f-freq-days').value) || 30,
+        start_date:       editingId ? undefined : document.getElementById('f-start').value || undefined,
+        next_due_date:    editingId ? (document.getElementById('f-start').value || undefined) : undefined,
+        responsible_role: document.getElementById('f-role').value.trim() || undefined,
+        description:      document.getElementById('f-description').value.trim() || undefined,
+        notes:            document.getElementById('f-notes').value.trim() || undefined,
+      };
+
+      btn.disabled = true; lbl.textContent = 'Saving…';
+      const url    = editingId ? `/api/v1/admin/ppm/${editingId}` : '/api/v1/admin/ppm';
+      const method = editingId ? 'PATCH' : 'POST';
+      try {
+        const res  = await fetch(url, { method, credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message ?? 'Save failed');
+        showToast(editingId ? 'Schedule updated.' : 'Schedule created.');
+        closePanel('form-panel');
+        await loadPPM();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; lbl.textContent = 'Save Schedule';
+      }
+    });
+
+    // ── Mark Done modal ───────────────────────────────────────────────────────
+    window.openDone = function(id, title, nextDue) {
+      document.getElementById('done-id').value    = id;
+      document.getElementById('done-title').value = title;
+      document.getElementById('done-date').value  = new Date().toISOString().slice(0, 10);
+      document.getElementById('done-cost').value  = '';
+      document.getElementById('done-by').value    = '';
+      document.getElementById('done-notes').value = '';
+      document.getElementById('done-error').classList.add('hidden');
+      document.getElementById('done-modal').classList.remove('hidden');
+    };
+
+    document.getElementById('done-cancel')?.addEventListener('click', () => {
+      document.getElementById('done-modal').classList.add('hidden');
+    });
+
+    document.getElementById('done-submit')?.addEventListener('click', async () => {
+      const id  = document.getElementById('done-id').value;
+      const errEl = document.getElementById('done-error');
+      errEl.classList.add('hidden');
+      const btn = document.getElementById('done-submit');
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/v1/admin/ppm/${id}/complete`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            completed_on: document.getElementById('done-date').value,
+            cost:         parseFloat(document.getElementById('done-cost').value) || undefined,
+            completed_by: document.getElementById('done-by').value.trim() || undefined,
+            notes:        document.getElementById('done-notes').value.trim() || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message ?? 'Failed');
+        document.getElementById('done-modal').classList.add('hidden');
+        showToast(`Done! Next due ${fmtDate(data.next_due_date)}.`);
+        await loadPPM();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+    window.deletePPM = async function(id) {
+      if (!confirm('Remove this PPM schedule? Completion history is preserved.')) return;
+      const res = await fetch(`/api/v1/admin/ppm/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) { showToast('Schedule removed.'); loadPPM(); }
+      else showToast('Failed to remove schedule.', 'error');
+    };
+
+    loadPPM();
+  </script>
+</PortalLayout>
