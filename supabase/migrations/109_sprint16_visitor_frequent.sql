@@ -8,8 +8,8 @@ SELECT
   'PARAMETER',
   'Frequent Visitor Shortcuts (Top N)',
   'integer',
-  '10',
-  '10',
+  '10'::jsonb,
+  '10'::jsonb,
   'Number of most-frequently pre-approved visitors shown as quick-pass shortcuts on the visitor form.',
   false
 FROM societies

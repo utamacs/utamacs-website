@@ -84,8 +84,8 @@ SELECT
   'Finance',
   'GST-exempt threshold — monthly maintenance (₹)',
   'Monthly maintenance amount below which GST is not levied (CBIC circular: ₹7,500/month).',
-  '7500',
-  '7500',
+  '7500'::jsonb,
+  '7500'::jsonb,
   'DECIMAL',
   false
 FROM societies
@@ -99,8 +99,8 @@ SELECT
   'Finance',
   'Enable Razorpay online payments',
   'When true, members see a "Pay Online" button on dues using the configured Razorpay credentials.',
-  'false',
-  'false',
+  'false'::jsonb,
+  'false'::jsonb,
   'BOOLEAN',
   false
 FROM societies
@@ -114,8 +114,8 @@ SELECT
   'Finance',
   'Expense approver role — 10K–20K',
   'Portal role required to approve expenses between ₹10,000 and ₹20,000.',
-  '"secretary"',
-  '"secretary"',
+  '"secretary"'::jsonb,
+  '"secretary"'::jsonb,
   'STRING',
   false
 FROM societies
@@ -128,8 +128,8 @@ SELECT
   'Finance',
   'Expense approver role — 20K–50K',
   'Portal role required to approve expenses between ₹20,000 and ₹50,000.',
-  '"president"',
-  '"president"',
+  '"president"'::jsonb,
+  '"president"'::jsonb,
   'STRING',
   false
 FROM societies
@@ -142,8 +142,8 @@ SELECT
   'Finance',
   'Expense approver role — above 50K',
   'Portal role required to approve expenses above ₹50,000 (normally president or board vote).',
-  '"president"',
-  '"president"',
+  '"president"'::jsonb,
+  '"president"'::jsonb,
   'STRING',
   false
 FROM societies
