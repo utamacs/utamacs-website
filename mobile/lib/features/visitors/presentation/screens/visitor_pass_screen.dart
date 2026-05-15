@@ -87,12 +87,16 @@ class VisitorPassScreen extends StatelessWidget {
                     _DetailRow(label: 'Visitor', value: approval.visitorName),
                     if (approval.purpose != null)
                       _DetailRow(label: 'Purpose', value: approval.purpose!),
+                    if (approval.vehicleNumber != null)
+                      _DetailRow(label: 'Vehicle', value: approval.vehicleNumber!),
                     _DetailRow(
                       label: 'Valid',
                       value: approval.expiresAt != null
                           ? '${formatDate(approval.expectedDate)} – ${formatDate(approval.expiresAt!)}'
                           : formatDate(approval.expectedDate),
                     ),
+                    if (approval.otpCode != null)
+                      _DetailRow(label: 'Guard OTP', value: approval.otpCode!),
                     if (approval.isRecurring)
                       const Padding(
                         padding: EdgeInsets.only(top: 8),

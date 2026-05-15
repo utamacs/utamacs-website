@@ -8,23 +8,27 @@ class VisitorPreApproval {
   final String id;
   final String visitorName;
   final String? visitorPhone;
+  final String? vehicleNumber;
   final String? purpose;
   final String status;
   final DateTime expectedDate;
   final DateTime? expiresAt;
   final bool isRecurring;
   final String? qrToken;
+  final String? otpCode;
 
   const VisitorPreApproval({
     required this.id,
     required this.visitorName,
     this.visitorPhone,
+    this.vehicleNumber,
     this.purpose,
     required this.status,
     required this.expectedDate,
     this.expiresAt,
     this.isRecurring = false,
     this.qrToken,
+    this.otpCode,
   });
 
   bool get isActive {
@@ -39,6 +43,7 @@ class VisitorPreApproval {
         id: j['id'] as String,
         visitorName: j['visitor_name'] as String,
         visitorPhone: j['visitor_phone_hash'] as String?,
+        vehicleNumber: j['vehicle_number'] as String?,
         purpose: j['purpose'] as String?,
         status: j['status'] as String,
         expectedDate: DateTime.parse(j['expected_date'] as String),
@@ -47,6 +52,7 @@ class VisitorPreApproval {
             : null,
         isRecurring: j['is_recurring'] as bool? ?? false,
         qrToken: j['qr_token'] as String?,
+        otpCode: j['otp_code'] as String?,
       );
 }
 
@@ -104,6 +110,7 @@ class VisitorRepository {
   Future<VisitorPreApproval> createPreApproval({
     required String visitorName,
     String? visitorPhone,
+    String? vehicleNumber,
     String? purpose,
     required DateTime expectedDate,
     DateTime? expiresAt,
@@ -127,6 +134,11 @@ class VisitorRepository {
         '${expectedDate.month.toString().padLeft(2, '0')}-'
         '${expectedDate.day.toString().padLeft(2, '0')}';
 
+    // 6-digit OTP the guard can type if QR scan fails (NOT NULL in schema)
+    final otp = (100000 + (DateTime.now().microsecondsSinceEpoch % 900000))
+        .toString()
+        .substring(0, 6);
+
     final data = await _client
         .from('visitor_pre_approvals')
         .insert({
@@ -135,10 +147,12 @@ class VisitorRepository {
           'host_unit_id': unitId,
           'visitor_name': visitorName,
           'visitor_phone_hash': visitorPhone,
+          'vehicle_number': vehicleNumber,
           'purpose': purpose,
           'expected_date': dateStr,
           'expires_at': expiresAt?.toIso8601String(),
           'status': 'pending',
+          'otp_code': otp,
         })
         .select()
         .single();

@@ -14,6 +14,7 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final _vehicleCtrl = TextEditingController();
   final _purposeCtrl = TextEditingController();
   DateTime _validFrom = DateTime.now();
   DateTime? _expiresAt;
@@ -23,6 +24,7 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
+    _vehicleCtrl.dispose();
     _purposeCtrl.dispose();
     super.dispose();
   }
@@ -55,6 +57,9 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
             visitorPhone: _phoneCtrl.text.trim().isEmpty
                 ? null
                 : _phoneCtrl.text.trim(),
+            vehicleNumber: _vehicleCtrl.text.trim().isEmpty
+                ? null
+                : _vehicleCtrl.text.trim().toUpperCase(),
             purpose: _purposeCtrl.text.trim().isEmpty
                 ? null
                 : _purposeCtrl.text.trim(),
@@ -114,6 +119,15 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
                 keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _vehicleCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Vehicle number (optional)',
+                  prefixIcon: Icon(Icons.directions_car_outlined),
+                ),
+                textCapitalization: TextCapitalization.characters,
               ),
               const SizedBox(height: 14),
               TextFormField(
