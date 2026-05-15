@@ -382,36 +382,32 @@ if (navRole === 'guard') {
               <div class="nav-group-items">
                 {group.items.map((item) => {
                   const isActive = activeModule === item.activeKey;
+                  const badgeKey: string | undefined = ({
+                    notifications: 'unread_notifications',
+                    notices:        'unread_notices',
+                    complaints:     'open_complaints',
+                    analytics:      'onboarding_pending',
+                    feedback:       'unread_feedback',
+                  } as Record<string, string>)[item.activeKey];
                   return (
-                    {(() => {
-                      const badgeKey: string | undefined = {
-                        notifications: 'unread_notifications',
-                        notices:        'unread_notices',
-                        complaints:     'open_complaints',
-                        analytics:      'onboarding_pending',
-                        feedback:       'unread_feedback',
-                      }[item.activeKey];
-                      return (
-                        <a
-                          href={item.href}
-                          class={`nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium mb-0.5 transition-colors ${
-                            isActive
-                              ? 'bg-primary-50 text-primary-600'
-                              : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
-                          }`}
-                          {...(badgeKey ? { 'data-badge-key': badgeKey } : {})}
-                        >
-                          <i class={`fas ${item.icon} w-4 text-center text-[13px]`} aria-hidden="true"></i>
-                          {item.label}
-                          {badgeKey && (
-                            <span
-                              class="nav-badge hidden ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none"
-                              aria-label="Unread count"
-                            ></span>
-                          )}
-                        </a>
-                      );
-                    })()}
+                    <a
+                      href={item.href}
+                      class={`nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium mb-0.5 transition-colors ${
+                        isActive
+                          ? 'bg-primary-50 text-primary-600'
+                          : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
+                      }`}
+                      {...(badgeKey ? { 'data-badge-key': badgeKey } : {})}
+                    >
+                      <i class={`fas ${item.icon} w-4 text-center text-[13px]`} aria-hidden="true"></i>
+                      {item.label}
+                      {badgeKey && (
+                        <span
+                          class="nav-badge hidden ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none"
+                          aria-label="Unread count"
+                        ></span>
+                      )}
+                    </a>
                   );
                 })}
               </div>
