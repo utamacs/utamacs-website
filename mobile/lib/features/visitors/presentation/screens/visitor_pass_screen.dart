@@ -87,14 +87,11 @@ class VisitorPassScreen extends StatelessWidget {
                     _DetailRow(label: 'Visitor', value: approval.visitorName),
                     if (approval.purpose != null)
                       _DetailRow(label: 'Purpose', value: approval.purpose!),
-                    if (approval.vehicleNumber != null)
-                      _DetailRow(
-                          label: 'Vehicle', value: approval.vehicleNumber!),
                     _DetailRow(
                       label: 'Valid',
                       value: approval.expiresAt != null
-                          ? '${formatDate(approval.validFrom)} – ${formatDate(approval.expiresAt!)}'
-                          : formatDate(approval.validFrom),
+                          ? '${formatDate(approval.expectedDate)} – ${formatDate(approval.expiresAt!)}'
+                          : formatDate(approval.expectedDate),
                     ),
                     if (approval.isRecurring)
                       const Padding(

@@ -1,6 +1,7 @@
 class Profile {
   final String id;
   final String societyId;
+  final String? unitId;
   final String? fullName;
   final String? unitNumber;
   final String? block;
@@ -12,6 +13,7 @@ class Profile {
   const Profile({
     required this.id,
     required this.societyId,
+    this.unitId,
     this.fullName,
     this.unitNumber,
     this.block,
@@ -31,15 +33,20 @@ class Profile {
   String get unitDisplay =>
       [if (block != null) block, unitNumber].whereType<String>().join('-');
 
-  factory Profile.fromJson(Map<String, dynamic> j) => Profile(
-        id: j['id'] as String,
-        societyId: j['society_id'] as String,
-        fullName: j['full_name'] as String?,
-        unitNumber: j['unit_number'] as String?,
-        block: j['block'] as String?,
-        portalRole: j['portal_role'] as String? ?? 'member',
-        isAdmin: j['is_admin'] as bool? ?? false,
-        avatarKey: j['avatar_key'] as String?,
-        phone: j['phone'] as String?,
-      );
+  factory Profile.fromJson(Map<String, dynamic> j) {
+    // units join may return a nested map with unit_number and block
+    final unitMap = j['units'] as Map<String, dynamic>?;
+    return Profile(
+      id: j['id'] as String,
+      societyId: j['society_id'] as String,
+      unitId: j['unit_id'] as String?,
+      fullName: j['full_name'] as String?,
+      unitNumber: unitMap?['unit_number'] as String? ?? j['unit_number'] as String?,
+      block: unitMap?['block'] as String? ?? j['block'] as String?,
+      portalRole: j['portal_role'] as String? ?? 'member',
+      isAdmin: j['is_admin'] as bool? ?? false,
+      avatarKey: j['avatar_storage_key'] as String?,
+      phone: j['phone_encrypted'] as String?,
+    );
+  }
 }

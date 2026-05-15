@@ -127,21 +127,10 @@ class _PreApprovalCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              if (approval.vehicleNumber != null) ...[
-                const Icon(Icons.directions_car_outlined,
-                    size: 14, color: kTextSecondary),
-                const SizedBox(width: 4),
-                Text(approval.vehicleNumber!,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: kTextSecondary)),
-                const SizedBox(width: 16),
-              ],
               const Icon(Icons.schedule, size: 14, color: kTextSecondary),
               const SizedBox(width: 4),
               Text(
-                timeago.format(approval.validFrom),
+                timeago.format(approval.expectedDate),
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall

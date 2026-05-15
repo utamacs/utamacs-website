@@ -39,7 +39,7 @@ class AuthRepository {
     if (uid == null) return null;
     final data = await _client
         .from('profiles')
-        .select()
+        .select('*, units(unit_number, block)')
         .eq('id', uid)
         .eq('society_id', env.societyId)
         .maybeSingle();

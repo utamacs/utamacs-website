@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/auth_notifier.dart';
 
@@ -41,13 +40,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _verifyCode() async {
     final email = _emailCtrl.text.trim();
     final token = _otpCtrl.text.trim();
-    if (token.length != 6) return;
+    if (token.length < 6) return;
     setState(() => _loading = true);
     try {
       await ref.read(authNotifierProvider.notifier).verifyEmailOtp(email, token);
-      if (mounted) context.go('/');
+      // Navigation handled by GoRouter refreshListenable on session change.
     } catch (e) {
-      _showError('Invalid or expired code. Please try again.');
+      _showError('$e');
     } finally {
       setState(() => _loading = false);
     }
@@ -128,9 +127,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextFormField(
                   controller: _otpCtrl,
                   keyboardType: TextInputType.number,
-                  maxLength: 6,
+                  maxLength: 8,
                   decoration: const InputDecoration(
-                    hintText: '• • • • • •',
+                    hintText: 'Enter code',
                     labelText: 'Sign-in code',
                     counterText: '',
                   ),
