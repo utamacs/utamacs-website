@@ -1,157 +1,225 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../../notices/data/notice_repository.dart';
 import '../../../visitors/data/visitor_repository.dart';
+import '../../../visitors/presentation/screens/visitor_pass_screen.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  bool _showMoreServices = false;
+
+  // Primary 8 services always visible
+  static const _primaryServices = [
+    _ServiceItem(
+        label: 'Notices',
+        icon: Icons.notifications_outlined,
+        bg: Color(0xFFEFF6FF),
+        fg: kPrimary600,
+        route: '/notices'),
+    _ServiceItem(
+        label: 'Visitors',
+        icon: Icons.badge_outlined,
+        bg: Color(0xFFD1FAE5),
+        fg: kSecondary500,
+        route: '/visitors'),
+    _ServiceItem(
+        label: 'Complaints',
+        icon: Icons.report_problem_outlined,
+        bg: Color(0xFFFFEEEE),
+        fg: kRed600),
+    _ServiceItem(
+        label: 'Finance',
+        icon: Icons.account_balance_wallet_outlined,
+        bg: Color(0xFFFFF8E1),
+        fg: kAccent500),
+    _ServiceItem(
+        label: 'Facilities',
+        icon: Icons.meeting_room_outlined,
+        bg: Color(0xFFE8F4FD),
+        fg: Color(0xFF0EA5E9)),
+    _ServiceItem(
+        label: 'Community',
+        icon: Icons.people_outline,
+        bg: Color(0xFFF3E8FF),
+        fg: Color(0xFF7C3AED)),
+    _ServiceItem(
+        label: 'Documents',
+        icon: Icons.folder_outlined,
+        bg: Color(0xFFECFDF5),
+        fg: Color(0xFF16A34A)),
+    _ServiceItem(
+        label: 'Parking',
+        icon: Icons.local_parking_outlined,
+        bg: Color(0xFFF5F5F5),
+        fg: Color(0xFF374151)),
+  ];
+
+  // Extra 4 revealed on expand
+  static const _extraServices = [
+    _ServiceItem(
+        label: 'Gallery',
+        icon: Icons.photo_library_outlined,
+        bg: Color(0xFFFFF3CD),
+        fg: Color(0xFFD97706)),
+    _ServiceItem(
+        label: 'Events',
+        icon: Icons.event_outlined,
+        bg: Color(0xFFE0F2FE),
+        fg: Color(0xFF0369A1)),
+    _ServiceItem(
+        label: 'Vendors',
+        icon: Icons.handyman_outlined,
+        bg: Color(0xFFF0FDF4),
+        fg: Color(0xFF15803D)),
+    _ServiceItem(
+        label: 'Water',
+        icon: Icons.water_drop_outlined,
+        bg: Color(0xFFE0F7FA),
+        fg: Color(0xFF0097A7)),
+  ];
+
+  void _onServiceTap(BuildContext context, _ServiceItem item) {
+    if (item.route != null) {
+      context.go(item.route!);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${item.label} — coming soon'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
     final profile = authState.profile;
     final noticesAsync = ref.watch(noticesProvider);
     final approvalsAsync = ref.watch(myPreApprovalsProvider);
 
+    final pinnedNotice = noticesAsync.whenOrNull(
+      data: (list) => list.where((n) => n.isPinned).firstOrNull,
+    );
+
+    final activeApprovals = approvalsAsync.whenOrNull(
+      data: (list) => list.where((p) => p.isActive).take(2).toList(),
+    );
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('UTA MACS'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () =>
-                ref.read(authNotifierProvider.notifier).signOut(),
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(noticesProvider);
-          ref.invalidate(myPreApprovalsProvider);
-        },
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+      backgroundColor: kBgWarm,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Greeting
-            AppCard(
-              color: kPrimary600,
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.white24,
-                    child: Text(
-                      (profile?.fullName?.isNotEmpty == true)
-                          ? profile!.fullName![0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hello, ${profile?.displayName ?? 'Resident'}',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16),
+            // Sticky header
+            _DashboardHeader(
+              profile: profile,
+              hasNotification: pinnedNotice != null ||
+                  (noticesAsync.value?.isNotEmpty ?? false),
+              onBellTap: () => context.go('/notices'),
+            ),
+            // Scrollable content
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(noticesProvider);
+                  ref.invalidate(myPreApprovalsProvider);
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Pinned notice banner
+                      if (pinnedNotice != null) ...[
+                        _NoticeBanner(
+                          title: pinnedNotice.title,
+                          onTap: () => context.go('/notices'),
                         ),
-                        if (profile?.unitDisplay.isNotEmpty == true)
-                          Text(
-                            'Unit ${profile!.unitDisplay}',
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 13),
+                        const SizedBox(height: 24),
+                      ] else
+                        const SizedBox(height: 16),
+
+                      // Services grid
+                      _sectionHeader('Quick Services'),
+                      const SizedBox(height: 14),
+                      _buildServicesGrid(context),
+                      const SizedBox(height: 8),
+                      // Expand / collapse toggle
+                      Center(
+                        child: GestureDetector(
+                          onTap: () => setState(
+                              () => _showMoreServices = !_showMoreServices),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: kBorderLight),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _showMoreServices
+                                      ? 'Show less'
+                                      : 'View more',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: kPrimary600,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  _showMoreServices
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                                  size: 16,
+                                  color: kPrimary600,
+                                ),
+                              ],
+                            ),
                           ),
+                        ),
+                      ),
+
+                      // Recent passes section
+                      if (activeApprovals != null &&
+                          activeApprovals.isNotEmpty) ...[
+                        const SizedBox(height: 28),
+                        _sectionHeader(
+                          'Active Visitor Passes',
+                          trailing: 'View all',
+                          onTrailingTap: () => context.go('/visitors'),
+                        ),
+                        const SizedBox(height: 14),
+                        ...activeApprovals.map(
+                          (pass) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _PassCard(approval: pass),
+                          ),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
-                  if (profile?.isExec == true)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: kAccent500,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        profile!.portalRole.toUpperCase(),
-                        style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white),
-                      ),
-                    ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            // Quick stats row
-            Row(
-              children: [
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.notifications_outlined,
-                    label: 'Notices',
-                    value: noticesAsync.when(
-                      data: (n) => '${n.length}',
-                      loading: () => '—',
-                      error: (_, _) => '!',
-                    ),
-                    color: kPrimary600,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.badge_outlined,
-                    label: 'Active passes',
-                    value: approvalsAsync.when(
-                      data: (a) =>
-                          '${a.where((p) => p.isActive).length}',
-                      loading: () => '—',
-                      error: (_, _) => '!',
-                    ),
-                    color: kSecondary500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Text('Quick actions',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            // Quick action grid
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.6,
-              children: [
-                _QuickAction(
-                  icon: Icons.notifications_outlined,
-                  label: 'Notices',
-                  color: kPrimary100,
-                  iconColor: kPrimary600,
-                  onTap: () => context.go('/notices'),
-                ),
-                _QuickAction(
-                  icon: Icons.badge_outlined,
-                  label: 'Visitor passes',
-                  color: const Color(0xFFD1FAE5),
-                  iconColor: kSecondary500,
-                  onTap: () => context.go('/visitors'),
-                ),
-              ],
             ),
           ],
         ),
@@ -159,76 +227,355 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildServicesGrid(BuildContext context) {
+    final items = _showMoreServices
+        ? [..._primaryServices, ..._extraServices]
+        : _primaryServices;
+
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 4,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 0.78,
+      children: items
+          .map((item) => _ServiceTile(
+                item: item,
+                onTap: () => _onServiceTap(context, item),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _sectionHeader(String title,
+      {String? trailing, VoidCallback? onTrailingTap}) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: kTextPrimary,
+          ),
+        ),
+        if (trailing != null) ...[
+          const Spacer(),
+          GestureDetector(
+            onTap: onTrailingTap,
+            child: Text(
+              trailing,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: kPrimary600,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
+// ── Header ──────────────────────────────────────────────────────────────────
 
-  const _StatCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
+class _DashboardHeader extends StatelessWidget {
+  final dynamic profile; // Profile?
+  final bool hasNotification;
+  final VoidCallback onBellTap;
+
+  const _DashboardHeader({
+    required this.profile,
+    required this.hasNotification,
+    required this.onBellTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final initial = (profile?.fullName?.isNotEmpty == true)
+        ? profile!.fullName![0].toUpperCase()
+        : 'R';
+    final name = profile?.displayName ?? 'Resident';
+    final unit = profile?.unitDisplay ?? '';
+
+    return Container(
+      color: kBgWarm,
+      padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
+      child: Row(
         children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 8),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 28, fontWeight: FontWeight.w700, color: color)),
-          const SizedBox(height: 2),
-          Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: kTextSecondary)),
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: kPrimary600,
+            child: Text(
+              initial,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hello, $name',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                  ),
+                ),
+                if (unit.isNotEmpty)
+                  Text(
+                    'Unit $unit',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: kTextSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (profile?.isExec == true) ...[
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: kAccent500,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                (profile!.portalRole as String).toUpperCase(),
+                style: GoogleFonts.inter(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined,
+                    size: 26, color: kTextPrimary),
+                onPressed: onBellTap,
+              ),
+              if (hasNotification)
+                Positioned(
+                  right: 10,
+                  top: 10,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: kRed600,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _QuickAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final Color iconColor;
+// ── Notice banner ────────────────────────────────────────────────────────────
+
+class _NoticeBanner extends StatelessWidget {
+  final String title;
   final VoidCallback onTap;
 
-  const _QuickAction({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.iconColor,
-    required this.onTap,
-  });
+  const _NoticeBanner({required this.title, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return GestureDetector(
       onTap: onTap,
-      color: color,
-      child: Row(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.campaign_outlined, size: 18, color: kAccent500),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: kTextPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.arrow_forward_ios,
+                size: 12, color: kTextSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Service tile ─────────────────────────────────────────────────────────────
+
+class _ServiceItem {
+  final String label;
+  final IconData icon;
+  final Color bg;
+  final Color fg;
+  final String? route;
+
+  const _ServiceItem({
+    required this.label,
+    required this.icon,
+    required this.bg,
+    required this.fg,
+    this.route,
+  });
+}
+
+class _ServiceTile extends StatelessWidget {
+  final _ServiceItem item;
+  final VoidCallback onTap;
+
+  const _ServiceTile({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: iconColor, size: 26),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(label,
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: iconColor,
-                    fontSize: 13)),
+          Container(
+            width: double.infinity,
+            height: 58,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.07),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: item.bg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(item.icon, size: 20, color: item.fg),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            item.label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: kTextPrimary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Pass card ────────────────────────────────────────────────────────────────
+
+class _PassCard extends StatelessWidget {
+  final VisitorPreApproval approval;
+
+  const _PassCard({required this.approval});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => VisitorPassScreen(approval: approval)),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: kPrimary50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.person_outline,
+                  color: kPrimary600, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    approval.visitorName,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  Text(
+                    timeago.format(approval.expectedDate),
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: kTextSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.qr_code_2, size: 20, color: kPrimary600),
+          ],
+        ),
       ),
     );
   }
