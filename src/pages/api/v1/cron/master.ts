@@ -136,6 +136,13 @@ export const GET: APIRoute = async ({ request }) => {
     results.digest_emails = { error: err instanceof Error ? err.message : String(err) };
   }
 
+  // ── 15. Late fee application (overdue maintenance dues) ───────────────────
+  try {
+    results.late_fees = await runLateFeeApplication(sb, now, todayStr);
+  } catch (err) {
+    results.late_fees = { error: err instanceof Error ? err.message : String(err) };
+  }
+
   // ── Write master heartbeat ─────────────────────────────────────────────────
   try {
     await sb.from('cron_heartbeats').insert({
@@ -727,6 +734,116 @@ async function runFeedbackSlaEscalation(sb: ReturnType<typeof getSupabaseService
   }
 
   return { escalated };
+}
+
+async function runLateFeeApplication(sb: ReturnType<typeof getSupabaseServiceClient>, now: Date, todayStr: string) {
+  const rules = await loadRules(SOCIETY_ID);
+  const enabled   = r<boolean>(rules, RULE.LATE_FEE_CRON_ENABLED, true);
+  if (!enabled) return 'DISABLED';
+
+  const graceDays  = r<number>(rules, RULE.LATE_FEE_GRACE_PERIOD_DAYS, 5);
+  const defaultPct = r<number>(rules, RULE.LATE_FEE_DEFAULT_RATE_PCT, 18);
+  const maxCap     = r<number>(rules, RULE.LATE_FEE_MAX_CAP_AMOUNT, 5000);
+
+  // Cutoff: dues past grace period
+  const graceCutoff = new Date(now);
+  graceCutoff.setDate(graceCutoff.getDate() - graceDays);
+  const graceCutoffStr = graceCutoff.toISOString().slice(0, 10);
+
+  // Fetch overdue dues that are past the grace period
+  const { data: overdueDues } = await sb
+    .from('maintenance_dues')
+    .select('id, total_amount, amount_paid, penalty_amount, due_date')
+    .eq('society_id', SOCIETY_ID)
+    .in('status', ['overdue', 'pending', 'partially_paid'])
+    .lt('due_date', graceCutoffStr)
+    .limit(100);
+
+  if (!overdueDues?.length) return { applied: 0, skipped: 0 };
+
+  let applied = 0;
+  let skipped = 0;
+
+  for (const due of overdueDues) {
+    const d = due as any;
+    const outstanding = Math.max(0, Number(d.total_amount) - Number(d.amount_paid ?? 0));
+    if (outstanding <= 0.005) { skipped++; continue; }
+
+    // Dedup: check if a charge already exists for today
+    const { count: existingToday } = await sb
+      .from('late_fee_charges')
+      .select('id', { count: 'exact', head: true })
+      .eq('dues_id', d.id)
+      .eq('charge_date', todayStr);
+    if (existingToday && existingToday > 0) { skipped++; continue; }
+
+    // Look up subcategory-specific late fee rule via invoice_line_items
+    let feeType: 'fixed' | 'percentage' = 'percentage';
+    let feeRate = defaultPct;
+    let feeCap = maxCap;
+    let feeFrequency: 'one_time' | 'monthly' = 'monthly';
+
+    const { data: lineItem } = await sb
+      .from('invoice_line_items')
+      .select('subcategory_id')
+      .eq('dues_id', d.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (lineItem?.subcategory_id) {
+      const { data: rule } = await sb
+        .from('late_fee_rules')
+        .select('fee_type, fee_amount, fee_frequency, grace_period_days, max_fee_cap')
+        .eq('subcategory_id', lineItem.subcategory_id)
+        .eq('society_id', SOCIETY_ID)
+        .maybeSingle();
+      if (rule) {
+        feeType      = rule.fee_type as 'fixed' | 'percentage';
+        feeRate      = Number(rule.fee_amount);
+        feeCap       = rule.max_fee_cap != null ? Number(rule.max_fee_cap) : maxCap;
+        feeFrequency = rule.fee_frequency as 'one_time' | 'monthly';
+      }
+    }
+
+    // For one_time fees, skip if any prior charge exists for this dues_id
+    if (feeFrequency === 'one_time') {
+      const { count: priorCharge } = await sb
+        .from('late_fee_charges')
+        .select('id', { count: 'exact', head: true })
+        .eq('dues_id', d.id);
+      if (priorCharge && priorCharge > 0) { skipped++; continue; }
+    }
+
+    // Calculate fee amount
+    let feeAmount: number;
+    if (feeType === 'fixed') {
+      feeAmount = Math.min(feeRate, feeCap);
+    } else {
+      feeAmount = Math.min(Math.round(outstanding * feeRate) / 100, feeCap);
+    }
+    feeAmount = Math.max(0.01, Math.round(feeAmount * 100) / 100);
+
+    try {
+      // Insert late fee charge (immutable record)
+      await sb.from('late_fee_charges').insert({
+        society_id:  SOCIETY_ID,
+        dues_id:     d.id,
+        charge_date: todayStr,
+        fee_amount:  feeAmount,
+      });
+
+      // Update dues penalty_amount to reflect cumulative late fees
+      const newPenalty = Math.round((Number(d.penalty_amount ?? 0) + feeAmount) * 100) / 100;
+      await sb.from('maintenance_dues')
+        .update({ penalty_amount: newPenalty, status: 'overdue' })
+        .eq('id', d.id)
+        .eq('society_id', SOCIETY_ID);
+
+      applied++;
+    } catch { skipped++; }
+  }
+
+  return { applied, skipped };
 }
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
