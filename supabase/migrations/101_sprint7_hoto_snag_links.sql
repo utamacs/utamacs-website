@@ -8,8 +8,8 @@
 CREATE TABLE IF NOT EXISTS hoto_item_snag_links (
   id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   society_id   uuid        NOT NULL REFERENCES societies(id) ON DELETE CASCADE,
-  hoto_item_id uuid        NOT NULL REFERENCES hoto_items(id) ON DELETE CASCADE,
-  snag_item_id uuid        NOT NULL REFERENCES snag_items(id) ON DELETE CASCADE,
+  hoto_item_id text        NOT NULL REFERENCES hoto_items(id) ON DELETE CASCADE,
+  snag_item_id text        NOT NULL REFERENCES snag_items(id) ON DELETE CASCADE,
   linked_by    uuid        REFERENCES profiles(id) ON DELETE SET NULL, -- personal data: staff identity
   notes        text        CHECK (length(notes) <= 500),
   created_at   timestamptz NOT NULL DEFAULT now(),
