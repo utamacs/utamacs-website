@@ -114,6 +114,63 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
+// PATCH /api/v1/security-patrol?id=<uuid> — mark incident resolved (exec/admin only)
+export const PATCH: APIRoute = async ({ request, url }) => {
+  try {
+    const user = await resolveFromRequest(request, SOCIETY_ID);
+    if (!user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    const isPrivileged = ['executive', 'secretary', 'president'].includes(user.portalRole ?? '') || user.isAdmin;
+    if (!isPrivileged) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
+
+    const id = url.searchParams.get('id') ?? '';
+    if (!UUID_RE.test(id)) return Response.json({ error: 'VALIDATION', message: 'Valid id required' }, { status: 400 });
+
+    const body = await request.json() as { resolution_note?: string };
+    const resolution_note = sanitizePlainText(String(body.resolution_note ?? '')).trim();
+    if (!resolution_note) {
+      return Response.json({ error: 'VALIDATION', message: 'resolution_note is required' }, { status: 400 });
+    }
+
+    const sb = getSupabaseServiceClient();
+
+    const { data: log } = await sb
+      .from('patrol_logs')
+      .select('id, is_incident, resolved_at')
+      .eq('id', id)
+      .eq('society_id', SOCIETY_ID)
+      .single();
+
+    if (!log) return Response.json({ error: 'NOT_FOUND', message: 'Patrol log not found' }, { status: 404 });
+    if (!log.is_incident) return Response.json({ error: 'VALIDATION', message: 'Only incident logs can be resolved' }, { status: 400 });
+    if (log.resolved_at) return Response.json({ error: 'CONFLICT', message: 'Already resolved' }, { status: 409 });
+
+    const { data: updated, error } = await sb
+      .from('patrol_logs')
+      .update({
+        resolved_at:     new Date().toISOString(),
+        resolved_by:     user.id,
+        resolution_note: resolution_note.slice(0, 500),
+      })
+      .eq('id', id)
+      .eq('society_id', SOCIETY_ID)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await writeAuditLog({
+      societyId: SOCIETY_ID, userId: user.id,
+      action: 'UPDATE', resourceType: 'patrol_incident', resourceId: id,
+      ip: extractClientIP(request),
+      newValues: { resolved_at: updated.resolved_at, resolution_note },
+    });
+
+    return Response.json(updated);
+  } catch (err) {
+    return normalizeError(err, request.url);
+  }
+};
+
 // DELETE /api/v1/security-patrol?id=<uuid> (exec/admin only)
 export const DELETE: APIRoute = async ({ request, url }) => {
   try {
