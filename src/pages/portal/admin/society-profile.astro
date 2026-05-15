@@ -1,0 +1,276 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+import { getSupabaseServiceClient } from '@lib/services/providers/supabase/SupabaseDB';
+import { getDocumentDownloadUrl } from '@lib/utils/githubDocStore';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!user.isAdmin) return new Response('Forbidden', { status: 403 });
+
+const SOCIETY_ID = import.meta.env.PUBLIC_SOCIETY_ID ?? '00000000-0000-0000-0000-000000000001';
+const sb = getSupabaseServiceClient();
+const { data: society } = await sb
+  .from('societies')
+  .select('id, name, registration_no, address, city, state, pincode, gstin, pan, total_units, logo_key, tagline, contact_email, contact_phone, website_url, whatsapp_group_url, fiscal_year_start, timezone, currency_symbol, invoice_prefix, receipt_prefix')
+  .eq('id', SOCIETY_ID)
+  .single();
+
+const soc = (society ?? {}) as any;
+
+let logoUrl: string | null = null;
+if (soc.logo_key) {
+  try { logoUrl = await getDocumentDownloadUrl(soc.logo_key); } catch { /* non-fatal */ }
+}
+---
+
+<PortalLayout title="Society Profile" user={user} activeModule="admin_society">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Society Profile</h1>
+      <p class="text-text-secondary text-sm mt-1">Edit society information, contact details, and billing preferences.</p>
+    </div>
+  </div>
+
+  <div id="success-banner" class="hidden mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 flex items-center gap-2">
+    <i class="fas fa-check-circle" aria-hidden="true"></i>
+    <span>Society profile updated successfully.</span>
+  </div>
+  <div id="error-banner" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"></div>
+
+  <form id="society-form" class="space-y-6" enctype="multipart/form-data">
+
+    <!-- Section 1: Basic Information -->
+    <div class="bg-white rounded-xl border border-border-light p-6">
+      <h2 class="text-lg font-semibold text-primary-600 mb-5">
+        <i class="fas fa-building mr-2" aria-hidden="true"></i>Basic Information
+      </h2>
+      <div class="flex gap-6 mb-5">
+        <!-- Logo -->
+        <div class="text-center flex-shrink-0">
+          <div class="w-24 h-24 rounded-xl bg-primary-50 flex items-center justify-center overflow-hidden mb-2 border border-border-light">
+            {logoUrl
+              ? <img id="logo-preview" src={logoUrl} alt="Society logo" class="w-full h-full object-contain" />
+              : <i id="logo-placeholder" class="fas fa-building text-3xl text-primary-300" aria-hidden="true"></i>
+            }
+            {!logoUrl && <img id="logo-preview" class="hidden w-full h-full object-contain" alt="Society logo" />}
+          </div>
+          <label class="btn-outline text-xs py-1.5 cursor-pointer">
+            Change Logo
+            <input type="file" name="logo" id="logo-input" accept="image/jpeg,image/png,image/webp,image/svg+xml" class="hidden" />
+          </label>
+          <p class="text-xs text-text-secondary mt-1">JPEG, PNG, WebP, SVG</p>
+        </div>
+        <!-- Fields -->
+        <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Society Name <span class="text-red-500">*</span></label>
+            <input type="text" name="name" required maxlength="200"
+              value={soc.name ?? ''}
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Registration Number</label>
+            <input type="text" value={soc.registration_no ?? ''}
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm bg-gray-50 text-text-secondary" readonly />
+            <p class="text-xs text-text-secondary mt-1">Contact Anthropic support to change the registration number.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">Tagline</label>
+            <input type="text" name="tagline" maxlength="200"
+              value={soc.tagline ?? ''}
+              placeholder="e.g. Your home, our responsibility"
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">GSTIN</label>
+            <input type="text" name="gstin" maxlength="15"
+              value={soc.gstin ?? ''}
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">PAN</label>
+            <input type="text" name="pan" maxlength="10"
+              value={soc.pan ?? ''}
+              class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Address -->
+    <div class="bg-white rounded-xl border border-border-light p-6">
+      <h2 class="text-lg font-semibold text-primary-600 mb-5">
+        <i class="fas fa-map-marker-alt mr-2" aria-hidden="true"></i>Address
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Street Address</label>
+          <input type="text" name="address" maxlength="300"
+            value={soc.address ?? ''}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">City</label>
+          <input type="text" name="city" maxlength="100"
+            value={soc.city ?? ''}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">State</label>
+          <input type="text" name="state" maxlength="100"
+            value={soc.state ?? 'Telangana'}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">PIN Code</label>
+          <input type="text" name="pincode" maxlength="6" pattern="[0-9]{6}"
+            value={soc.pincode ?? ''}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Contact & Social -->
+    <div class="bg-white rounded-xl border border-border-light p-6">
+      <h2 class="text-lg font-semibold text-primary-600 mb-5">
+        <i class="fas fa-phone mr-2" aria-hidden="true"></i>Contact & Social
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Contact Email</label>
+          <input type="email" name="contact_email" maxlength="200"
+            value={soc.contact_email ?? ''}
+            placeholder="management@utamacs.org"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Contact Phone</label>
+          <input type="tel" name="contact_phone" maxlength="15"
+            value={soc.contact_phone ?? ''}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Website URL</label>
+          <input type="url" name="website_url" maxlength="500"
+            value={soc.website_url ?? ''}
+            placeholder="https://utamacs.org"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">WhatsApp Group Link</label>
+          <input type="url" name="whatsapp_group_url" maxlength="500"
+            value={soc.whatsapp_group_url ?? ''}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Finance Preferences -->
+    <div class="bg-white rounded-xl border border-border-light p-6">
+      <h2 class="text-lg font-semibold text-primary-600 mb-5">
+        <i class="fas fa-cog mr-2" aria-hidden="true"></i>Finance Preferences
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Invoice Prefix</label>
+          <input type="text" name="invoice_prefix" maxlength="10"
+            value={soc.invoice_prefix ?? 'INV'}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+          <p class="text-xs text-text-secondary mt-1">e.g. INV → INV/2025-26/ABC123</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Receipt Prefix</label>
+          <input type="text" name="receipt_prefix" maxlength="10"
+            value={soc.receipt_prefix ?? 'RCP'}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Fiscal Year Start</label>
+          <select name="fiscal_year_start"
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 bg-white">
+            <option value="april" selected={soc.fiscal_year_start !== 'january'}>April (Indian FY)</option>
+            <option value="january" selected={soc.fiscal_year_start === 'january'}>January</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Currency Symbol</label>
+          <input type="text" name="currency_symbol" maxlength="5"
+            value={soc.currency_symbol ?? '₹'}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">Timezone</label>
+          <input type="text" name="timezone" maxlength="50"
+            value={soc.timezone ?? 'Asia/Kolkata'}
+            class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-3">
+      <button type="submit" id="save-btn" class="btn-primary flex items-center gap-2">
+        <i class="fas fa-save" aria-hidden="true"></i>
+        <span id="save-text">Save Changes</span>
+        <span id="save-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+      </button>
+      <a href="/portal/admin" class="btn-outline">Cancel</a>
+    </div>
+
+  </form>
+</PortalLayout>
+
+<script>
+  // Logo preview
+  const logoInput = document.getElementById('logo-input') as HTMLInputElement;
+  const logoPreview = document.getElementById('logo-preview') as HTMLImageElement;
+  const logoPlaceholder = document.getElementById('logo-placeholder');
+  logoInput?.addEventListener('change', () => {
+    const f = logoInput.files?.[0];
+    if (f) {
+      logoPreview.src = URL.createObjectURL(f);
+      logoPreview.classList.remove('hidden');
+      logoPlaceholder?.classList.add('hidden');
+    }
+  });
+
+  // Form submit
+  const form       = document.getElementById('society-form') as HTMLFormElement;
+  const saveBtn    = document.getElementById('save-btn') as HTMLButtonElement;
+  const saveText   = document.getElementById('save-text')!;
+  const saveSpinner = document.getElementById('save-spinner')!;
+  const successBanner = document.getElementById('success-banner')!;
+  const errorBanner   = document.getElementById('error-banner')!;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    successBanner.classList.add('hidden');
+    errorBanner.classList.add('hidden');
+    saveText.classList.add('hidden');
+    saveSpinner.classList.remove('hidden');
+    saveBtn.disabled = true;
+
+    try {
+      const fd = new FormData(form);
+      const res = await fetch('/api/v1/admin/society', {
+        method: 'PATCH', credentials: 'include', body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errorBanner.textContent = data.message ?? data.error ?? 'Failed to save.';
+        errorBanner.classList.remove('hidden');
+      } else {
+        successBanner.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch {
+      errorBanner.textContent = 'Network error. Please try again.';
+      errorBanner.classList.remove('hidden');
+    } finally {
+      saveText.classList.remove('hidden');
+      saveSpinner.classList.add('hidden');
+      saveBtn.disabled = false;
+    }
+  });
+</script>

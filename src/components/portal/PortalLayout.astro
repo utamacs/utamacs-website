@@ -212,15 +212,17 @@ if (navRole === 'guard') {
   if (user.isAdmin) {
     const adminItems = groupMap.get('Administration') ?? [];
     adminItems.unshift(
-      link('Audit Logs',         '/portal/admin/audit',         'fa-shield-alt',        'admin_audit'),
-      link('Asset Register',      '/portal/admin/assets',        'fa-cogs',              'admin_assets'),
-      link('Rules Engine',       '/portal/admin/rules',         'fa-sliders-h',         'admin_rules'),
-      link('RBAC & Permissions', '/portal/admin/rbac',          'fa-lock',              'admin_rbac'),
-      link('Email Drafts',       '/portal/admin/email-drafts',  'fa-envelope-open-text','admin_email'),
-      link('Feature Config',     '/portal/admin/features',      'fa-toggle-on',         'admin_features'),
-      link('Staff Attendance',   '/portal/admin/staff',         'fa-user-clock',        'admin_staff'),
-      link('TDS Tracking',       '/portal/admin/tds',           'fa-file-invoice',      'admin_tds'),
-      link('Consent Mgmt',       '/portal/admin/consent',       'fa-user-shield',       'admin_consent'),
+      link('Society Profile',     '/portal/admin/society-profile', 'fa-building',          'admin_society'),
+      link('Holiday Calendar',   '/portal/admin/holidays',        'fa-calendar-day',      'admin_holidays'),
+      link('Audit Logs',         '/portal/admin/audit',           'fa-shield-alt',        'admin_audit'),
+      link('Asset Register',     '/portal/admin/assets',          'fa-cogs',              'admin_assets'),
+      link('Rules Engine',       '/portal/admin/rules',           'fa-sliders-h',         'admin_rules'),
+      link('RBAC & Permissions', '/portal/admin/rbac',            'fa-lock',              'admin_rbac'),
+      link('Email Drafts',       '/portal/admin/email-drafts',    'fa-envelope-open-text','admin_email'),
+      link('Feature Config',     '/portal/admin/features',        'fa-toggle-on',         'admin_features'),
+      link('Staff Attendance',   '/portal/admin/staff',           'fa-user-clock',        'admin_staff'),
+      link('TDS Tracking',       '/portal/admin/tds',             'fa-file-invoice',      'admin_tds'),
+      link('Consent Mgmt',       '/portal/admin/consent',         'fa-user-shield',       'admin_consent'),
     );
     groupMap.set('Administration', adminItems);
   }
@@ -376,25 +378,35 @@ if (navRole === 'guard') {
                 {group.items.map((item) => {
                   const isActive = activeModule === item.activeKey;
                   return (
-                    <a
-                      href={item.href}
-                      class={`nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium mb-0.5 transition-colors ${
-                        isActive
-                          ? 'bg-primary-50 text-primary-600'
-                          : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
-                      }`}
-                      {...(item.activeKey === 'notifications' ? { id: 'notif-nav-link' } : {})}
-                    >
-                      <i class={`fas ${item.icon} w-4 text-center text-[13px]`} aria-hidden="true"></i>
-                      {item.label}
-                      {item.activeKey === 'notifications' && (
-                        <span
-                          id="notif-badge"
-                          class="hidden ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none"
-                          aria-label="Unread notifications"
-                        ></span>
-                      )}
-                    </a>
+                    {(() => {
+                      const badgeKey: string | undefined = {
+                        notifications: 'unread_notifications',
+                        notices:        'unread_notices',
+                        complaints:     'open_complaints',
+                        analytics:      'onboarding_pending',
+                        feedback:       'unread_feedback',
+                      }[item.activeKey];
+                      return (
+                        <a
+                          href={item.href}
+                          class={`nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium mb-0.5 transition-colors ${
+                            isActive
+                              ? 'bg-primary-50 text-primary-600'
+                              : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
+                          }`}
+                          {...(badgeKey ? { 'data-badge-key': badgeKey } : {})}
+                        >
+                          <i class={`fas ${item.icon} w-4 text-center text-[13px]`} aria-hidden="true"></i>
+                          {item.label}
+                          {badgeKey && (
+                            <span
+                              class="nav-badge hidden ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none"
+                              aria-label="Unread count"
+                            ></span>
+                          )}
+                        </a>
+                      );
+                    })()}
                   );
                 })}
               </div>
@@ -716,19 +728,23 @@ if (navRole === 'guard') {
       });
     })();
 
-    // ── Notification unread badge ─────────────────────────────────────────────
+    // ── Nav badges (unread counts) ────────────────────────────────────────────
     (async function () {
-      const badge = document.getElementById('notif-badge');
-      if (!badge) return;
       try {
-        const res = await fetch('/api/v1/notifications?unread=true&limit=50', { credentials: 'include' });
+        const res = await fetch('/api/v1/nav/badges', { credentials: 'include' });
         if (!res.ok) return;
-        const items: unknown[] = await res.json();
-        const count = Array.isArray(items) ? items.length : 0;
-        if (count > 0) {
-          badge.textContent = count > 99 ? '99+' : String(count);
-          badge.classList.remove('hidden');
-        }
+        const counts = await res.json() as Record<string, number>;
+        document.querySelectorAll<HTMLElement>('[data-badge-key]').forEach((link) => {
+          const key = link.getAttribute('data-badge-key')!;
+          const count = counts[key] ?? 0;
+          if (count > 0) {
+            const badge = link.querySelector<HTMLElement>('.nav-badge');
+            if (badge) {
+              badge.textContent = count > 99 ? '99+' : String(count);
+              badge.classList.remove('hidden');
+            }
+          }
+        });
       } catch { /* non-critical */ }
     })();
   </script>
