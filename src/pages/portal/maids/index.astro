@@ -110,6 +110,10 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
           class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
           Attendance Log
         </button>
+        <button onclick="switchTab('summary')" id="tab-summary"
+          class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+          Monthly Summary
+        </button>
       </>
     ) : (
       <>
@@ -120,6 +124,10 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
         <button onclick="switchTab('attendance')" id="tab-attendance"
           class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
           Attendance
+        </button>
+        <button onclick="switchTab('summary')" id="tab-summary"
+          class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
+          Summary
         </button>
         <button onclick="switchTab('add-helper')" id="tab-add-helper"
           class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-text-primary">
@@ -163,6 +171,36 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
       <div class="text-center py-12 text-text-secondary">
         <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>Loading…
       </div>
+    </div>
+  </div>
+
+  <!-- Monthly Summary Panel -->
+  <div id="panel-summary" class="hidden">
+    <div class="flex flex-wrap gap-3 mb-5 items-end">
+      <div>
+        <label class="block text-xs font-medium text-text-secondary mb-1">Month</label>
+        <select id="sum-month" class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white">
+          {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+            <option value={m} selected={m === new Date().getMonth() + 1}>
+              {new Date(2000, m-1, 1).toLocaleString('en-IN', { month: 'long' })}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-text-secondary mb-1">Year</label>
+        <select id="sum-year" class="text-sm border border-border-light rounded-lg px-3 py-2 bg-white">
+          {[new Date().getFullYear(), new Date().getFullYear() - 1].map(y => (
+            <option value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+      <button onclick="loadSummary()" class="btn-outline text-sm">
+        <i class="fas fa-chart-bar mr-1" aria-hidden="true"></i>Load
+      </button>
+    </div>
+    <div id="summary-container">
+      <div class="text-center py-12 text-text-secondary text-sm">Select a month and click Load.</div>
     </div>
   </div>
 
@@ -314,9 +352,64 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
     let myApprovals = [];
     let myUnitId = null;
 
-    function switchTab(tab) {
+    async function loadSummary() {
+      const container = document.getElementById('summary-container');
+      if (!container) return;
+      const month = (document.getElementById('sum-month') as HTMLSelectElement)?.value ?? String(new Date().getMonth() + 1);
+      const year  = (document.getElementById('sum-year')  as HTMLSelectElement)?.value ?? String(new Date().getFullYear());
+      container.innerHTML = '<div class="text-center py-12 text-text-secondary text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>';
+      try {
+        const res  = await fetch(`/api/v1/maids/attendance/summary?year=${year}&month=${month}`, { credentials: 'include' });
+        const data = await res.json();
+        if (!res.ok) { container.innerHTML = `<div class="text-center text-red-500 py-8">${data.message ?? 'Failed.'}</div>`; return; }
+
+        const { summary, total_working_days } = data;
+        const monthLabel = new Date(Number(year), Number(month) - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+
+        if (!summary.length) {
+          container.innerHTML = `<div class="text-center py-12 text-text-secondary text-sm">No attendance records for ${monthLabel}.</div>`;
+          return;
+        }
+
+        const rows = summary.map((s: any) => {
+          const pct  = Math.round((s.days_present / total_working_days) * 100);
+          const bar  = `<div class="w-full bg-gray-100 rounded-full h-1.5 mt-1"><div class="bg-primary-600 h-1.5 rounded-full" style="width:${pct}%"></div></div>`;
+          return `
+          <tr class="border-b border-border-light hover:bg-gray-50">
+            <td class="py-3 px-4 font-medium text-sm">${s.full_name}</td>
+            <td class="py-3 px-4 text-sm text-text-secondary capitalize">${(s.work_type as string).replace('_',' ')}</td>
+            <td class="py-3 px-4 text-sm">
+              <span class="font-semibold text-text-primary">${s.days_present}</span>
+              <span class="text-text-secondary"> / ${total_working_days} days</span>
+              ${bar}
+            </td>
+            <td class="py-3 px-4 text-sm text-primary-600">${pct}%</td>
+          </tr>`;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="mb-3 text-sm text-text-secondary">Attendance summary for <strong>${monthLabel}</strong> · ${total_working_days} days in month</div>
+          <div class="bg-white rounded-2xl border border-border-light overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-border-light">
+                <tr>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Helper Name</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Work Type</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Days Present</th>
+                  <th class="py-3 px-4 text-xs font-medium text-text-secondary text-left">Attendance %</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      } catch {
+        container.innerHTML = '<div class="text-center text-red-500 py-8">Network error.</div>';
+      }
+    }
+
+    function switchTab(tab: string) {
       currentTab = tab;
-      const panels = ['all', 'my', 'attendance', 'add-helper'];
+      const panels = ['all', 'my', 'attendance', 'summary', 'add-helper'];
       panels.forEach(p => {
         const el = document.getElementById(`panel-${p}`);
         if (el) el.classList.toggle('hidden', p !== tab);
@@ -333,6 +426,7 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
       if (tab === 'all' && !allHelpers.length) loadAllHelpers();
       if (tab === 'my' && !myApprovals.length) loadMyHelpers();
       if (tab === 'attendance') loadAttendance();
+      if (tab === 'summary') loadSummary();
       if (tab === 'add-helper') loadAllHelpersForSearch();
     }
 
@@ -382,7 +476,14 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
                     <td class="py-3 px-4 text-text-secondary">${m.agency_name ?? '—'}</td>
                     <td class="py-3 px-4">
                       ${m.police_verified
-                        ? `<span class="inline-flex items-center gap-1 text-xs text-secondary-500"><i class="fas fa-shield-check"></i> Verified</span>`
+                        ? `<div class="space-y-1">
+                            <span class="inline-flex items-center gap-1 text-xs text-secondary-500"><i class="fas fa-shield-check"></i> Verified</span>
+                            ${m.kyc_expires_at
+                              ? `<div class="text-xs ${new Date(m.kyc_expires_at) < new Date() ? 'text-red-600 font-medium' : 'text-text-secondary'}">
+                                  ${new Date(m.kyc_expires_at) < new Date() ? '⚠ Expired' : 'Valid'} · ${new Date(m.kyc_expires_at).toLocaleDateString('en-IN')}
+                                </div>`
+                              : ''}
+                          </div>`
                         : `<span class="text-xs text-amber-600"><i class="fas fa-clock mr-1"></i>Pending</span>`}
                     </td>
                     <td class="py-3 px-4">
@@ -391,12 +492,18 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
                       </span>
                     </td>
                     <td class="py-3 px-4">
-                      ${isPrivileged
-                        ? `<button onclick="toggleMaidActive('${m.id}', ${m.is_active})"
-                             class="text-xs ${m.is_active ? 'text-red-600 hover:text-red-700' : 'text-secondary-500 hover:text-secondary-600'}">
-                             ${m.is_active ? 'Deactivate' : 'Reactivate'}
-                           </button>`
-                        : ''}
+                      <div class="flex items-center gap-2">
+                        <a href="/api/v1/maids/${m.id}/pass" target="_blank"
+                          class="text-xs text-primary-600 hover:underline">
+                          <i class="fas fa-id-card mr-1" aria-hidden="true"></i>Pass
+                        </a>
+                        ${isPrivileged
+                          ? `<button onclick="toggleMaidActive('${m.id}', ${m.is_active})"
+                               class="text-xs ${m.is_active ? 'text-red-600 hover:text-red-700' : 'text-secondary-500 hover:text-secondary-600'}">
+                               ${m.is_active ? 'Deactivate' : 'Reactivate'}
+                             </button>`
+                          : ''}
+                      </div>
                     </td>
                   </tr>`).join('')}
               </tbody>
@@ -443,11 +550,15 @@ const isPrivileged = ['executive', 'secretary', 'president'].includes(user.porta
                 </div>
                 ${m.police_verified ? '<i class="fas fa-shield-check text-secondary-500 text-sm" title="Verified"></i>' : ''}
               </div>
-              <div class="flex gap-2 mt-2">
+              <div class="flex gap-2 mt-2 flex-wrap">
                 <button onclick="openLogAtt('${a.maid_id}','${m.full_name ?? ''}')"
                   class="flex-1 text-xs btn-outline py-1.5">
                   <i class="fas fa-calendar-check mr-1"></i>Log Attendance
                 </button>
+                <a href="/api/v1/maids/${a.maid_id}/pass" target="_blank"
+                  class="text-xs btn-ghost px-3 py-1.5 flex items-center gap-1">
+                  <i class="fas fa-id-card" aria-hidden="true"></i>Pass
+                </a>
                 <button onclick="toggleApproval('${a.id}', ${!active})"
                   class="text-xs px-3 py-1.5 rounded-lg border ${active ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}">
                   ${active ? 'Remove' : 'Re-add'}
