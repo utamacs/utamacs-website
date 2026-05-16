@@ -76,11 +76,11 @@ class FeedbackRepository {
     required String body,
     int? rating,
     bool isAnonymous = false,
+    String priority = 'normal',
   }) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw Exception('Not authenticated');
 
-    // Fetch unit_id from profile
     final profileRow = await _client
         .from('profiles')
         .select('unit_id')
@@ -100,7 +100,7 @@ class FeedbackRepository {
           if (unitId != null) 'unit_id': unitId,
           'is_anonymous': isAnonymous,
           'status': 'new',
-          'priority': 'normal',
+          'priority': priority,
         })
         .select()
         .single();

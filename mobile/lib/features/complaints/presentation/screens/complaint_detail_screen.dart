@@ -8,12 +8,57 @@ import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
 import '../../data/complaint_repository.dart';
 
-class ComplaintDetailScreen extends ConsumerWidget {
+class ComplaintDetailScreen extends ConsumerStatefulWidget {
   final Complaint complaint;
   const ComplaintDetailScreen({super.key, required this.complaint});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ComplaintDetailScreen> createState() =>
+      _ComplaintDetailScreenState();
+}
+
+class _ComplaintDetailScreenState
+    extends ConsumerState<ComplaintDetailScreen> {
+  final _commentController = TextEditingController();
+  bool _submittingComment = false;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _submittingComment = true);
+    try {
+      await ref
+          .read(complaintRepositoryProvider)
+          .addComment(widget.complaint.id, text);
+      _commentController.clear();
+      ref.invalidate(complaintCommentsProvider(widget.complaint.id));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e'),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submittingComment = false);
+    }
+  }
+
+  Complaint get complaint => widget.complaint;
+
+  @override
+  Widget build(BuildContext context) {
     final historyAsync =
         ref.watch(complaintHistoryProvider(complaint.id));
     final isOverdue = complaint.slaDeadline != null &&
@@ -22,6 +67,9 @@ class ComplaintDetailScreen extends ConsumerWidget {
     final slaDue = complaint.slaDeadline != null &&
         complaint.resolvedAt == null &&
         !isOverdue;
+
+    final commentsAsync =
+        ref.watch(complaintCommentsProvider(complaint.id));
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -34,7 +82,9 @@ class ComplaintDetailScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
       ),
-      body: ListView(
+      body: Column(
+        children: [
+          Expanded(child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // ── Status row ──────────────────────────────────────────────────
@@ -288,7 +338,149 @@ class ComplaintDetailScreen extends ConsumerWidget {
             },
           ),
 
+          const SizedBox(height: 20),
+
+          // ── Comments section ─────────────────────────────────────────────
+          Text(
+            'Comments',
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: kPrimary600,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          commentsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (comments) {
+              if (comments.isEmpty) {
+                return AppCard(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'No comments yet.',
+                      style: GoogleFonts.inter(
+                          fontSize: 13, color: kTextSecondary),
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: comments
+                    .map((c) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: AppCard(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      c.authorName ?? 'Staff',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: kTextPrimary,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      timeago.format(c.createdAt),
+                                      style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          color: kTextSecondary),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  c.comment,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 13, color: kTextPrimary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              );
+            },
+          ),
+
           const SizedBox(height: 24),
+        ],
+      )),
+          // Comment input bar
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: kBorderLight)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _commentController,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        hintText: 'Add a comment…',
+                        hintStyle: GoogleFonts.inter(
+                            fontSize: 14, color: kTextSecondary),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide:
+                              const BorderSide(color: kBorderLight),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide:
+                              const BorderSide(color: kBorderLight),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: const BorderSide(color: kPrimary600),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        isDense: true,
+                      ),
+                      maxLines: 3,
+                      minLines: 1,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _submittingComment
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : IconButton(
+                          onPressed: _submitComment,
+                          icon: const Icon(Icons.send_rounded),
+                          color: kPrimary600,
+                          style: IconButton.styleFrom(
+                            backgroundColor: kPrimary50,
+                            shape: const CircleBorder(),
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

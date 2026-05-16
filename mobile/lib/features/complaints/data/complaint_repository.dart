@@ -87,6 +87,7 @@ class ComplaintComment {
   final String complaintId;
   final String comment;
   final bool isInternal;
+  final String? authorName;
   final DateTime createdAt;
 
   const ComplaintComment({
@@ -94,16 +95,21 @@ class ComplaintComment {
     required this.complaintId,
     required this.comment,
     required this.isInternal,
+    this.authorName,
     required this.createdAt,
   });
 
-  factory ComplaintComment.fromJson(Map<String, dynamic> j) => ComplaintComment(
-        id: j['id'] as String,
-        complaintId: j['complaint_id'] as String,
-        comment: j['comment'] as String,
-        isInternal: j['is_internal'] as bool? ?? false,
-        createdAt: DateTime.parse(j['created_at'] as String),
-      );
+  factory ComplaintComment.fromJson(Map<String, dynamic> j) {
+    final profile = j['profiles'] as Map<String, dynamic>?;
+    return ComplaintComment(
+      id: j['id'] as String,
+      complaintId: j['complaint_id'] as String,
+      comment: j['comment'] as String,
+      isInternal: j['is_internal'] as bool? ?? false,
+      authorName: profile?['full_name'] as String?,
+      createdAt: DateTime.parse(j['created_at'] as String),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +166,38 @@ class ComplaintRepository {
         .order('changed_at', ascending: true);
     return (data as List).map((e) => ComplaintHistory.fromJson(e)).toList();
   }
+
+  Future<List<ComplaintComment>> fetchComments(String complaintId) async {
+    final uid = _client.auth.currentUser?.id;
+    final data = await _client
+        .from('complaint_comments')
+        .select('*, profiles(full_name)')
+        .eq('complaint_id', complaintId)
+        .eq('is_internal', false)
+        .order('created_at', ascending: true);
+    // Filter internal notes client-side (exec sees all, member sees public only)
+    return (data as List)
+        .map((e) => ComplaintComment.fromJson(e))
+        .where((c) => !c.isInternal || c.complaintId == uid)
+        .toList();
+  }
+
+  Future<ComplaintComment> addComment(
+      String complaintId, String comment) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final data = await _client
+        .from('complaint_comments')
+        .insert({
+          'complaint_id': complaintId,
+          'comment': comment,
+          'is_internal': false,
+          'commented_by': uid,
+        })
+        .select('*, profiles(full_name)')
+        .single();
+    return ComplaintComment.fromJson(data);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -180,4 +218,9 @@ final complaintHistoryProvider = FutureProvider.autoDispose
   return ref
       .read(complaintRepositoryProvider)
       .fetchCommentHistory(complaintId);
+});
+
+final complaintCommentsProvider = FutureProvider.autoDispose
+    .family<List<ComplaintComment>, String>((ref, complaintId) {
+  return ref.read(complaintRepositoryProvider).fetchComments(complaintId);
 });

@@ -5,23 +5,69 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../data/notification_repository.dart';
+import 'notification_preferences_screen.dart';
 
-class NotificationsListScreen extends ConsumerWidget {
+const _notifTypes = [
+  'all',
+  'complaint',
+  'notice',
+  'event',
+  'poll',
+  'payment',
+  'community',
+  'visitor',
+  'facility',
+  'amc',
+  'feedback',
+  'system',
+];
+
+String _labelForType(String type) => switch (type) {
+      'complaint' => 'Complaints',
+      'notice' => 'Notices',
+      'event' => 'Events',
+      'poll' => 'Polls',
+      'payment' => 'Payments',
+      'community' => 'Community',
+      'visitor' => 'Visitors',
+      'facility' => 'Facility',
+      'amc' => 'AMC',
+      'feedback' => 'Feedback',
+      'system' => 'System',
+      _ => 'All',
+    };
+
+IconData _iconForType(String type) => switch (type) {
+      'complaint' => Icons.report_outlined,
+      'notice' => Icons.campaign_outlined,
+      'payment' => Icons.payment_outlined,
+      'event' => Icons.event_outlined,
+      'visitor' => Icons.badge_outlined,
+      'poll' => Icons.how_to_vote_outlined,
+      'community' => Icons.forum_outlined,
+      'facility' => Icons.meeting_room_outlined,
+      'amc' => Icons.build_outlined,
+      'feedback' => Icons.rate_review_outlined,
+      'system' => Icons.info_outline,
+      _ => Icons.notifications_outlined,
+    };
+
+class NotificationsListScreen extends ConsumerStatefulWidget {
   const NotificationsListScreen({super.key});
 
-  IconData _iconForType(String type) => switch (type) {
-        'complaint' => Icons.report_outlined,
-        'notice' => Icons.campaign_outlined,
-        'payment' => Icons.payment_outlined,
-        'event' => Icons.event_outlined,
-        'visitor' => Icons.badge_outlined,
-        _ => Icons.notifications_outlined,
-      };
+  @override
+  ConsumerState<NotificationsListScreen> createState() =>
+      _NotificationsListScreenState();
+}
+
+class _NotificationsListScreenState
+    extends ConsumerState<NotificationsListScreen> {
+  String _typeFilter = 'all';
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notificationsAsync = ref.watch(notificationsProvider);
+  Widget build(BuildContext context) {
     final repo = ref.read(notificationRepositoryProvider);
+    final notificationsAsync = ref.watch(notificationsProvider);
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -30,7 +76,15 @@ class NotificationsListScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
-          // Mark all read
+          IconButton(
+            icon: const Icon(Icons.tune_outlined),
+            tooltip: 'Preferences',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const NotificationPreferencesScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.check_circle_outline),
             tooltip: 'Mark all as read',
@@ -45,48 +99,112 @@ class NotificationsListScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: notificationsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load notifications',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(notificationsProvider),
-            child: const Text('Retry'),
+      body: Column(
+        children: [
+          // Type filter chips
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _notifTypes.map((t) {
+                  final selected = _typeFilter == t;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(
+                        _labelForType(t),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? Colors.white : kTextSecondary,
+                        ),
+                      ),
+                      selected: selected,
+                      selectedColor: kPrimary600,
+                      backgroundColor: kSectionAlt,
+                      side: BorderSide(
+                          color: selected ? kPrimary600 : kBorderLight),
+                      onSelected: (_) => setState(() => _typeFilter = t),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
           ),
-        ),
-        data: (notifications) {
-          if (notifications.isEmpty) {
-            return const EmptyState(
-              icon: Icons.notifications_none,
-              title: 'No notifications yet',
-              subtitle: 'You\'re all caught up! Check back later.',
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(notificationsProvider),
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: notifications.length,
-              separatorBuilder: (_, __) =>
-                  const Divider(height: 1, indent: 72, color: kBorderLight),
-              itemBuilder: (context, i) {
-                final n = notifications[i];
-                return _NotificationTile(
-                  notification: n,
-                  typeIcon: _iconForType(n.type),
-                  onTap: () async {
-                    if (!n.isRead) {
-                      await repo.markRead(n.id);
-                      ref.invalidate(notificationsProvider);
-                    }
-                  },
+          const Divider(height: 1, color: kBorderLight),
+          // Notification list
+          Expanded(
+            child: notificationsAsync.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => EmptyState(
+                icon: Icons.error_outline,
+                title: 'Could not load notifications',
+                subtitle: e.toString(),
+                action: ElevatedButton(
+                  onPressed: () => ref.invalidate(notificationsProvider),
+                  child: const Text('Retry'),
+                ),
+              ),
+              data: (all) {
+                final notifications = _typeFilter == 'all'
+                    ? all
+                    : all
+                        .where((n) => n.type == _typeFilter)
+                        .toList();
+                if (notifications.isEmpty) {
+                  return EmptyState(
+                    icon: Icons.notifications_none,
+                    title: _typeFilter == 'all'
+                        ? 'No notifications yet'
+                        : 'No ${_labelForType(_typeFilter)} notifications',
+                    subtitle: 'You\'re all caught up! Check back later.',
+                  );
+                }
+                return RefreshIndicator(
+                  onRefresh: () async =>
+                      ref.invalidate(notificationsProvider),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: notifications.length,
+                    separatorBuilder: (_, __) => const Divider(
+                        height: 1, indent: 72, color: kBorderLight),
+                    itemBuilder: (context, i) {
+                      final n = notifications[i];
+                      return Dismissible(
+                        key: Key(n.id),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          color: kRed600,
+                          child: const Icon(Icons.delete_outline,
+                              color: Colors.white, size: 24),
+                        ),
+                        onDismissed: (_) async {
+                          await repo.deleteNotification(n.id);
+                          ref.invalidate(notificationsProvider);
+                        },
+                        child: _NotificationTile(
+                          notification: n,
+                          typeIcon: _iconForType(n.type),
+                          onTap: () async {
+                            if (!n.isRead) {
+                              await repo.markRead(n.id);
+                              ref.invalidate(notificationsProvider);
+                            }
+                          },
+                        ),
+                      );
+                    },
+                  ),
                 );
               },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -124,12 +242,10 @@ class _NotificationTile extends StatelessWidget {
                   )
                 : null,
           ),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Type icon
               Container(
                 width: 40,
                 height: 40,
@@ -144,7 +260,6 @@ class _NotificationTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,9 +268,8 @@ class _NotificationTile extends StatelessWidget {
                       notification.title,
                       style: GoogleFonts.inter(
                         fontSize: 14,
-                        fontWeight: isUnread
-                            ? FontWeight.w600
-                            : FontWeight.w400,
+                        fontWeight:
+                            isUnread ? FontWeight.w600 : FontWeight.w400,
                         color: kTextPrimary,
                       ),
                     ),
@@ -168,7 +282,7 @@ class _NotificationTile extends StatelessWidget {
                           fontSize: 13,
                           color: kTextSecondary,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -183,7 +297,6 @@ class _NotificationTile extends StatelessWidget {
                   ],
                 ),
               ),
-              // Unread dot
               if (isUnread)
                 Padding(
                   padding: const EdgeInsets.only(top: 4, left: 8),

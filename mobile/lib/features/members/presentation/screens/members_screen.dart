@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -16,6 +17,23 @@ class MembersScreen extends ConsumerStatefulWidget {
 class _MembersScreenState extends ConsumerState<MembersScreen> {
   final _searchController = TextEditingController();
   String _query = '';
+  String _occupancyFilter = 'all';
+
+  static const _occupancyFilters = [
+    'all',
+    'owner_occupied',
+    'tenant_occupied',
+    'vacant',
+    'under_renovation',
+  ];
+
+  static String _occupancyLabel(String f) => switch (f) {
+        'owner_occupied' => 'Owner',
+        'tenant_occupied' => 'Tenant',
+        'vacant' => 'Vacant',
+        'under_renovation' => 'Renovation',
+        _ => 'All',
+      };
 
   @override
   void dispose() {
@@ -24,9 +42,15 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
   }
 
   List<Member> _filtered(List<Member> all) {
-    if (_query.isEmpty) return all;
+    var result = all;
+    if (_occupancyFilter != 'all') {
+      result = result
+          .where((m) => m.occupancyType == _occupancyFilter)
+          .toList();
+    }
+    if (_query.isEmpty) return result;
     final lower = _query.toLowerCase();
-    return all
+    return result
         .where((m) =>
             m.fullName.toLowerCase().contains(lower) ||
             m.unitDisplay.toLowerCase().contains(lower))
@@ -107,6 +131,40 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                   ),
                 ),
               ),
+              // Occupancy filter chips
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _occupancyFilters.map((f) {
+                      final selected = _occupancyFilter == f;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(
+                            _occupancyLabel(f),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? Colors.white : kTextSecondary,
+                            ),
+                          ),
+                          selected: selected,
+                          selectedColor: kPrimary600,
+                          backgroundColor: kSectionAlt,
+                          side: BorderSide(
+                              color:
+                                  selected ? kPrimary600 : kBorderLight),
+                          onSelected: (_) =>
+                              setState(() => _occupancyFilter = f),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
               const Divider(height: 1, color: kBorderLight),
               // List
               Expanded(
@@ -172,7 +230,7 @@ class _MemberCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          // Name + unit
+          // Name + unit + move-in date
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,12 +253,20 @@ class _MemberCard extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (member.moveInDate != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Since ${DateFormat('MMM yyyy').format(member.moveInDate!)}',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: kTextSecondary,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          // Role chip — only for exec roles
-          if (member.isExec)
-            _RoleChip(label: member.roleLabel),
+          _RoleChip(label: member.roleLabel, isExec: member.isExec),
         ],
       ),
     );
@@ -209,23 +275,28 @@ class _MemberCard extends StatelessWidget {
 
 class _RoleChip extends StatelessWidget {
   final String label;
-  const _RoleChip({required this.label});
+  final bool isExec;
+  const _RoleChip({required this.label, this.isExec = false});
 
   @override
   Widget build(BuildContext context) {
+    final bg = isExec ? kPrimary50 : kSectionAlt;
+    final border = isExec ? kPrimary100 : kBorderLight;
+    final text = isExec ? kPrimary600 : kTextSecondary;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: kPrimary50,
+        color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kPrimary100),
+        border: Border.all(color: border),
       ),
       child: Text(
         label,
         style: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: kPrimary600,
+          color: text,
         ),
       ),
     );

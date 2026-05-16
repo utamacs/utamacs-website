@@ -90,6 +90,33 @@ class SnagRepository {
     return (data as List).map((e) => SnagItem.fromJson(e)).toList();
   }
 
+  /// Advance status: open→in_progress→resolved→verified_closed.
+  /// verified_closed→reopened requires a non-empty reopenReason.
+  Future<void> transitionStatus(
+    String snagId,
+    String newStatus, {
+    String? reopenReason,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+
+    final payload = <String, dynamic>{
+      'status': newStatus,
+      'updated_by': uid,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    if (newStatus == 'verified_closed') {
+      payload['verified_at'] = DateTime.now().toIso8601String();
+      payload['verified_by'] = uid;
+    }
+    if (newStatus == 'reopened' && reopenReason != null) {
+      payload['reopen_reason'] = reopenReason;
+    }
+
+    await _client.from('snag_items').update(payload).eq('id', snagId);
+  }
+
   Future<SnagItem> reportSnag({
     required String description,
     required String category,

@@ -11,6 +11,7 @@ class Notice {
   final String? category;
   final String? attachmentKey;
   final bool isPinned;
+  final bool requiresAcknowledgement;
   final DateTime publishedAt;
   final DateTime? expiresAt;
 
@@ -21,6 +22,7 @@ class Notice {
     this.category,
     this.attachmentKey,
     this.isPinned = false,
+    this.requiresAcknowledgement = false,
     required this.publishedAt,
     this.expiresAt,
   });
@@ -32,6 +34,8 @@ class Notice {
         category: j['category'] as String?,
         attachmentKey: j['attachment_key'] as String?,
         isPinned: j['is_pinned'] as bool? ?? false,
+        requiresAcknowledgement:
+            j['requires_acknowledgement'] as bool? ?? false,
         publishedAt: DateTime.parse(j['published_at'] as String),
         expiresAt: j['expires_at'] != null
             ? DateTime.parse(j['expires_at'] as String)
@@ -57,8 +61,36 @@ class NoticeRepository {
         .limit(limit);
     return (data as List).map((e) => Notice.fromJson(e)).toList();
   }
+
+  Future<bool> hasAcknowledged(String noticeId) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return false;
+    final result = await _client
+        .from('notice_acknowledgements')
+        .select('id')
+        .eq('notice_id', noticeId)
+        .eq('user_id', uid)
+        .maybeSingle();
+    return result != null;
+  }
+
+  Future<void> acknowledgeNotice(String noticeId) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    await _client.from('notice_acknowledgements').upsert({
+      'notice_id': noticeId,
+      'user_id': uid,
+      'society_id': env.societyId,
+      'acknowledged_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'notice_id,user_id');
+  }
 }
 
 @riverpod
 Future<List<Notice>> notices(NoticesRef ref) =>
     ref.watch(noticeRepositoryProvider).fetchNotices();
+
+final hasAcknowledgedProvider =
+    FutureProvider.autoDispose.family<bool, String>((ref, noticeId) {
+  return ref.read(noticeRepositoryProvider).hasAcknowledged(noticeId);
+});

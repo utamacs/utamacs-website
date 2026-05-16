@@ -71,6 +71,34 @@ class PatrolLog {
 class PatrolRepository {
   final _client = Supabase.instance.client;
 
+  Future<void> logPatrol({
+    required DateTime patrolDate,
+    required String shift,
+    required String guardName,
+    String? remarks,
+    bool isIncident = false,
+    String? incidentType,
+    String? incidentDescription,
+    List<String> checkpoints = const [],
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+
+    await _client.from('patrol_logs').insert({
+      'society_id': env.societyId,
+      'patrol_date': patrolDate.toIso8601String().split('T').first,
+      'shift': shift,
+      'guard_name': guardName.trim(),
+      if (checkpoints.isNotEmpty) 'checkpoints': checkpoints,
+      if (remarks != null && remarks.isNotEmpty) 'remarks': remarks,
+      'is_incident': isIncident,
+      if (isIncident && incidentDescription != null &&
+          incidentDescription.isNotEmpty)
+        'incidents': incidentDescription,
+      'logged_by': uid,
+    });
+  }
+
   Future<List<PatrolLog>> fetchRecentLogs({int limit = 30}) async {
     final data = await _client
         .from('patrol_logs')
