@@ -8,11 +8,33 @@ import '../../data/community_repository.dart';
 import 'create_post_screen.dart';
 import 'post_detail_screen.dart';
 
-class CommunityScreen extends ConsumerWidget {
+const _communityCategories = [
+  'all',
+  'general',
+  'help',
+  'lost_found',
+  'recommendation',
+  'alert',
+];
+
+String _communityLabel(String c) => switch (c) {
+      'lost_found' => 'Lost & Found',
+      'recommendation' => 'Recommend',
+      _ => c[0].toUpperCase() + c.substring(1),
+    };
+
+class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CommunityScreen> createState() => _CommunityScreenState();
+}
+
+class _CommunityScreenState extends ConsumerState<CommunityScreen> {
+  String _categoryFilter = 'all';
+
+  @override
+  Widget build(BuildContext context) {
     final postsAsync = ref.watch(communityPostsProvider);
 
     return Scaffold(
@@ -41,35 +63,85 @@ class CommunityScreen extends ConsumerWidget {
         icon: const Icon(Icons.edit_outlined),
         label: const Text('Post'),
       ),
-      body: postsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load posts',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(communityPostsProvider),
-            child: const Text('Retry'),
-          ),
-        ),
-        data: (posts) {
-          if (posts.isEmpty) {
-            return const EmptyState(
-              icon: Icons.forum_outlined,
-              title: 'No posts yet',
-              subtitle: 'Be the first to share something with the community.',
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(communityPostsProvider),
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-              itemCount: posts.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) => _PostCard(post: posts[i]),
+      body: Column(
+        children: [
+          // Category filter chips
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _communityCategories.map((c) {
+                  final selected = _categoryFilter == c;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(
+                        _communityLabel(c),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? Colors.white : kTextSecondary,
+                        ),
+                      ),
+                      selected: selected,
+                      selectedColor: kPrimary600,
+                      backgroundColor: kSectionAlt,
+                      side: BorderSide(
+                          color: selected ? kPrimary600 : kBorderLight),
+                      onSelected: (_) =>
+                          setState(() => _categoryFilter = c),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
-          );
-        },
+          ),
+          const Divider(height: 1, color: kBorderLight),
+          Expanded(
+            child: postsAsync.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => EmptyState(
+                icon: Icons.error_outline,
+                title: 'Could not load posts',
+                subtitle: e.toString(),
+                action: ElevatedButton(
+                  onPressed: () => ref.invalidate(communityPostsProvider),
+                  child: const Text('Retry'),
+                ),
+              ),
+              data: (allPosts) {
+                final posts = _categoryFilter == 'all'
+                    ? allPosts
+                    : allPosts
+                        .where((p) => p.category == _categoryFilter)
+                        .toList();
+                if (posts.isEmpty) {
+                  return EmptyState(
+                    icon: Icons.forum_outlined,
+                    title: _categoryFilter == 'all'
+                        ? 'No posts yet'
+                        : 'No ${_communityLabel(_categoryFilter)} posts',
+                    subtitle:
+                        'Be the first to share something with the community.',
+                  );
+                }
+                return RefreshIndicator(
+                  onRefresh: () async =>
+                      ref.invalidate(communityPostsProvider),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                    itemCount: posts.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, i) => _PostCard(post: posts[i]),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

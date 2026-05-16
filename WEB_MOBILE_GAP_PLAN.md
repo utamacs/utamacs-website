@@ -14,13 +14,13 @@
 | 03 Complaints | 13 | 3 | 10 |
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 4 | 5 |
-| 06 Polls | 9 | 1 | 8 |
-| 07 Community Board | 11 | 2 | 9 |
+| 06 Polls | 9 | 4 | 5 |
+| 07 Community Board | 11 | 3 | 8 |
 | 08 Documents | 11 | 0 | 11 |
 | 09 Gallery | 5 | 0 | 5 |
 | 10 Facilities | 6 | 0 | 6 |
 | 11 Parking | 12 | 3 | 9 |
-| 12 Maids | 9 | 2 | 7 |
+| 12 Maids | 9 | 3 | 6 |
 | 13 Members | 8 | 3 | 5 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 7 | 1 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 2 | 4 |
-| **TOTAL** | **234** | **42** | **192** |
+| **TOTAL** | **234** | **47** | **187** |
 
 ---
 
@@ -126,9 +126,9 @@
 
 - [x] 🔴 Rating poll type — 5-star input widget, `avg_rating` display, per-star distribution bar
 - [ ] 🟠 Create poll form — question, poll_type (single/multi/yes_no/rating), options builder (hidden for rating), anonymous toggle, one_vote_per_unit, max_choices (multi-choice), closing datetime
-- [ ] 🟡 Yes/No poll type UI variant
-- [ ] 🟡 Multi-choice limit enforcement (`max_choices` 2–20, disable submit if over limit)
-- [ ] 🟡 Close poll early button (exec) with confirmation dialog
+- [x] 🟡 Yes/No poll type UI variant
+- [x] 🟡 Multi-choice limit enforcement (`max_choices` 2–20, disable submit if over limit)
+- [x] 🟡 Close poll early button (exec) with confirmation dialog
 - [ ] 🟡 PDF export of results (exec) — signed PDF with society letterhead
 - [ ] 🟡 Anonymous voting — display layer hides voter identity
 - [ ] 🟡 Result visibility modes fully enforced: `after_vote` / `after_close` / `executive_only`
@@ -146,7 +146,7 @@
 - [ ] 🟡 Pin / unpin post (exec) with pinned visual indicator
 - [ ] 🟡 Report post modal — reason (spam / offensive / misinformation / harassment / other) + optional details (max 300 chars)
 - [ ] 🟡 Moderation queue — 3 reports hides post; exec can clear or remove
-- [ ] 🟡 Category filter chips (General / Help / Lost & Found / Recommendation / Alert)
+- [x] 🟡 Category filter chips (General / Help / Lost & Found / Recommendation / Alert)
 - [ ] 🟡 Marketplace sub-section (buy / sell / giveaway listings)
 - [ ] 🟢 Pagination / load-more (offset-based, limit=10)
 
@@ -210,7 +210,7 @@
 
 - [x] 🔴 Log attendance modal — date, entry_time, exit_time, notes; saves to `maid_attendance`
 - [x] 🔴 Monthly summary tab — days_present / total_working_days, attendance %, progress bar per helper
-- [ ] 🔴 Register helper form (exec) — full_name, phone, work_type (8 options), agency, id_type (6 options), id_number, police_verified + verification_date
+- [x] 🔴 Register helper form (exec) — full_name, phone, work_type (8 options), agency, id_type (6 options), id_number, police_verified + verification_date
 - [ ] 🟠 Find & Approve tab — browse all registered helpers, approve for own unit
 - [ ] 🟠 Attendance tab with date picker and attendance table
 - [ ] 🟡 KYC expiry / renewal warnings (`kyc_expires_at`)
