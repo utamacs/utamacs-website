@@ -21,85 +21,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   // Primary 8 services always visible
   static const _primaryServices = [
-    _ServiceItem(
-        label: 'Notices',
-        icon: Icons.notifications_outlined,
-        bg: Color(0xFFEFF6FF),
-        fg: kPrimary600,
-        route: '/notices'),
-    _ServiceItem(
-        label: 'Visitors',
-        icon: Icons.badge_outlined,
-        bg: Color(0xFFD1FAE5),
-        fg: kSecondary500,
-        route: '/visitors'),
-    _ServiceItem(
-        label: 'Complaints',
-        icon: Icons.report_problem_outlined,
-        bg: Color(0xFFFFEEEE),
-        fg: kRed600),
-    _ServiceItem(
-        label: 'Finance',
-        icon: Icons.account_balance_wallet_outlined,
-        bg: Color(0xFFFFF8E1),
-        fg: kAccent500),
-    _ServiceItem(
-        label: 'Facilities',
-        icon: Icons.meeting_room_outlined,
-        bg: Color(0xFFE8F4FD),
-        fg: Color(0xFF0EA5E9)),
-    _ServiceItem(
-        label: 'Community',
-        icon: Icons.people_outline,
-        bg: Color(0xFFF3E8FF),
-        fg: Color(0xFF7C3AED)),
-    _ServiceItem(
-        label: 'Documents',
-        icon: Icons.folder_outlined,
-        bg: Color(0xFFECFDF5),
-        fg: Color(0xFF16A34A)),
-    _ServiceItem(
-        label: 'Parking',
-        icon: Icons.local_parking_outlined,
-        bg: Color(0xFFF5F5F5),
-        fg: Color(0xFF374151)),
+    _ServiceItem(label: 'Notices', icon: Icons.notifications_outlined, bg: Color(0xFFEFF6FF), fg: kPrimary600, route: '/notices'),
+    _ServiceItem(label: 'Visitors', icon: Icons.badge_outlined, bg: Color(0xFFD1FAE5), fg: kSecondary500, route: '/visitors'),
+    _ServiceItem(label: 'Complaints', icon: Icons.report_problem_outlined, bg: Color(0xFFFFEEEE), fg: kRed600, route: '/complaints'),
+    _ServiceItem(label: 'Finance', icon: Icons.account_balance_wallet_outlined, bg: Color(0xFFFFF8E1), fg: kAccent500, route: '/finance'),
+    _ServiceItem(label: 'Facilities', icon: Icons.meeting_room_outlined, bg: Color(0xFFE8F4FD), fg: Color(0xFF0EA5E9), route: '/facilities'),
+    _ServiceItem(label: 'Community', icon: Icons.people_outline, bg: Color(0xFFF3E8FF), fg: Color(0xFF7C3AED), route: '/community'),
+    _ServiceItem(label: 'Documents', icon: Icons.folder_outlined, bg: Color(0xFFECFDF5), fg: Color(0xFF16A34A), route: '/documents'),
+    _ServiceItem(label: 'Parking', icon: Icons.local_parking_outlined, bg: Color(0xFFF5F5F5), fg: Color(0xFF374151), route: '/parking'),
   ];
 
   // Extra 4 revealed on expand
   static const _extraServices = [
-    _ServiceItem(
-        label: 'Gallery',
-        icon: Icons.photo_library_outlined,
-        bg: Color(0xFFFFF3CD),
-        fg: Color(0xFFD97706)),
-    _ServiceItem(
-        label: 'Events',
-        icon: Icons.event_outlined,
-        bg: Color(0xFFE0F2FE),
-        fg: Color(0xFF0369A1)),
-    _ServiceItem(
-        label: 'Vendors',
-        icon: Icons.handyman_outlined,
-        bg: Color(0xFFF0FDF4),
-        fg: Color(0xFF15803D)),
-    _ServiceItem(
-        label: 'Water',
-        icon: Icons.water_drop_outlined,
-        bg: Color(0xFFE0F7FA),
-        fg: Color(0xFF0097A7)),
+    _ServiceItem(label: 'Gallery', icon: Icons.photo_library_outlined, bg: Color(0xFFFFF3CD), fg: Color(0xFFD97706), route: '/gallery'),
+    _ServiceItem(label: 'Events', icon: Icons.event_outlined, bg: Color(0xFFE0F2FE), fg: Color(0xFF0369A1), route: '/events'),
+    _ServiceItem(label: 'Polls', icon: Icons.how_to_vote_outlined, bg: Color(0xFFFDF4FF), fg: Color(0xFF9333EA), route: '/polls'),
+    _ServiceItem(label: 'Water', icon: Icons.water_drop_outlined, bg: Color(0xFFE0F7FA), fg: Color(0xFF0097A7), route: '/water-tankers'),
   ];
 
   void _onServiceTap(BuildContext context, _ServiceItem item) {
     if (item.route != null) {
       context.go(item.route!);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${item.label} — coming soon'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
     }
   }
 
