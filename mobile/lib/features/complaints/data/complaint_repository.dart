@@ -12,6 +12,7 @@ class Complaint {
   final String title;
   final String? description;
   final String category;
+  final String? subCategory;
   final String priority;
   final String status;
   final String raisedBy;
@@ -26,6 +27,7 @@ class Complaint {
     required this.title,
     this.description,
     required this.category,
+    this.subCategory,
     required this.priority,
     required this.status,
     required this.raisedBy,
@@ -41,6 +43,7 @@ class Complaint {
         title: j['title'] as String,
         description: j['description'] as String?,
         category: j['category'] as String,
+        subCategory: j['sub_category'] as String?,
         priority: j['priority'] as String,
         status: j['status'] as String,
         raisedBy: j['raised_by'] as String,
@@ -130,6 +133,7 @@ class ComplaintRepository {
     required String title,
     required String description,
     required String category,
+    String? subCategory,
     required String priority,
   }) async {
     final uid = _client.auth.currentUser?.id;
@@ -144,6 +148,8 @@ class ComplaintRepository {
           'title': title,
           'description': description,
           'category': category,
+          if (subCategory != null && subCategory.isNotEmpty)
+            'sub_category': subCategory,
           'priority': priority,
           'status': 'open',
         })

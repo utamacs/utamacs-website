@@ -71,6 +71,27 @@ class HotoRepository {
     return (data as List).map((e) => HotoItem.fromJson(e)).toList();
   }
 
+  Future<HotoItem> fetchItemById(String id) async {
+    final data = await _client
+        .from('hoto_items')
+        .select()
+        .eq('id', id)
+        .single();
+    return HotoItem.fromJson(data);
+  }
+
+  Future<void> updateHotoStatus(String id, String newStatus,
+      {String? note}) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    await _client.from('hoto_items').update({
+      'status': newStatus,
+      'updated_by': uid,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      if (note != null && note.isNotEmpty) 'notes': note,
+    }).eq('id', id);
+  }
+
   Future<Map<String, int>> fetchSummary() async {
     final data = await _client
         .from('hoto_items')
@@ -111,4 +132,9 @@ final hotoFilteredItemsProvider =
 final hotoSummaryProvider =
     FutureProvider.autoDispose<Map<String, int>>((ref) {
   return ref.read(hotoRepositoryProvider).fetchSummary();
+});
+
+final hotoItemDetailProvider =
+    FutureProvider.autoDispose.family<HotoItem, String>((ref, id) {
+  return ref.read(hotoRepositoryProvider).fetchItemById(id);
 });

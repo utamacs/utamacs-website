@@ -126,6 +126,27 @@ class SnagRepository {
         .single();
     return SnagItem.fromJson(data);
   }
+
+  Future<void> updateSnag({
+    required String id,
+    required String category,
+    required String location,
+    required String description,
+    required String severity,
+    String? subcategory,
+    String? flatNumber,
+  }) async {
+    await _client.from('snag_items').update({
+      'category': category,
+      if (subcategory != null && subcategory.isNotEmpty)
+        'subcategory': subcategory,
+      'location': location,
+      if (flatNumber != null && flatNumber.isNotEmpty)
+        'flat_number': flatNumber,
+      'description': description,
+      'severity': severity,
+    }).eq('id', id);
+  }
 }
 
 // ---------------------------------------------------------------------------
