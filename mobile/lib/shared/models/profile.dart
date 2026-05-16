@@ -9,6 +9,12 @@ class Profile {
   final bool isAdmin;
   final String? avatarKey;
   final String? phone;
+  final String? bio;
+  final String? whatsappNumber;
+  final String? preferredLanguage;
+  final String? emergencyContactName;
+  final String? emergencyContactPhone;
+  final String? emergencyContactRelation;
 
   const Profile({
     required this.id,
@@ -21,6 +27,12 @@ class Profile {
     this.isAdmin = false,
     this.avatarKey,
     this.phone,
+    this.bio,
+    this.whatsappNumber,
+    this.preferredLanguage,
+    this.emergencyContactName,
+    this.emergencyContactPhone,
+    this.emergencyContactRelation,
   });
 
   bool get isExec =>
@@ -47,6 +59,42 @@ class Profile {
       isAdmin: j['is_admin'] as bool? ?? false,
       avatarKey: j['avatar_storage_key'] as String?,
       phone: j['phone_encrypted'] as String?,
+      bio: j['bio'] as String?,
+      whatsappNumber: j['whatsapp_number'] as String?,
+      preferredLanguage: j['preferred_language'] as String?,
+      emergencyContactName: j['emergency_contact_name'] as String?,
+      emergencyContactPhone: j['emergency_contact_phone'] as String?,
+      emergencyContactRelation: j['emergency_contact_relation'] as String?,
     );
   }
+
+  Profile copyWith({
+    String? bio,
+    String? whatsappNumber,
+    String? preferredLanguage,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? emergencyContactRelation,
+  }) =>
+      Profile(
+        id: id,
+        societyId: societyId,
+        unitId: unitId,
+        fullName: fullName,
+        unitNumber: unitNumber,
+        block: block,
+        portalRole: portalRole,
+        isAdmin: isAdmin,
+        avatarKey: avatarKey,
+        phone: phone,
+        bio: bio ?? this.bio,
+        whatsappNumber: whatsappNumber ?? this.whatsappNumber,
+        preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+        emergencyContactName:
+            emergencyContactName ?? this.emergencyContactName,
+        emergencyContactPhone:
+            emergencyContactPhone ?? this.emergencyContactPhone,
+        emergencyContactRelation:
+            emergencyContactRelation ?? this.emergencyContactRelation,
+      );
 }
