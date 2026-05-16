@@ -96,6 +96,50 @@ class TenantKycRepository {
     if (data == null) return null;
     return TenantKyc.fromJson(data);
   }
+
+  Future<void> createTenantKyc({
+    required String unitId,
+    required String fullName,
+    required DateTime tenancyStartDate,
+    DateTime? tenancyEndDate,
+    double? monthlyRent,
+    String? nationality,
+    String? aadhaarLast4,
+    String? pan,
+    String? notes,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    await _client.from('tenant_kyc').insert({
+      'society_id': env.societyId,
+      'unit_id': unitId,
+      'full_name': fullName,
+      'tenancy_start_date': tenancyStartDate.toIso8601String().split('T').first,
+      if (tenancyEndDate != null)
+        'tenancy_end_date':
+            tenancyEndDate.toIso8601String().split('T').first,
+      if (monthlyRent != null) 'monthly_rent': monthlyRent,
+      if (nationality != null && nationality.isNotEmpty)
+        'nationality': nationality,
+      if (aadhaarLast4 != null && aadhaarLast4.isNotEmpty)
+        'aadhaar_last4': aadhaarLast4,
+      if (pan != null && pan.isNotEmpty) 'pan': pan,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+      'owner_profile_id': uid,
+      'owner_consent': true,
+      'status': 'pending',
+    });
+  }
+
+  Future<List<TenantKyc>> fetchAllTenants() async {
+    final data = await _client
+        .from('tenant_kyc')
+        .select()
+        .eq('society_id', env.societyId)
+        .order('created_at', ascending: false)
+        .limit(50);
+    return (data as List).map((e) => TenantKyc.fromJson(e)).toList();
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../data/document_repository.dart';
 
-class DocumentsScreen extends ConsumerWidget {
+class DocumentsScreen extends ConsumerStatefulWidget {
   const DocumentsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DocumentsScreen> createState() => _DocumentsScreenState();
+}
+
+class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
+  String? _selectedCategory; // null = All
+
+  @override
+  Widget build(BuildContext context) {
     final docsAsync = ref.watch(documentsProvider);
 
     return Scaffold(
@@ -44,14 +52,23 @@ class DocumentsScreen extends ConsumerWidget {
             );
           }
 
-          // Group documents by category
+          // Collect sorted unique categories
+          final allCategories = docs.map((d) => d.category).toSet().toList()
+            ..sort();
+
+          // Apply filter
+          final filtered = _selectedCategory == null
+              ? docs
+              : docs.where((d) => d.category == _selectedCategory).toList();
+
+          // Group filtered documents by category
           final Map<String, List<SocietyDocument>> grouped = {};
-          for (final doc in docs) {
+          for (final doc in filtered) {
             grouped.putIfAbsent(doc.category, () => []).add(doc);
           }
           final categories = grouped.keys.toList()..sort();
 
-          // Build flat list: category headers interleaved with document rows
+          // Build flat list: category headers + document rows
           final List<_ListItem> items = [];
           for (final cat in categories) {
             items.add(_CategoryHeader(cat));
@@ -60,24 +77,87 @@ class DocumentsScreen extends ConsumerWidget {
             }
           }
 
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(documentsProvider),
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: items.length,
-              itemBuilder: (context, i) {
-                final item = items[i];
-                if (item is _CategoryHeader) {
-                  return _CategoryHeaderTile(label: item.label);
-                } else if (item is _DocumentItem) {
-                  return _DocumentTile(
-                    doc: item.doc,
-                    onTap: () => _showDocumentDialog(context, item.doc),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
+          return Column(
+            children: [
+              // Category filter chips
+              Container(
+                color: Colors.white,
+                child: SizedBox(
+                  height: 52,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    itemCount: allCategories.length + 1,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final isAll = i == 0;
+                      final catValue = isAll ? null : allCategories[i - 1];
+                      final label = isAll ? 'All' : catValue!;
+                      final selected = _selectedCategory == catValue;
+                      return GestureDetector(
+                        onTap: () =>
+                            setState(() => _selectedCategory = catValue),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: selected ? kPrimary600 : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected ? kPrimary600 : kBorderLight,
+                            ),
+                          ),
+                          child: Text(
+                            label,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: selected
+                                  ? Colors.white
+                                  : kTextSecondary,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+
+              // Document list
+              Expanded(
+                child: filtered.isEmpty
+                    ? const EmptyState(
+                        icon: Icons.folder_open_outlined,
+                        title: 'No documents in this category',
+                        subtitle: 'Try a different filter.',
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () async =>
+                            ref.invalidate(documentsProvider),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: items.length,
+                          itemBuilder: (context, i) {
+                            final item = items[i];
+                            if (item is _CategoryHeader) {
+                              return _CategoryHeaderTile(label: item.label);
+                            } else if (item is _DocumentItem) {
+                              return _DocumentTile(
+                                doc: item.doc,
+                                onTap: () =>
+                                    _showDocumentDialog(context, item.doc),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -93,7 +173,7 @@ class DocumentsScreen extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// List item types (sealed pattern without codegen)
+// List item types
 // ---------------------------------------------------------------------------
 
 abstract class _ListItem {}
@@ -216,8 +296,7 @@ class _DocumentTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right,
-                  color: kTextSecondary, size: 18),
+              const Icon(Icons.chevron_right, color: kTextSecondary, size: 18),
             ],
           ),
         ),
@@ -299,24 +378,15 @@ class _DocumentDetailDialog extends StatelessWidget {
             const Divider(height: 1),
             const SizedBox(height: 12),
           ],
-          _DetailRow(
-            label: 'Category',
-            value: doc.category,
-          ),
-          _DetailRow(
-            label: 'Version',
-            value: 'v${doc.version}',
-          ),
+          _DetailRow(label: 'Category', value: doc.category),
+          _DetailRow(label: 'Version', value: 'v${doc.version}'),
           if (doc.fileSizeBytes != null)
             _DetailRow(
               label: 'File size',
               value: _DocumentTile._formatSize(doc.fileSizeBytes!),
             ),
           if (doc.fileName != null)
-            _DetailRow(
-              label: 'File',
-              value: doc.fileName!,
-            ),
+            _DetailRow(label: 'File', value: doc.fileName!),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
@@ -326,8 +396,7 @@ class _DocumentDetailDialog extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.open_in_browser,
-                    size: 16, color: kPrimary600),
+                const Icon(Icons.open_in_browser, size: 16, color: kPrimary600),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
