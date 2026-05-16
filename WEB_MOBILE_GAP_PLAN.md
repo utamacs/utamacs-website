@@ -13,18 +13,18 @@
 | 02 Visitors | 14 | 0 | 14 |
 | 03 Complaints | 13 | 3 | 10 |
 | 04 Finance | 12 | 0 | 12 |
-| 05 Events | 9 | 2 | 7 |
+| 05 Events | 9 | 4 | 5 |
 | 06 Polls | 9 | 1 | 8 |
 | 07 Community Board | 11 | 2 | 9 |
 | 08 Documents | 11 | 0 | 11 |
 | 09 Gallery | 5 | 0 | 5 |
 | 10 Facilities | 6 | 0 | 6 |
-| 11 Parking | 12 | 0 | 12 |
+| 11 Parking | 12 | 3 | 9 |
 | 12 Maids | 9 | 2 | 7 |
-| 13 Members | 8 | 0 | 8 |
-| 14 Notifications | 5 | 3 | 2 |
-| 15 Feedback | 8 | 4 | 4 |
-| 16 Water Tankers | 11 | 2 | 9 |
+| 13 Members | 8 | 3 | 5 |
+| 14 Notifications | 5 | 5 | 0 |
+| 15 Feedback | 8 | 7 | 1 |
+| 16 Water Tankers | 11 | 5 | 6 |
 | 17 Snags | 11 | 3 | 8 |
 | 18 HOTO | 8 | 0 | 8 |
 | 19 Analytics | 8 | 0 | 8 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 2 | 4 |
-| **TOTAL** | **234** | **26** | **208** |
+| **TOTAL** | **234** | **42** | **192** |
 
 ---
 
@@ -117,8 +117,8 @@
 - [ ] 🟠 Create event form — title, category (8 types), capacity, start/end datetime, location, description, registration_deadline, ticket_price
 - [ ] 🟡 Guest count selection (1–5 attendees) in RSVP modal
 - [x] 🟡 Registration deadline enforcement (disable RSVP after deadline)
-- [ ] 🟡 Cancel RSVP button
-- [ ] 🟡 8 event categories rendered as filter/badge chips
+- [x] 🟡 Cancel RSVP button
+- [x] 🟡 8 event categories rendered as filter/badge chips
 
 ---
 
@@ -191,9 +191,9 @@
 
 ## 11 · PARKING
 
-- [ ] 🔴 Slot grid — colour-coded availability for all slots (slot_number, type, level, monthly_charge, occupied/free status)
-- [ ] 🔴 Waitlist — join waitlist, view position in queue, withdraw
-- [ ] 🔴 Transfer request — member requests slot transfer to another unit with reason
+- [x] 🔴 Slot grid — colour-coded availability for all slots (slot_number, type, level, monthly_charge, occupied/free status)
+- [x] 🔴 Waitlist — join waitlist, view position in queue, withdraw
+- [x] 🔴 Transfer request — member requests slot transfer to another unit with reason
 - [ ] 🟠 Slot type / vehicle type filter dropdowns
 - [ ] 🟠 Insurance document upload + expiry date tracking
 - [ ] 🟠 RC document upload at allocation
@@ -224,9 +224,9 @@
 
 - [x] 🔴 Edit own profile — bio, preferred_language, WhatsApp number, emergency contact (name / phone / relation)
 - [ ] 🔴 Avatar upload — JPEG/PNG/WebP with progress indicator; stored via GitHub Docs
-- [ ] 🟠 Occupancy filter — owner_occupied / tenant_occupied / vacant / under_renovation
-- [ ] 🟡 Role badge on member card (member / executive / secretary / president)
-- [ ] 🟡 Move-in date ("Member since MMM YYYY") on profile
+- [x] 🟠 Occupancy filter — owner_occupied / tenant_occupied / vacant / under_renovation
+- [x] 🟡 Role badge on member card (member / executive / secretary / president)
+- [x] 🟡 Move-in date ("Member since MMM YYYY") on profile
 - [ ] 🟡 Vehicle details section (reg_no, make, model) in own profile
 - [ ] 🟢 Tenancy expiry filter ("Expiring in 30 days")
 - [ ] 🟢 CSV export (exec)
@@ -238,8 +238,8 @@
 - [x] 🔴 Notification preferences screen — 12 category toggles + 5 channel toggles (email, email_digest, SMS, push, WhatsApp)
 - [x] 🟠 Quiet hours configuration (from/to time picker)
 - [x] 🟠 Delete individual notification (swipe-to-delete or trash icon)
-- [ ] 🟡 Type filter chips (11 types: complaint / notice / event / poll / payment / community / visitor / facility / amc / feedback / system)
-- [ ] 🟡 Notification type icons — expand mobile switch from 5 to all 11 types
+- [x] 🟡 Type filter chips (11 types: complaint / notice / event / poll / payment / community / visitor / facility / amc / feedback / system)
+- [x] 🟡 Notification type icons — expand mobile switch from 5 to all 11 types
 
 ---
 
@@ -248,10 +248,10 @@
 - [x] 🔴 Management response view — show `response` text + `responded_at` in detail panel
 - [x] 🔴 Full detail drawer — subject, body, star rating, status, priority, management response section
 - [x] 🟠 Category alignment — replace mobile categories with web set: general / maintenance / safety / amenities / management / events / other
-- [ ] 🟠 Status filter dropdown (7 statuses: open / acknowledged / in_progress / resolved / closed)
+- [x] 🟠 Status filter dropdown (7 statuses: open / acknowledged / in_progress / resolved / closed)
 - [x] 🟠 Priority field on submit form (low / normal / high / urgent)
-- [ ] 🟡 Priority badge on feedback list card
-- [ ] 🟡 Body preview (2-line truncate) in list card
+- [x] 🟡 Priority badge on feedback list card
+- [x] 🟡 Body preview (2-line truncate) in list card
 - [ ] 🟡 Unit display in exec list view
 
 ---
@@ -263,9 +263,9 @@
 - [ ] 🟠 12-month trend chart — bar chart with KL delivered + cost per month
 - [ ] 🟠 Month picker filter (input type=month to select viewing period)
 - [ ] 🟡 Payment mode badge (Cash / UPI / Bank Transfer / Credit)
-- [ ] 🟡 Invoice number displayed on delivery card
-- [ ] 🟡 Notes field displayed on delivery card
-- [ ] 🟡 Cost-per-KL displayed
+- [x] 🟡 Invoice number displayed on delivery card
+- [x] 🟡 Notes field displayed on delivery card
+- [x] 🟡 Cost-per-KL displayed
 - [ ] 🟢 Year-to-date KL stat card
 - [ ] 🟢 CSV export (exec)
 - [ ] 🟢 Total monthly spend stat card

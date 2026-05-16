@@ -298,7 +298,7 @@ class _DeliveryCard extends StatelessWidget {
             const SizedBox(height: 6),
           ],
           // Cost + payment mode row
-          if (delivery.totalCost != null || delivery.paymentMode != null)
+          if (delivery.totalCost != null || delivery.paymentMode != null) ...[
             Row(
               children: [
                 if (delivery.totalCost != null) ...[
@@ -314,12 +314,54 @@ class _DeliveryCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (delivery.totalCost != null &&
-                    delivery.paymentMode != null)
-                  const SizedBox(width: 12),
-                if (delivery.paymentMode != null)
+                if (delivery.costPerKl != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    '@ ₹${currencyFmt.format(delivery.costPerKl)}/KL',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: kTextSecondary,
+                    ),
+                  ),
+                ],
+                if (delivery.paymentMode != null) ...[
+                  const SizedBox(width: 10),
                   _PaymentModeBadge(mode: delivery.paymentMode!),
+                ],
               ],
+            ),
+            const SizedBox(height: 6),
+          ],
+          // Invoice number
+          if (delivery.invoiceNumber != null &&
+              delivery.invoiceNumber!.isNotEmpty) ...[
+            Row(
+              children: [
+                const Icon(Icons.receipt_outlined,
+                    size: 14, color: kTextSecondary),
+                const SizedBox(width: 6),
+                Text(
+                  'Invoice: ${delivery.invoiceNumber}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: kTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+          // Notes
+          if (delivery.notes != null && delivery.notes!.isNotEmpty)
+            Text(
+              delivery.notes!,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: kTextSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
         ],
       ),

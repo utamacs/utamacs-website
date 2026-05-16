@@ -27,6 +27,16 @@ class FeedbackScreen extends ConsumerStatefulWidget {
   ConsumerState<FeedbackScreen> createState() => _FeedbackScreenState();
 }
 
+const _statusFilters = ['all', 'new', 'reviewing', 'resolved', 'closed'];
+
+String _statusLabel(String s) => switch (s) {
+      'new' => 'New',
+      'reviewing' => 'Reviewing',
+      'resolved' => 'Resolved',
+      'closed' => 'Closed',
+      _ => 'All',
+    };
+
 class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
   final _formKey = GlobalKey<FormState>();
   final _subjectCtrl = TextEditingController();
@@ -34,6 +44,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
 
   String _selectedCategory = _categories.first;
   String _selectedPriority = 'normal';
+  String _statusFilter = 'all';
   int _rating = 0;
   bool _isAnonymous = false;
   bool _submitting = false;
@@ -355,6 +366,37 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
             ),
             const SizedBox(height: 12),
 
+            // Status filter chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _statusFilters.map((s) {
+                  final selected = _statusFilter == s;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(
+                        _statusLabel(s),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? Colors.white : kTextSecondary,
+                        ),
+                      ),
+                      selected: selected,
+                      selectedColor: kPrimary600,
+                      backgroundColor: kSectionAlt,
+                      side: BorderSide(
+                          color: selected ? kPrimary600 : kBorderLight),
+                      onSelected: (_) =>
+                          setState(() => _statusFilter = s),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 12),
+
             feedbackAsync.when(
               loading: () =>
                   const Center(child: CircularProgressIndicator()),
@@ -367,12 +409,21 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                   child: const Text('Retry'),
                 ),
               ),
-              data: (items) {
+              data: (allItems) {
+                final items = _statusFilter == 'all'
+                    ? allItems
+                    : allItems
+                        .where((f) => f.status == _statusFilter)
+                        .toList();
                 if (items.isEmpty) {
-                  return const EmptyState(
+                  return EmptyState(
                     icon: Icons.feedback_outlined,
-                    title: 'No submissions yet',
-                    subtitle: 'Your submitted feedback will appear here.',
+                    title: _statusFilter == 'all'
+                        ? 'No submissions yet'
+                        : 'No ${_statusLabel(_statusFilter)} feedback',
+                    subtitle: _statusFilter == 'all'
+                        ? 'Your submitted feedback will appear here.'
+                        : 'Try a different status filter.',
                   );
                 }
                 return ListView.separated(
@@ -432,18 +483,53 @@ class _FeedbackItemCard extends StatelessWidget {
               StatusBadge.forStatus(item.status),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
+          // Body preview
+          Text(
+            item.body,
+            style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               _CategoryChip(category: item.category),
+              const SizedBox(width: 6),
+              // Priority badge
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _priorityColor(item.priority).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_priorityIcon(item.priority),
+                        size: 10, color: _priorityColor(item.priority)),
+                    const SizedBox(width: 3),
+                    Text(
+                      item.priority.toUpperCase(),
+                      style: GoogleFonts.inter(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: _priorityColor(item.priority),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               if (item.rating != null) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Row(
                   children: List.generate(
                     5,
                     (i) => Icon(
                       i < item.rating! ? Icons.star : Icons.star_border,
-                      size: 13,
+                      size: 12,
                       color: kAccent500,
                     ),
                   ),
