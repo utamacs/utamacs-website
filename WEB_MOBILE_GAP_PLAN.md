@@ -22,13 +22,13 @@
 | 11 Parking | 12 | 0 | 12 |
 | 12 Maids | 9 | 2 | 7 |
 | 13 Members | 8 | 0 | 8 |
-| 14 Notifications | 5 | 2 | 3 |
-| 15 Feedback | 8 | 0 | 8 |
-| 16 Water Tankers | 11 | 0 | 11 |
-| 17 Snags | 11 | 0 | 11 |
+| 14 Notifications | 5 | 3 | 2 |
+| 15 Feedback | 8 | 4 | 4 |
+| 16 Water Tankers | 11 | 2 | 9 |
+| 17 Snags | 11 | 3 | 8 |
 | 18 HOTO | 8 | 0 | 8 |
 | 19 Analytics | 8 | 0 | 8 |
-| 20 Security Patrol | 6 | 0 | 6 |
+| 20 Security Patrol | 6 | 1 | 5 |
 | 21 Staff Management | 9 | 0 | 9 |
 | 22 Policies | 4 | 0 | 4 |
 | 23 Register / Membership | 6 | 0 | 6 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 2 | 4 |
-| **TOTAL** | **234** | **16** | **218** |
+| **TOTAL** | **234** | **26** | **208** |
 
 ---
 
@@ -237,7 +237,7 @@
 
 - [x] 🔴 Notification preferences screen — 12 category toggles + 5 channel toggles (email, email_digest, SMS, push, WhatsApp)
 - [x] 🟠 Quiet hours configuration (from/to time picker)
-- [ ] 🟠 Delete individual notification (swipe-to-delete or trash icon)
+- [x] 🟠 Delete individual notification (swipe-to-delete or trash icon)
 - [ ] 🟡 Type filter chips (11 types: complaint / notice / event / poll / payment / community / visitor / facility / amc / feedback / system)
 - [ ] 🟡 Notification type icons — expand mobile switch from 5 to all 11 types
 
@@ -245,11 +245,11 @@
 
 ## 15 · FEEDBACK
 
-- [ ] 🔴 Management response view — show `response` text + `responded_at` in detail panel
-- [ ] 🔴 Full detail drawer — subject, body, star rating, status, priority, management response section
-- [ ] 🟠 Category alignment — replace mobile categories with web set: general / maintenance / safety / amenities / management / events / other
+- [x] 🔴 Management response view — show `response` text + `responded_at` in detail panel
+- [x] 🔴 Full detail drawer — subject, body, star rating, status, priority, management response section
+- [x] 🟠 Category alignment — replace mobile categories with web set: general / maintenance / safety / amenities / management / events / other
 - [ ] 🟠 Status filter dropdown (7 statuses: open / acknowledged / in_progress / resolved / closed)
-- [ ] 🟠 Priority field on submit form (low / normal / high / urgent)
+- [x] 🟠 Priority field on submit form (low / normal / high / urgent)
 - [ ] 🟡 Priority badge on feedback list card
 - [ ] 🟡 Body preview (2-line truncate) in list card
 - [ ] 🟡 Unit display in exec list view
@@ -258,8 +258,8 @@
 
 ## 16 · WATER TANKERS
 
-- [ ] 🔴 Log delivery modal (exec) — delivery_date, supplier, capacity_kl, tanker_count, cost_per_kl, total_cost (auto-calc), payment_mode, invoice#, notes
-- [ ] 🔴 Cost alert banner — threshold warnings from `/api/v1/water-tankers/cost-alert`
+- [x] 🔴 Log delivery modal (exec) — delivery_date, supplier, capacity_kl, tanker_count, cost_per_kl, total_cost (auto-calc), payment_mode, invoice#, notes
+- [x] 🔴 Cost alert banner — threshold warnings from `/api/v1/water-tankers/cost-alert`
 - [ ] 🟠 12-month trend chart — bar chart with KL delivered + cost per month
 - [ ] 🟠 Month picker filter (input type=month to select viewing period)
 - [ ] 🟡 Payment mode badge (Cash / UPI / Bank Transfer / Credit)
@@ -274,9 +274,9 @@
 
 ## 17 · SNAGS
 
-- [ ] 🔴 Status transition buttons — OPEN → IN_PROGRESS → RESOLVED → VERIFIED_CLOSED; VERIFIED_CLOSED → REOPENED (with mandatory reason)
+- [x] 🔴 Status transition buttons — OPEN → IN_PROGRESS → RESOLVED → VERIFIED_CLOSED; VERIFIED_CLOSED → REOPENED (with mandatory reason)
 - [ ] 🔴 Edit snag after creation — category, subcategory, location, description, severity, builder_ref, builder_committed_date
-- [ ] 🔴 Reopen workflow — VERIFIED_CLOSED → REOPENED with mandatory reason text
+- [x] 🔴 Reopen workflow — VERIFIED_CLOSED → REOPENED with mandatory reason text
 - [ ] 🟠 Photo management — upload (multi-file), lightbox view, delete, before/after comparison
 - [ ] 🟠 Document uploads — PDF/DOC/CSV up to 50 MB with description
 - [ ] 🟠 Comments thread — view + add comments on snag
@@ -316,7 +316,7 @@
 
 ## 20 · SECURITY PATROL
 
-- [ ] 🔴 Log patrol form — patrol_date, shift, guard_name, remarks, incident flag, incident_type, severity, location, description
+- [x] 🔴 Log patrol form — patrol_date, shift, guard_name, remarks, incident flag, incident_type, severity, location, description
 - [ ] 🟠 Incident management — view open incidents list (exec)
 - [ ] 🟠 Guard attendance dashboard — days worked / absent / late over 7 / 30 / 60 / 90-day windows
 - [ ] 🟡 Shift schedule — view and create shifts (exec)

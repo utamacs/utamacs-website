@@ -11,11 +11,14 @@ import '../../data/feedback_repository.dart';
 const _categories = [
   'general',
   'maintenance',
-  'security',
-  'cleanliness',
-  'governance',
-  'billing',
+  'safety',
+  'amenities',
+  'management',
+  'events',
+  'other',
 ];
+
+const _priorities = ['low', 'normal', 'high', 'urgent'];
 
 class FeedbackScreen extends ConsumerStatefulWidget {
   const FeedbackScreen({super.key});
@@ -30,6 +33,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
   final _bodyCtrl = TextEditingController();
 
   String _selectedCategory = _categories.first;
+  String _selectedPriority = 'normal';
   int _rating = 0;
   bool _isAnonymous = false;
   bool _submitting = false;
@@ -51,6 +55,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
             body: _bodyCtrl.text.trim(),
             rating: _rating > 0 ? _rating : null,
             isAnonymous: _isAnonymous,
+            priority: _selectedPriority,
           );
       ref.invalidate(myFeedbackProvider);
       _formKey.currentState!.reset();
@@ -58,6 +63,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
       _bodyCtrl.clear();
       setState(() {
         _selectedCategory = _categories.first;
+        _selectedPriority = 'normal';
         _rating = 0;
         _isAnonymous = false;
       });
@@ -204,6 +210,42 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                       textCapitalization: TextCapitalization.sentences,
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Feedback details are required' : null,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Priority dropdown
+                    Text('Priority',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: kTextSecondary,
+                        )),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      value: _selectedPriority,
+                      decoration: const InputDecoration(
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      items: _priorities
+                          .map((p) => DropdownMenuItem(
+                                value: p,
+                                child: Row(
+                                  children: [
+                                    Icon(_priorityIcon(p),
+                                        size: 16,
+                                        color: _priorityColor(p)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      p[0].toUpperCase() + p.substring(1),
+                                      style: GoogleFonts.inter(fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(
+                          () => _selectedPriority = v ?? _selectedPriority),
                     ),
                     const SizedBox(height: 14),
 
@@ -362,8 +404,15 @@ class _FeedbackItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
+    return GestureDetector(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _FeedbackDetailSheet(item: item),
+      ),
+      child: AppCard(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -421,7 +470,7 @@ class _FeedbackItemCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Response',
+                    'Management Response',
                     style: GoogleFonts.inter(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -434,18 +483,49 @@ class _FeedbackItemCard extends StatelessWidget {
                     item.response!,
                     style:
                         GoogleFonts.inter(fontSize: 13, color: kTextPrimary),
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
           ],
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                'Tap to view details',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: kPrimary600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right,
+                  size: 14, color: kPrimary600),
+            ],
+          ),
         ],
       ),
-    );
+    ));
   }
 }
+
+IconData _priorityIcon(String p) => switch (p) {
+      'urgent' => Icons.priority_high,
+      'high' => Icons.arrow_upward,
+      'low' => Icons.arrow_downward,
+      _ => Icons.remove,
+    };
+
+Color _priorityColor(String p) => switch (p) {
+      'urgent' => kRed600,
+      'high' => kAccent500,
+      'low' => kSecondary500,
+      _ => kTextSecondary,
+    };
 
 class _CategoryChip extends StatelessWidget {
   final String category;
@@ -467,6 +547,234 @@ class _CategoryChip extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: kTextSecondary,
           letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Feedback Detail Bottom Sheet
+// ---------------------------------------------------------------------------
+
+class _FeedbackDetailSheet extends StatelessWidget {
+  final FeedbackItem item;
+  const _FeedbackDetailSheet({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.8,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      builder: (_, controller) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorderLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Feedback Details',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimary600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: kBorderLight),
+            // Content
+            Expanded(
+              child: ListView(
+                controller: controller,
+                padding: const EdgeInsets.all(20),
+                children: [
+                  // Status + Priority row
+                  Row(
+                    children: [
+                      StatusBadge.forStatus(item.status),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color:
+                              _priorityColor(item.priority).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_priorityIcon(item.priority),
+                                size: 12,
+                                color: _priorityColor(item.priority)),
+                            const SizedBox(width: 4),
+                            Text(
+                              item.priority.toUpperCase(),
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: _priorityColor(item.priority),
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      _CategoryChip(category: item.category),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Subject
+                  Text(
+                    item.subject,
+                    style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Body
+                  Text(
+                    item.body,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: kTextPrimary,
+                      height: 1.55,
+                    ),
+                  ),
+
+                  // Rating
+                  if (item.rating != null) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Text(
+                          'Rating: ',
+                          style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: kTextSecondary),
+                        ),
+                        ...List.generate(
+                          5,
+                          (i) => Icon(
+                            i < item.rating! ? Icons.star : Icons.star_border,
+                            size: 18,
+                            color: kAccent500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+                  Text(
+                    'Submitted ${timeago.format(item.createdAt)}',
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: kTextSecondary),
+                  ),
+
+                  // Management Response section
+                  const SizedBox(height: 24),
+                  Text(
+                    'Management Response',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimary600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (item.response != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: kPrimary50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kPrimary100),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.response!,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: kTextPrimary,
+                              height: 1.55,
+                            ),
+                          ),
+                          if (item.respondedAt != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Responded ${timeago.format(item.respondedAt!)}',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: kTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ] else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 20, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: kSectionAlt,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kBorderLight),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.hourglass_empty,
+                              size: 16, color: kTextSecondary),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Awaiting management response',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: kTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
