@@ -5,6 +5,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../data/notification_repository.dart';
+import 'notification_preferences_screen.dart';
 
 class NotificationsListScreen extends ConsumerWidget {
   const NotificationsListScreen({super.key});
@@ -30,6 +31,16 @@ class NotificationsListScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          // Preferences
+          IconButton(
+            icon: const Icon(Icons.tune_outlined),
+            tooltip: 'Preferences',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const NotificationPreferencesScreen()),
+            ),
+          ),
           // Mark all read
           IconButton(
             icon: const Icon(Icons.check_circle_outline),
@@ -73,15 +84,30 @@ class NotificationsListScreen extends ConsumerWidget {
                   const Divider(height: 1, indent: 72, color: kBorderLight),
               itemBuilder: (context, i) {
                 final n = notifications[i];
-                return _NotificationTile(
-                  notification: n,
-                  typeIcon: _iconForType(n.type),
-                  onTap: () async {
-                    if (!n.isRead) {
-                      await repo.markRead(n.id);
-                      ref.invalidate(notificationsProvider);
-                    }
+                return Dismissible(
+                  key: Key(n.id),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    color: kRed600,
+                    child: const Icon(Icons.delete_outline,
+                        color: Colors.white, size: 24),
+                  ),
+                  onDismissed: (_) async {
+                    await repo.deleteNotification(n.id);
+                    ref.invalidate(notificationsProvider);
                   },
+                  child: _NotificationTile(
+                    notification: n,
+                    typeIcon: _iconForType(n.type),
+                    onTap: () async {
+                      if (!n.isRead) {
+                        await repo.markRead(n.id);
+                        ref.invalidate(notificationsProvider);
+                      }
+                    },
+                  ),
                 );
               },
             ),
