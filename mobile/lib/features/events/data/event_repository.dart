@@ -18,6 +18,7 @@ class Event {
   final bool isPaid;
   final double? ticketPrice;
   final bool isPublished;
+  final DateTime? registrationDeadline;
   final DateTime createdAt;
 
   const Event({
@@ -32,11 +33,15 @@ class Event {
     required this.isPaid,
     this.ticketPrice,
     required this.isPublished,
+    this.registrationDeadline,
     required this.createdAt,
   });
 
   bool get isPast => startsAt.isBefore(DateTime.now());
   bool get isUpcoming => !isPast;
+  bool get isRegistrationOpen =>
+      registrationDeadline == null ||
+      registrationDeadline!.isAfter(DateTime.now());
 
   factory Event.fromJson(Map<String, dynamic> j) => Event(
         id: j['id'] as String,
@@ -54,6 +59,9 @@ class Event {
             ? (j['ticket_price'] as num).toDouble()
             : null,
         isPublished: j['is_published'] as bool? ?? false,
+        registrationDeadline: j['registration_deadline'] != null
+            ? DateTime.parse(j['registration_deadline'] as String)
+            : null,
         createdAt: DateTime.parse(j['created_at'] as String),
       );
 }
@@ -152,6 +160,16 @@ class EventRepository {
         .eq('id', registrationId)
         .eq('user_id', uid);
   }
+
+  Future<int> fetchRegistrationCount(String eventId) async {
+    final data = await _client
+        .from('event_registrations')
+        .select('attendees_count')
+        .eq('event_id', eventId)
+        .inFilter('status', ['registered', 'waitlisted', 'attended']);
+    return (data as List).fold<int>(
+        0, (sum, row) => sum + (row['attendees_count'] as int? ?? 1));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -169,4 +187,9 @@ final eventsProvider = FutureProvider.autoDispose<List<Event>>((ref) {
 final myEventRegistrationsProvider =
     FutureProvider.autoDispose<List<EventRegistration>>((ref) {
   return ref.read(eventRepositoryProvider).fetchMyRegistrations();
+});
+
+final eventRegistrationCountProvider =
+    FutureProvider.autoDispose.family<int, String>((ref, eventId) {
+  return ref.read(eventRepositoryProvider).fetchRegistrationCount(eventId);
 });

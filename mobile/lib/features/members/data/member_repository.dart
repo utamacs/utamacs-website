@@ -12,6 +12,8 @@ class Member {
   final String? unitNumber;
   final String? block;
   final String portalRole;
+  final String? occupancyType;
+  final DateTime? moveInDate;
 
   const Member({
     required this.id,
@@ -19,9 +21,10 @@ class Member {
     this.unitNumber,
     this.block,
     required this.portalRole,
+    this.occupancyType,
+    this.moveInDate,
   });
 
-  /// Returns "B-101" style display, or just unit number, or empty string.
   String get unitDisplay =>
       [if (block != null) block, unitNumber].whereType<String>().join('-');
 
@@ -29,6 +32,7 @@ class Member {
         'executive' => 'Executive',
         'secretary' => 'Secretary',
         'president' => 'President',
+        'security_guard' => 'Guard',
         _ => 'Member',
       };
 
@@ -36,7 +40,6 @@ class Member {
       ['executive', 'secretary', 'president'].contains(portalRole);
 
   factory Member.fromJson(Map<String, dynamic> j) {
-    // The units join returns a nested map under 'units'.
     final unitMap = j['units'] as Map<String, dynamic>?;
     return Member(
       id: j['id'] as String,
@@ -46,6 +49,10 @@ class Member {
       unitNumber: unitMap?['unit_number'] as String?,
       block: unitMap?['block'] as String?,
       portalRole: j['portal_role'] as String? ?? 'member',
+      occupancyType: unitMap?['occupancy_type'] as String?,
+      moveInDate: j['move_in_date'] != null
+          ? DateTime.tryParse(j['move_in_date'] as String)
+          : null,
     );
   }
 }
@@ -60,7 +67,8 @@ class MemberRepository {
   Future<List<Member>> fetchMembers() async {
     final data = await _client
         .from('profiles')
-        .select('id, full_name, portal_role, units!inner(unit_number, block)')
+        .select(
+            'id, full_name, portal_role, move_in_date, units!inner(unit_number, block, occupancy_type)')
         .eq('society_id', env.societyId)
         .order('full_name', ascending: true)
         .limit(200);

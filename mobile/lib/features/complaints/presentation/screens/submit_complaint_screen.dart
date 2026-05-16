@@ -24,10 +24,18 @@ class _SubmitComplaintScreenState
 
   static const _categories = [
     'maintenance',
+    'electrical',
+    'plumbing',
+    'lift_elevator',
     'security',
-    'noise',
-    'cleanliness',
-    'billing',
+    'housekeeping',
+    'noise_nuisance',
+    'parking',
+    'water_supply',
+    'internet_cable',
+    'garbage_disposal',
+    'billing_finance',
+    'common_areas',
     'other',
   ];
 
@@ -209,10 +217,18 @@ class _SubmitComplaintScreenState
 
   String _labelFor(String category) => switch (category) {
         'maintenance' => 'Maintenance',
+        'electrical' => 'Electrical',
+        'plumbing' => 'Plumbing',
+        'lift_elevator' => 'Lift / Elevator',
         'security' => 'Security',
-        'noise' => 'Noise',
-        'cleanliness' => 'Cleanliness',
-        'billing' => 'Billing',
+        'housekeeping' => 'Housekeeping',
+        'noise_nuisance' => 'Noise / Nuisance',
+        'parking' => 'Parking',
+        'water_supply' => 'Water Supply',
+        'internet_cable' => 'Internet / Cable',
+        'garbage_disposal' => 'Garbage Disposal',
+        'billing_finance' => 'Billing / Finance',
+        'common_areas' => 'Common Areas',
         'other' => 'Other',
         _ => category,
       };

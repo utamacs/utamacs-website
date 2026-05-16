@@ -46,4 +46,37 @@ class AuthRepository {
     if (data == null) return null;
     return Profile.fromJson(data);
   }
+
+  Future<void> updateProfile({
+    String? bio,
+    String? whatsappNumber,
+    String? preferredLanguage,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? emergencyContactRelation,
+  }) async {
+    final uid = currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final payload = <String, dynamic>{};
+    if (bio != null) payload['bio'] = bio;
+    if (whatsappNumber != null) payload['whatsapp_number'] = whatsappNumber;
+    if (preferredLanguage != null) {
+      payload['preferred_language'] = preferredLanguage;
+    }
+    if (emergencyContactName != null) {
+      payload['emergency_contact_name'] = emergencyContactName;
+    }
+    if (emergencyContactPhone != null) {
+      payload['emergency_contact_phone'] = emergencyContactPhone;
+    }
+    if (emergencyContactRelation != null) {
+      payload['emergency_contact_relation'] = emergencyContactRelation;
+    }
+    if (payload.isEmpty) return;
+    await _client
+        .from('profiles')
+        .update(payload)
+        .eq('id', uid)
+        .eq('society_id', env.societyId);
+  }
 }

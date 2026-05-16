@@ -76,4 +76,12 @@ class AuthNotifier extends _$AuthNotifier {
     await repo.signOut();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
+
+  Future<void> reloadProfile() async {
+    final repo = ref.read(authRepositoryProvider);
+    final profile = await repo.fetchProfile();
+    if (profile != null) {
+      state = state.copyWith(profile: profile);
+    }
+  }
 }

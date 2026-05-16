@@ -251,11 +251,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ],
                 if (event.capacity != null) ...[
                   const Divider(height: 20),
-                  _DetailRow(
-                    icon: Icons.people_outline,
-                    label: 'Capacity',
-                    value: '${event.capacity} seats',
-                  ),
+                  _CapacityRow(event: event),
                 ],
                 if (event.isPaid && event.ticketPrice != null) ...[
                   const Divider(height: 20),
@@ -293,6 +289,46 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       fontSize: 14,
                       color: kTextPrimary,
                       height: 1.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // ── Registration deadline warning ─────────────────────────────
+          if (event.registrationDeadline != null && !event.isPast) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: event.isRegistrationOpen
+                    ? const Color(0xFFFEF3C7)
+                    : const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: event.isRegistrationOpen ? kAccent500 : kRed600),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    event.isRegistrationOpen
+                        ? Icons.access_time_outlined
+                        : Icons.block_outlined,
+                    size: 16,
+                    color:
+                        event.isRegistrationOpen ? kAccent500 : kRed600,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    event.isRegistrationOpen
+                        ? 'Registration closes ${_formatCompact(event.registrationDeadline!)}'
+                        : 'Registration closed',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color:
+                          event.isRegistrationOpen ? kAccent500 : kRed600,
                     ),
                   ),
                 ],
@@ -345,7 +381,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           const SizedBox(height: 32),
 
           // ── CTA button ────────────────────────────────────────────────
-          if (!isPast)
+          if (!isPast && event.isRegistrationOpen)
             _actionLoading
                 ? const Center(child: CircularProgressIndicator())
                 : isRegistered
@@ -427,6 +463,89 @@ class _DetailRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CapacityRow extends ConsumerWidget {
+  final Event event;
+  const _CapacityRow({required this.event});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final countAsync =
+        ref.watch(eventRegistrationCountProvider(event.id));
+
+    return countAsync.when(
+      loading: () => _DetailRow(
+        icon: Icons.people_outline,
+        label: 'Capacity',
+        value: '${event.capacity} seats',
+      ),
+      error: (_, __) => _DetailRow(
+        icon: Icons.people_outline,
+        label: 'Capacity',
+        value: '${event.capacity} seats',
+      ),
+      data: (registered) {
+        final capacity = event.capacity!;
+        final remaining = capacity - registered;
+        final isFull = remaining <= 0;
+        final fraction = (registered / capacity).clamp(0.0, 1.0);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.people_outline,
+                    size: 18, color: kTextSecondary),
+                const SizedBox(width: 10),
+                Text('Capacity',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: kTextSecondary)),
+                const Spacer(),
+                Text(
+                  isFull
+                      ? 'Full'
+                      : '$remaining of $capacity spots left',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isFull
+                        ? kRed600
+                        : remaining <= capacity * 0.2
+                            ? kAccent500
+                            : kSecondary500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: fraction,
+                minHeight: 6,
+                backgroundColor: kBorderLight,
+                color: isFull
+                    ? kRed600
+                    : fraction >= 0.8
+                        ? kAccent500
+                        : kSecondary500,
+              ),
+            ),
+            if (isFull)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Waitlist available — join after registering',
+                  style: GoogleFonts.inter(
+                      fontSize: 11, color: kTextSecondary),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

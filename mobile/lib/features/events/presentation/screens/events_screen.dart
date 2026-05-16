@@ -17,11 +17,35 @@ String _formatEventDate(DateTime dt) {
   return '$dayName, $dayNum $month • $time';
 }
 
-class EventsScreen extends ConsumerWidget {
+const _eventCategories = [
+  'all',
+  'general',
+  'sports',
+  'cultural',
+  'maintenance',
+  'meeting',
+  'workshop',
+  'social',
+  'festival',
+];
+
+String _categoryLabel(String c) => switch (c) {
+      'all' => 'All',
+      _ => c[0].toUpperCase() + c.substring(1),
+    };
+
+class EventsScreen extends ConsumerStatefulWidget {
   const EventsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EventsScreen> createState() => _EventsScreenState();
+}
+
+class _EventsScreenState extends ConsumerState<EventsScreen> {
+  String _categoryFilter = 'all';
+
+  @override
+  Widget build(BuildContext context) {
     final eventsAsync = ref.watch(eventsProvider);
     final registrationsAsync = ref.watch(myEventRegistrationsProvider);
 
@@ -41,95 +65,138 @@ class EventsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: eventsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load events',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(eventsProvider),
-            child: const Text('Retry'),
-          ),
-        ),
-        data: (events) {
-          if (events.isEmpty) {
-            return const EmptyState(
-              icon: Icons.event_outlined,
-              title: 'No events yet',
-              subtitle:
-                  'Community events and society programmes will appear here.',
-            );
-          }
-
-          // Extract my active registration IDs — show loading state until ready
-          final Set<String> registeredEventIds = registrationsAsync.when(
-            data: (regs) => regs
-                .where((r) => r.isActive)
-                .map((r) => r.eventId)
-                .toSet(),
-            loading: () => {},
-            error: (_, __) => {},
-          );
-
-          final upcoming = events.where((e) => e.isUpcoming).toList();
-          final past = events.where((e) => e.isPast).toList();
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(eventsProvider);
-              ref.invalidate(myEventRegistrationsProvider);
-            },
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // ── Upcoming banner header ─────────────────────────────
-                if (upcoming.isNotEmpty) ...[
-                  _UpcomingBanner(count: upcoming.length),
-                  const SizedBox(height: 16),
-                ],
-
-                // ── Upcoming events ────────────────────────────────────
-                if (upcoming.isNotEmpty) ...[
-                  _SectionHeader('Upcoming Events'),
-                  const SizedBox(height: 10),
-                  ...upcoming.map(
-                    (event) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _EventCard(
-                        event: event,
-                        isRegistered:
-                            registeredEventIds.contains(event.id),
-                        isPast: false,
-                      ),
-                    ),
-                  ),
-                ],
-
-                // ── Past events ────────────────────────────────────────
-                if (past.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _SectionHeader('Past Events'),
-                  const SizedBox(height: 10),
-                  ...past.map(
-                    (event) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Opacity(
-                        opacity: 0.55,
-                        child: _EventCard(
-                          event: event,
-                          isRegistered:
-                              registeredEventIds.contains(event.id),
-                          isPast: true,
+      body: Column(
+        children: [
+          // Category filter chips
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _eventCategories.map((c) {
+                  final selected = _categoryFilter == c;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(
+                        _categoryLabel(c),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? Colors.white : kTextSecondary,
                         ),
                       ),
+                      selected: selected,
+                      selectedColor: kPrimary600,
+                      backgroundColor: kSectionAlt,
+                      side: BorderSide(
+                          color: selected ? kPrimary600 : kBorderLight),
+                      onSelected: (_) =>
+                          setState(() => _categoryFilter = c),
                     ),
-                  ),
-                ],
-              ],
+                  );
+                }).toList(),
+              ),
             ),
-          );
-        },
+          ),
+          const Divider(height: 1, color: kBorderLight),
+          Expanded(
+            child: eventsAsync.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => EmptyState(
+                icon: Icons.error_outline,
+                title: 'Could not load events',
+                subtitle: e.toString(),
+                action: ElevatedButton(
+                  onPressed: () => ref.invalidate(eventsProvider),
+                  child: const Text('Retry'),
+                ),
+              ),
+              data: (allEvents) {
+                final events = _categoryFilter == 'all'
+                    ? allEvents
+                    : allEvents
+                        .where((e) => e.category == _categoryFilter)
+                        .toList();
+
+                if (events.isEmpty) {
+                  return EmptyState(
+                    icon: Icons.event_outlined,
+                    title: _categoryFilter == 'all'
+                        ? 'No events yet'
+                        : 'No ${_categoryLabel(_categoryFilter)} events',
+                    subtitle:
+                        'Community events and society programmes will appear here.',
+                  );
+                }
+
+                final Set<String> registeredEventIds = registrationsAsync.when(
+                  data: (regs) => regs
+                      .where((r) => r.isActive)
+                      .map((r) => r.eventId)
+                      .toSet(),
+                  loading: () => {},
+                  error: (_, __) => {},
+                );
+
+                final upcoming = events.where((e) => e.isUpcoming).toList();
+                final past = events.where((e) => e.isPast).toList();
+
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(eventsProvider);
+                    ref.invalidate(myEventRegistrationsProvider);
+                  },
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      if (upcoming.isNotEmpty) ...[
+                        _UpcomingBanner(count: upcoming.length),
+                        const SizedBox(height: 16),
+                      ],
+                      if (upcoming.isNotEmpty) ...[
+                        _SectionHeader('Upcoming Events'),
+                        const SizedBox(height: 10),
+                        ...upcoming.map(
+                          (event) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _EventCard(
+                              event: event,
+                              isRegistered:
+                                  registeredEventIds.contains(event.id),
+                              isPast: false,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (past.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _SectionHeader('Past Events'),
+                        const SizedBox(height: 10),
+                        ...past.map(
+                          (event) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Opacity(
+                              opacity: 0.55,
+                              child: _EventCard(
+                                event: event,
+                                isRegistered:
+                                    registeredEventIds.contains(event.id),
+                                isPast: true,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

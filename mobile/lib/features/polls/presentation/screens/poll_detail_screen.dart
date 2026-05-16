@@ -17,6 +17,7 @@ class PollDetailScreen extends ConsumerStatefulWidget {
 
 class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
   String? _selectedOptionId;
+  int? _selectedRating;
   bool _isSubmitting = false;
 
   Future<void> _submitVote() async {
@@ -37,6 +38,33 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to submit vote: ${e.toString()}'),
+            backgroundColor: kRed600,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _submitRating() async {
+    if (_selectedRating == null) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await ref
+          .read(pollRepositoryProvider)
+          .voteWithRating(widget.pollId, _selectedRating!);
+      if (mounted) {
+        ref.invalidate(pollDetailsProvider(widget.pollId));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Rating submitted!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e'),
             backgroundColor: kRed600,
           ),
         );
@@ -95,47 +123,52 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
                   _buildHeaderCard(context, poll, details),
                   const SizedBox(height: 16),
 
-                  // Options
-                  Text(
-                    canVote ? 'Select an option' : 'Options',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  ...details.options.map(
-                    (option) => _buildOptionTile(
-                      context,
-                      option: option,
-                      details: details,
-                      showResults: showResults,
-                      canVote: canVote,
+                  // Rating poll UI
+                  if (poll.pollType == 'rating') ...[
+                    _buildRatingSection(context, details, canVote),
+                  ] else ...[
+                    // Options
+                    Text(
+                      canVote ? 'Select an option' : 'Options',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
 
-                  const SizedBox(height: 20),
-
-                  // Vote button
-                  if (canVote)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: (_selectedOptionId != null && !_isSubmitting)
-                            ? _submitVote
-                            : null,
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Submit Vote'),
+                    ...details.options.map(
+                      (option) => _buildOptionTile(
+                        context,
+                        option: option,
+                        details: details,
+                        showResults: showResults,
+                        canVote: canVote,
                       ),
                     ),
+
+                    const SizedBox(height: 20),
+
+                    // Vote button
+                    if (canVote)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: (_selectedOptionId != null && !_isSubmitting)
+                              ? _submitVote
+                              : null,
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Submit Vote'),
+                        ),
+                      ),
+                  ],
 
                   if (details.hasVoted && !poll.isClosed)
                     Container(
@@ -193,6 +226,170 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
       ),
     );
   }
+
+  Widget _buildRatingSection(
+      BuildContext context, PollWithDetails details, bool canVote) {
+    final stats = details.ratingStats;
+    final myRating = details.myRating ?? _selectedRating;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Average display
+        if (stats != null && stats.totalVotes > 0) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: kBorderLight),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  stats.avgRating.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontSize: 52,
+                    fontWeight: FontWeight.w700,
+                    color: kAccent500,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _StarRow(rating: stats.avgRating, size: 28),
+                const SizedBox(height: 4),
+                Text('${stats.totalVotes} rating${stats.totalVotes == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                        fontSize: 12, color: kTextSecondary)),
+                const SizedBox(height: 16),
+                // Distribution bars
+                ...List.generate(5, (i) {
+                  final star = 5 - i;
+                  final count = stats.distribution[star] ?? 0;
+                  final frac = stats.totalVotes > 0
+                      ? count / stats.totalVotes
+                      : 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Text('$star',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: kTextSecondary)),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.star,
+                            size: 12, color: kAccent500),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: frac,
+                              minHeight: 8,
+                              backgroundColor: kBorderLight,
+                              color: kAccent500,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('$count',
+                            style: const TextStyle(
+                                fontSize: 11, color: kTextSecondary)),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Star input
+        if (canVote || (details.hasVoted && details.myRating != null)) ...[
+          Text(
+            details.hasVoted ? 'Your rating' : 'Rate this',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: kBorderLight),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    final star = i + 1;
+                    final filled = myRating != null && star <= myRating;
+                    return GestureDetector(
+                      onTap: canVote
+                          ? () => setState(() => _selectedRating = star)
+                          : null,
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(
+                          filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                          size: 44,
+                          color:
+                              filled ? kAccent500 : const Color(0xFFD1D5DB),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                if (_selectedRating != null && canVote) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _ratingLabel(_selectedRating!),
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: kAccent500,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting ? null : _submitRating,
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Text('Submit Rating'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _ratingLabel(int r) => switch (r) {
+        1 => 'Poor',
+        2 => 'Fair',
+        3 => 'Good',
+        4 => 'Very Good',
+        5 => 'Excellent',
+        _ => '',
+      };
 
   Widget _buildHeaderCard(
       BuildContext context, Poll poll, PollWithDetails details) {
@@ -448,6 +645,31 @@ class _MetaItem extends StatelessWidget {
               ?.copyWith(color: kTextSecondary),
         ),
       ],
+    );
+  }
+}
+
+class _StarRow extends StatelessWidget {
+  final double rating;
+  final double size;
+  const _StarRow({required this.rating, this.size = 20});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (i) {
+        final star = i + 1;
+        if (star <= rating.floor()) {
+          return Icon(Icons.star_rounded, size: size, color: kAccent500);
+        } else if (star - 1 < rating && rating < star) {
+          return Icon(Icons.star_half_rounded, size: size, color: kAccent500);
+        } else {
+          return Icon(Icons.star_outline_rounded,
+              size: size, color: const Color(0xFFD1D5DB));
+        }
+      }),
     );
   }
 }
