@@ -305,41 +305,79 @@ class _PolicyCardState extends State<_PolicyCard> {
             ],
           ),
 
-          // Acknowledge button — only if required and not yet done
-          if (policy.acknowledgementRequired && !widget.isAcked) ...[
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _loading ? null : _handleAck,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: kAccent500,
-                  side: const BorderSide(color: kAccent500, width: 1.5),
-                  minimumSize: const Size(double.infinity, 42),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+          // Action row: Read + Acknowledge
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              // Read policy button (shown when body exists)
+              if (policy.body != null && policy.body!.isNotEmpty) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        _showPolicyBody(context, policy),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kPrimary600,
+                      side: const BorderSide(color: kPrimary600),
+                      minimumSize: const Size(0, 40),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      textStyle: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    icon: const Icon(Icons.article_outlined, size: 16),
+                    label: const Text('Read Policy'),
                   ),
                 ),
-                icon: _loading
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: kAccent500,
-                        ),
-                      )
-                    : const Icon(Icons.draw_outlined, size: 16),
-                label: const Text('Acknowledge'),
-              ),
-            ),
-          ],
+                if (policy.acknowledgementRequired && !widget.isAcked)
+                  const SizedBox(width: 10),
+              ],
+
+              // Acknowledge button
+              if (policy.acknowledgementRequired && !widget.isAcked)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _handleAck,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kAccent500,
+                      side: const BorderSide(color: kAccent500, width: 1.5),
+                      minimumSize: const Size(0, 40),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      textStyle: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    icon: _loading
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: kAccent500,
+                            ),
+                          )
+                        : const Icon(Icons.draw_outlined, size: 16),
+                    label: const Text('Acknowledge'),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  void _showPolicyBody(BuildContext context, Policy policy) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PolicyBodySheet(policy: policy),
     );
   }
 }
@@ -370,6 +408,102 @@ class _PolicyTypeBadge extends StatelessWidget {
           letterSpacing: 0.4,
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Policy body bottom sheet
+// ---------------------------------------------------------------------------
+
+class _PolicyBodySheet extends StatelessWidget {
+  final Policy policy;
+  const _PolicyBodySheet({required this.policy});
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (context, scrollCtrl) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 4),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: kBorderLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Header
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _PolicyTypeBadge(policyType: policy.policyType),
+                          const SizedBox(height: 6),
+                          Text(
+                            policy.title,
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: kPrimary600,
+                            ),
+                          ),
+                          Text(
+                            'Version ${policy.version} · Effective ${DateFormat('dd MMM yyyy').format(policy.effectiveDate)}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: kTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Body
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    policy.body ?? '',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: kTextPrimary,
+                      height: 1.7,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
