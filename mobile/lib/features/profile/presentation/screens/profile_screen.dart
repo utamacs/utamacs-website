@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/domain/auth_notifier.dart';
+import 'profile_edit_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -25,6 +26,19 @@ class ProfileScreen extends ConsumerWidget {
         title: const Text('Profile'),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
+        actions: [
+          if (profile != null)
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => ProfileEditScreen(profile: profile)),
+              ),
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('Edit'),
+              style: TextButton.styleFrom(foregroundColor: kPrimary600),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -133,6 +147,33 @@ class ProfileScreen extends ConsumerWidget {
                     label: 'Role',
                     value: _roleLabel(role),
                   ),
+                  if (profile?.whatsappNumber != null) ...[
+                    const Divider(height: 1, indent: 56),
+                    _InfoRow(
+                      icon: Icons.chat_outlined,
+                      label: 'WhatsApp',
+                      value: profile!.whatsappNumber!,
+                    ),
+                  ],
+                  if (profile?.bio != null &&
+                      profile!.bio!.isNotEmpty) ...[
+                    const Divider(height: 1, indent: 56),
+                    _InfoRow(
+                      icon: Icons.info_outline,
+                      label: 'Bio',
+                      value: profile.bio!,
+                    ),
+                  ],
+                  if (profile?.emergencyContactName != null) ...[
+                    const Divider(height: 1, indent: 56),
+                    _InfoRow(
+                      icon: Icons.emergency_outlined,
+                      label: 'Emergency',
+                      value:
+                          '${profile!.emergencyContactName}'
+                          '${profile.emergencyContactRelation != null ? ' (${profile.emergencyContactRelation})' : ''}',
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -5,6 +5,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../data/notification_repository.dart';
+import 'notification_preferences_screen.dart';
 
 class NotificationsListScreen extends ConsumerWidget {
   const NotificationsListScreen({super.key});
@@ -30,6 +31,16 @@ class NotificationsListScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          // Preferences
+          IconButton(
+            icon: const Icon(Icons.tune_outlined),
+            tooltip: 'Preferences',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const NotificationPreferencesScreen()),
+            ),
+          ),
           // Mark all read
           IconButton(
             icon: const Icon(Icons.check_circle_outline),

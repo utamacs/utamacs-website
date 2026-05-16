@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../data/notice_repository.dart';
 
-class NoticeDetailScreen extends StatelessWidget {
+class NoticeDetailScreen extends ConsumerWidget {
   final Notice notice;
   const NoticeDetailScreen({super.key, required this.notice});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: const Text('Notice')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -97,6 +99,129 @@ class NoticeDetailScreen extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+      // Acknowledgement bottom bar
+      bottomNavigationBar: notice.requiresAcknowledgement
+          ? _AcknowledgeBar(notice: notice)
+          : null,
+    );
+  }
+}
+
+class _AcknowledgeBar extends ConsumerStatefulWidget {
+  final Notice notice;
+  const _AcknowledgeBar({required this.notice});
+
+  @override
+  ConsumerState<_AcknowledgeBar> createState() => _AcknowledgeBarState();
+}
+
+class _AcknowledgeBarState extends ConsumerState<_AcknowledgeBar> {
+  bool _loading = false;
+
+  Future<void> _acknowledge() async {
+    setState(() => _loading = true);
+    try {
+      await ref
+          .read(noticeRepositoryProvider)
+          .acknowledgeNotice(widget.notice.id);
+      ref.invalidate(hasAcknowledgedProvider(widget.notice.id));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Notice acknowledged.',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+            ),
+            backgroundColor: kSecondary500,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ackAsync = ref.watch(hasAcknowledgedProvider(widget.notice.id));
+
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: kBorderLight)),
+        ),
+        child: ackAsync.when(
+          loading: () => const SizedBox(
+            height: 48,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (acknowledged) => acknowledged
+              ? Container(
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: kSecondary500.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kSecondary500.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle,
+                          color: kSecondary500, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Acknowledged',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: kSecondary500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _loading ? null : _acknowledge,
+                    icon: _loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.check_circle_outline, size: 18),
+                    label: Text(
+                      'Acknowledge Notice',
+                      style: GoogleFonts.inter(
+                          fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
         ),
       ),
     );

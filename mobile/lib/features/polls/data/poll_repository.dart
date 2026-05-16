@@ -94,19 +94,35 @@ class PollOption {
       );
 }
 
+class PollRatingStats {
+  final double avgRating;
+  final int totalVotes;
+  final Map<int, int> distribution; // star (1-5) → count
+
+  const PollRatingStats({
+    required this.avgRating,
+    required this.totalVotes,
+    required this.distribution,
+  });
+}
+
 class PollWithDetails {
   final Poll poll;
   final List<PollOption> options;
   final bool hasVoted;
   final String? myVoteOptionId;
+  final int? myRating;
   final int totalVotes;
+  final PollRatingStats? ratingStats;
 
   const PollWithDetails({
     required this.poll,
     required this.options,
     required this.hasVoted,
     this.myVoteOptionId,
+    this.myRating,
     required this.totalVotes,
+    this.ratingStats,
   });
 }
 
@@ -182,12 +198,44 @@ class PollRepository {
       }
     }
 
+    // For rating polls, build ratingStats from vote data
+    PollRatingStats? ratingStats;
+    int? myRating;
+    if (poll.pollType == 'rating') {
+      final ratingVotesData = await _client
+          .from('poll_votes')
+          .select('rating_value, user_id')
+          .eq('poll_id', pollId);
+      final ratingVotes = ratingVotesData as List;
+      final Map<int, int> dist = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
+      double sum = 0;
+      for (final v in ratingVotes) {
+        final r = v['rating_value'] as int? ?? 0;
+        if (r >= 1 && r <= 5) {
+          dist[r] = (dist[r] ?? 0) + 1;
+          sum += r;
+        }
+        if (uid != null && v['user_id'] == uid) myRating = r;
+      }
+      final count = ratingVotes.length;
+      ratingStats = PollRatingStats(
+        avgRating: count > 0 ? sum / count : 0,
+        totalVotes: count,
+        distribution: dist,
+      );
+      hasVoted = myRating != null;
+    }
+
     return PollWithDetails(
       poll: poll,
       options: options,
       hasVoted: hasVoted,
       myVoteOptionId: myVoteOptionId,
-      totalVotes: totalVotes,
+      myRating: myRating,
+      totalVotes: poll.pollType == 'rating'
+          ? (ratingStats?.totalVotes ?? totalVotes)
+          : totalVotes,
+      ratingStats: ratingStats,
     );
   }
 
@@ -200,6 +248,17 @@ class PollRepository {
       'user_id': uid,
       'voted_at': DateTime.now().toIso8601String(),
     });
+  }
+
+  Future<void> voteWithRating(String pollId, int rating) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    await _client.from('poll_votes').upsert({
+      'poll_id': pollId,
+      'user_id': uid,
+      'rating_value': rating,
+      'voted_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'poll_id,user_id');
   }
 }
 
