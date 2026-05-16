@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
 import '../../data/hoto_repository.dart';
+import 'hoto_item_detail_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -329,7 +330,14 @@ class _HotoItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HotoItemDetailScreen(itemId: item.id),
+        ),
+      ),
+      child: Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -391,6 +399,7 @@ class _HotoItemCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

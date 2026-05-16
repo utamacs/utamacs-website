@@ -4,6 +4,162 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/complaint_repository.dart';
 
+// ---------------------------------------------------------------------------
+// Category / sub-category data
+// ---------------------------------------------------------------------------
+
+const _categories = [
+  'plumbing',
+  'electrical',
+  'lift',
+  'security',
+  'housekeeping',
+  'pest_control',
+  'carpentry',
+  'civil_structural',
+  'parking',
+  'garden',
+  'common_areas',
+  'noise',
+  'billing',
+  'other',
+];
+
+const _subCategories = <String, List<String>>{
+  'plumbing': [
+    'Leakage',
+    'Pipe burst',
+    'Clog / Blockage',
+    'Low water pressure',
+    'No water supply',
+    'Water tank issue',
+    'Tap / Fixture repair',
+    'Other',
+  ],
+  'electrical': [
+    'Power outage',
+    'Short circuit',
+    'Wiring issue',
+    'Earthing problem',
+    'Faulty switch / socket',
+    'Common area lighting',
+    'Meter issue',
+    'Other',
+  ],
+  'lift': [
+    'Lift not working',
+    'Unusual noise',
+    'Door issue',
+    'Emergency / Stuck',
+    'Service overdue',
+    'Other',
+  ],
+  'security': [
+    'CCTV not working',
+    'Access card issue',
+    'Gate malfunction',
+    'Guard conduct',
+    'Suspicious activity',
+    'Trespassing',
+    'Intercom issue',
+    'Other',
+  ],
+  'housekeeping': [
+    'Dustbin overflow',
+    'Common area cleaning',
+    'Staircase / Corridor',
+    'Rooftop / Terrace',
+    'Garbage collection',
+    'Drainage / Sewage',
+    'Other',
+  ],
+  'pest_control': [
+    'Cockroaches',
+    'Mosquitoes / Flies',
+    'Rodents',
+    'Termites',
+    'Ants',
+    'Other insects',
+    'Other',
+  ],
+  'carpentry': [
+    'Door / Window repair',
+    'Lock / Handle',
+    'Furniture damage',
+    'Railing',
+    'Other',
+  ],
+  'civil_structural': [
+    'Wall crack',
+    'Ceiling damage',
+    'Flooring',
+    'Seepage / Dampness',
+    'Roof leak',
+    'Compound wall',
+    'Other',
+  ],
+  'parking': [
+    'Obstruction',
+    'Marking faded',
+    'Gate / Barrier',
+    'Lighting',
+    'Drainage',
+    'Unauthorized vehicle',
+    'Other',
+  ],
+  'garden': [
+    'Overgrowth',
+    'Tree / Branch hazard',
+    'Sprinkler issue',
+    'Pathway damage',
+    'Lighting in garden',
+    'Other',
+  ],
+  'common_areas': [
+    'Gym equipment',
+    'Pool / STP',
+    'Clubhouse',
+    'Children\'s play area',
+    'Notice board',
+    'Other',
+  ],
+  'noise': [
+    'Construction noise',
+    'Party / Loud music',
+    'Pet noise',
+    'Vehicle noise',
+    'Other',
+  ],
+  'billing': [
+    'Incorrect charge',
+    'Maintenance amount query',
+    'Late fee dispute',
+    'Receipt not received',
+    'Other',
+  ],
+};
+
+String _categoryLabel(String c) => switch (c) {
+      'plumbing' => 'Plumbing',
+      'electrical' => 'Electrical',
+      'lift' => 'Lift / Elevator',
+      'security' => 'Security',
+      'housekeeping' => 'Housekeeping',
+      'pest_control' => 'Pest Control',
+      'carpentry' => 'Carpentry',
+      'civil_structural' => 'Civil / Structural',
+      'parking' => 'Parking',
+      'garden' => 'Garden / Landscaping',
+      'common_areas' => 'Common Areas',
+      'noise' => 'Noise',
+      'billing' => 'Billing / Finance',
+      _ => 'Other',
+    };
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
+
 class SubmitComplaintScreen extends ConsumerStatefulWidget {
   const SubmitComplaintScreen({super.key});
 
@@ -18,26 +174,26 @@ class _SubmitComplaintScreenState
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  String _category = 'maintenance';
+  String _category = 'plumbing';
+  String? _subCategory;
   String _priority = 'medium';
   bool _submitting = false;
 
-  static const _categories = [
-    'maintenance',
-    'security',
-    'noise',
-    'cleanliness',
-    'billing',
-    'other',
-  ];
-
-  static const _priorities = ['low', 'medium', 'high'];
+  static const _priorities = ['low', 'medium', 'high', 'urgent'];
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  void _onCategoryChanged(String? v) {
+    if (v == null) return;
+    setState(() {
+      _category = v;
+      _subCategory = null;
+    });
   }
 
   Future<void> _submit() async {
@@ -48,6 +204,7 @@ class _SubmitComplaintScreenState
             title: _titleController.text.trim(),
             description: _descriptionController.text.trim(),
             category: _category,
+            subCategory: _subCategory,
             priority: _priority,
           );
       ref.invalidate(myComplaintsProvider);
@@ -88,6 +245,8 @@ class _SubmitComplaintScreenState
 
   @override
   Widget build(BuildContext context) {
+    final subCats = _subCategories[_category] ?? const <String>[];
+
     return Scaffold(
       backgroundColor: kBgWarm,
       appBar: AppBar(
@@ -100,6 +259,7 @@ class _SubmitComplaintScreenState
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            // Title
             _SectionLabel('Title'),
             const SizedBox(height: 6),
             TextFormField(
@@ -119,60 +279,86 @@ class _SubmitComplaintScreenState
               },
             ),
             const SizedBox(height: 20),
+
+            // Category
             _SectionLabel('Category'),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
               value: _category,
               decoration: const InputDecoration(),
               items: _categories
-                  .map(
-                    (c) => DropdownMenuItem(
-                      value: c,
-                      child: Text(
-                        _labelFor(c),
-                        style: GoogleFonts.inter(
-                            fontSize: 14, color: kTextPrimary),
-                      ),
-                    ),
-                  )
+                  .map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(
+                          _categoryLabel(c),
+                          style: GoogleFonts.inter(
+                              fontSize: 14, color: kTextPrimary),
+                        ),
+                      ))
                   .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _category = v);
-              },
+              onChanged: _onCategoryChanged,
             ),
             const SizedBox(height: 20),
+
+            // Sub-category (shown only when sub-cats exist for the selected category)
+            if (subCats.isNotEmpty) ...[
+              _SectionLabel('Sub-category'),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String?>(
+                value: _subCategory,
+                decoration: const InputDecoration(
+                    hintText: 'Select sub-category (optional)'),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(
+                      'Not specified',
+                      style: GoogleFonts.inter(
+                          fontSize: 14, color: kTextSecondary),
+                    ),
+                  ),
+                  ...subCats.map((s) => DropdownMenuItem(
+                        value: s,
+                        child: Text(s,
+                            style:
+                                GoogleFonts.inter(fontSize: 14, color: kTextPrimary)),
+                      )),
+                ],
+                onChanged: (v) => setState(() => _subCategory = v),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // Priority
             _SectionLabel('Priority'),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
               value: _priority,
               decoration: const InputDecoration(),
               items: _priorities
-                  .map(
-                    (p) => DropdownMenuItem(
-                      value: p,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.circle,
-                            size: 10,
-                            color: _priorityColor(p),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            p[0].toUpperCase() + p.substring(1),
-                            style: GoogleFonts.inter(
-                                fontSize: 14, color: kTextPrimary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
+                  .map((p) => DropdownMenuItem(
+                        value: p,
+                        child: Row(
+                          children: [
+                            Icon(Icons.circle,
+                                size: 10, color: _priorityColor(p)),
+                            const SizedBox(width: 8),
+                            Text(
+                              p[0].toUpperCase() + p.substring(1),
+                              style: GoogleFonts.inter(
+                                  fontSize: 14, color: kTextPrimary),
+                            ),
+                          ],
+                        ),
+                      ))
                   .toList(),
               onChanged: (v) {
                 if (v != null) setState(() => _priority = v);
               },
             ),
             const SizedBox(height: 20),
+
+            // Description
             _SectionLabel('Description (optional)'),
             const SizedBox(height: 6),
             TextFormField(
@@ -186,6 +372,7 @@ class _SubmitComplaintScreenState
               ),
             ),
             const SizedBox(height: 32),
+
             ElevatedButton(
               onPressed: _submitting ? null : _submit,
               child: _submitting
@@ -207,17 +394,8 @@ class _SubmitComplaintScreenState
     );
   }
 
-  String _labelFor(String category) => switch (category) {
-        'maintenance' => 'Maintenance',
-        'security' => 'Security',
-        'noise' => 'Noise',
-        'cleanliness' => 'Cleanliness',
-        'billing' => 'Billing',
-        'other' => 'Other',
-        _ => category,
-      };
-
   Color _priorityColor(String priority) => switch (priority) {
+        'urgent' => const Color(0xFF7C3AED),
         'high' => kRed600,
         'medium' => kAccent500,
         'low' => kSecondary500,
