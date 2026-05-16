@@ -8,90 +8,39 @@ class ServicesScreen extends StatelessWidget {
 
   static const _sections = [
     _Section(title: 'Resident Services', items: [
-      _ServiceItem(
-          label: 'Notices',
-          icon: Icons.notifications_outlined,
-          bg: Color(0xFFEFF6FF),
-          fg: kPrimary600,
-          route: '/notices'),
-      _ServiceItem(
-          label: 'Visitors',
-          icon: Icons.badge_outlined,
-          bg: Color(0xFFD1FAE5),
-          fg: kSecondary500,
-          route: '/visitors'),
-      _ServiceItem(
-          label: 'Complaints',
-          icon: Icons.report_problem_outlined,
-          bg: Color(0xFFFFEEEE),
-          fg: kRed600),
-      _ServiceItem(
-          label: 'Finance',
-          icon: Icons.account_balance_wallet_outlined,
-          bg: Color(0xFFFFF8E1),
-          fg: kAccent500),
-      _ServiceItem(
-          label: 'Facilities',
-          icon: Icons.meeting_room_outlined,
-          bg: Color(0xFFE8F4FD),
-          fg: Color(0xFF0EA5E9)),
-      _ServiceItem(
-          label: 'Community',
-          icon: Icons.people_outline,
-          bg: Color(0xFFF3E8FF),
-          fg: Color(0xFF7C3AED)),
-      _ServiceItem(
-          label: 'Documents',
-          icon: Icons.folder_outlined,
-          bg: Color(0xFFECFDF5),
-          fg: Color(0xFF16A34A)),
-      _ServiceItem(
-          label: 'Parking',
-          icon: Icons.local_parking_outlined,
-          bg: Color(0xFFF5F5F5),
-          fg: Color(0xFF374151)),
+      _ServiceItem(label: 'Notices', icon: Icons.notifications_outlined, bg: Color(0xFFEFF6FF), fg: kPrimary600, route: '/notices'),
+      _ServiceItem(label: 'Visitors', icon: Icons.badge_outlined, bg: Color(0xFFD1FAE5), fg: kSecondary500, route: '/visitors'),
+      _ServiceItem(label: 'Complaints', icon: Icons.report_problem_outlined, bg: Color(0xFFFFEEEE), fg: kRed600, route: '/complaints'),
+      _ServiceItem(label: 'Finance', icon: Icons.account_balance_wallet_outlined, bg: Color(0xFFFFF8E1), fg: kAccent500, route: '/finance'),
+      _ServiceItem(label: 'Facilities', icon: Icons.meeting_room_outlined, bg: Color(0xFFE8F4FD), fg: Color(0xFF0EA5E9), route: '/facilities'),
+      _ServiceItem(label: 'Community', icon: Icons.people_outline, bg: Color(0xFFF3E8FF), fg: Color(0xFF7C3AED), route: '/community'),
+      _ServiceItem(label: 'Documents', icon: Icons.folder_outlined, bg: Color(0xFFECFDF5), fg: Color(0xFF16A34A), route: '/documents'),
+      _ServiceItem(label: 'Parking', icon: Icons.local_parking_outlined, bg: Color(0xFFF5F5F5), fg: Color(0xFF374151), route: '/parking'),
     ]),
     _Section(title: 'Society & Amenities', items: [
-      _ServiceItem(
-          label: 'Gallery',
-          icon: Icons.photo_library_outlined,
-          bg: Color(0xFFFFF3CD),
-          fg: Color(0xFFD97706)),
-      _ServiceItem(
-          label: 'Events',
-          icon: Icons.event_outlined,
-          bg: Color(0xFFE0F2FE),
-          fg: Color(0xFF0369A1)),
-      _ServiceItem(
-          label: 'Vendors',
-          icon: Icons.handyman_outlined,
-          bg: Color(0xFFF0FDF4),
-          fg: Color(0xFF15803D)),
-      _ServiceItem(
-          label: 'Water',
-          icon: Icons.water_drop_outlined,
-          bg: Color(0xFFE0F7FA),
-          fg: Color(0xFF0097A7)),
-      _ServiceItem(
-          label: 'Polls',
-          icon: Icons.how_to_vote_outlined,
-          bg: Color(0xFFFDF4FF),
-          fg: Color(0xFF9333EA)),
-      _ServiceItem(
-          label: 'Maids',
-          icon: Icons.cleaning_services_outlined,
-          bg: Color(0xFFFFF7ED),
-          fg: Color(0xFFEA580C)),
-      _ServiceItem(
-          label: 'Security',
-          icon: Icons.security_outlined,
-          bg: Color(0xFFEFF6FF),
-          fg: Color(0xFF1D4ED8)),
-      _ServiceItem(
-          label: 'AGM',
-          icon: Icons.gavel_outlined,
-          bg: Color(0xFFF8FAFC),
-          fg: Color(0xFF475569)),
+      _ServiceItem(label: 'Gallery', icon: Icons.photo_library_outlined, bg: Color(0xFFFFF3CD), fg: Color(0xFFD97706), route: '/gallery'),
+      _ServiceItem(label: 'Events', icon: Icons.event_outlined, bg: Color(0xFFE0F2FE), fg: Color(0xFF0369A1), route: '/events'),
+      _ServiceItem(label: 'Vendors', icon: Icons.handyman_outlined, bg: Color(0xFFF0FDF4), fg: Color(0xFF15803D), route: '/vendors'),
+      _ServiceItem(label: 'Water', icon: Icons.water_drop_outlined, bg: Color(0xFFE0F7FA), fg: Color(0xFF0097A7), route: '/water-tankers'),
+      _ServiceItem(label: 'Polls', icon: Icons.how_to_vote_outlined, bg: Color(0xFFFDF4FF), fg: Color(0xFF9333EA), route: '/polls'),
+      _ServiceItem(label: 'Maids', icon: Icons.cleaning_services_outlined, bg: Color(0xFFFFF7ED), fg: Color(0xFFEA580C), route: '/maids'),
+      _ServiceItem(label: 'Security', icon: Icons.security_outlined, bg: Color(0xFFEFF6FF), fg: Color(0xFF1D4ED8), route: '/security-patrol'),
+      _ServiceItem(label: 'Members', icon: Icons.groups_outlined, bg: Color(0xFFF8FAFC), fg: Color(0xFF475569), route: '/members'),
+    ]),
+    _Section(title: 'Governance & Compliance', items: [
+      _ServiceItem(label: 'AGM', icon: Icons.gavel_outlined, bg: Color(0xFFF0FDF4), fg: Color(0xFF166534), route: '/agm'),
+      _ServiceItem(label: 'Policies', icon: Icons.policy_outlined, bg: Color(0xFFEFF6FF), fg: kPrimary600, route: '/policies'),
+      _ServiceItem(label: 'Membership', icon: Icons.card_membership_outlined, bg: Color(0xFFFFF3CD), fg: Color(0xFF92400E), route: '/register'),
+      _ServiceItem(label: 'Tenant KYC', icon: Icons.how_to_reg_outlined, bg: Color(0xFFD1FAE5), fg: Color(0xFF065F46), route: '/tenant-kyc'),
+      _ServiceItem(label: 'Feedback', icon: Icons.rate_review_outlined, bg: Color(0xFFFFF8E1), fg: kAccent500, route: '/feedback'),
+      _ServiceItem(label: 'Snags', icon: Icons.construction_outlined, bg: Color(0xFFFFEEEE), fg: kRed600, route: '/snags'),
+      _ServiceItem(label: 'Letters', icon: Icons.mail_outlined, bg: Color(0xFFF3E8FF), fg: Color(0xFF6D28D9), route: '/letters'),
+      _ServiceItem(label: 'Notifications', icon: Icons.notifications_active_outlined, bg: Color(0xFFE8F4FD), fg: Color(0xFF0369A1), route: '/notifications-list'),
+    ]),
+    _Section(title: 'Management', items: [
+      _ServiceItem(label: 'HOTO', icon: Icons.swap_horiz_outlined, bg: Color(0xFFF0FDF4), fg: Color(0xFF15803D), route: '/hoto'),
+      _ServiceItem(label: 'Staff', icon: Icons.badge_outlined, bg: Color(0xFFF5F5F5), fg: Color(0xFF374151), route: '/staff'),
+      _ServiceItem(label: 'Overview', icon: Icons.bar_chart_outlined, bg: Color(0xFFEFF6FF), fg: kPrimary600, route: '/analytics'),
     ]),
   ];
 
@@ -132,7 +81,7 @@ class ServicesScreen extends StatelessWidget {
                 children: section.items
                     .map((item) => _ServiceTile(
                           item: item,
-                          onTap: () => _onTap(context, item),
+                          onTap: () => context.go(item.route),
                         ))
                     .toList(),
               ),
@@ -141,20 +90,6 @@ class ServicesScreen extends StatelessWidget {
         },
       ),
     );
-  }
-
-  void _onTap(BuildContext context, _ServiceItem item) {
-    if (item.route != null) {
-      context.go(item.route!);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${item.label} — coming soon'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
   }
 }
 
@@ -169,13 +104,14 @@ class _ServiceItem {
   final IconData icon;
   final Color bg;
   final Color fg;
-  final String? route;
-  const _ServiceItem(
-      {required this.label,
-      required this.icon,
-      required this.bg,
-      required this.fg,
-      this.route});
+  final String route;
+  const _ServiceItem({
+    required this.label,
+    required this.icon,
+    required this.bg,
+    required this.fg,
+    required this.route,
+  });
 }
 
 class _ServiceTile extends StatelessWidget {

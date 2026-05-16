@@ -1,0 +1,183 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/constants/supabase.dart' as env;
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+class Complaint {
+  final String id;
+  final String ticketNumber;
+  final String title;
+  final String? description;
+  final String category;
+  final String priority;
+  final String status;
+  final String raisedBy;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? resolvedAt;
+  final DateTime? slaDeadline;
+
+  const Complaint({
+    required this.id,
+    required this.ticketNumber,
+    required this.title,
+    this.description,
+    required this.category,
+    required this.priority,
+    required this.status,
+    required this.raisedBy,
+    required this.createdAt,
+    required this.updatedAt,
+    this.resolvedAt,
+    this.slaDeadline,
+  });
+
+  factory Complaint.fromJson(Map<String, dynamic> j) => Complaint(
+        id: j['id'] as String,
+        ticketNumber: j['ticket_number'] as String,
+        title: j['title'] as String,
+        description: j['description'] as String?,
+        category: j['category'] as String,
+        priority: j['priority'] as String,
+        status: j['status'] as String,
+        raisedBy: j['raised_by'] as String,
+        createdAt: DateTime.parse(j['created_at'] as String),
+        updatedAt: DateTime.parse(j['updated_at'] as String),
+        resolvedAt: j['resolved_at'] != null
+            ? DateTime.parse(j['resolved_at'] as String)
+            : null,
+        slaDeadline: j['sla_deadline'] != null
+            ? DateTime.parse(j['sla_deadline'] as String)
+            : null,
+      );
+}
+
+class ComplaintHistory {
+  final String id;
+  final String complaintId;
+  final String oldStatus;
+  final String newStatus;
+  final String? note;
+  final DateTime changedAt;
+
+  const ComplaintHistory({
+    required this.id,
+    required this.complaintId,
+    required this.oldStatus,
+    required this.newStatus,
+    this.note,
+    required this.changedAt,
+  });
+
+  factory ComplaintHistory.fromJson(Map<String, dynamic> j) => ComplaintHistory(
+        id: j['id'] as String,
+        complaintId: j['complaint_id'] as String,
+        oldStatus: j['old_status'] as String,
+        newStatus: j['new_status'] as String,
+        note: j['note'] as String?,
+        changedAt: DateTime.parse(j['changed_at'] as String),
+      );
+}
+
+class ComplaintComment {
+  final String id;
+  final String complaintId;
+  final String comment;
+  final bool isInternal;
+  final DateTime createdAt;
+
+  const ComplaintComment({
+    required this.id,
+    required this.complaintId,
+    required this.comment,
+    required this.isInternal,
+    required this.createdAt,
+  });
+
+  factory ComplaintComment.fromJson(Map<String, dynamic> j) => ComplaintComment(
+        id: j['id'] as String,
+        complaintId: j['complaint_id'] as String,
+        comment: j['comment'] as String,
+        isInternal: j['is_internal'] as bool? ?? false,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Repository
+// ---------------------------------------------------------------------------
+
+class ComplaintRepository {
+  final _client = Supabase.instance.client;
+
+  Future<List<Complaint>> fetchMyComplaints() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return [];
+    final data = await _client
+        .from('complaints')
+        .select()
+        .eq('society_id', env.societyId)
+        .eq('raised_by', uid)
+        .order('created_at', ascending: false)
+        .limit(50);
+    return (data as List).map((e) => Complaint.fromJson(e)).toList();
+  }
+
+  Future<Complaint> submitComplaint({
+    required String title,
+    required String description,
+    required String category,
+    required String priority,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final ticketNumber = 'CMP-${DateTime.now().millisecondsSinceEpoch}';
+    final data = await _client
+        .from('complaints')
+        .insert({
+          'society_id': env.societyId,
+          'raised_by': uid,
+          'ticket_number': ticketNumber,
+          'title': title,
+          'description': description,
+          'category': category,
+          'priority': priority,
+          'status': 'open',
+        })
+        .select()
+        .single();
+    return Complaint.fromJson(data);
+  }
+
+  Future<List<ComplaintHistory>> fetchCommentHistory(String complaintId) async {
+    final data = await _client
+        .from('complaint_status_history')
+        .select()
+        .eq('complaint_id', complaintId)
+        .order('changed_at', ascending: true);
+    return (data as List).map((e) => ComplaintHistory.fromJson(e)).toList();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Providers
+// ---------------------------------------------------------------------------
+
+final complaintRepositoryProvider = Provider<ComplaintRepository>(
+  (ref) => ComplaintRepository(),
+);
+
+final myComplaintsProvider =
+    FutureProvider.autoDispose<List<Complaint>>((ref) {
+  return ref.read(complaintRepositoryProvider).fetchMyComplaints();
+});
+
+final complaintHistoryProvider = FutureProvider.autoDispose
+    .family<List<ComplaintHistory>, String>((ref, complaintId) {
+  return ref
+      .read(complaintRepositoryProvider)
+      .fetchCommentHistory(complaintId);
+});
