@@ -86,7 +86,7 @@ class GalleryScreen extends ConsumerWidget {
   }
 }
 
-class _AlbumCard extends StatelessWidget {
+class _AlbumCard extends ConsumerWidget {
   final GalleryAlbum album;
   const _AlbumCard({required this.album});
 
@@ -110,10 +110,13 @@ class _AlbumCard extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final idx = album.id.hashCode.abs() % _palette.length;
     final bgColor = _palette[idx];
     final iconColor = _iconColors[idx];
+    final coverUrlAsync = album.coverKey != null
+        ? ref.watch(albumCoverUrlProvider(album.coverKey!))
+        : null;
 
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -131,21 +134,39 @@ class _AlbumCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Album icon thumbnail
+            // Album cover thumbnail
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(15)),
-              child: Container(
+              child: SizedBox(
                 height: 110,
                 width: double.infinity,
-                color: bgColor,
-                child: Center(
-                  child: Icon(
-                    Icons.photo_library_outlined,
-                    size: 48,
-                    color: iconColor,
-                  ),
-                ),
+                child: coverUrlAsync != null &&
+                        coverUrlAsync.valueOrNull != null
+                    ? Image.network(
+                        coverUrlAsync.valueOrNull!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: bgColor,
+                          child: Center(
+                            child: Icon(
+                              Icons.photo_library_outlined,
+                              size: 48,
+                              color: iconColor,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: bgColor,
+                        child: Center(
+                          child: Icon(
+                            Icons.photo_library_outlined,
+                            size: 48,
+                            color: iconColor,
+                          ),
+                        ),
+                      ),
               ),
             ),
 

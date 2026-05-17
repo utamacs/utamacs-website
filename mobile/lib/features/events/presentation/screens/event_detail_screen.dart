@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../auth/domain/auth_notifier.dart';
@@ -280,12 +281,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ],
                 if (event.bannerKey != null) ...[
                   const Divider(height: 20),
-                  _DetailRow(
-                    icon: Icons.image_outlined,
-                    label: 'Banner',
-                    value: 'Available — view on portal.utamacs.org',
-                    valueColor: kPrimary600,
-                  ),
+                  _BannerButton(eventId: event.id),
                 ],
               ],
             ),
@@ -760,6 +756,37 @@ class _GuestCountModalState extends State<_GuestCountModal> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Banner button — opens event portal page to view banner
+// ---------------------------------------------------------------------------
+
+class _BannerButton extends StatelessWidget {
+  final String eventId;
+  const _BannerButton({required this.eventId});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: kPrimary600,
+        side: const BorderSide(color: kPrimary600),
+        minimumSize: const Size(double.infinity, 44),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      icon: const Icon(Icons.image_outlined, size: 18),
+      label: const Text('View Event Banner'),
+      onPressed: () async {
+        final uri = Uri.parse(
+            'https://portal.utamacs.org/portal/events/$eventId');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      },
     );
   }
 }
