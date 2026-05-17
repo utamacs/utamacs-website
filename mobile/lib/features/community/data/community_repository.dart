@@ -145,6 +145,22 @@ class CommunityRepository {
         .eq('id', postId);
   }
 
+  Future<void> reportPost({
+    required String postId,
+    required String reason,
+    String? details,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    await _client.from('post_reports').insert({
+      'post_id': postId,
+      'reported_by': uid,
+      'reason': reason,
+      if (details != null && details.trim().isNotEmpty)
+        'details': details.trim(),
+    });
+  }
+
   /// Toggles a reaction: inserts if not present, deletes if already present.
   Future<void> toggleReaction(String postId, String reactionType) async {
     final uid = _client.auth.currentUser?.id;

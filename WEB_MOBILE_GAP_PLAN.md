@@ -15,12 +15,12 @@
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 6 | 3 |
 | 06 Polls | 9 | 7 | 2 |
-| 07 Community Board | 11 | 6 | 5 |
+| 07 Community Board | 11 | 7 | 4 |
 | 08 Documents | 11 | 5 | 6 |
 | 09 Gallery | 5 | 2 | 3 |
 | 10 Facilities | 6 | 1 | 5 |
 | 11 Parking | 12 | 6 | 6 |
-| 12 Maids | 9 | 4 | 5 |
+| 12 Maids | 9 | 6 | 3 |
 | 13 Members | 8 | 3 | 5 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 7 | 1 |
@@ -28,7 +28,7 @@
 | 17 Snags | 11 | 5 | 6 |
 | 18 HOTO | 8 | 2 | 6 |
 | 19 Analytics | 8 | 1 | 7 |
-| 20 Security Patrol | 6 | 1 | 5 |
+| 20 Security Patrol | 6 | 2 | 4 |
 | 21 Staff Management | 9 | 2 | 7 |
 | 22 Policies | 4 | 1 | 3 |
 | 23 Register / Membership | 6 | 1 | 5 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 3 | 3 |
-| **TOTAL** | **234** | **91** | **143** |
+| **TOTAL** | **234** | **95** | **139** |
 
 ---
 
@@ -144,7 +144,7 @@
 - [x] 🟡 Edit post modal (owner-only) — title + body
 - [x] 🟡 Delete / soft-delete post (owner or exec)
 - [x] 🟡 Pin / unpin post (exec) with pinned visual indicator
-- [ ] 🟡 Report post modal — reason (spam / offensive / misinformation / harassment / other) + optional details (max 300 chars)
+- [x] 🟡 Report post modal — reason (spam / offensive / misinformation / harassment / other) + optional details (max 300 chars)
 - [ ] 🟡 Moderation queue — 3 reports hides post; exec can clear or remove
 - [x] 🟡 Category filter chips (General / Help / Lost & Found / Recommendation / Alert)
 - [ ] 🟡 Marketplace sub-section (buy / sell / giveaway listings)
@@ -213,8 +213,8 @@
 - [x] 🔴 Register helper form (exec) — full_name, phone, work_type (8 options), agency, id_type (6 options), id_number, police_verified + verification_date
 - [x] 🟠 Find & Approve tab — browse all registered helpers, approve for own unit
 - [ ] 🟠 Attendance tab with date picker and attendance table
-- [ ] 🟡 KYC expiry / renewal warnings (`kyc_expires_at`)
-- [ ] 🟢 Agency name displayed on helper card
+- [x] 🟡 KYC expiry / renewal warnings (`kyc_expires_at`)
+- [x] 🟢 Agency name displayed on helper card
 - [ ] 🟢 Toggle helper active / inactive (exec)
 - [ ] 🟢 Photo display for registered helpers
 
@@ -317,7 +317,7 @@
 ## 20 · SECURITY PATROL
 
 - [x] 🔴 Log patrol form — patrol_date, shift, guard_name, remarks, incident flag, incident_type, severity, location, description
-- [ ] 🟠 Incident management — view open incidents list (exec)
+- [x] 🟠 Incident management — view open incidents list (exec)
 - [ ] 🟠 Guard attendance dashboard — days worked / absent / late over 7 / 30 / 60 / 90-day windows
 - [ ] 🟡 Shift schedule — view and create shifts (exec)
 - [ ] 🟡 CSV export of patrol logs (exec)

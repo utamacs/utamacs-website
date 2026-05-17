@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/patrol_repository.dart';
 
 class SecurityPatrolScreen extends ConsumerWidget {
@@ -12,7 +13,51 @@ class SecurityPatrolScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final logsAsync = ref.watch(patrolLogsProvider);
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+
+    if (isExec) {
+      return DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          backgroundColor: kBgWarm,
+          appBar: AppBar(
+            title: const Text('Security Patrol'),
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  ref.invalidate(patrolLogsProvider);
+                  ref.invalidate(incidentLogsProvider);
+                },
+              ),
+            ],
+            bottom: TabBar(
+              labelStyle: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600, fontSize: 14),
+              unselectedLabelStyle: GoogleFonts.inter(
+                  fontWeight: FontWeight.w400, fontSize: 14),
+              labelColor: kPrimary600,
+              unselectedLabelColor: kTextSecondary,
+              indicatorColor: kPrimary600,
+              indicatorWeight: 2.5,
+              tabs: const [
+                Tab(text: 'Patrol Logs'),
+                Tab(text: 'Incidents'),
+              ],
+            ),
+          ),
+          body: const TabBarView(
+            children: [
+              _PatrolLogsTab(),
+              _IncidentsTab(),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -27,50 +72,298 @@ class SecurityPatrolScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: logsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load patrol logs',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(patrolLogsProvider),
-            child: const Text('Retry'),
-          ),
-        ),
-        data: (logs) {
-          if (logs.isEmpty) {
-            return const EmptyState(
-              icon: Icons.security,
-              title: 'No patrol logs yet',
-              subtitle: 'Security patrol records will appear here.',
-            );
-          }
+      body: const _PatrolLogsTab(),
+    );
+  }
+}
 
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(patrolLogsProvider),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _SummaryCard(logs: logs),
-                const SizedBox(height: 20),
-                Text(
-                  'Recent Logs',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
+// ---------------------------------------------------------------------------
+// Patrol Logs Tab
+// ---------------------------------------------------------------------------
+
+class _PatrolLogsTab extends ConsumerWidget {
+  const _PatrolLogsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final logsAsync = ref.watch(patrolLogsProvider);
+
+    return logsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load patrol logs',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(patrolLogsProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (logs) {
+        if (logs.isEmpty) {
+          return const EmptyState(
+            icon: Icons.security,
+            title: 'No patrol logs yet',
+            subtitle: 'Security patrol records will appear here.',
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(patrolLogsProvider),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _SummaryCard(logs: logs),
+              const SizedBox(height: 20),
+              Text(
+                'Recent Logs',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...logs.map((log) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _PatrolLogCard(log: log),
+                  )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Incidents Tab (exec only)
+// ---------------------------------------------------------------------------
+
+class _IncidentsTab extends ConsumerWidget {
+  const _IncidentsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final incidentsAsync = ref.watch(incidentLogsProvider);
+
+    return incidentsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load incidents',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(incidentLogsProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (incidents) {
+        if (incidents.isEmpty) {
+          return const EmptyState(
+            icon: Icons.check_circle_outline,
+            title: 'No incidents reported',
+            subtitle: 'All clear — no incidents in the patrol logs.',
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(incidentLogsProvider),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _IncidentSummaryCard(incidents: incidents),
+              const SizedBox(height: 20),
+              Text(
+                'All Incidents',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...incidents.map((log) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _IncidentCard(log: log),
+                  )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _IncidentSummaryCard extends StatelessWidget {
+  final List<PatrolLog> incidents;
+  const _IncidentSummaryCard({required this.incidents});
+
+  @override
+  Widget build(BuildContext context) {
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    final last7 =
+        incidents.where((i) => i.patrolDate.isAfter(sevenDaysAgo)).length;
+    final last30 =
+        incidents.where((i) => i.patrolDate.isAfter(thirtyDaysAgo)).length;
+
+    return AppCard(
+      color: const Color(0xFF7F1D1D),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  color: Color(0xFFFCA5A5), size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Incident Overview',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _StatBox(
+                  value: '$last7',
+                  label: 'Last 7 Days',
+                  valueColor: last7 > 0
+                      ? const Color(0xFFFCA5A5)
+                      : const Color(0xFF6EE7B7),
+                  labelColor: Colors.white70,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _StatBox(
+                  value: '$last30',
+                  label: 'Last 30 Days',
+                  valueColor: last30 > 0
+                      ? const Color(0xFFFCA5A5)
+                      : const Color(0xFF6EE7B7),
+                  labelColor: Colors.white70,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _StatBox(
+                  value: '${incidents.length}',
+                  label: 'Total Logged',
+                  valueColor: Colors.white,
+                  labelColor: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IncidentCard extends StatelessWidget {
+  final PatrolLog log;
+  const _IncidentCard({required this.log});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  color: kRed600, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                DateFormat('EEE, d MMM y').format(log.patrolDate),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  log.shiftLabel,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: kPrimary600,
+                    color: kRed600,
+                    letterSpacing: 0.3,
                   ),
                 ),
-                const SizedBox(height: 12),
-                ...logs.map((log) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _PatrolLogCard(log: log),
-                    )),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.person_outline,
+                  size: 13, color: kTextSecondary),
+              const SizedBox(width: 4),
+              Text(
+                log.guardName,
+                style:
+                    GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+              ),
+            ],
+          ),
+          if (log.incidents != null && log.incidents!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: Text(
+                log.incidents!,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: kRed600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+          if (log.remarks != null && log.remarks!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.notes_outlined,
+                    size: 13, color: kTextSecondary),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    log.remarks!,
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: kTextSecondary),
+                  ),
+                ),
               ],
             ),
-          );
-        },
+          ],
+        ],
       ),
     );
   }

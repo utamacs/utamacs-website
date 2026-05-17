@@ -14,6 +14,8 @@ class Maid {
   final bool policeVerified;
   final DateTime? verificationDate;
   final DateTime registeredAt;
+  final String? agency;
+  final DateTime? kycExpiresAt;
 
   const Maid({
     required this.id,
@@ -23,7 +25,18 @@ class Maid {
     required this.policeVerified,
     this.verificationDate,
     required this.registeredAt,
+    this.agency,
+    this.kycExpiresAt,
   });
+
+  bool get kycExpired =>
+      kycExpiresAt != null && kycExpiresAt!.isBefore(DateTime.now());
+
+  bool get kycExpiringSoon =>
+      kycExpiresAt != null &&
+      !kycExpired &&
+      kycExpiresAt!
+          .isBefore(DateTime.now().add(const Duration(days: 30)));
 
   factory Maid.fromJson(Map<String, dynamic> j) => Maid(
         id: j['id'] as String,
@@ -35,6 +48,10 @@ class Maid {
             ? DateTime.parse(j['verification_date'] as String)
             : null,
         registeredAt: DateTime.parse(j['registered_at'] as String),
+        agency: j['agency'] as String?,
+        kycExpiresAt: j['kyc_expires_at'] != null
+            ? DateTime.parse(j['kyc_expires_at'] as String)
+            : null,
       );
 }
 
