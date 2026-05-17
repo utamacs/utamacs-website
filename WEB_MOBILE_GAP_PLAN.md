@@ -9,7 +9,7 @@
 
 | Module | Total | Done | Remaining |
 |--------|-------|------|-----------|
-| 01 Notices | 9 | 4 | 5 |
+| 01 Notices | 9 | 5 | 4 |
 | 02 Visitors | 14 | 0 | 14 |
 | 03 Complaints | 13 | 13 | 0 |
 | 04 Finance | 12 | 0 | 12 |
@@ -18,12 +18,12 @@
 | 07 Community Board | 11 | 7 | 4 |
 | 08 Documents | 11 | 5 | 6 |
 | 09 Gallery | 5 | 2 | 3 |
-| 10 Facilities | 6 | 1 | 5 |
+| 10 Facilities | 6 | 3 | 3 |
 | 11 Parking | 12 | 6 | 6 |
 | 12 Maids | 9 | 6 | 3 |
 | 13 Members | 8 | 3 | 5 |
 | 14 Notifications | 5 | 5 | 0 |
-| 15 Feedback | 8 | 7 | 1 |
+| 15 Feedback | 8 | 8 | 0 |
 | 16 Water Tankers | 11 | 8 | 3 |
 | 17 Snags | 11 | 5 | 6 |
 | 18 HOTO | 8 | 2 | 6 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 3 | 3 |
-| **TOTAL** | **234** | **102** | **132** |
+| **TOTAL** | **234** | **107** | **127** |
 
 ---
 
@@ -49,7 +49,7 @@
 - [x] 🟠 Create notice form — title, category, audience (all/owners/tenants), target blocks/wings, body HTML, is_pinned, requires_acknowledgement, scheduled_at, draft mode
 - [ ] 🟠 Attachment viewer — tap to open/download PDF or image via signed URL
 - [ ] 🟠 Target audience & wing/block field on create form
-- [ ] 🟡 Video URL field + embedded player in notice detail
+- [x] 🟡 Video URL field + embedded player in notice detail
 - [x] 🟢 Full category colour-coding (Urgent=red, Financial=amber, Governance=blue, Maintenance=orange, Events=purple, General=grey)
 
 ---
@@ -181,8 +181,8 @@
 ## 10 · FACILITIES BOOKING
 
 - [x] 🟠 Cancel booking — for pending / confirmed / waitlisted bookings, with optional reason input
-- [ ] 🟡 Booking fee and deposit amount displayed before and on booking confirmation
-- [ ] 🟡 Client-side advance booking validation (enforce `advance_booking_days` minimum)
+- [x] 🟡 Booking fee and deposit amount displayed before and on booking confirmation
+- [x] 🟡 Client-side advance booking validation (enforce `advance_booking_days` minimum)
 - [ ] 🟢 Advance booking window indicator ("Up to X days in advance")
 - [ ] 🟢 No-show suspension warning (3 no-shows = account flagged)
 - [ ] 🟢 Deposit refund / credit details on cancellation
@@ -252,7 +252,7 @@
 - [x] 🟠 Priority field on submit form (low / normal / high / urgent)
 - [x] 🟡 Priority badge on feedback list card
 - [x] 🟡 Body preview (2-line truncate) in list card
-- [ ] 🟡 Unit display in exec list view
+- [x] 🟡 Unit display in exec list view
 
 ---
 
@@ -261,7 +261,7 @@
 - [x] 🔴 Log delivery modal (exec) — delivery_date, supplier, capacity_kl, tanker_count, cost_per_kl, total_cost (auto-calc), payment_mode, invoice#, notes
 - [x] 🔴 Cost alert banner — threshold warnings from `/api/v1/water-tankers/cost-alert`
 - [ ] 🟠 12-month trend chart — bar chart with KL delivered + cost per month
-- [ ] 🟠 Month picker filter (input type=month to select viewing period)
+- [x] 🟠 Month picker filter (input type=month to select viewing period)
 - [x] 🟡 Payment mode badge (Cash / UPI / Bank Transfer / Credit)
 - [x] 🟡 Invoice number displayed on delivery card
 - [x] 🟡 Notes field displayed on delivery card

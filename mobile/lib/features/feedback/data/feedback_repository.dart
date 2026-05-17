@@ -18,6 +18,7 @@ class FeedbackItem {
   final String? response;
   final DateTime? respondedAt;
   final DateTime createdAt;
+  final String? unitId;
 
   const FeedbackItem({
     required this.id,
@@ -31,6 +32,7 @@ class FeedbackItem {
     this.response,
     this.respondedAt,
     required this.createdAt,
+    this.unitId,
   });
 
   factory FeedbackItem.fromJson(Map<String, dynamic> j) => FeedbackItem(
@@ -47,6 +49,7 @@ class FeedbackItem {
             ? DateTime.parse(j['responded_at'] as String)
             : null,
         createdAt: DateTime.parse(j['created_at'] as String),
+        unitId: j['unit_id'] as String?,
       );
 }
 
@@ -106,6 +109,16 @@ class FeedbackRepository {
         .single();
     return FeedbackItem.fromJson(data);
   }
+
+  Future<List<FeedbackItem>> fetchAllFeedback({int limit = 50}) async {
+    final data = await _client
+        .from('feedbacks')
+        .select()
+        .eq('society_id', env.societyId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (data as List).map((e) => FeedbackItem.fromJson(e)).toList();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -119,3 +132,7 @@ final feedbackRepositoryProvider = Provider<FeedbackRepository>(
 final myFeedbackProvider =
     FutureProvider.autoDispose<List<FeedbackItem>>((ref) =>
         ref.read(feedbackRepositoryProvider).fetchMyFeedback());
+
+final allFeedbackProvider =
+    FutureProvider.autoDispose<List<FeedbackItem>>((ref) =>
+        ref.read(feedbackRepositoryProvider).fetchAllFeedback());

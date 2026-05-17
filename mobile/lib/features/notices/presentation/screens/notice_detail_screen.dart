@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../auth/domain/auth_notifier.dart';
@@ -130,6 +131,29 @@ class NoticeDetailScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
+            ],
+
+            if (notice.videoUrl != null &&
+                notice.videoUrl!.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kPrimary600,
+                  side: const BorderSide(color: kPrimary600),
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.play_circle_outline, size: 20),
+                label: const Text('Watch Video'),
+                onPressed: () async {
+                  final uri = Uri.tryParse(notice.videoUrl!);
+                  if (uri != null && await canLaunchUrl(uri)) {
+                    await launchUrl(uri,
+                        mode: LaunchMode.externalApplication);
+                  }
+                },
               ),
             ],
           ],
