@@ -85,6 +85,70 @@ class HotoRepository {
     }
     return counts;
   }
+
+  Future<List<HotoComment>> fetchComments(String itemId) async {
+    final data = await _client
+        .from('hoto_comments')
+        .select('id, item_id, author_id, content, is_pinned, created_at, profiles(full_name)')
+        .eq('item_id', itemId)
+        .eq('item_type', 'hoto_item')
+        .order('created_at', ascending: true);
+    return (data as List).map((e) => HotoComment.fromJson(e)).toList();
+  }
+
+  Future<HotoComment> addComment(String itemId, String content) async {
+    final uid = _client.auth.currentUser!.id;
+    final id = 'hoto-cmt-${DateTime.now().millisecondsSinceEpoch}';
+    final data = await _client
+        .from('hoto_comments')
+        .insert({
+          'id': id,
+          'item_type': 'hoto_item',
+          'item_id': itemId,
+          'author_id': uid,
+          'content': content.trim(),
+        })
+        .select('id, item_id, author_id, content, is_pinned, created_at, profiles(full_name)')
+        .single();
+    return HotoComment.fromJson(data);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HOTO Comment model
+// ---------------------------------------------------------------------------
+
+class HotoComment {
+  final String id;
+  final String itemId;
+  final String authorId;
+  final String? authorName;
+  final String content;
+  final bool isPinned;
+  final DateTime createdAt;
+
+  const HotoComment({
+    required this.id,
+    required this.itemId,
+    required this.authorId,
+    this.authorName,
+    required this.content,
+    required this.isPinned,
+    required this.createdAt,
+  });
+
+  factory HotoComment.fromJson(Map<String, dynamic> j) {
+    final profile = j['profiles'] as Map<String, dynamic>?;
+    return HotoComment(
+      id: j['id'] as String,
+      itemId: j['item_id'] as String,
+      authorId: j['author_id'] as String,
+      authorName: profile?['full_name'] as String?,
+      content: j['content'] as String,
+      isPinned: j['is_pinned'] as bool? ?? false,
+      createdAt: DateTime.parse(j['created_at'] as String),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -112,3 +176,9 @@ final hotoSummaryProvider =
     FutureProvider.autoDispose<Map<String, int>>((ref) {
   return ref.read(hotoRepositoryProvider).fetchSummary();
 });
+
+final hotoCommentsProvider =
+    FutureProvider.autoDispose.family<List<HotoComment>, String>(
+  (ref, itemId) =>
+      ref.read(hotoRepositoryProvider).fetchComments(itemId),
+);

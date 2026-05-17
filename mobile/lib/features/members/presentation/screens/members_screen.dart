@@ -16,6 +16,7 @@ class MembersScreen extends ConsumerStatefulWidget {
 class _MembersScreenState extends ConsumerState<MembersScreen> {
   final _searchController = TextEditingController();
   String _query = '';
+  bool _filterExpiring = false;
 
   @override
   void dispose() {
@@ -23,10 +24,16 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
     super.dispose();
   }
 
-  List<Member> _filtered(List<Member> all) {
-    if (_query.isEmpty) return all;
+  List<Member> _filtered(List<Member> all, Set<String> expiringUnitIds) {
+    var result = all;
+    if (_filterExpiring) {
+      result = result
+          .where((m) => m.unitId != null && expiringUnitIds.contains(m.unitId))
+          .toList();
+    }
+    if (_query.isEmpty) return result;
     final lower = _query.toLowerCase();
-    return all
+    return result
         .where((m) =>
             m.fullName.toLowerCase().contains(lower) ||
             m.unitDisplay.toLowerCase().contains(lower))
@@ -62,7 +69,9 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
           ),
         ),
         data: (members) {
-          final filtered = _filtered(members);
+          final expiringIds =
+              ref.watch(expiringTenancyUnitIdsProvider).valueOrNull ?? {};
+          final filtered = _filtered(members, expiringIds);
           return Column(
             children: [
               // Search bar
@@ -107,18 +116,38 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                   ),
                 ),
               ),
+              // Filter chips
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Row(
+                  children: [
+                    _FilterChip(
+                      label: 'Tenancy Expiring (30d)',
+                      selected: _filterExpiring,
+                      onTap: () => setState(
+                          () => _filterExpiring = !_filterExpiring),
+                      color: kAccent500,
+                    ),
+                  ],
+                ),
+              ),
               const Divider(height: 1, color: kBorderLight),
               // List
               Expanded(
                 child: filtered.isEmpty
                     ? EmptyState(
                         icon: Icons.people_outline,
-                        title: _query.isEmpty
-                            ? 'No members found'
-                            : 'No results for "$_query"',
-                        subtitle: _query.isEmpty
-                            ? 'The member directory is currently empty.'
-                            : 'Try a different name or unit number.',
+                        title: _filterExpiring
+                            ? 'No expiring tenancies'
+                            : _query.isEmpty
+                                ? 'No members found'
+                                : 'No results for "$_query"',
+                        subtitle: _filterExpiring
+                            ? 'No tenant KYC records expire within 30 days.'
+                            : _query.isEmpty
+                                ? 'The member directory is currently empty.'
+                                : 'Try a different name or unit number.',
                       )
                     : RefreshIndicator(
                         onRefresh: () async =>
@@ -202,6 +231,52 @@ class _MemberCard extends StatelessWidget {
           if (member.isExec)
             _RoleChip(label: member.roleLabel),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color color;
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? color.withOpacity(0.12) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? color : kBorderLight),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              Icon(Icons.check_circle, size: 13, color: color),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: selected ? color : kTextSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

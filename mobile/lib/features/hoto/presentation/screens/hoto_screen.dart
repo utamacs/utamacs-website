@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
@@ -327,12 +328,24 @@ class _HotoItemCard extends StatelessWidget {
     };
   }
 
+  void _openDetail(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _HotoItemDetailSheet(item: item),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
+      child: InkWell(
+        onTap: () => _openDetail(context),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: kBorderLight),
@@ -389,6 +402,7 @@ class _HotoItemCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -481,6 +495,280 @@ class _DeadlineRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HOTO item detail + comments bottom sheet
+// ---------------------------------------------------------------------------
+
+class _HotoItemDetailSheet extends ConsumerStatefulWidget {
+  final HotoItem item;
+  const _HotoItemDetailSheet({required this.item});
+
+  @override
+  ConsumerState<_HotoItemDetailSheet> createState() =>
+      _HotoItemDetailSheetState();
+}
+
+class _HotoItemDetailSheetState extends ConsumerState<_HotoItemDetailSheet> {
+  final _commentCtrl = TextEditingController();
+  bool _posting = false;
+
+  @override
+  void dispose() {
+    _commentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _postComment() async {
+    final text = _commentCtrl.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _posting = true);
+    try {
+      await ref
+          .read(hotoRepositoryProvider)
+          .addComment(widget.item.id, text);
+      _commentCtrl.clear();
+      ref.invalidate(hotoCommentsProvider(widget.item.id));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to post comment: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _posting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final commentsAsync = ref.watch(hotoCommentsProvider(item.id));
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: kBorderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      _IdChip(id: item.id),
+                      const SizedBox(width: 8),
+                      StatusBadge.forStatus(item.status),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    item.title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  if (item.description != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      item.description!,
+                      style: GoogleFonts.inter(
+                          fontSize: 13, color: kTextSecondary, height: 1.5),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _CategoryChip(category: item.category),
+                      if (item.deadline != null) ...[
+                        const SizedBox(width: 8),
+                        _DeadlineRow(
+                          deadline: item.deadline!,
+                          isOverdue: item.isOverdue,
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(height: 1, color: kBorderLight),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Comments',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  commentsAsync.when(
+                    loading: () => const Center(
+                        child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(),
+                    )),
+                    error: (e, _) => Text('Could not load comments: $e',
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: kTextSecondary)),
+                    data: (comments) {
+                      if (comments.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            'No comments yet. Be the first to add one.',
+                            style: GoogleFonts.inter(
+                                fontSize: 13, color: kTextSecondary),
+                          ),
+                        );
+                      }
+                      return Column(
+                        children: comments
+                            .map((c) => _CommentTile(comment: c))
+                            .toList(),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+          // Comment input
+          Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: kBorderLight)),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentCtrl,
+                    maxLines: 1,
+                    decoration: InputDecoration(
+                      hintText: 'Add a comment…',
+                      filled: true,
+                      fillColor: kBgWarm,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: const BorderSide(color: kBorderLight)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: const BorderSide(color: kBorderLight)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                    ),
+                    style: GoogleFonts.inter(fontSize: 14),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _posting
+                    ? const SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : IconButton.filled(
+                        onPressed: _postComment,
+                        icon: const Icon(Icons.send, size: 18),
+                        style: IconButton.styleFrom(
+                          backgroundColor: kPrimary600,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommentTile extends StatelessWidget {
+  final HotoComment comment;
+  const _CommentTile({required this.comment});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: kPrimary100,
+            child: Text(
+              (comment.authorName ?? 'U')[0].toUpperCase(),
+              style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary600),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      comment.authorName ?? 'Member',
+                      style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: kTextPrimary),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      timeago.format(comment.createdAt),
+                      style: GoogleFonts.inter(
+                          fontSize: 11, color: kTextSecondary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  comment.content,
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: kTextPrimary, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
