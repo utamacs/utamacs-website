@@ -100,6 +100,40 @@ class StaffTask {
 }
 
 // ---------------------------------------------------------------------------
+// Staff attendance model
+// ---------------------------------------------------------------------------
+
+class StaffAttendance {
+  final String id;
+  final String staffId;
+  final String date;
+  final String? checkIn;
+  final String? checkOut;
+  final DateTime createdAt;
+
+  const StaffAttendance({
+    required this.id,
+    required this.staffId,
+    required this.date,
+    this.checkIn,
+    this.checkOut,
+    required this.createdAt,
+  });
+
+  bool get hasCheckedIn => checkIn != null;
+  bool get hasCheckedOut => checkOut != null;
+
+  factory StaffAttendance.fromJson(Map<String, dynamic> j) => StaffAttendance(
+        id: j['id'] as String,
+        staffId: j['staff_id'] as String,
+        date: j['date'] as String,
+        checkIn: j['check_in'] as String?,
+        checkOut: j['check_out'] as String?,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
+}
+
+// ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
 
@@ -155,6 +189,41 @@ class StaffRepository {
         .single();
     return StaffTask.fromJson(data);
   }
+
+  Future<List<StaffAttendance>> fetchAttendance({String? date}) async {
+    final today = date ?? DateTime.now().toIso8601String().substring(0, 10);
+    final data = await _client
+        .from('staff_attendance')
+        .select()
+        .eq('society_id', env.societyId)
+        .eq('date', today)
+        .order('created_at', ascending: true);
+    return (data as List).map((e) => StaffAttendance.fromJson(e)).toList();
+  }
+
+  Future<void> logCheckIn(String staffId) async {
+    final uid = _client.auth.currentUser!.id;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final now = DateTime.now().toIso8601String();
+    await _client.from('staff_attendance').upsert({
+      'society_id': env.societyId,
+      'staff_id': staffId,
+      'date': today,
+      'check_in': now,
+      'logged_by': uid,
+    }, onConflict: 'staff_id,date');
+  }
+
+  Future<void> logCheckOut(String staffId) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final now = DateTime.now().toIso8601String();
+    await _client
+        .from('staff_attendance')
+        .update({'check_out': now})
+        .eq('staff_id', staffId)
+        .eq('date', today)
+        .eq('society_id', env.societyId);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -173,4 +242,9 @@ final activeStaffProvider =
 final staffTasksProvider =
     FutureProvider.autoDispose<List<StaffTask>>((ref) {
   return ref.read(staffRepositoryProvider).fetchTasks();
+});
+
+final staffAttendanceProvider =
+    FutureProvider.autoDispose<List<StaffAttendance>>((ref) {
+  return ref.read(staffRepositoryProvider).fetchAttendance();
 });

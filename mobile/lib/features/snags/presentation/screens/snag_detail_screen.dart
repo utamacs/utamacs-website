@@ -188,11 +188,165 @@ class SnagDetailScreen extends ConsumerWidget {
             ),
           ],
 
+          // ── Linked HOTO items (exec only) ─────────────────────────────
+          if (isExec) ...[
+            const SizedBox(height: 16),
+            _LinkedHotoSection(snagId: snag.id),
+          ],
+
           // ── Comments thread (exec only) ────────────────────────────────
           if (isExec) ...[
             const SizedBox(height: 20),
             _CommentsSection(snagId: snag.id),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Linked HOTO items section
+// ---------------------------------------------------------------------------
+
+class _LinkedHotoSection extends ConsumerWidget {
+  final String snagId;
+  const _LinkedHotoSection({required this.snagId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final linkedAsync = ref.watch(snagLinkedHotoItemsProvider(snagId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'LINKED HOTO ITEMS',
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: kPrimary600,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 8),
+        linkedAsync.when(
+          loading: () =>
+              const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Text(
+            'Could not load linked items',
+            style: GoogleFonts.inter(color: kRed600, fontSize: 13),
+          ),
+          data: (items) => items.isEmpty
+              ? Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kBorderLight),
+                  ),
+                  child: Text(
+                    'No linked HOTO items.',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: kTextSecondary),
+                  ),
+                )
+              : Column(
+                  children:
+                      items.map((item) => _LinkedHotoTile(item: item)).toList(),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LinkedHotoTile extends StatelessWidget {
+  final LinkedHotoItem item;
+  const _LinkedHotoTile({required this.item});
+
+  static Color _statusBg(String s) => s == 'done'
+      ? const Color(0xFFD1FAE5)
+      : s == 'in_progress'
+          ? kPrimary50
+          : kSectionAlt;
+
+  static Color _statusFg(String s) => s == 'done'
+      ? kSecondary500
+      : s == 'in_progress'
+          ? kPrimary600
+          : kTextSecondary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorderLight),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: kPrimary50,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              item.hotoItemId,
+              style: GoogleFonts.inter(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: kPrimary600,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: kTextPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  item.category,
+                  style: GoogleFonts.inter(
+                      fontSize: 11, color: kTextSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: _statusBg(item.status),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              item.status.toUpperCase(),
+              style: GoogleFonts.inter(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: _statusFg(item.status),
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
         ],
       ),
     );

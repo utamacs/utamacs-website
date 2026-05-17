@@ -11,6 +11,7 @@ class Event {
   final String title;
   final String? description;
   final String? category;
+  final String? bannerKey;
   final DateTime startsAt;
   final DateTime? endsAt;
   final String? location;
@@ -25,6 +26,7 @@ class Event {
     required this.title,
     this.description,
     this.category,
+    this.bannerKey,
     required this.startsAt,
     this.endsAt,
     this.location,
@@ -43,6 +45,7 @@ class Event {
         title: j['title'] as String,
         description: j['description'] as String?,
         category: j['category'] as String?,
+        bannerKey: j['banner_key'] as String?,
         startsAt: DateTime.parse(j['starts_at'] as String),
         endsAt: j['ends_at'] != null
             ? DateTime.parse(j['ends_at'] as String)

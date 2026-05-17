@@ -175,6 +175,10 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
 
   void _showDocumentDialog(BuildContext context, SocietyDocument doc) {
     final isExec = ref.read(authNotifierProvider).profile?.isExec ?? false;
+    if (isExec) {
+      unawaited(
+          ref.read(documentRepositoryProvider).logDocumentAccess(doc.id));
+    }
     showDialog(
       context: context,
       builder: (_) => _DocumentDetailDialog(

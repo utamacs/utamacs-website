@@ -278,6 +278,15 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     valueColor: kAccent500,
                   ),
                 ],
+                if (event.bannerKey != null) ...[
+                  const Divider(height: 20),
+                  _DetailRow(
+                    icon: Icons.image_outlined,
+                    label: 'Banner',
+                    value: 'Available — view on portal.utamacs.org',
+                    valueColor: kPrimary600,
+                  ),
+                ],
               ],
             ),
           ),
