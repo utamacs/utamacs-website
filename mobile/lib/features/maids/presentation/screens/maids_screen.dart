@@ -300,6 +300,23 @@ class _MaidCard extends StatelessWidget {
                     ],
                   ],
                 ),
+                if (maid.agency != null && maid.agency!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.business_outlined,
+                          size: 13, color: kTextSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        maid.agency!,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: kTextSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   'Registered $registeredDate',
@@ -308,6 +325,32 @@ class _MaidCard extends StatelessWidget {
                     color: kTextSecondary,
                   ),
                 ),
+                if (maid.kycExpired || maid.kycExpiringSoon) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: maid.kycExpired
+                          ? const Color(0xFFFEE2E2)
+                          : const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      maid.kycExpired
+                          ? 'KYC EXPIRED'
+                          : 'KYC EXPIRING ${DateFormat('d MMM').format(maid.kycExpiresAt!)}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: maid.kycExpired
+                            ? kRed600
+                            : const Color(0xFFD97706),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

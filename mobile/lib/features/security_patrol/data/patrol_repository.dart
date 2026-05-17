@@ -81,6 +81,18 @@ class PatrolRepository {
         .limit(limit);
     return (data as List).map((e) => PatrolLog.fromJson(e)).toList();
   }
+
+  Future<List<PatrolLog>> fetchIncidentLogs({int limit = 50}) async {
+    final data = await _client
+        .from('patrol_logs')
+        .select()
+        .eq('society_id', env.societyId)
+        .eq('is_incident', true)
+        .order('patrol_date', ascending: false)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (data as List).map((e) => PatrolLog.fromJson(e)).toList();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -94,3 +106,7 @@ final patrolRepositoryProvider = Provider<PatrolRepository>(
 final patrolLogsProvider =
     FutureProvider.autoDispose<List<PatrolLog>>((ref) =>
         ref.read(patrolRepositoryProvider).fetchRecentLogs());
+
+final incidentLogsProvider =
+    FutureProvider.autoDispose<List<PatrolLog>>((ref) =>
+        ref.read(patrolRepositoryProvider).fetchIncidentLogs());

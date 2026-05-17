@@ -163,6 +163,18 @@ class _PostCard extends ConsumerWidget {
     }
   }
 
+  void _showReportModal(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ReportPostModal(
+        postId: post.id,
+        onReported: () {},
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final myId = ref.watch(authNotifierProvider).profile?.id;
@@ -172,6 +184,7 @@ class _PostCard extends ConsumerWidget {
     final canEdit = isOwner;
     final canDelete = isOwner || isExec;
     final canPin = isExec;
+    final canReport = !isOwner;
 
     return AppCard(
       child: Column(
@@ -193,7 +206,7 @@ class _PostCard extends ConsumerWidget {
                     .bodySmall
                     ?.copyWith(color: kTextSecondary),
               ),
-              if (canEdit || canDelete || canPin) ...[
+              if (canEdit || canDelete || canPin || canReport) ...[
                 const SizedBox(width: 4),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert,
@@ -202,6 +215,7 @@ class _PostCard extends ConsumerWidget {
                     if (v == 'edit') _showEditModal(context, ref);
                     if (v == 'delete') _confirmDelete(context, ref);
                     if (v == 'pin') _togglePin(context, ref);
+                    if (v == 'report') _showReportModal(context, ref);
                   },
                   itemBuilder: (_) => [
                     if (canPin)
@@ -246,6 +260,20 @@ class _PostCard extends ConsumerWidget {
                                 size: 16, color: kRed600),
                             const SizedBox(width: 10),
                             Text('Delete',
+                                style: GoogleFonts.inter(
+                                    fontSize: 14, color: kRed600)),
+                          ],
+                        ),
+                      ),
+                    if (canReport)
+                      PopupMenuItem(
+                        value: 'report',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.flag_outlined,
+                                size: 16, color: kRed600),
+                            const SizedBox(width: 10),
+                            Text('Report',
                                 style: GoogleFonts.inter(
                                     fontSize: 14, color: kRed600)),
                           ],
@@ -551,6 +579,182 @@ class _EditPostModalState extends ConsumerState<_EditPostModal> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Report post modal
+// ---------------------------------------------------------------------------
+
+class _ReportPostModal extends ConsumerStatefulWidget {
+  final String postId;
+  final VoidCallback onReported;
+  const _ReportPostModal({required this.postId, required this.onReported});
+
+  @override
+  ConsumerState<_ReportPostModal> createState() => _ReportPostModalState();
+}
+
+class _ReportPostModalState extends ConsumerState<_ReportPostModal> {
+  static const _reasons = [
+    ('spam', 'Spam'),
+    ('offensive', 'Offensive content'),
+    ('misinformation', 'Misinformation'),
+    ('harassment', 'Harassment'),
+    ('other', 'Other'),
+  ];
+
+  String _reason = 'spam';
+  final _detailsCtrl = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _detailsCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() => _submitting = true);
+    try {
+      await ref.read(communityRepositoryProvider).reportPost(
+            postId: widget.postId,
+            reason: _reason,
+            details: _detailsCtrl.text.trim().isEmpty
+                ? null
+                : _detailsCtrl.text.trim(),
+          );
+      widget.onReported();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Report submitted',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: kSecondary500,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e', style: GoogleFonts.inter()),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: kBorderLight,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Text(
+                  'Report Post',
+                  style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: kRed600),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                  color: kTextSecondary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Reason',
+                style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _reason,
+              decoration: InputDecoration(
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+              items: _reasons
+                  .map((r) => DropdownMenuItem(
+                      value: r.$1,
+                      child:
+                          Text(r.$2, style: GoogleFonts.inter(fontSize: 14))))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _reason = v);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _detailsCtrl,
+              maxLines: 3,
+              maxLength: 300,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: 'Additional details (optional)',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kRed600,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _submitting ? null : _submit,
+                child: _submitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Submit Report'),
+              ),
+            ),
+          ],
         ),
       ),
     );
