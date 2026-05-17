@@ -65,6 +65,26 @@ class WaterDelivery {
 }
 
 // ---------------------------------------------------------------------------
+// Monthly trend model
+// ---------------------------------------------------------------------------
+
+class WaterMonthlyTrend {
+  final DateTime month;
+  final double totalKl;
+  final double? totalCost;
+  final int deliveryCount;
+
+  const WaterMonthlyTrend({
+    required this.month,
+    required this.totalKl,
+    this.totalCost,
+    required this.deliveryCount,
+  });
+
+  String get monthLabel => DateFormat('MMM yy').format(month);
+}
+
+// ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
 
@@ -97,6 +117,38 @@ class WaterTankerRepository {
         .map((e) => WaterDelivery.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  Future<List<WaterMonthlyTrend>> fetchMonthlyTrend() async {
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month - 11, 1);
+    final fromStr = DateFormat('yyyy-MM-dd').format(from);
+
+    final data = await _client
+        .from('water_tankers')
+        .select('delivery_date, total_kl, total_cost')
+        .eq('society_id', env.societyId)
+        .gte('delivery_date', fromStr)
+        .order('delivery_date', ascending: true);
+
+    final monthMap = <String, WaterMonthlyTrend>{};
+    for (final row in (data as List)) {
+      final d = DateTime.parse(row['delivery_date'] as String);
+      final key = '${d.year}-${d.month.toString().padLeft(2, '0')}';
+      final month = DateTime(d.year, d.month);
+      final kl = (row['total_kl'] as num?)?.toDouble() ?? 0.0;
+      final cost = (row['total_cost'] as num?)?.toDouble();
+      final existing = monthMap[key];
+      monthMap[key] = WaterMonthlyTrend(
+        month: month,
+        totalKl: (existing?.totalKl ?? 0) + kl,
+        totalCost: cost != null
+            ? ((existing?.totalCost ?? 0) + cost)
+            : existing?.totalCost,
+        deliveryCount: (existing?.deliveryCount ?? 0) + 1,
+      );
+    }
+    return monthMap.values.toList()..sort((a, b) => a.month.compareTo(b.month));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -115,4 +167,9 @@ final waterDeliveriesProvider =
   return ref
       .read(waterTankerRepositoryProvider)
       .fetchDeliveries(month: month);
+});
+
+final waterMonthlyTrendProvider =
+    FutureProvider.autoDispose<List<WaterMonthlyTrend>>((ref) {
+  return ref.read(waterTankerRepositoryProvider).fetchMonthlyTrend();
 });

@@ -24,10 +24,10 @@
 | 13 Members | 8 | 5 | 3 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
-| 16 Water Tankers | 11 | 8 | 3 |
-| 17 Snags | 11 | 7 | 4 |
+| 16 Water Tankers | 11 | 9 | 2 |
+| 17 Snags | 11 | 8 | 3 |
 | 18 HOTO | 8 | 4 | 4 |
-| 19 Analytics | 8 | 2 | 6 |
+| 19 Analytics | 8 | 3 | 5 |
 | 20 Security Patrol | 6 | 5 | 1 |
 | 21 Staff Management | 9 | 4 | 5 |
 | 22 Policies | 4 | 3 | 1 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 1 | 4 |
 | 27 Vendors & Work Orders | 9 | 4 | 5 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **234** | **153** | **81** |
+| **TOTAL** | **234** | **156** | **78** |
 
 ---
 
@@ -260,7 +260,7 @@
 
 - [x] 🔴 Log delivery modal (exec) — delivery_date, supplier, capacity_kl, tanker_count, cost_per_kl, total_cost (auto-calc), payment_mode, invoice#, notes
 - [x] 🔴 Cost alert banner — threshold warnings from `/api/v1/water-tankers/cost-alert`
-- [ ] 🟠 12-month trend chart — bar chart with KL delivered + cost per month
+- [x] 🟠 12-month trend chart — bar chart with KL delivered + cost per month
 - [x] 🟠 Month picker filter (input type=month to select viewing period)
 - [x] 🟡 Payment mode badge (Cash / UPI / Bank Transfer / Credit)
 - [x] 🟡 Invoice number displayed on delivery card
@@ -280,7 +280,7 @@
 - [ ] 🟠 Photo management — upload (multi-file), lightbox view, delete, before/after comparison
 - [ ] 🟠 Document uploads — PDF/DOC/CSV up to 50 MB with description
 - [x] 🟠 Comments thread — view + add comments on snag
-- [ ] 🟡 Create vendor work order from snag (linked WO with deadline + quoted amount)
+- [x] 🟡 Create vendor work order from snag (linked WO with deadline + quoted amount)
 - [x] 🟡 Assignee field — assign to committee member (exec/secretary/president)
 - [x] 🟡 HOTO item linkage — view linked HOTO item; HOTO blocked until snag verified
 - [ ] 🟡 CSV export with filters (status, severity, scope, category)
@@ -304,7 +304,7 @@
 ## 19 · ANALYTICS
 
 - [x] 🔴 Overview KPI cards — total members, units, dues collection %, complaints, visitors
-- [ ] 🔴 Charts — bar (complaints by status, visitor types), line (14-day visitor trend, 6-month P&L, collection efficiency), pie (member composition, expense breakdown)
+- [x] 🔴 Charts — bar (complaints by status, visitor types), line (14-day visitor trend, 6-month P&L, collection efficiency), pie (member composition, expense breakdown)
 - [ ] 🟠 Filtered data CSV export
 - [ ] 🟠 Executive PDF report (`/api/v1/reports/executive-pdf`)
 - [ ] 🟡 Wing / block / billing-period filters

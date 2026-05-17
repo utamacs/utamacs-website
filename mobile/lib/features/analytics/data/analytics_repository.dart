@@ -24,6 +24,13 @@ class SocietyStats {
   });
 }
 
+class ComplaintBreakdown {
+  final Map<String, int> countsByStatus;
+  const ComplaintBreakdown({required this.countsByStatus});
+
+  int get total => countsByStatus.values.fold(0, (a, b) => a + b);
+}
+
 // ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
@@ -100,6 +107,20 @@ class AnalyticsRepository {
       pendingDues: pendingDues,
     );
   }
+
+  Future<ComplaintBreakdown> fetchComplaintBreakdown() async {
+    final data = await _client
+        .from('complaints')
+        .select('status')
+        .eq('society_id', env.societyId);
+
+    final counts = <String, int>{};
+    for (final row in (data as List)) {
+      final s = row['status'] as String;
+      counts[s] = (counts[s] ?? 0) + 1;
+    }
+    return ComplaintBreakdown(countsByStatus: counts);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -113,4 +134,9 @@ final analyticsRepositoryProvider = Provider<AnalyticsRepository>(
 final societyStatsProvider =
     FutureProvider.autoDispose<SocietyStats>((ref) {
   return ref.read(analyticsRepositoryProvider).fetchStats();
+});
+
+final complaintBreakdownProvider =
+    FutureProvider.autoDispose<ComplaintBreakdown>((ref) {
+  return ref.read(analyticsRepositoryProvider).fetchComplaintBreakdown();
 });

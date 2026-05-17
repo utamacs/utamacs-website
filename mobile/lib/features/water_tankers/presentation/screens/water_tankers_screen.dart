@@ -37,6 +37,7 @@ class WaterTankersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final deliveriesAsync = ref.watch(waterDeliveriesProvider);
+    final trendAsync = ref.watch(waterMonthlyTrendProvider);
     final selectedMonth = ref.watch(selectedMonthProvider);
     final monthLabel = selectedMonth != null
         ? DateFormat('MMM yyyy').format(selectedMonth)
@@ -106,13 +107,26 @@ class WaterTankersScreen extends ConsumerWidget {
                   : 'Water tanker delivery records will appear here once added.',
             );
           }
+          final trendData = trendAsync.valueOrNull ?? [];
+          final showTrend = selectedMonth == null && trendData.isNotEmpty;
+          final headerCount = showTrend ? 2 : 1; // trend + summary OR just summary
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(waterDeliveriesProvider),
+            onRefresh: () async {
+              ref.invalidate(waterDeliveriesProvider);
+              ref.invalidate(waterMonthlyTrendProvider);
+            },
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: deliveries.length + 1, // +1 for summary card
+              itemCount: deliveries.length + headerCount,
               itemBuilder: (context, i) {
-                if (i == 0) {
+                if (showTrend && i == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _TrendChart(data: trendData),
+                  );
+                }
+                final summaryIdx = showTrend ? 1 : 0;
+                if (i == summaryIdx) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: _SummaryCard(
@@ -121,7 +135,7 @@ class WaterTankersScreen extends ConsumerWidget {
                 }
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _DeliveryCard(delivery: deliveries[i - 1]),
+                  child: _DeliveryCard(delivery: deliveries[i - headerCount]),
                 );
               },
             ),
@@ -373,6 +387,82 @@ class _DeliveryCard extends StatelessWidget {
                   _PaymentModeBadge(mode: delivery.paymentMode!),
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 12-month KL trend chart (simple bar chart using containers)
+// ---------------------------------------------------------------------------
+
+class _TrendChart extends StatelessWidget {
+  final List<WaterMonthlyTrend> data;
+  const _TrendChart({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    if (data.isEmpty) return const SizedBox.shrink();
+
+    final maxKl = data.map((d) => d.totalKl).reduce((a, b) => a > b ? a : b);
+    if (maxKl == 0) return const SizedBox.shrink();
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.bar_chart_rounded, size: 18, color: kPrimary600),
+              const SizedBox(width: 8),
+              Text('12-Month KL Trend',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 80,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: data.map((month) {
+                final barHeight = (month.totalKl / maxKl) * 70;
+                final isLatest = month == data.last;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Container(
+                          height: barHeight.clamp(4.0, 70.0),
+                          decoration: BoxDecoration(
+                            color: isLatest ? kPrimary600 : kPrimary100,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          month.monthLabel.substring(0, 3),
+                          style: GoogleFonts.inter(
+                              fontSize: 9, color: kTextSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'KL delivered per month — current month highlighted',
+            style: GoogleFonts.inter(fontSize: 11, color: kTextSecondary),
+          ),
         ],
       ),
     );
