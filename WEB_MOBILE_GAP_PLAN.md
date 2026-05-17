@@ -13,20 +13,20 @@
 | 02 Visitors | 14 | 3 | 11 |
 | 03 Complaints | 13 | 12 | 1 |
 | 04 Finance | 12 | 0 | 12 |
-| 05 Events | 9 | 8 | 1 |
+| 05 Events | 9 | 9 | 0 |
 | 06 Polls | 9 | 9 | 0 |
-| 07 Community Board | 11 | 10 | 1 |
+| 07 Community Board | 11 | 11 | 0 |
 | 08 Documents | 11 | 11 | 0 |
-| 09 Gallery | 5 | 3 | 2 |
+| 09 Gallery | 5 | 4 | 1 |
 | 10 Facilities | 6 | 6 | 0 |
-| 11 Parking | 12 | 10 | 2 |
+| 11 Parking | 12 | 12 | 0 |
 | 12 Maids | 9 | 9 | 0 |
 | 13 Members | 8 | 8 | 0 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
 | 16 Water Tankers | 11 | 11 | 0 |
-| 17 Snags | 11 | 9 | 2 |
-| 18 HOTO | 8 | 6 | 2 |
+| 17 Snags | 11 | 11 | 0 |
+| 18 HOTO | 8 | 8 | 0 |
 | 19 Analytics | 8 | 7 | 1 |
 | 20 Security Patrol | 6 | 6 | 0 |
 | 21 Staff Management | 9 | 9 | 0 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 5 | 0 |
 | 27 Vendors & Work Orders | 9 | 9 | 0 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **233** | **198** | **35** |
+| **TOTAL** | **233** | **207** | **26** |
 
 ---
 
@@ -111,7 +111,7 @@
 ## 05 · EVENTS
 
 - [x] 🔴 Capacity management — spots-left counter, capacity progress bar, auto-waitlist when full
-- [ ] 🟠 Waitlist auto-promotion when a spot opens + push notification to next in queue
+- [x] 🟠 Waitlist auto-promotion when a spot opens + push notification to next in queue
 - [x] 🟠 Banner image — display in list and detail; upload (exec)
 - [x] 🟠 Attendee list — name, unit, guest count, check-in status (exec-only)
 - [x] 🟠 Create event form — title, category (8 types), capacity, start/end datetime, location, description, registration_deadline, ticket_price
@@ -140,7 +140,7 @@
 
 - [x] 🔴 Like / Helpful reactions — `like_count`, `helpful_count`, animated toggle buttons
 - [x] 🔴 Comments — view thread per post, add comment form, delete own comment
-- [ ] 🟠 Image uploads in create post — up to 5 images, JPEG/PNG/WebP/HEIC, signed URL via GitHub Docs
+- [x] 🟠 Image uploads in create post — up to 5 images, JPEG/PNG/WebP/HEIC, signed URL via GitHub Docs
 - [x] 🟡 Edit post modal (owner-only) — title + body
 - [x] 🟡 Delete / soft-delete post (owner or exec)
 - [x] 🟡 Pin / unpin post (exec) with pinned visual indicator
@@ -174,7 +174,7 @@
 - [ ] 🟠 Upload photos to album — multi-file picker (exec), progress indicator
 - [x] 🟡 Album cover image displayed in grid (currently placeholder colour only)
 - [x] 🟡 Album description and event_date shown in detail view
-- [ ] 🟢 Photo captions in lightbox view
+- [x] 🟢 Photo captions in lightbox view
 
 ---
 
@@ -195,8 +195,8 @@
 - [x] 🔴 Waitlist — join waitlist, view position in queue, withdraw
 - [x] 🔴 Transfer request — member requests slot transfer to another unit with reason
 - [x] 🟠 Slot type / vehicle type filter dropdowns
-- [ ] 🟠 Insurance document upload + expiry date tracking
-- [ ] 🟠 RC document upload at allocation
+- [x] 🟠 Insurance document upload + expiry date tracking
+- [x] 🟠 RC document upload at allocation
 - [x] 🟡 Vehicle details — make, model, colour on allocation card
 - [x] 🟡 Monthly charge (`₹X/month`) displayed on allocation card
 - [x] 🟡 Allocation expiry date (`expires_at`) displayed
@@ -277,8 +277,8 @@
 - [x] 🔴 Status transition buttons — OPEN → IN_PROGRESS → RESOLVED → VERIFIED_CLOSED; VERIFIED_CLOSED → REOPENED (with mandatory reason)
 - [x] 🔴 Edit snag after creation — category, subcategory, location, description, severity, builder_ref, builder_committed_date
 - [x] 🔴 Reopen workflow — VERIFIED_CLOSED → REOPENED with mandatory reason text
-- [ ] 🟠 Photo management — upload (multi-file), lightbox view, delete, before/after comparison
-- [ ] 🟠 Document uploads — PDF/DOC/CSV up to 50 MB with description
+- [x] 🟠 Photo management — upload (multi-file), lightbox view, delete, before/after comparison
+- [x] 🟠 Document uploads — PDF/DOC/CSV up to 50 MB with description
 - [x] 🟠 Comments thread — view + add comments on snag
 - [x] 🟡 Create vendor work order from snag (linked WO with deadline + quoted amount)
 - [x] 🟡 Assignee field — assign to committee member (exec/secretary/president)
@@ -294,8 +294,8 @@
 - [x] 🔴 Snag ↔ HOTO bidirectional linking (attach snag to HOTO item; block HOTO review if snag open)
 - [x] 🟠 Status transition buttons (advance / submit for review / approve / reject)
 - [x] 🟠 Delegation management — assign authority to committee member
-- [ ] 🟠 Elections workflow screen
-- [ ] 🟠 Finance tab — resolutions, budget approvals, funding decisions
+- [x] 🟠 Elections workflow screen
+- [x] 🟠 Finance tab — resolutions, budget approvals, funding decisions
 - [x] 🟡 Comments on HOTO items
 - [x] 🟡 User invitations to HOTO process
 

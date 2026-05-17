@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -1008,6 +1009,13 @@ class _ParkingCard extends StatelessWidget {
   final ParkingAllocation allocation;
   const _ParkingCard({required this.allocation});
 
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   String _capitalize(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
@@ -1108,6 +1116,48 @@ class _ParkingCard extends StatelessWidget {
               label: 'Expires On',
               value: DateFormat('dd MMM yyyy').format(allocation.expiresAt!),
             ),
+          const SizedBox(height: 16),
+          const Divider(color: kBorderLight),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _openPortal('parking?action=upload-insurance'),
+                  icon: const Icon(Icons.verified_outlined, size: 15),
+                  label: const Text('Upload Insurance'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kPrimary600,
+                    side: const BorderSide(color: kPrimary600),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    textStyle: GoogleFonts.inter(
+                        fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _openPortal('parking?action=upload-rc'),
+                  icon: const Icon(Icons.article_outlined, size: 15),
+                  label: const Text('Upload RC'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kTextSecondary,
+                    side: const BorderSide(color: kBorderLight),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    textStyle: GoogleFonts.inter(
+                        fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

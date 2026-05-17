@@ -320,43 +320,81 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           // ── Registration status indicator ─────────────────────────────
           if (isRegistered) ...[
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFD1FAE5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: kSecondary500.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle,
-                      color: kSecondary500, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'You are registered',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: kSecondary500,
+            if (registration!.status == 'waitlisted')
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: kAccent500.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kAccent500.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.hourglass_top_outlined,
+                        color: kAccent500, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'You are on the waitlist',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: kAccent500,
+                            ),
                           ),
-                        ),
-                        Text(
-                          '${registration.attendeesCount} attendee${registration.attendeesCount == 1 ? '' : 's'}',
-                          style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: const Color(0xFF065F46)),
-                        ),
-                      ],
+                          Text(
+                            'You will be notified if a spot opens up.',
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF92400E)),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD1FAE5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: kSecondary500.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: kSecondary500, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'You are registered',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: kSecondary500,
+                            ),
+                          ),
+                          Text(
+                            '${registration.attendeesCount} attendee${registration.attendeesCount == 1 ? '' : 's'}',
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF065F46)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
 
           const SizedBox(height: 32),
