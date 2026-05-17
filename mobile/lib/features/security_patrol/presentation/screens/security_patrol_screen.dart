@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -28,6 +29,18 @@ class SecurityPatrolScreen extends ConsumerWidget {
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
             actions: [
+              IconButton(
+                icon: const Icon(Icons.download_outlined),
+                tooltip: 'Export CSV',
+                onPressed: () async {
+                  final uri = Uri.parse(
+                      'https://portal.utamacs.org/portal/security-patrol?export=csv');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri,
+                        mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: () {
