@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/community_repository.dart';
 import 'create_post_screen.dart';
 
@@ -74,12 +76,83 @@ class CommunityScreen extends ConsumerWidget {
   }
 }
 
-class _PostCard extends StatelessWidget {
+class _PostCard extends ConsumerWidget {
   final CommunityPost post;
   const _PostCard({required this.post});
 
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Post',
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600, fontSize: 16)),
+        content: Text('Are you sure you want to delete this post?',
+            style: GoogleFonts.inter(fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel',
+                style: GoogleFonts.inter(color: kTextSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete',
+                style: GoogleFonts.inter(
+                    color: kRed600, fontWeight: FontWeight.w600)),
+          ),
+        ],
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await ref.read(communityRepositoryProvider).deletePost(post.id);
+      ref.invalidate(communityPostsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Post deleted',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e', style: GoogleFonts.inter()),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showEditModal(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditPostModal(
+        post: post,
+        onSaved: () => ref.invalidate(communityPostsProvider),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final myId = ref.watch(authNotifierProvider).profile?.id;
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+    final isOwner = myId == post.authorId;
+    final canEdit = isOwner;
+    final canDelete = isOwner || isExec;
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,6 +173,46 @@ class _PostCard extends StatelessWidget {
                     .bodySmall
                     ?.copyWith(color: kTextSecondary),
               ),
+              if (canEdit || canDelete) ...[
+                const SizedBox(width: 4),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert,
+                      size: 18, color: kTextSecondary),
+                  onSelected: (v) {
+                    if (v == 'edit') _showEditModal(context, ref);
+                    if (v == 'delete') _confirmDelete(context, ref);
+                  },
+                  itemBuilder: (_) => [
+                    if (canEdit)
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.edit_outlined,
+                                size: 16, color: kTextSecondary),
+                            const SizedBox(width: 10),
+                            Text('Edit',
+                                style: GoogleFonts.inter(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    if (canDelete)
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete_outline,
+                                size: 16, color: kRed600),
+                            const SizedBox(width: 10),
+                            Text('Delete',
+                                style: GoogleFonts.inter(
+                                    fontSize: 14, color: kRed600)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 10),
@@ -237,4 +350,168 @@ class _CategoryStyle {
     required this.bg,
     required this.text,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Edit post modal (owner-only)
+// ---------------------------------------------------------------------------
+
+class _EditPostModal extends ConsumerStatefulWidget {
+  final CommunityPost post;
+  final VoidCallback onSaved;
+  const _EditPostModal({required this.post, required this.onSaved});
+
+  @override
+  ConsumerState<_EditPostModal> createState() => _EditPostModalState();
+}
+
+class _EditPostModalState extends ConsumerState<_EditPostModal> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _bodyCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.post.title);
+    _bodyCtrl = TextEditingController(text: widget.post.body ?? '');
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _bodyCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(communityRepositoryProvider).editPost(
+            postId: widget.post.id,
+            title: _titleCtrl.text.trim(),
+            body: _bodyCtrl.text.trim(),
+          );
+      widget.onSaved();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Post updated',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: kSecondary500,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e', style: GoogleFonts.inter()),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: kBorderLight,
+                      borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Text(
+                    'Edit Post',
+                    style: GoogleFonts.poppins(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimary600),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                    color: kTextSecondary,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _titleCtrl,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  labelText: 'Title *',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Title is required'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _bodyCtrl,
+                maxLines: 5,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  labelText: 'Body',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Save Changes'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

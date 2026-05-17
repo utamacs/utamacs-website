@@ -112,6 +112,32 @@ class CommunityRepository {
     return (data as List).length;
   }
 
+  Future<CommunityPost> editPost({
+    required String postId,
+    required String title,
+    required String body,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final data = await _client
+        .from('community_posts')
+        .update({'title': title, 'body': body})
+        .eq('id', postId)
+        .eq('author_id', uid)
+        .select()
+        .single();
+    return CommunityPost.fromJson(data);
+  }
+
+  Future<void> deletePost(String postId) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    await _client
+        .from('community_posts')
+        .update({'is_published': false})
+        .eq('id', postId);
+  }
+
   /// Toggles a reaction: inserts if not present, deletes if already present.
   Future<void> toggleReaction(String postId, String reactionType) async {
     final uid = _client.auth.currentUser?.id;
