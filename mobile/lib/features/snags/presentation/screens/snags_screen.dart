@@ -3,115 +3,175 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
-import '../../../../shared/widgets/status_badge.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/snag_repository.dart';
 import 'report_snag_screen.dart';
 import 'snag_detail_screen.dart';
 
-class SnagsScreen extends ConsumerStatefulWidget {
+class SnagsScreen extends ConsumerWidget {
   const SnagsScreen({super.key});
 
   @override
-  ConsumerState<SnagsScreen> createState() => _SnagsScreenState();
-}
-
-class _SnagsScreenState extends ConsumerState<SnagsScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('Snag List'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          if (isExec)
-            IconButton(
-              icon: const Icon(Icons.download_outlined),
-              tooltip: 'Export CSV',
-              onPressed: () async {
-                final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/snags?export=csv');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri,
-                      mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(mySnagItemsProvider);
-              ref.invalidate(allSnagItemsProvider);
-            },
+    final surfaceColor = isDark ? dsDarkSurface : dsSurface;
+    final titleColor = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final subtitleColor = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: isDark ? dsDarkBackground : dsBackground,
+        extendBody: true,
+        floatingActionButton: _ReportFab(ref: ref),
+        body: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxScrolled) {
+            return [
+              SliverAppBar(
+                pinned: true,
+                backgroundColor: surfaceColor,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                scrolledUnderElevation: isDark ? 0.5 : 1,
+                shadowColor:
+                    isDark ? dsDarkBorderLight : dsBorderLight,
+                automaticallyImplyLeading: false,
+                titleSpacing: 0,
+                title: Padding(
+                  padding: const EdgeInsets.only(left: dsSpace4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Snag List',
+                        style: GoogleFonts.poppins(
+                          fontSize: context.sp(16),
+                          fontWeight: FontWeight.w700,
+                          color: titleColor,
+                          height: 1.1,
+                        ),
+                      ),
+                      Text(
+                        'Defect & punch-list tracking',
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(11),
+                          color: subtitleColor,
+                          height: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  if (isExec)
+                    DsActionButton(
+                      icon: Icons.download_outlined,
+                      onTap: () async {
+                        final uri = Uri.parse(
+                            'https://portal.utamacs.org/portal/snags?export=csv');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri,
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
+                  DsActionButton(
+                    icon: Icons.refresh_rounded,
+                    onTap: () {
+                      ref.invalidate(mySnagItemsProvider);
+                      ref.invalidate(allSnagItemsProvider);
+                    },
+                  ),
+                  const SizedBox(width: dsSpace2),
+                ],
+                bottom: TabBar(
+                  labelColor: dsColorIndigo600,
+                  unselectedLabelColor:
+                      isDark ? dsDarkTextSecondary : dsTextSecondary,
+                  indicatorColor: dsColorIndigo600,
+                  indicatorWeight: 2.5,
+                  labelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: context.sp(13),
+                  ),
+                  unselectedLabelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500,
+                    fontSize: context.sp(13),
+                  ),
+                  tabs: const [
+                    Tab(text: 'My Reports'),
+                    Tab(text: 'All Snags'),
+                  ],
+                ),
+              ),
+            ];
+          },
+          body: const TabBarView(
+            children: [
+              _MySnagTab(),
+              _AllSnagTab(),
+            ],
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: kPrimary600,
-          unselectedLabelColor: kTextSecondary,
-          indicatorColor: kPrimary600,
-          labelStyle:
-              GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
-          tabs: const [
-            Tab(text: 'My Reports'),
-            Tab(text: 'All Snags'),
-          ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: kPrimary600,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: Text(
-          'Report Snag',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => const ReportSnagScreen()),
-          );
-          ref.invalidate(mySnagItemsProvider);
-          ref.invalidate(allSnagItemsProvider);
-        },
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          _MySnagTab(),
-          _AllSnagTab(),
-        ],
       ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// My Reports Tab
+// FAB
+// ---------------------------------------------------------------------------
+
+class _ReportFab extends ConsumerWidget {
+  final WidgetRef ref;
+  const _ReportFab({required this.ref});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(dsRadiusXl),
+        boxShadow: dsShadowBrand,
+      ),
+      child: FloatingActionButton.extended(
+        backgroundColor: dsColorIndigo600,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        focusElevation: 0,
+        hoverElevation: 0,
+        highlightElevation: 0,
+        icon: Icon(Icons.add_rounded, size: context.si(20)),
+        label: Text(
+          'Report Snag',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700,
+            fontSize: context.sp(14),
+          ),
+        ),
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ReportSnagScreen()),
+          );
+          ref.invalidate(mySnagItemsProvider);
+          ref.invalidate(allSnagItemsProvider);
+        },
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// My Reports tab
 // ---------------------------------------------------------------------------
 
 class _MySnagTab extends ConsumerWidget {
@@ -123,30 +183,37 @@ class _MySnagTab extends ConsumerWidget {
 
     return snagsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load snags',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(mySnagItemsProvider),
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(mySnagItemsProvider),
       ),
       data: (snags) {
         if (snags.isEmpty) {
-          return const EmptyState(
-            icon: Icons.construction,
+          return const DsEmptyPlaceholder(
+            icon: Icons.construction_rounded,
             title: 'No snags reported',
-            subtitle: 'Tap "Report Snag" to log a defect or issue.',
+            message: 'Tap "Report Snag" to log a defect or issue.',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(mySnagItemsProvider),
+          color: dsColorIndigo600,
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            padding: EdgeInsets.fromLTRB(
+              dsSpace4,
+              dsSpace4,
+              dsSpace4,
+              80 + MediaQuery.paddingOf(context).bottom + dsSpace16,
+            ),
             itemCount: snags.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, i) => _SnagCard(snag: snags[i]),
+            separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
+            itemBuilder: (context, i) => DSFadeSlide(
+              delay: Duration(milliseconds: i * 30),
+              child: _SnagCard(snag: snags[i]),
+            ),
           ),
         );
       },
@@ -155,7 +222,7 @@ class _MySnagTab extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// All Snags Tab
+// All Snags tab
 // ---------------------------------------------------------------------------
 
 class _AllSnagTab extends ConsumerWidget {
@@ -167,30 +234,37 @@ class _AllSnagTab extends ConsumerWidget {
 
     return snagsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load snags',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(allSnagItemsProvider),
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(allSnagItemsProvider),
       ),
       data: (snags) {
         if (snags.isEmpty) {
-          return const EmptyState(
-            icon: Icons.check_circle_outline,
+          return const DsEmptyPlaceholder(
+            icon: Icons.check_circle_outline_rounded,
             title: 'No open snags',
-            subtitle: 'All reported defects have been resolved.',
+            message: 'All reported defects have been resolved.',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(allSnagItemsProvider),
+          color: dsColorIndigo600,
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            padding: EdgeInsets.fromLTRB(
+              dsSpace4,
+              dsSpace4,
+              dsSpace4,
+              80 + MediaQuery.paddingOf(context).bottom + dsSpace16,
+            ),
             itemCount: snags.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, i) => _SnagCard(snag: snags[i]),
+            separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
+            itemBuilder: (context, i) => DSFadeSlide(
+              delay: Duration(milliseconds: i * 30),
+              child: _SnagCard(snag: snags[i]),
+            ),
           ),
         );
       },
@@ -199,129 +273,236 @@ class _AllSnagTab extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Snag Card
+// Snag card
 // ---------------------------------------------------------------------------
 
-class _SnagCard extends StatelessWidget {
+class _SnagCard extends ConsumerWidget {
   final SnagItem snag;
   const _SnagCard({required this.snag});
 
-  Color _severityBgColor(String severity) => switch (severity) {
-        'critical' => const Color(0xFFFEE2E2),
-        'major' => const Color(0xFFFFEDD5),
-        'moderate' => const Color(0xFFFEF3C7),
-        'minor' => const Color(0xFFDBEAFE),
-        _ => kSectionAlt,
+  Color _severityStrip(String severity) => switch (severity) {
+        'critical' => dsColorRed600,
+        'major'    => dsColorTerra500,
+        'moderate' => dsColorAmber600,
+        'minor'    => dsColorIndigo600,
+        _          => dsColorSlate400,
       };
 
-  Color _severityTextColor(String severity) => switch (severity) {
-        'critical' => kRed600,
-        'major' => const Color(0xFFEA580C),
-        'moderate' => const Color(0xFFD97706),
-        'minor' => kPrimary600,
-        _ => kTextSecondary,
+  Color _severityBg(String severity) => switch (severity) {
+        'critical' => dsColorRed100,
+        'major'    => dsColorTerra100,
+        'moderate' => dsColorAmber100,
+        'minor'    => dsColorIndigo100,
+        _          => dsColorSlate100,
+      };
+
+  Color _severityText(String severity) => switch (severity) {
+        'critical' => dsColorRed700,
+        'major'    => dsColorTerra600,
+        'moderate' => dsColorAmber700,
+        'minor'    => dsColorIndigo600,
+        _          => dsColorSlate600,
+      };
+
+  (Color bg, Color text) _statusColors(String status) => switch (status) {
+        'open'        => (dsColorRed50, dsColorRed700),
+        'in_progress' => (dsColorIndigo50, dsColorIndigo600),
+        'resolved'    => (dsColorEmerald50, dsColorEmerald700),
+        'closed'      => (dsColorSlate100, dsColorSlate600),
+        _             => (dsColorAmber50, dsColorAmber700),
+      };
+
+  String _statusLabel(String status) => switch (status) {
+        'open'        => 'Open',
+        'in_progress' => 'In Progress',
+        'resolved'    => 'Resolved',
+        'closed'      => 'Closed',
+        _             => status.replaceAll('_', ' '),
       };
 
   @override
-  Widget build(BuildContext context) {
-    return AppCard(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final strip = _severityStrip(snag.severity);
+    final (statusBg, statusText) = _statusColors(snag.status);
+
+    return DSScalePress(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => SnagDetailScreen(snag: snag)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ID row
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: kPrimary50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: kPrimary100),
-                ),
-                child: Text(
-                  snag.id,
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: kPrimary600,
-                    letterSpacing: 0.5,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? dsDarkSurface : dsSurface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border: isDark ? Border.all(color: dsDarkBorderSubtle) : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 4px severity color strip
+                Container(width: 4, color: strip),
+                // Card body
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(dsSpace4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ID + status row
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? dsColorIndigo600.withValues(alpha: 0.18)
+                                    : dsColorIndigo50,
+                                borderRadius:
+                                    BorderRadius.circular(dsRadiusSm),
+                                border: Border.all(
+                                  color: isDark
+                                      ? dsColorIndigo600.withValues(alpha: 0.35)
+                                      : dsColorIndigo100,
+                                ),
+                              ),
+                              child: Text(
+                                snag.id,
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(10),
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? dsColorIndigo300
+                                      : dsColorIndigo600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            // Status pill
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? statusText.withValues(alpha: 0.15)
+                                    : statusBg,
+                                borderRadius:
+                                    BorderRadius.circular(dsRadiusFull),
+                              ),
+                              child: Text(
+                                _statusLabel(snag.status),
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(11),
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? statusText.withValues(alpha: 0.9)
+                                      : statusText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: dsSpace2),
+
+                        // Description
+                        Text(
+                          snag.description,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(14),
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? dsDarkTextPrimary
+                                : dsTextPrimary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: dsSpace2),
+
+                        // Location
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: context.si(13),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
+                            ),
+                            const SizedBox(width: dsSpace1),
+                            Expanded(
+                              child: Text(
+                                snag.location,
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(12),
+                                  color: isDark
+                                      ? dsDarkTextSecondary
+                                      : dsTextSecondary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: dsSpace3),
+                        Divider(
+                          height: 1,
+                          color:
+                              isDark ? dsDarkBorderSubtle : dsBorderSubtle,
+                        ),
+                        const SizedBox(height: dsSpace3),
+
+                        // Severity badge + date
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? strip.withValues(alpha: 0.15)
+                                    : _severityBg(snag.severity),
+                                borderRadius:
+                                    BorderRadius.circular(dsRadiusFull),
+                              ),
+                              child: Text(
+                                snag.severity.toUpperCase(),
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(10),
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? strip.withValues(alpha: 0.9)
+                                      : _severityText(snag.severity),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              DateFormat('d MMM y').format(snag.reportedDate),
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(11),
+                                color: isDark
+                                    ? dsDarkTextSecondary
+                                    : dsTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const Spacer(),
-              StatusBadge.forStatus(snag.status),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Description
-          Text(
-            snag.description,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: kTextPrimary,
+              ],
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 8),
-
-          // Location row
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined,
-                  size: 13, color: kTextSecondary),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  snag.location,
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: kTextSecondary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Divider(height: 1, color: kBorderLight),
-          const SizedBox(height: 10),
-
-          // Severity + date row
-          Row(
-            children: [
-              // Severity badge
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _severityBgColor(snag.severity),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  snag.severity.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: _severityTextColor(snag.severity),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                DateFormat('d MMM y').format(snag.reportedDate),
-                style:
-                    GoogleFonts.inter(fontSize: 11, color: kTextSecondary),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }

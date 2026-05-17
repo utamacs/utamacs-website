@@ -162,7 +162,7 @@ class _SubmitComplaintScreenState
             _SectionLabel('Category'),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(),
               items: _categories
                   .map(
@@ -184,7 +184,7 @@ class _SubmitComplaintScreenState
             _SectionLabel('Priority'),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              value: _priority,
+              initialValue: _priority,
               decoration: const InputDecoration(),
               items: _priorities
                   .map(

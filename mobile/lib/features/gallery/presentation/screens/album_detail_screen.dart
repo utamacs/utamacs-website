@@ -277,11 +277,11 @@ class _PhotoTile extends ConsumerWidget {
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
-              placeholder: (_, __) => Center(
+              placeholder: (_, _) => Center(
                 child: Icon(Icons.photo_outlined, size: 28,
                     color: iconColor.withValues(alpha: 0.7)),
               ),
-              errorWidget: (_, __, ___) => Center(
+              errorWidget: (_, _, _) => Center(
                 child: Icon(Icons.photo_outlined, size: 28,
                     color: iconColor.withValues(alpha: 0.7)),
               ),
@@ -375,11 +375,11 @@ class _PhotoLightbox extends StatelessWidget {
                 ? CachedNetworkImage(
                     imageUrl: signedUrl!,
                     fit: BoxFit.contain,
-                    placeholder: (_, __) => const Center(
+                    placeholder: (_, _) => const Center(
                       child: CircularProgressIndicator(
                           color: Colors.white),
                     ),
-                    errorWidget: (_, __, ___) => const Icon(
+                    errorWidget: (_, _, _) => const Icon(
                       Icons.broken_image_outlined,
                       color: Colors.white54,
                       size: 60,

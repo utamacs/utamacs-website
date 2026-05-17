@@ -194,7 +194,7 @@ class ComplaintRepository {
           'category': category,
           'priority': priority,
           'status': 'open',
-          if (unitId != null) 'unit_id': unitId,
+          'unit_id': ?unitId,
         })
         .select()
         .single();
@@ -211,7 +211,7 @@ class ComplaintRepository {
     if (uid == null) throw Exception('Not authenticated');
     await _client.from('complaints').update({
       'status': newStatus,
-      if (assigneeId != null) 'assigned_to': assigneeId,
+      'assigned_to': ?assigneeId,
       if (newStatus == 'resolved') 'resolved_at': DateTime.now().toIso8601String(),
     }).eq('id', complaintId);
     // Log status change in complaint_status_history

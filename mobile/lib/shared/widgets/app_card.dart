@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/design/ds_tokens.dart';
+
+// Upgraded AppCard — shadow-based elevation, no border.
+// Drop-in replacement for all existing AppCard(child: ...) usages.
 
 class AppCard extends StatelessWidget {
   final Widget child;
@@ -17,19 +20,24 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color ?? Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kBorderLight),
+    return Container(
+      decoration: BoxDecoration(
+        color: color ?? dsSurface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: dsShadowMd,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          highlightColor: dsColorIndigo600.withValues(alpha: 0.04),
+          splashColor: dsColorIndigo600.withValues(alpha: 0.06),
+          child: Padding(
+            padding: padding ?? const EdgeInsets.all(dsSpaceCardPadding),
+            child: child,
           ),
-          padding: padding ?? const EdgeInsets.all(16),
-          child: child,
         ),
       ),
     );

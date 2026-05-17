@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/maid_repository.dart';
 
@@ -13,49 +15,77 @@ class MaidsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isExec =
-        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+    final isDark = ref.watch(isDarkModeProvider);
+    final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
+
+    final tabBar = TabBar(
+      labelStyle: GoogleFonts.inter(
+          fontWeight: FontWeight.w600, fontSize: context.sp(14)),
+      unselectedLabelStyle: GoogleFonts.inter(
+          fontWeight: FontWeight.w400, fontSize: context.sp(14)),
+      labelColor: dsColorIndigo600,
+      unselectedLabelColor: isDark ? dsDarkTextSecondary : dsTextSecondary,
+      indicatorColor: dsColorIndigo600,
+      indicatorWeight: 2.5,
+      dividerColor: isDark ? dsDarkBorderSubtle : dsBorderLight,
+      tabs: [
+        const Tab(text: 'My Helpers'),
+        const Tab(text: 'Find & Approve'),
+        if (isExec) const Tab(text: 'Attendance'),
+      ],
+    );
 
     return DefaultTabController(
       length: isExec ? 3 : 2,
       child: Scaffold(
-        backgroundColor: kBgWarm,
-        appBar: AppBar(
-          title: const Text('Domestic Help'),
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                ref.invalidate(myMaidsProvider);
-                ref.invalidate(allMaidsProvider);
-                ref.invalidate(approvedMaidIdsProvider);
-              },
+        backgroundColor: isDark ? dsDarkBackground : dsBackground,
+        body: NestedScrollView(
+          headerSliverBuilder: (context, _) => [
+            SliverAppBar(
+              pinned: true,
+              floating: true,
+              snap: true,
+              expandedHeight: 100,
+              backgroundColor: isDark ? dsDarkSurface : dsSurface,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.black26,
+              elevation: 1,
+              flexibleSpace: FlexibleSpaceBar(
+                titlePadding:
+                    const EdgeInsets.fromLTRB(dsSpace4, 0, dsSpace4, 56),
+                title: Text(
+                  'Domestic Help',
+                  style: GoogleFonts.poppins(
+                    fontSize: context.sp(18),
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                  ),
+                ),
+              ),
+              actions: [
+                DsActionButton(
+                  icon: Icons.refresh_rounded,
+                  onTap: () {
+                    ref.invalidate(myMaidsProvider);
+                    ref.invalidate(allMaidsProvider);
+                    ref.invalidate(approvedMaidIdsProvider);
+                  },
+                ),
+                const SizedBox(width: dsSpace2),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: tabBar,
+              ),
             ),
           ],
-          bottom: TabBar(
-            labelStyle:
-                GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
-            unselectedLabelStyle:
-                GoogleFonts.inter(fontWeight: FontWeight.w400, fontSize: 14),
-            labelColor: kPrimary600,
-            unselectedLabelColor: kTextSecondary,
-            indicatorColor: kPrimary600,
-            indicatorWeight: 2.5,
-            tabs: [
-              const Tab(text: 'My Helpers'),
-              const Tab(text: 'Find & Approve'),
-              if (isExec) const Tab(text: 'Attendance'),
+          body: TabBarView(
+            children: [
+              _MyHelpersTab(isDark: isDark),
+              _FindApproveTab(isDark: isDark),
+              if (isExec) _AttendanceTab(isDark: isDark),
             ],
           ),
-        ),
-        body: TabBarView(
-          children: [
-            const _MyHelpersTab(),
-            const _FindApproveTab(),
-            if (isExec) const _AttendanceTab(),
-          ],
         ),
       ),
     );
@@ -67,7 +97,8 @@ class MaidsScreen extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _MyHelpersTab extends ConsumerWidget {
-  const _MyHelpersTab();
+  final bool isDark;
+  const _MyHelpersTab({required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,31 +106,37 @@ class _MyHelpersTab extends ConsumerWidget {
 
     return maidsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load helpers',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(myMaidsProvider),
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(myMaidsProvider),
       ),
       data: (maids) {
         if (maids.isEmpty) {
-          return const EmptyState(
+          return const DsEmptyPlaceholder(
             icon: Icons.cleaning_services_outlined,
             title: 'No domestic helpers approved',
-            subtitle:
+            message:
                 'Helpers you approve from the "Find & Approve" tab will appear here.',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(myMaidsProvider),
           child: ListView.separated(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              dsSpace4,
+              dsSpace3,
+              dsSpace4,
+              80 + MediaQuery.paddingOf(context).bottom,
+            ),
             itemCount: maids.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, i) => _MaidCard(maid: maids[i]),
+            separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
+            itemBuilder: (context, i) => DSFadeSlide(
+              delay: Duration(milliseconds: i * 40),
+              child: _MaidCard(maid: maids[i], isDark: isDark),
+            ),
           ),
         );
       },
@@ -112,7 +149,8 @@ class _MyHelpersTab extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _FindApproveTab extends ConsumerWidget {
-  const _FindApproveTab();
+  final bool isDark;
+  const _FindApproveTab({required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -123,31 +161,30 @@ class _FindApproveTab extends ConsumerWidget {
 
     return allMaidsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load helpers',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () {
-            ref.invalidate(allMaidsProvider);
-            ref.invalidate(approvedMaidIdsProvider);
-          },
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () {
+          ref.invalidate(allMaidsProvider);
+          ref.invalidate(approvedMaidIdsProvider);
+        },
       ),
       data: (allMaids) {
         if (allMaids.isEmpty) {
-          return const EmptyState(
-            icon: Icons.people_outline,
+          return const DsEmptyPlaceholder(
+            icon: Icons.people_outline_rounded,
             title: 'No helpers registered',
-            subtitle: 'No domestic helpers are registered in the society yet.',
+            message:
+                'No domestic helpers are registered in the society yet.',
           );
         }
 
         final approvedIds = approvedIdsAsync.when(
           data: (ids) => ids.toSet(),
           loading: () => <String>{},
-          error: (_, __) => <String>{},
+          error: (_, _) => <String>{},
         );
 
         return RefreshIndicator(
@@ -156,32 +193,39 @@ class _FindApproveTab extends ConsumerWidget {
             ref.invalidate(approvedMaidIdsProvider);
           },
           child: ListView.separated(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              dsSpace4,
+              dsSpace3,
+              dsSpace4,
+              80 + MediaQuery.paddingOf(context).bottom,
+            ),
             itemCount: allMaids.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
             itemBuilder: (context, i) {
               final maid = allMaids[i];
               final isApproved = approvedIds.contains(maid.id);
-              return _FindApproveCard(
-                maid: maid,
-                isApproved: isApproved,
-                isExec: isExec,
-                onToggle: () async {
-                  try {
-                    if (isApproved) {
-                      await ref
-                          .read(maidRepositoryProvider)
-                          .removeApprovalForUnit(maid.id);
-                    } else {
-                      await ref
-                          .read(maidRepositoryProvider)
-                          .approveMaidForUnit(maid.id);
-                    }
-                    ref.invalidate(approvedMaidIdsProvider);
-                    ref.invalidate(myMaidsProvider);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+              return DSFadeSlide(
+                delay: Duration(milliseconds: i * 40),
+                child: _FindApproveCard(
+                  maid: maid,
+                  isApproved: isApproved,
+                  isExec: isExec,
+                  isDark: isDark,
+                  onToggle: () async {
+                    try {
+                      if (isApproved) {
+                        await ref
+                            .read(maidRepositoryProvider)
+                            .removeApprovalForUnit(maid.id);
+                      } else {
+                        await ref
+                            .read(maidRepositoryProvider)
+                            .approveMaidForUnit(maid.id);
+                      }
+                      ref.invalidate(approvedMaidIdsProvider);
+                      ref.invalidate(myMaidsProvider);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                           content: Text(
                             isApproved
                                 ? '${maid.fullName} removed from your unit'
@@ -189,37 +233,41 @@ class _FindApproveTab extends ConsumerWidget {
                             style: GoogleFonts.inter(
                                 fontWeight: FontWeight.w500),
                           ),
-                          backgroundColor:
-                              isApproved ? kTextSecondary : kSecondary500,
+                          backgroundColor: isApproved
+                              ? dsTextSecondary
+                              : dsColorEmerald600,
                           behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                          shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(dsRadiusMd)),
+                        ));
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                           content: Text('Error: $e',
                               style: GoogleFonts.inter()),
-                          backgroundColor: kRed600,
+                          backgroundColor: dsColorRed600,
                           behavior: SnackBarBehavior.floating,
-                        ),
-                      );
+                          shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(dsRadiusMd)),
+                        ));
+                      }
                     }
-                  }
-                },
-                onToggleActive: isExec
-                    ? (active) async {
-                        try {
-                          await ref
-                              .read(maidRepositoryProvider)
-                              .toggleMaidActive(maid.id,
-                                  isActive: active);
-                          ref.invalidate(allMaidsProvider);
-                          ref.invalidate(myMaidsProvider);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
+                  },
+                  onToggleActive: isExec
+                      ? (active) async {
+                          try {
+                            await ref
+                                .read(maidRepositoryProvider)
+                                .toggleMaidActive(maid.id,
+                                    isActive: active);
+                            ref.invalidate(allMaidsProvider);
+                            ref.invalidate(myMaidsProvider);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
                                 content: Text(
                                   active
                                       ? '${maid.fullName} activated'
@@ -227,26 +275,32 @@ class _FindApproveTab extends ConsumerWidget {
                                   style: GoogleFonts.inter(
                                       fontWeight: FontWeight.w500),
                                 ),
-                                backgroundColor:
-                                    active ? kSecondary500 : kTextSecondary,
+                                backgroundColor: active
+                                    ? dsColorEmerald600
+                                    : dsTextSecondary,
                                 behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        dsRadiusMd)),
+                              ));
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
                                 content: Text('Error: $e',
                                     style: GoogleFonts.inter()),
-                                backgroundColor: kRed600,
+                                backgroundColor: dsColorRed600,
                                 behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        dsRadiusMd)),
+                              ));
+                            }
                           }
                         }
-                      }
-                    : null,
+                      : null,
+                ),
               );
             },
           ),
@@ -257,199 +311,205 @@ class _FindApproveTab extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Maid card
+// Maid card (my helpers)
 // ---------------------------------------------------------------------------
 
 class _MaidCard extends StatelessWidget {
   final Maid maid;
-  const _MaidCard({required this.maid});
+  final bool isDark;
+  const _MaidCard({required this.maid, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
     final registeredDate =
         DateFormat('dd MMM yyyy').format(maid.registeredAt);
 
-    return AppCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Avatar with initial + photo-on-file badge
-          Stack(
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? dsDarkSurface : dsSurface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: isDark ? [] : dsShadowSm,
+        border: isDark ? Border.all(color: dsDarkBorderSubtle) : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: kPrimary100,
-                child: Text(
-                  maid.fullName.isNotEmpty
-                      ? maid.fullName[0].toUpperCase()
-                      : '?',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: kPrimary600,
+              Container(
+                width: 4,
+                color: maid.policeVerified
+                    ? dsColorEmerald600
+                    : dsColorAmber600,
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(dsSpace4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: context.si(22),
+                            backgroundColor: dsColorIndigo600
+                                .withValues(alpha: 0.12),
+                            child: Text(
+                              maid.fullName.isNotEmpty
+                                  ? maid.fullName[0].toUpperCase()
+                                  : '?',
+                              style: GoogleFonts.poppins(
+                                fontSize: context.sp(16),
+                                fontWeight: FontWeight.w700,
+                                color: dsColorIndigo600,
+                              ),
+                            ),
+                          ),
+                          if (maid.photoKey != null)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                width: context.si(16),
+                                height: context.si(16),
+                                decoration: const BoxDecoration(
+                                  color: dsColorEmerald600,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.camera_alt,
+                                    size: context.si(9),
+                                    color: Colors.white),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(width: dsSpace3),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    maid.fullName,
+                                    style: GoogleFonts.inter(
+                                      fontSize: context.sp(15),
+                                      fontWeight: FontWeight.w600,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: dsSpace2),
+                                _WorkTypeBadge(
+                                    workType: maid.workType,
+                                    isDark: isDark),
+                              ],
+                            ),
+                            const SizedBox(height: dsSpace2),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.shield_rounded,
+                                  size: context.si(13),
+                                  color: maid.policeVerified
+                                      ? dsColorEmerald600
+                                      : textSecondary,
+                                ),
+                                const SizedBox(width: dsSpace1),
+                                Text(
+                                  maid.policeVerified
+                                      ? 'Police Verified'
+                                      : 'Not Verified',
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(12),
+                                    color: maid.policeVerified
+                                        ? dsColorEmerald600
+                                        : textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (maid.policeVerified &&
+                                    maid.verificationDate != null) ...[
+                                  Text(
+                                    ' · ${DateFormat('dd MMM yyyy').format(maid.verificationDate!)}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: context.sp(12),
+                                      color: textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (maid.agency != null &&
+                                maid.agency!.isNotEmpty) ...[
+                              const SizedBox(height: dsSpace1),
+                              Row(
+                                children: [
+                                  Icon(Icons.business_outlined,
+                                      size: context.si(12),
+                                      color: textSecondary),
+                                  const SizedBox(width: dsSpace1),
+                                  Text(
+                                    maid.agency!,
+                                    style: GoogleFonts.inter(
+                                      fontSize: context.sp(12),
+                                      color: textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            const SizedBox(height: dsSpace1),
+                            Text(
+                              'Registered $registeredDate',
+                              style: GoogleFonts.inter(
+                                  fontSize: context.sp(12),
+                                  color: textSecondary),
+                            ),
+                            if (maid.kycExpired ||
+                                maid.kycExpiringSoon) ...[
+                              const SizedBox(height: dsSpace2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: maid.kycExpired
+                                      ? dsColorRed600.withValues(alpha: 0.12)
+                                      : dsColorAmber600
+                                          .withValues(alpha: 0.12),
+                                  borderRadius:
+                                      BorderRadius.circular(dsRadiusFull),
+                                ),
+                                child: Text(
+                                  maid.kycExpired
+                                      ? 'KYC EXPIRED'
+                                      : 'KYC EXPIRING ${DateFormat('d MMM').format(maid.kycExpiresAt!)}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(9),
+                                    fontWeight: FontWeight.w700,
+                                    color: maid.kycExpired
+                                        ? dsColorRed600
+                                        : dsColorAmber600,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              if (maid.photoKey != null)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 16,
-                    height: 16,
-                    decoration: const BoxDecoration(
-                      color: kSecondary500,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      size: 10,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
             ],
           ),
-          const SizedBox(width: 14),
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Name + work type badge row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        maid.fullName,
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: kTextPrimary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _WorkTypeBadge(workType: maid.workType),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Police verified indicator
-                Row(
-                  children: [
-                    Icon(
-                      Icons.shield,
-                      size: 15,
-                      color: maid.policeVerified
-                          ? kSecondary500
-                          : kTextSecondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      maid.policeVerified
-                          ? 'Police Verified'
-                          : 'Not Verified',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: maid.policeVerified
-                            ? kSecondary500
-                            : kTextSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (maid.policeVerified &&
-                        maid.verificationDate != null) ...[
-                      Text(
-                        ' · ${DateFormat('dd MMM yyyy').format(maid.verificationDate!)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: kTextSecondary,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                if (maid.agency != null && maid.agency!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.business_outlined,
-                          size: 13, color: kTextSecondary),
-                      const SizedBox(width: 4),
-                      Text(
-                        maid.agency!,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: kTextSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 4),
-                Text(
-                  'Registered $registeredDate',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: kTextSecondary,
-                  ),
-                ),
-                if (maid.kycExpired || maid.kycExpiringSoon) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: maid.kycExpired
-                          ? const Color(0xFFFEE2E2)
-                          : const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      maid.kycExpired
-                          ? 'KYC EXPIRED'
-                          : 'KYC EXPIRING ${DateFormat('d MMM').format(maid.kycExpiresAt!)}',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: maid.kycExpired
-                            ? kRed600
-                            : const Color(0xFFD97706),
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkTypeBadge extends StatelessWidget {
-  final String workType;
-  const _WorkTypeBadge({required this.workType});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: kSectionAlt,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: kBorderLight),
-      ),
-      child: Text(
-        workType.replaceAll('_', ' ').toUpperCase(),
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: kTextSecondary,
-          letterSpacing: 0.4,
         ),
       ),
     );
@@ -464,12 +524,14 @@ class _FindApproveCard extends StatelessWidget {
   final Maid maid;
   final bool isApproved;
   final bool isExec;
+  final bool isDark;
   final VoidCallback onToggle;
   final void Function(bool active)? onToggleActive;
 
   const _FindApproveCard({
     required this.maid,
     required this.isApproved,
+    required this.isDark,
     this.isExec = false,
     required this.onToggle,
     this.onToggleActive,
@@ -477,7 +539,17 @@ class _FindApproveCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? dsDarkSurface : dsSurface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: isDark ? [] : dsShadowSm,
+        border: isDark ? Border.all(color: dsDarkBorderSubtle) : null,
+      ),
+      padding: const EdgeInsets.all(dsSpace4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -485,20 +557,22 @@ class _FindApproveCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CircleAvatar(
-                radius: 22,
-                backgroundColor: maid.isActive ? kPrimary100 : kBorderLight,
+                radius: context.si(20),
+                backgroundColor: maid.isActive
+                    ? dsColorIndigo600.withValues(alpha: 0.12)
+                    : (isDark ? dsDarkBorderLight : dsBorderLight),
                 child: Text(
                   maid.fullName.isNotEmpty
                       ? maid.fullName[0].toUpperCase()
                       : '?',
                   style: GoogleFonts.poppins(
-                    fontSize: 16,
+                    fontSize: context.sp(14),
                     fontWeight: FontWeight.w700,
-                    color: maid.isActive ? kPrimary600 : kTextSecondary,
+                    color: maid.isActive ? dsColorIndigo600 : textSecondary,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: dsSpace3),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,50 +583,55 @@ class _FindApproveCard extends StatelessWidget {
                           child: Text(
                             maid.fullName,
                             style: GoogleFonts.inter(
-                              fontSize: 14,
+                              fontSize: context.sp(14),
                               fontWeight: FontWeight.w600,
                               color: maid.isActive
-                                  ? kTextPrimary
-                                  : kTextSecondary,
+                                  ? textPrimary
+                                  : textSecondary,
                             ),
                           ),
                         ),
-                        if (!maid.isActive)
+                        if (!maid.isActive) ...[
+                          const SizedBox(width: dsSpace2),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEE2E2),
-                              borderRadius: BorderRadius.circular(4),
+                              color: dsColorRed600.withValues(alpha: 0.12),
+                              borderRadius:
+                                  BorderRadius.circular(dsRadiusFull),
                             ),
                             child: Text(
                               'INACTIVE',
                               style: GoogleFonts.inter(
-                                  fontSize: 9,
+                                  fontSize: context.sp(9),
                                   fontWeight: FontWeight.w700,
-                                  color: kRed600,
+                                  color: dsColorRed600,
                                   letterSpacing: 0.4),
                             ),
                           ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: dsSpace1),
                     Row(
                       children: [
-                        _WorkTypeBadge(workType: maid.workType),
-                        const SizedBox(width: 8),
+                        _WorkTypeBadge(
+                            workType: maid.workType, isDark: isDark),
+                        const SizedBox(width: dsSpace2),
                         if (maid.policeVerified)
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.shield,
-                                  size: 12, color: kSecondary500),
+                              Icon(Icons.shield_rounded,
+                                  size: context.si(11),
+                                  color: dsColorEmerald600),
                               const SizedBox(width: 3),
                               Text(
                                 'Verified',
                                 style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: kSecondary500,
+                                  fontSize: context.sp(11),
+                                  color: dsColorEmerald600,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -563,71 +642,88 @@ class _FindApproveCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: dsSpace2),
               isApproved
                   ? OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: kRed600,
-                        side: const BorderSide(color: kRed600),
+                        foregroundColor: dsColorRed600,
+                        side: BorderSide(
+                            color: dsColorRed600.withValues(alpha: 0.5)),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius:
+                                BorderRadius.circular(dsRadiusSm)),
                         minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        tapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
                       ),
                       onPressed: onToggle,
                       child: Text('Remove',
                           style: GoogleFonts.inter(
-                              fontSize: 12, fontWeight: FontWeight.w600)),
+                              fontSize: context.sp(12),
+                              fontWeight: FontWeight.w600)),
                     )
                   : ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimary600,
+                        backgroundColor: dsColorIndigo600,
                         foregroundColor: Colors.white,
+                        elevation: 0,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius:
+                                BorderRadius.circular(dsRadiusSm)),
                         minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        tapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
                       ),
                       onPressed: onToggle,
                       child: Text('Approve',
                           style: GoogleFonts.inter(
-                              fontSize: 12, fontWeight: FontWeight.w600)),
+                              fontSize: context.sp(12),
+                              fontWeight: FontWeight.w600)),
                     ),
             ],
           ),
           if (isExec && onToggleActive != null) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
+            const SizedBox(height: dsSpace3),
+            Divider(
+                height: 1,
+                color: isDark ? dsDarkBorderSubtle : dsBorderLight),
+            const SizedBox(height: dsSpace2),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
                   maid.isActive ? 'Active' : 'Inactive',
                   style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: maid.isActive ? kSecondary500 : kTextSecondary),
+                    fontSize: context.sp(12),
+                    color: maid.isActive
+                        ? dsColorEmerald600
+                        : textSecondary,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: dsSpace2),
                 SizedBox(
                   height: 24,
                   child: TextButton(
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10),
                       minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      foregroundColor:
-                          maid.isActive ? kRed600 : kSecondary500,
+                      tapTargetSize:
+                          MaterialTapTargetSize.shrinkWrap,
+                      foregroundColor: maid.isActive
+                          ? dsColorRed600
+                          : dsColorEmerald600,
                     ),
                     onPressed: () => onToggleActive!(!maid.isActive),
                     child: Text(
                       maid.isActive ? 'Deactivate' : 'Activate',
                       style: GoogleFonts.inter(
-                          fontSize: 12, fontWeight: FontWeight.w600),
+                          fontSize: context.sp(12),
+                          fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
@@ -645,7 +741,8 @@ class _FindApproveCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _AttendanceTab extends ConsumerWidget {
-  const _AttendanceTab();
+  final bool isDark;
+  const _AttendanceTab({required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -653,20 +750,21 @@ class _AttendanceTab extends ConsumerWidget {
     final selectedMaid = ref.watch(selectedMaidForAttendanceProvider);
     final month = ref.watch(attendanceMonthProvider);
     final monthFmt = DateFormat('MMMM yyyy');
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
 
     return allMaidsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load helpers',
-        subtitle: e.toString(),
+        message: e.toString(),
       ),
       data: (allMaids) {
         if (allMaids.isEmpty) {
-          return const EmptyState(
+          return const DsEmptyPlaceholder(
             icon: Icons.cleaning_services_outlined,
             title: 'No helpers registered',
-            subtitle: 'Register helpers first to track attendance.',
+            message: 'Register helpers first to track attendance.',
           );
         }
 
@@ -679,22 +777,24 @@ class _AttendanceTab extends ConsumerWidget {
           children: [
             // Controls bar
             Container(
-              color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: isDark ? dsDarkSurface : dsSurface,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: dsSpace4, vertical: dsSpace3),
               child: Row(
                 children: [
-                  // Maid picker
                   Expanded(
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<Maid>(
                         value: effective,
                         isExpanded: true,
+                        dropdownColor: isDark ? dsDarkSurface : dsSurface,
                         style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: kTextPrimary,
+                            fontSize: context.sp(13),
+                            color: textPrimary,
                             fontWeight: FontWeight.w500),
                         onChanged: (m) => ref
-                            .read(selectedMaidForAttendanceProvider.notifier)
+                            .read(
+                                selectedMaidForAttendanceProvider.notifier)
                             .state = m,
                         items: allMaids
                             .map((m) => DropdownMenuItem<Maid>(
@@ -706,42 +806,47 @@ class _AttendanceTab extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  // Month picker
+                  const SizedBox(width: dsSpace3),
                   GestureDetector(
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
                         initialDate: month,
                         firstDate: DateTime(
-                            DateTime.now().year - 2, DateTime.now().month),
+                            DateTime.now().year - 2,
+                            DateTime.now().month),
                         lastDate: DateTime.now(),
                         initialDatePickerMode: DatePickerMode.year,
                       );
                       if (picked != null) {
-                        ref.read(attendanceMonthProvider.notifier).state =
-                            DateTime(picked.year, picked.month);
+                        ref
+                            .read(attendanceMonthProvider.notifier)
+                            .state = DateTime(picked.year, picked.month);
                       }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                          horizontal: dsSpace3, vertical: 6),
                       decoration: BoxDecoration(
-                        color: kPrimary50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: kPrimary100),
+                        color: dsColorIndigo600.withValues(alpha: 0.08),
+                        borderRadius:
+                            BorderRadius.circular(dsRadiusSm),
+                        border: Border.all(
+                            color:
+                                dsColorIndigo600.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.calendar_month,
-                              size: 14, color: kPrimary600),
-                          const SizedBox(width: 4),
+                          Icon(Icons.calendar_month_outlined,
+                              size: context.si(13),
+                              color: dsColorIndigo600),
+                          const SizedBox(width: dsSpace1),
                           Text(
                             monthFmt.format(month),
                             style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: kPrimary600,
+                                fontSize: context.sp(12),
+                                color: dsColorIndigo600,
                                 fontWeight: FontWeight.w600),
                           ),
                         ],
@@ -751,37 +856,44 @@ class _AttendanceTab extends ConsumerWidget {
                 ],
               ),
             ),
-            const Divider(height: 1),
-            // Attendance list
+            Divider(
+                height: 1,
+                color: isDark ? dsDarkBorderSubtle : dsBorderLight),
             Expanded(
               child: attendanceAsync.when(
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
-                error: (e, _) => EmptyState(
-                  icon: Icons.error_outline,
+                error: (e, _) => DsEmptyPlaceholder(
+                  icon: Icons.error_outline_rounded,
                   title: 'Could not load attendance',
-                  subtitle: e.toString(),
-                  action: ElevatedButton(
-                    onPressed: () => ref.invalidate(maidAttendanceProvider),
-                    child: const Text('Retry'),
-                  ),
+                  message: e.toString(),
+                  actionLabel: 'Retry',
+                  onAction: () => ref.invalidate(maidAttendanceProvider),
                 ),
                 data: (records) {
                   if (records.isEmpty) {
-                    return EmptyState(
+                    return DsEmptyPlaceholder(
                       icon: Icons.event_busy_outlined,
                       title: 'No records for ${monthFmt.format(month)}',
-                      subtitle:
+                      message:
                           'Attendance entries for ${effective.fullName} will appear here.',
                     );
                   }
                   return ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.fromLTRB(
+                      dsSpace4,
+                      dsSpace3,
+                      dsSpace4,
+                      80 + MediaQuery.paddingOf(context).bottom,
+                    ),
                     itemCount: records.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: 8),
-                    itemBuilder: (context, i) =>
-                        _AttendanceRow(record: records[i]),
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: dsSpace2),
+                    itemBuilder: (context, i) => DSFadeSlide(
+                      delay: Duration(milliseconds: i * 30),
+                      child: _AttendanceRow(
+                          record: records[i], isDark: isDark),
+                    ),
                   );
                 },
               ),
@@ -795,33 +907,44 @@ class _AttendanceTab extends ConsumerWidget {
 
 class _AttendanceRow extends StatelessWidget {
   final MaidAttendance record;
-  const _AttendanceRow({required this.record});
+  final bool isDark;
+  const _AttendanceRow({required this.record, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
     final dateFmt = DateFormat('EEE, dd MMM');
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: dsSpace4, vertical: dsSpace3),
+      decoration: BoxDecoration(
+        color: isDark ? dsDarkSurface : dsSurface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: isDark ? [] : dsShadowSm,
+        border: isDark ? Border.all(color: dsDarkBorderSubtle) : null,
+      ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: context.si(40),
+            height: context.si(40),
             decoration: BoxDecoration(
-              color: kPrimary50,
-              borderRadius: BorderRadius.circular(10),
+              color: dsColorIndigo600.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(dsRadiusSm),
             ),
             child: Center(
               child: Text(
                 DateFormat('d').format(record.attendanceDate),
                 style: GoogleFonts.poppins(
-                    fontSize: 16,
+                    fontSize: context.sp(15),
                     fontWeight: FontWeight.w700,
-                    color: kPrimary600),
+                    color: dsColorIndigo600),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: dsSpace3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -829,9 +952,9 @@ class _AttendanceRow extends StatelessWidget {
                 Text(
                   dateFmt.format(record.attendanceDate),
                   style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: context.sp(13),
                       fontWeight: FontWeight.w600,
-                      color: kTextPrimary),
+                      color: textPrimary),
                 ),
                 if (record.entryTime != null ||
                     record.exitTime != null) ...[
@@ -844,7 +967,7 @@ class _AttendanceRow extends StatelessWidget {
                         'Out: ${record.exitTime}',
                     ].join('  ·  '),
                     style: GoogleFonts.inter(
-                        fontSize: 12, color: kTextSecondary),
+                        fontSize: context.sp(12), color: textSecondary),
                   ),
                 ],
                 if (record.notes != null &&
@@ -853,7 +976,7 @@ class _AttendanceRow extends StatelessWidget {
                   Text(
                     record.notes!,
                     style: GoogleFonts.inter(
-                        fontSize: 12, color: kTextSecondary),
+                        fontSize: context.sp(12), color: textSecondary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -861,8 +984,38 @@ class _AttendanceRow extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.check_circle, size: 16, color: kSecondary500),
+          Icon(Icons.check_circle_rounded,
+              size: context.si(16), color: dsColorEmerald600),
         ],
+      ),
+    );
+  }
+}
+
+class _WorkTypeBadge extends StatelessWidget {
+  final String workType;
+  final bool isDark;
+  const _WorkTypeBadge({required this.workType, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+        borderRadius: BorderRadius.circular(dsRadiusFull),
+        border: Border.all(
+            color: isDark ? dsDarkBorderLight : dsBorderLight),
+      ),
+      child: Text(
+        workType.replaceAll('_', ' ').toUpperCase(),
+        style: GoogleFonts.inter(
+          fontSize: context.sp(9),
+          fontWeight: FontWeight.w600,
+          color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+          letterSpacing: 0.4,
+        ),
       ),
     );
   }

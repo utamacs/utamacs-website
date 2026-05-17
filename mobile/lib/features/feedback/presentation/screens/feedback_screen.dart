@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:timeago/timeago.dart' as timeago;
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
-import '../../../../shared/widgets/status_badge.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/feedback_repository.dart';
 
@@ -17,6 +18,24 @@ const _categories = [
   'governance',
   'billing',
 ];
+
+Color _categoryColor(String category) => switch (category) {
+      'maintenance'  => dsColorIndigo600,
+      'security'     => dsColorRed600,
+      'cleanliness'  => dsColorEmerald600,
+      'governance'   => dsColorViolet600,
+      'billing'      => dsColorAmber600,
+      _              => dsColorSlate500,
+    };
+
+Color _categoryBg(String category) => switch (category) {
+      'maintenance'  => dsColorIndigo50,
+      'security'     => dsColorRed50,
+      'cleanliness'  => dsColorEmerald50,
+      'governance'   => dsColorViolet50,
+      'billing'      => dsColorAmber50,
+      _              => dsColorSlate100,
+    };
 
 class FeedbackScreen extends ConsumerStatefulWidget {
   const FeedbackScreen({super.key});
@@ -65,11 +84,9 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Feedback submitted. Thank you!',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-            ),
-            backgroundColor: kSecondary500,
+            content: Text('Feedback submitted. Thank you!',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: dsColorEmerald600,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -78,11 +95,9 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Failed to submit: $e',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-            ),
-            backgroundColor: kRed600,
+            content: Text('Failed to submit: $e',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: dsColorRed600,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -94,316 +109,437 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = ref.watch(isDarkModeProvider);
     final feedbackAsync = ref.watch(myFeedbackProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     if (isExec) {
-      return DefaultTabController(
-        length: 2,
-        child: Scaffold(
-          backgroundColor: kBgWarm,
-          appBar: AppBar(
-            title: const Text('Feedback'),
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.white,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () {
-                  ref.invalidate(myFeedbackProvider);
-                  ref.invalidate(allFeedbackProvider);
-                },
-              ),
-            ],
-            bottom: TabBar(
-              labelStyle: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600, fontSize: 14),
-              unselectedLabelStyle: GoogleFonts.inter(
-                  fontWeight: FontWeight.w400, fontSize: 14),
-              labelColor: kPrimary600,
-              unselectedLabelColor: kTextSecondary,
-              indicatorColor: kPrimary600,
-              indicatorWeight: 2.5,
-              tabs: const [
-                Tab(text: 'My Feedback'),
-                Tab(text: 'All Feedback'),
-              ],
-            ),
-          ),
-          body: TabBarView(
-            children: [
-              _buildContent(context, feedbackAsync),
-              const _AllFeedbackTab(),
-            ],
-          ),
-        ),
+      return _ExecFeedbackView(
+        isDark: isDark,
+        myTab: _buildMyTab(context, isDark, feedbackAsync),
       );
     }
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('Feedback'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(myFeedbackProvider),
-          ),
-        ],
-      ),
-      body: _buildContent(context, feedbackAsync),
+    return DsScreenShell(
+      title: 'Feedback',
+      subtitle: 'Share suggestions & ratings',
+      actions: [
+        DsActionButton(
+          icon: Icons.refresh_rounded,
+          onTap: () => ref.invalidate(myFeedbackProvider),
+        ),
+      ],
+      onRefresh: () async => ref.invalidate(myFeedbackProvider),
+      slivers: [_buildMyTab(context, isDark, feedbackAsync)],
     );
   }
 
-  Widget _buildContent(BuildContext context, AsyncValue<List<FeedbackItem>> feedbackAsync) {
-    return SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ------------------------------------------------------------------
-            // Feedback Form Card
-            // ------------------------------------------------------------------
-            AppCard(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.feedback_outlined,
-                            color: kPrimary600, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Share Feedback',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: kPrimary600,
+  Widget _buildMyTab(
+    BuildContext context,
+    bool isDark,
+    AsyncValue<List<FeedbackItem>> feedbackAsync,
+  ) {
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Feedback form card
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              dsSpace4, dsSpace3, dsSpace4, 0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(dsRadiusCard),
+              boxShadow: isDark ? [] : dsShadowMd,
+              border: isDark
+                  ? Border.all(color: dsDarkBorderSubtle)
+                  : null,
+            ),
+            padding: const EdgeInsets.all(dsSpace4),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: dsColorAmber600.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(dsRadiusSm),
+                        ),
+                        child: Icon(Icons.feedback_outlined,
+                            size: context.si(18),
+                            color: dsColorAmber600),
+                      ),
+                      const SizedBox(width: dsSpace3),
+                      Text(
+                        'Share Feedback',
+                        style: GoogleFonts.poppins(
+                          fontSize: context.sp(15),
+                          fontWeight: FontWeight.w700,
+                          color: dsColorIndigo600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: dsSpace4),
+
+                  // Category dropdown
+                  _FormLabel(label: 'Category', isDark: isDark),
+                  const SizedBox(height: 6),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? dsDarkSurfaceMuted
+                          : dsSurfaceMuted,
+                      borderRadius: BorderRadius.circular(dsRadiusMd),
+                      border: Border.all(color: borderColor),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: dsSpace4),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedCategory,
+                        isExpanded: true,
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(14),
+                          color: textPrimary,
+                        ),
+                        dropdownColor: surface,
+                        items: _categories
+                            .map((c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(
+                                    c[0].toUpperCase() + c.substring(1),
+                                    style: GoogleFonts.inter(
+                                      fontSize: context.sp(14),
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (v) => setState(
+                            () => _selectedCategory = v ?? _selectedCategory),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: dsSpace3),
+
+                  // Subject
+                  _FormLabel(label: 'Subject *', isDark: isDark),
+                  const SizedBox(height: 6),
+                  _FormField(
+                    controller: _subjectCtrl,
+                    hint: 'Brief summary of your feedback',
+                    isDark: isDark,
+                    textCapitalization: TextCapitalization.sentences,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Subject is required'
+                        : null,
+                  ),
+                  const SizedBox(height: dsSpace3),
+
+                  // Details
+                  _FormLabel(label: 'Details *', isDark: isDark),
+                  const SizedBox(height: 6),
+                  _FormField(
+                    controller: _bodyCtrl,
+                    hint: 'Describe your feedback in detail…',
+                    isDark: isDark,
+                    maxLines: 4,
+                    textCapitalization: TextCapitalization.sentences,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Feedback details are required'
+                        : null,
+                  ),
+                  const SizedBox(height: dsSpace3),
+
+                  // Star rating
+                  _FormLabel(label: 'Rating (optional)', isDark: isDark),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: List.generate(5, (i) {
+                      final starVal = i + 1;
+                      return GestureDetector(
+                        onTap: () => setState(() =>
+                            _rating =
+                                _rating == starVal ? 0 : starVal),
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Icon(
+                            starVal <= _rating
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            color: starVal <= _rating
+                                ? dsColorAmber500
+                                : (isDark
+                                    ? dsDarkBorderLight
+                                    : dsBorderDefault),
+                            size: context.si(28),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: dsSpace3),
 
-                    // Category dropdown
-                    Text('Category',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: kTextSecondary,
-                        )),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      value: _selectedCategory,
-                      decoration: const InputDecoration(
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      ),
-                      items: _categories
-                          .map((c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(
-                                  c[0].toUpperCase() + c.substring(1),
-                                  style: GoogleFonts.inter(fontSize: 14),
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (v) =>
-                          setState(() => _selectedCategory = v ?? _selectedCategory),
+                  // Anonymous toggle
+                  Container(
+                    padding: const EdgeInsets.all(dsSpace3),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? dsDarkSurfaceMuted
+                          : dsSurfaceMuted,
+                      borderRadius: BorderRadius.circular(dsRadiusMd),
+                      border: Border.all(color: borderColor),
                     ),
-                    const SizedBox(height: 14),
-
-                    // Subject field
-                    Text('Subject',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: kTextSecondary,
-                        )),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: _subjectCtrl,
-                      decoration: const InputDecoration(
-                        hintText: 'Brief summary of your feedback',
-                      ),
-                      textCapitalization: TextCapitalization.sentences,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Subject is required' : null,
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Body text area
-                    Text('Details',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: kTextSecondary,
-                        )),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: _bodyCtrl,
-                      decoration: const InputDecoration(
-                        hintText: 'Describe your feedback in detail…',
-                        alignLabelWithHint: true,
-                      ),
-                      maxLines: 4,
-                      textCapitalization: TextCapitalization.sentences,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Feedback details are required' : null,
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Star rating
-                    Text('Rating (optional)',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: kTextSecondary,
-                        )),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: List.generate(5, (i) {
-                        final starValue = i + 1;
-                        return GestureDetector(
-                          onTap: () => setState(() =>
-                              _rating = _rating == starValue ? 0 : starValue),
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Icon(
-                              starValue <= _rating
-                                  ? Icons.star
-                                  : Icons.star_border,
-                              color: starValue <= _rating
-                                  ? kAccent500
-                                  : kBorderLight,
-                              size: 30,
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Anonymous toggle
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Row(
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Submit Anonymously',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: kTextPrimary,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Submit Anonymously',
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(14),
+                                  fontWeight: FontWeight.w500,
+                                  color: textPrimary,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'Your name will not be shown',
-                              style: GoogleFonts.inter(
-                                  fontSize: 12, color: kTextSecondary),
-                            ),
-                          ],
+                              Text(
+                                'Your name will not be shown',
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(12),
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         Switch(
                           value: _isAnonymous,
-                          activeColor: kPrimary600,
-                          onChanged: (v) => setState(() => _isAnonymous = v),
+                          activeThumbColor: dsColorIndigo600,
+                          onChanged: (v) =>
+                              setState(() => _isAnonymous = v),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                  ),
+                  const SizedBox(height: dsSpace4),
 
-                    // Submit button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _submitting ? null : _submit,
-                        child: _submitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                'Submit Feedback',
-                                style: GoogleFonts.inter(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
+                  // Submit button
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius:
+                          BorderRadius.circular(dsRadiusButton),
+                      boxShadow: dsShadowBrand,
                     ),
-                  ],
-                ),
+                    child: ElevatedButton(
+                      onPressed: _submitting ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: dsColorIndigo600,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: dsSpace4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusButton),
+                        ),
+                      ),
+                      child: _submitting
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              'Submit Feedback',
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(15),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            // ------------------------------------------------------------------
-            // Previous Submissions
-            // ------------------------------------------------------------------
-            Text(
-              'My Submissions',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: kPrimary600,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            feedbackAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, _) => EmptyState(
-                icon: Icons.error_outline,
-                title: 'Could not load feedback',
-                subtitle: e.toString(),
-                action: ElevatedButton(
-                  onPressed: () => ref.invalidate(myFeedbackProvider),
-                  child: const Text('Retry'),
-                ),
-              ),
-              data: (items) {
-                if (items.isEmpty) {
-                  return const EmptyState(
-                    icon: Icons.feedback_outlined,
-                    title: 'No submissions yet',
-                    subtitle: 'Your submitted feedback will appear here.',
-                  );
-                }
-                return ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, i) =>
-                      _FeedbackItemCard(item: items[i]),
-                );
-              },
-            ),
-
-            const SizedBox(height: 32),
-          ],
+          ),
         ),
+
+        // My Submissions section header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              dsSpace4, dsSpace6, dsSpace4, dsSpace2),
+          child: Text(
+            'My Submissions',
+            style: GoogleFonts.poppins(
+              fontSize: context.sp(14),
+              fontWeight: FontWeight.w700,
+              color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+            ),
+          ),
+        ),
+
+        feedbackAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: 40),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load feedback',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () => ref.invalidate(myFeedbackProvider),
+          ),
+          data: (items) {
+            if (items.isEmpty) {
+              return const DsEmptyPlaceholder(
+                icon: Icons.feedback_outlined,
+                title: 'No submissions yet',
+                message: 'Your submitted feedback will appear here.',
+              );
+            }
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: dsSpace4),
+              itemCount: items.length,
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: dsSpace2),
+              itemBuilder: (context, i) => DSFadeSlide(
+                delay: Duration(milliseconds: i * 30),
+                child: _FeedbackItemCard(item: items[i]),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: dsSpace8),
+      ],
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// All Feedback Tab (exec only)
+// Exec view — 2 tabs
+// ---------------------------------------------------------------------------
+
+class _ExecFeedbackView extends ConsumerWidget {
+  final bool isDark;
+  final Widget myTab;
+
+  const _ExecFeedbackView({required this.isDark, required this.myTab});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final surfaceColor = isDark ? dsDarkSurface : dsSurface;
+    final titleColor = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final subtitleColor = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: isDark ? dsDarkBackground : dsBackground,
+        extendBody: true,
+        body: NestedScrollView(
+          headerSliverBuilder: (context, _) => [
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: surfaceColor,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: isDark ? 0.5 : 1,
+              shadowColor: isDark ? dsDarkBorderLight : dsBorderLight,
+              automaticallyImplyLeading: false,
+              titleSpacing: 0,
+              title: Padding(
+                padding: const EdgeInsets.only(left: dsSpace4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Feedback',
+                      style: GoogleFonts.poppins(
+                        fontSize: context.sp(16),
+                        fontWeight: FontWeight.w700,
+                        color: titleColor,
+                        height: 1.1,
+                      ),
+                    ),
+                    Text(
+                      'Resident suggestions & ratings',
+                      style: GoogleFonts.inter(
+                        fontSize: context.sp(11),
+                        color: subtitleColor,
+                        height: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                DsActionButton(
+                  icon: Icons.refresh_rounded,
+                  onTap: () {
+                    ref.invalidate(myFeedbackProvider);
+                    ref.invalidate(allFeedbackProvider);
+                  },
+                ),
+                const SizedBox(width: dsSpace2),
+              ],
+              bottom: TabBar(
+                labelColor: dsColorIndigo600,
+                unselectedLabelColor:
+                    isDark ? dsDarkTextSecondary : dsTextSecondary,
+                indicatorColor: dsColorIndigo600,
+                indicatorWeight: 2.5,
+                labelStyle: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: context.sp(13),
+                ),
+                unselectedLabelStyle: GoogleFonts.inter(
+                  fontWeight: FontWeight.w500,
+                  fontSize: context.sp(13),
+                ),
+                tabs: const [
+                  Tab(text: 'My Feedback'),
+                  Tab(text: 'All Feedback'),
+                ],
+              ),
+            ),
+          ],
+          body: TabBarView(
+            children: [
+              SingleChildScrollView(child: myTab),
+              const _AllFeedbackTab(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// All Feedback tab (exec only)
 // ---------------------------------------------------------------------------
 
 class _AllFeedbackTab extends ConsumerWidget {
@@ -415,31 +551,37 @@ class _AllFeedbackTab extends ConsumerWidget {
 
     return allAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load feedback',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(allFeedbackProvider),
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(allFeedbackProvider),
       ),
       data: (items) {
         if (items.isEmpty) {
-          return const EmptyState(
+          return const DsEmptyPlaceholder(
             icon: Icons.feedback_outlined,
             title: 'No feedback yet',
-            subtitle: 'No feedback submissions have been made.',
+            message: 'No feedback submissions have been made.',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(allFeedbackProvider),
+          color: dsColorIndigo600,
           child: ListView.separated(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              dsSpace4,
+              dsSpace4,
+              dsSpace4,
+              80 + MediaQuery.paddingOf(context).bottom,
+            ),
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, i) =>
-                _FeedbackItemCard(item: items[i], showUnit: true),
+            separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
+            itemBuilder: (context, i) => DSFadeSlide(
+              delay: Duration(milliseconds: i * 25),
+              child: _FeedbackItemCard(item: items[i], showUnit: true),
+            ),
           ),
         );
       },
@@ -448,137 +590,321 @@ class _AllFeedbackTab extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Feedback Item Card
+// Feedback item card
 // ---------------------------------------------------------------------------
 
-class _FeedbackItemCard extends StatelessWidget {
+class _FeedbackItemCard extends ConsumerWidget {
   final FeedbackItem item;
   final bool showUnit;
   const _FeedbackItemCard({required this.item, this.showUnit = false});
 
+  (Color bg, Color text) _statusColors(String status) => switch (status) {
+        'new'         => (dsColorIndigo50, dsColorIndigo600),
+        'acknowledged'=> (dsColorAmber50, dsColorAmber700),
+        'resolved'    => (dsColorEmerald50, dsColorEmerald700),
+        'closed'      => (dsColorSlate100, dsColorSlate600),
+        _             => (dsColorSlate100, dsColorSlate600),
+      };
+
+  String _statusLabel(String s) => switch (s) {
+        'new'          => 'New',
+        'acknowledged' => 'Acknowledged',
+        'resolved'     => 'Resolved',
+        'closed'       => 'Closed',
+        _              => s[0].toUpperCase() + s.substring(1),
+      };
+
   @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final catColor = _categoryColor(item.category);
+    final catBg = isDark
+        ? catColor.withValues(alpha: 0.15)
+        : _categoryBg(item.category);
+    final (statusBg, statusText) = _statusColors(item.status);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? dsDarkSurface : dsSurface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: isDark ? [] : dsShadowSm,
+        border: isDark ? Border.all(color: dsDarkBorderSubtle) : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Container(width: 4, color: catColor),
               Expanded(
-                child: Text(
-                  item.subject,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                child: Padding(
+                  padding: const EdgeInsets.all(dsSpace3),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Subject + status
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.subject,
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(13),
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? dsDarkTextPrimary
+                                    : dsTextPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: dsSpace2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? statusText.withValues(alpha: 0.15)
+                                  : statusBg,
+                              borderRadius:
+                                  BorderRadius.circular(dsRadiusFull),
+                            ),
+                            child: Text(
+                              _statusLabel(item.status),
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(10),
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? statusText.withValues(alpha: 0.9)
+                                    : statusText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: dsSpace2),
+
+                      // Category + stars + timeago
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: catBg,
+                              borderRadius:
+                                  BorderRadius.circular(dsRadiusXs),
+                            ),
+                            child: Text(
+                              item.category.replaceAll('_', ' ').toUpperCase(),
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(9),
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? catColor.withValues(alpha: 0.9)
+                                    : catColor,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                          if (item.rating != null) ...[
+                            const SizedBox(width: dsSpace2),
+                            ...List.generate(
+                              5,
+                              (i) => Icon(
+                                i < item.rating!
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                size: context.si(12),
+                                color: dsColorAmber500,
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          Text(
+                            timeago.format(item.createdAt),
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(10),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Unit (exec view)
+                      if (showUnit &&
+                          !item.isAnonymous &&
+                          item.unitId != null) ...[
+                        const SizedBox(height: dsSpace2),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.home_outlined,
+                              size: context.si(12),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
+                            ),
+                            const SizedBox(width: dsSpace1),
+                            Text(
+                              'Unit ${item.unitId}',
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(11),
+                                color: isDark
+                                    ? dsDarkTextSecondary
+                                    : dsTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+
+                      // Response box
+                      if (item.response != null) ...[
+                        const SizedBox(height: dsSpace3),
+                        Container(
+                          padding: const EdgeInsets.all(dsSpace3),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? dsColorIndigo600.withValues(alpha: 0.12)
+                                : dsColorIndigo25,
+                            borderRadius:
+                                BorderRadius.circular(dsRadiusSm),
+                            border: Border.all(
+                              color: isDark
+                                  ? dsColorIndigo600.withValues(alpha: 0.3)
+                                  : dsColorIndigo100,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'RESPONSE',
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(9),
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? dsColorIndigo300
+                                      : dsColorIndigo600,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                              const SizedBox(height: dsSpace1),
+                              Text(
+                                item.response!,
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(12),
+                                  color: isDark
+                                      ? dsDarkTextPrimary
+                                      : dsTextPrimary,
+                                  height: 1.4,
+                                ),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              StatusBadge.forStatus(item.status),
             ],
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _CategoryChip(category: item.category),
-              if (item.rating != null) ...[
-                const SizedBox(width: 8),
-                Row(
-                  children: List.generate(
-                    5,
-                    (i) => Icon(
-                      i < item.rating! ? Icons.star : Icons.star_border,
-                      size: 13,
-                      color: kAccent500,
-                    ),
-                  ),
-                ),
-              ],
-              const Spacer(),
-              Text(
-                timeago.format(item.createdAt),
-                style:
-                    GoogleFonts.inter(fontSize: 11, color: kTextSecondary),
-              ),
-            ],
-          ),
-          if (showUnit && !item.isAnonymous && item.unitId != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.home_outlined, size: 13, color: kTextSecondary),
-                const SizedBox(width: 4),
-                Text(
-                  'Unit ${item.unitId}',
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: kTextSecondary),
-                ),
-              ],
-            ),
-          ],
-          if (item.response != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: kPrimary50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kPrimary100),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Response',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: kPrimary600,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.response!,
-                    style:
-                        GoogleFonts.inter(fontSize: 13, color: kTextPrimary),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
 }
 
-class _CategoryChip extends StatelessWidget {
-  final String category;
-  const _CategoryChip({required this.category});
+// ---------------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------------
+
+class _FormLabel extends StatelessWidget {
+  final String label;
+  final bool isDark;
+  const _FormLabel({required this.label, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: kSectionAlt,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: kBorderLight),
+    return Text(
+      label,
+      style: GoogleFonts.inter(
+        fontSize: context.sp(12),
+        fontWeight: FontWeight.w600,
+        color: isDark ? dsDarkTextSecondary : dsTextSecondary,
       ),
-      child: Text(
-        category.replaceAll('_', ' ').toUpperCase(),
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: kTextSecondary,
-          letterSpacing: 0.4,
+    );
+  }
+}
+
+class _FormField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final bool isDark;
+  final int maxLines;
+  final TextCapitalization textCapitalization;
+  final String? Function(String?)? validator;
+
+  const _FormField({
+    required this.controller,
+    required this.hint,
+    required this.isDark,
+    this.maxLines = 1,
+    this.textCapitalization = TextCapitalization.none,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      textCapitalization: textCapitalization,
+      style: GoogleFonts.inter(
+        fontSize: context.sp(14),
+        color: textPrimary,
+      ),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.inter(
+          fontSize: context.sp(13),
+          color: textSecondary,
+        ),
+        filled: true,
+        fillColor: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: dsSpace4, vertical: dsSpace3),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide:
+              const BorderSide(color: dsColorIndigo600, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: const BorderSide(color: dsColorRed600),
         ),
       ),
+      validator: validator,
     );
   }
 }

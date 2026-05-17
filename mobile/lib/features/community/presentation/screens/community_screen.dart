@@ -3,93 +3,192 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/community_repository.dart';
 import 'create_post_screen.dart';
+
+// ─── Community Screen ─────────────────────────────────────────────────────────
 
 class CommunityScreen extends ConsumerWidget {
   const CommunityScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final bg = isDark ? dsDarkBackground : dsBackground;
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: kBgWarm,
-        appBar: AppBar(
-          title: const Text('Community Board'),
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          actions: [
-            if (isExec)
-              IconButton(
-                tooltip: 'Moderation Queue',
-                icon: const Icon(Icons.admin_panel_settings_outlined),
-                onPressed: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => _ModerationSheet(
-                    onChanged: () {
-                      ref.invalidate(communityPostsProvider);
-                      ref.invalidate(moderationQueueProvider);
-                    },
+        backgroundColor: bg,
+        body: NestedScrollView(
+          headerSliverBuilder: (ctx, _) => [
+            SliverAppBar(
+              expandedHeight: 96,
+              collapsedHeight: 56,
+              pinned: true,
+              floating: false,
+              snap: false,
+              backgroundColor: isDark ? dsDarkSurface : dsSurface,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              flexibleSpace: FlexibleSpaceBar(
+                titlePadding:
+                    const EdgeInsets.fromLTRB(20, 0, 0, 56),
+                title: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Community',
+                      style: GoogleFonts.poppins(
+                        fontSize: context.sp(18),
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? dsDarkTextPrimary
+                            : dsTextPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Board & marketplace',
+                      style: GoogleFonts.inter(
+                        fontSize: context.sp(12),
+                        color: isDark
+                            ? dsDarkTextSecondary
+                            : dsTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                if (isExec)
+                  IconButton(
+                    tooltip: 'Moderation Queue',
+                    icon: Icon(
+                      Icons.admin_panel_settings_rounded,
+                      size: context.si(22),
+                      color: isDark
+                          ? dsDarkTextSecondary
+                          : dsTextSecondary,
+                    ),
+                    onPressed: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => _ModerationSheet(
+                        isDark: isDark,
+                        onChanged: () {
+                          ref.invalidate(communityPostsProvider);
+                          ref.invalidate(moderationQueueProvider);
+                        },
+                      ),
+                    ),
+                  ),
+                IconButton(
+                  icon: Icon(
+                    Icons.refresh_rounded,
+                    size: context.si(22),
+                    color: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary,
+                  ),
+                  onPressed: () {
+                    ref.read(communityLimitProvider.notifier).state =
+                        30;
+                    ref.invalidate(communityPostsProvider);
+                    ref.invalidate(marketplaceListingsProvider);
+                  },
+                ),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Container(
+                  color: surface,
+                  child: TabBar(
+                    labelColor: dsColorIndigo600,
+                    unselectedLabelColor:
+                        isDark ? dsDarkTextSecondary : dsTextSecondary,
+                    indicatorColor: dsColorIndigo600,
+                    indicatorWeight: 2.5,
+                    labelStyle: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        fontSize: context.sp(14)),
+                    unselectedLabelStyle: GoogleFonts.inter(
+                        fontWeight: FontWeight.w400,
+                        fontSize: context.sp(14)),
+                    tabs: const [
+                      Tab(text: 'Board'),
+                      Tab(text: 'Marketplace'),
+                    ],
                   ),
                 ),
               ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                ref.read(communityLimitProvider.notifier).state = 30;
-                ref.invalidate(communityPostsProvider);
-                ref.invalidate(marketplaceListingsProvider);
-              },
             ),
           ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Board'),
-              Tab(text: 'Marketplace'),
+          body: TabBarView(
+            children: [
+              _BoardTab(isDark: isDark),
+              _MarketplaceTab(isDark: isDark),
             ],
-            labelStyle: TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CreatePostScreen()),
-            );
-            ref.invalidate(communityPostsProvider);
-          },
-          backgroundColor: kPrimary600,
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.edit_outlined),
-          label: const Text('Post'),
-        ),
-        body: const TabBarView(
-          children: [
-            _BoardTab(),
-            _MarketplaceTab(),
-          ],
+        floatingActionButton: _PostFab(isDark: isDark),
+      ),
+    );
+  }
+}
+
+// ─── FAB ─────────────────────────────────────────────────────────────────────
+
+class _PostFab extends ConsumerWidget {
+  final bool isDark;
+  const _PostFab({required this.isDark});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(dsRadiusXl),
+        boxShadow: dsShadowBrand,
+      ),
+      child: FloatingActionButton.extended(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => const CreatePostScreen()),
+          );
+          ref.invalidate(communityPostsProvider);
+        },
+        backgroundColor: dsColorIndigo600,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        icon: Icon(Icons.edit_rounded, size: context.si(20)),
+        label: Text(
+          'Post',
+          style: GoogleFonts.inter(
+              fontSize: context.sp(14),
+              fontWeight: FontWeight.w700),
         ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Board tab
-// ---------------------------------------------------------------------------
+// ─── Board Tab ────────────────────────────────────────────────────────────────
 
 class _BoardTab extends ConsumerWidget {
-  const _BoardTab();
+  final bool isDark;
+  const _BoardTab({required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -97,22 +196,22 @@ class _BoardTab extends ConsumerWidget {
     final currentLimit = ref.watch(communityLimitProvider);
 
     return postsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      loading: () =>
+          const Center(child: CircularProgressIndicator()),
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load posts',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(communityPostsProvider),
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(communityPostsProvider),
       ),
       data: (posts) {
         if (posts.isEmpty) {
-          return const EmptyState(
-            icon: Icons.forum_outlined,
+          return const DsEmptyPlaceholder(
+            icon: Icons.forum_rounded,
             title: 'No posts yet',
-            subtitle: 'Be the first to share something with the community.',
+            message:
+                'Be the first to share something with the community.',
           );
         }
         final hasMore = posts.length >= currentLimit;
@@ -122,28 +221,52 @@ class _BoardTab extends ConsumerWidget {
             ref.invalidate(communityPostsProvider);
           },
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+            padding: EdgeInsets.fromLTRB(
+              dsSpace4,
+              dsSpace4,
+              dsSpace4,
+              80 +
+                  MediaQuery.paddingOf(context).bottom +
+                  dsSpace5,
+            ),
             children: [
-              ...posts.map((post) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _PostCard(post: post),
-                  )),
+              ...posts.asMap().entries.map((entry) {
+                final i = entry.key;
+                final post = entry.value;
+                return Padding(
+                  padding: EdgeInsets.only(
+                      bottom: i == posts.length - 1 && !hasMore
+                          ? 0
+                          : dsSpace3),
+                  child: DSFadeSlide(
+                    delay: Duration(milliseconds: i * 30),
+                    child: _PostCard(
+                        post: post, isDark: isDark),
+                  ),
+                );
+              }),
               if (hasMore)
                 Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 8),
+                  padding:
+                      const EdgeInsets.only(top: dsSpace2),
                   child: Center(
                     child: TextButton.icon(
-                      icon: const Icon(Icons.expand_more, size: 18),
+                      icon: Icon(Icons.expand_more_rounded,
+                          size: context.si(18),
+                          color: dsColorIndigo600),
                       label: Text(
                         'Load more',
                         style: GoogleFonts.inter(
-                          fontSize: 13,
+                          fontSize: context.sp(13),
                           fontWeight: FontWeight.w600,
+                          color: dsColorIndigo600,
                         ),
                       ),
                       onPressed: () {
-                        ref.read(communityLimitProvider.notifier).state =
-                            currentLimit + 10;
+                        ref
+                            .read(communityLimitProvider
+                                .notifier)
+                            .state = currentLimit + 10;
                       },
                     ),
                   ),
@@ -156,44 +279,61 @@ class _BoardTab extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Marketplace tab
-// ---------------------------------------------------------------------------
+// ─── Marketplace Tab ──────────────────────────────────────────────────────────
 
 class _MarketplaceTab extends ConsumerWidget {
-  const _MarketplaceTab();
+  final bool isDark;
+  const _MarketplaceTab({required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final listingsAsync = ref.watch(marketplaceListingsProvider);
 
     return listingsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      loading: () =>
+          const Center(child: CircularProgressIndicator()),
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load listings',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(marketplaceListingsProvider),
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () =>
+            ref.invalidate(marketplaceListingsProvider),
       ),
       data: (listings) {
         if (listings.isEmpty) {
-          return const EmptyState(
-            icon: Icons.storefront_outlined,
+          return const DsEmptyPlaceholder(
+            icon: Icons.storefront_rounded,
             title: 'No listings yet',
-            subtitle:
+            message:
                 'Neighbours will post items for sale, giveaway, or services here.',
           );
         }
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(marketplaceListingsProvider),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-            itemCount: listings.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (_, i) => _ListingCard(listing: listings[i]),
+          onRefresh: () async =>
+              ref.invalidate(marketplaceListingsProvider),
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              dsSpace4,
+              dsSpace4,
+              dsSpace4,
+              80 + MediaQuery.paddingOf(context).bottom + dsSpace5,
+            ),
+            children: listings.asMap().entries.map((entry) {
+              final i = entry.key;
+              final listing = entry.value;
+              return Padding(
+                padding: EdgeInsets.only(
+                    bottom: i == listings.length - 1
+                        ? 0
+                        : dsSpace3),
+                child: DSFadeSlide(
+                  delay: Duration(milliseconds: i * 30),
+                  child: _ListingCard(
+                      listing: listing, isDark: isDark),
+                ),
+              );
+            }).toList(),
           ),
         );
       },
@@ -201,475 +341,581 @@ class _MarketplaceTab extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Marketplace listing card
-// ---------------------------------------------------------------------------
-
-class _ListingCard extends StatelessWidget {
-  final MarketplaceListing listing;
-  const _ListingCard({required this.listing});
-
-  Color get _categoryColor => switch (listing.category) {
-        'Electronics' => kPrimary600,
-        'Furniture' => const Color(0xFF7C3AED),
-        'Books' => const Color(0xFF065F46),
-        'Vehicles' => const Color(0xFF92400E),
-        'Services' => kSecondary500,
-        _ => kTextSecondary,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _categoryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  listing.categoryLabel,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _categoryColor,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              if (listing.price != null)
-                Text(
-                  '₹${NumberFormat('#,##0').format(listing.price)}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: kSecondary500,
-                  ),
-                )
-              else
-                Text(
-                  'FREE',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: kSecondary500,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            listing.title,
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: kTextPrimary,
-            ),
-          ),
-          if (listing.description != null &&
-              listing.description!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              listing.description!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                  fontSize: 13, color: kTextSecondary, height: 1.4),
-            ),
-          ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(Icons.schedule_outlined,
-                  size: 13, color: kTextSecondary),
-              const SizedBox(width: 4),
-              Text(
-                timeago.format(listing.createdAt),
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: kTextSecondary),
-              ),
-              const Spacer(),
-              const Icon(Icons.chat_bubble_outline,
-                  size: 13, color: kTextSecondary),
-              const SizedBox(width: 4),
-              Text(
-                listing.contactPreference == 'phone' ? 'Call seller' : 'In-app',
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: kTextSecondary),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
+// ─── Post Card ────────────────────────────────────────────────────────────────
 
 class _PostCard extends ConsumerWidget {
   final CommunityPost post;
-  const _PostCard({required this.post});
+  final bool isDark;
+  const _PostCard({required this.post, required this.isDark});
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+  static const Map<String, _CatStyle> _styles = {
+    'announcement': _CatStyle(
+      label: 'Announcement',
+      color: dsColorIndigo600,
+    ),
+    'discussion': _CatStyle(
+      label: 'Discussion',
+      color: dsColorViolet600,
+    ),
+    'help': _CatStyle(
+      label: 'Help',
+      color: dsColorAmber600,
+    ),
+    'lost_found': _CatStyle(
+      label: 'Lost & Found',
+      color: dsColorRed600,
+    ),
+    'buy_sell': _CatStyle(
+      label: 'Buy / Sell',
+      color: dsColorEmerald600,
+    ),
+    'general': _CatStyle(
+      label: 'General',
+      color: dsTextSecondary,
+    ),
+  };
+
+  static _CatStyle _styleFor(String cat) =>
+      _styles[cat] ??
+      const _CatStyle(label: 'General', color: dsTextSecondary);
+
+  Future<void> _confirmDelete(
+      BuildContext context, WidgetRef ref) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Delete Post',
             style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w600, fontSize: 16)),
-        content: Text('Are you sure you want to delete this post?',
+        content: Text(
+            'Are you sure you want to delete this post?',
             style: GoogleFonts.inter(fontSize: 14)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(dsRadiusLg)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text('Cancel',
-                style: GoogleFonts.inter(color: kTextSecondary)),
+                style: GoogleFonts.inter(
+                    color: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Delete',
                 style: GoogleFonts.inter(
-                    color: kRed600, fontWeight: FontWeight.w600)),
+                    color: dsColorRed600,
+                    fontWeight: FontWeight.w600)),
           ),
         ],
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
       ),
     );
     if (confirm != true) return;
     try {
-      await ref.read(communityRepositoryProvider).deletePost(post.id);
-      ref.invalidate(communityPostsProvider);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Post deleted',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed: $e', style: GoogleFonts.inter()),
-            backgroundColor: kRed600,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  void _showEditModal(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _EditPostModal(
-        post: post,
-        onSaved: () => ref.invalidate(communityPostsProvider),
-      ),
-    );
-  }
-
-  Future<void> _togglePin(BuildContext context, WidgetRef ref) async {
-    try {
       await ref
           .read(communityRepositoryProvider)
-          .pinPost(post.id, pin: !post.isPinned);
+          .deletePost(post.id);
       ref.invalidate(communityPostsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Post deleted',
+              style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w500)),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed: $e', style: GoogleFonts.inter()),
-            backgroundColor: kRed600,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text('Failed: $e', style: GoogleFonts.inter()),
+          backgroundColor: dsColorRed600,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     }
-  }
-
-  void _showReportModal(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ReportPostModal(
-        postId: post.id,
-        onReported: () {},
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final myId = ref.watch(authNotifierProvider).profile?.id;
+    final myId =
+        ref.watch(authNotifierProvider).profile?.id;
     final isExec =
-        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+        ref.watch(authNotifierProvider).profile?.isExec ??
+            false;
     final isOwner = myId == post.authorId;
-    final canEdit = isOwner;
-    final canDelete = isOwner || isExec;
-    final canPin = isExec;
-    final canReport = !isOwner;
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final catStyle = _styleFor(post.category);
+    final catColor = catStyle.color;
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Category chip + pinned indicator
-          Row(
-            children: [
-              _CategoryChip(category: post.category),
-              if (post.isPinned) ...[
-                const SizedBox(width: 8),
-                const Icon(Icons.push_pin, size: 14, color: kAccent500),
-              ],
-              const Spacer(),
-              Text(
-                timeago.format(post.createdAt),
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: kTextSecondary),
+    return DSScalePress(
+      onTap: () {/* tap-to-expand if needed */},
+      child: Container(
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border: isDark
+              ? Border.all(color: dsDarkBorderSubtle, width: 1)
+              : null,
+        ),
+        child: Column(
+          children: [
+            // Category accent strip
+            Container(
+              height: 4,
+              decoration: BoxDecoration(
+                color: catColor,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(dsRadiusCard)),
               ),
-              if (canEdit || canDelete || canPin || canReport) ...[
-                const SizedBox(width: 4),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert,
-                      size: 18, color: kTextSecondary),
-                  onSelected: (v) {
-                    if (v == 'edit') _showEditModal(context, ref);
-                    if (v == 'delete') _confirmDelete(context, ref);
-                    if (v == 'pin') _togglePin(context, ref);
-                    if (v == 'report') _showReportModal(context, ref);
-                  },
-                  itemBuilder: (_) => [
-                    if (canPin)
-                      PopupMenuItem(
-                        value: 'pin',
-                        child: Row(
-                          children: [
-                            Icon(
-                              post.isPinned
-                                  ? Icons.push_pin_outlined
-                                  : Icons.push_pin,
-                              size: 16,
-                              color: kAccent500,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              post.isPinned ? 'Unpin Post' : 'Pin Post',
-                              style: GoogleFonts.inter(fontSize: 14),
-                            ),
-                          ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(dsSpace4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top row: category chip + pin + time + menu
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: dsSpace2, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: catColor.withValues(
+                              alpha: isDark ? 0.15 : 0.09),
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusXs),
+                        ),
+                        child: Text(
+                          catStyle.label,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(10),
+                            fontWeight: FontWeight.w700,
+                            color: catColor,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ),
-                    if (canEdit)
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.edit_outlined,
-                                size: 16, color: kTextSecondary),
-                            const SizedBox(width: 10),
-                            Text('Edit',
-                                style: GoogleFonts.inter(fontSize: 14)),
-                          ],
+                      if (post.isPinned) ...[
+                        const SizedBox(width: dsSpace2),
+                        Icon(Icons.push_pin_rounded,
+                            size: context.si(13),
+                            color: dsColorAmber600),
+                      ],
+                      const Spacer(),
+                      Text(
+                        timeago.format(post.createdAt),
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(11),
+                          color: isDark
+                              ? dsDarkTextSecondary
+                              : dsTextSecondary,
                         ),
                       ),
-                    if (canDelete)
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.delete_outline,
-                                size: 16, color: kRed600),
-                            const SizedBox(width: 10),
-                            Text('Delete',
-                                style: GoogleFonts.inter(
-                                    fontSize: 14, color: kRed600)),
+                      if (isOwner || isExec) ...[
+                        const SizedBox(width: 2),
+                        PopupMenuButton<String>(
+                          icon: Icon(Icons.more_vert_rounded,
+                              size: context.si(18),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary),
+                          color: isDark
+                              ? dsDarkSurface
+                              : dsSurface,
+                          shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(
+                                      dsRadiusMd)),
+                          onSelected: (v) {
+                            if (v == 'delete') {
+                              _confirmDelete(context, ref);
+                            }
+                            if (v == 'pin') {
+                              ref
+                                  .read(
+                                      communityRepositoryProvider)
+                                  .pinPost(post.id,
+                                      pin: !post.isPinned)
+                                  .then((_) => ref.invalidate(
+                                      communityPostsProvider))
+                                  .catchError((_) {});
+                            }
+                            if (v == 'edit') {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor:
+                                    Colors.transparent,
+                                builder: (_) =>
+                                    _EditPostModal(
+                                  post: post,
+                                  isDark: isDark,
+                                  onSaved: () => ref.invalidate(
+                                      communityPostsProvider),
+                                ),
+                              );
+                            }
+                            if (v == 'report') {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor:
+                                    Colors.transparent,
+                                builder: (_) =>
+                                    _ReportPostModal(
+                                  postId: post.id,
+                                  isDark: isDark,
+                                ),
+                              );
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            if (isExec)
+                              PopupMenuItem(
+                                value: 'pin',
+                                child: Row(children: [
+                                  Icon(
+                                    post.isPinned
+                                        ? Icons.push_pin_outlined
+                                        : Icons.push_pin_rounded,
+                                    size: 16,
+                                    color: dsColorAmber600,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    post.isPinned
+                                        ? 'Unpin'
+                                        : 'Pin Post',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 14),
+                                  ),
+                                ]),
+                              ),
+                            if (isOwner)
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Row(children: [
+                                  const Icon(
+                                      Icons.edit_outlined,
+                                      size: 16,
+                                      color: dsTextSecondary),
+                                  const SizedBox(width: 10),
+                                  Text('Edit',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 14)),
+                                ]),
+                              ),
+                            if (isOwner || isExec)
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Row(children: [
+                                  const Icon(
+                                      Icons.delete_outline,
+                                      size: 16,
+                                      color: dsColorRed600),
+                                  const SizedBox(width: 10),
+                                  Text('Delete',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 14,
+                                          color: dsColorRed600)),
+                                ]),
+                              ),
+                            if (!isOwner)
+                              PopupMenuItem(
+                                value: 'report',
+                                child: Row(children: [
+                                  const Icon(Icons.flag_outlined,
+                                      size: 16,
+                                      color: dsColorRed600),
+                                  const SizedBox(width: 10),
+                                  Text('Report',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 14,
+                                          color: dsColorRed600)),
+                                ]),
+                              ),
                           ],
                         ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: dsSpace2),
+                  // Title
+                  Text(
+                    post.title,
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(14),
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? dsDarkTextPrimary
+                          : dsTextPrimary,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // Body preview
+                  if (post.body != null &&
+                      post.body!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      post.body!,
+                      style: GoogleFonts.inter(
+                        fontSize: context.sp(12),
+                        color: isDark
+                            ? dsDarkTextSecondary
+                            : dsTextSecondary,
+                        height: 1.4,
                       ),
-                    if (canReport)
-                      PopupMenuItem(
-                        value: 'report',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.flag_outlined,
-                                size: 16, color: kRed600),
-                            const SizedBox(width: 10),
-                            Text('Report',
-                                style: GoogleFonts.inter(
-                                    fontSize: 14, color: kRed600)),
-                          ],
-                        ),
-                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Title
-          Text(
-            post.title,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-
-          // Body preview
-          if (post.body != null && post.body!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              post.body!,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: kTextSecondary),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: dsSpace3),
+                  Divider(
+                    height: 1,
+                    color: isDark
+                        ? dsDarkBorderSubtle
+                        : const Color(0xFFF3F4F6),
+                  ),
+                  const SizedBox(height: dsSpace3),
+                  // Footer
+                  Row(
+                    children: [
+                      Icon(Icons.home_rounded,
+                          size: context.si(13),
+                          color: isDark
+                              ? dsDarkTextSecondary
+                              : dsTextSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        post.unitId != null
+                            ? 'Unit'
+                            : 'Resident',
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(11),
+                          color: isDark
+                              ? dsDarkTextSecondary
+                              : dsTextSecondary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(Icons.visibility_rounded,
+                          size: context.si(13),
+                          color: isDark
+                              ? dsDarkTextSecondary
+                              : dsTextSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${post.viewCount} views',
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(11),
+                          color: isDark
+                              ? dsDarkTextSecondary
+                              : dsTextSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
-
-          const SizedBox(height: 10),
-          const Divider(height: 1),
-          const SizedBox(height: 10),
-
-          // Footer: unit + view count
-          Row(
-            children: [
-              const Icon(Icons.home_outlined, size: 14, color: kTextSecondary),
-              const SizedBox(width: 4),
-              Text(
-                post.unitId != null ? 'Unit' : 'Resident',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: kTextSecondary),
-              ),
-              const Spacer(),
-              const Icon(Icons.visibility_outlined,
-                  size: 14, color: kTextSecondary),
-              const SizedBox(width: 4),
-              Text(
-                '${post.viewCount} views',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: kTextSecondary),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  final String category;
-  const _CategoryChip({required this.category});
-
-  static const Map<String, _CategoryStyle> _styles = {
-    'announcement': _CategoryStyle(
-      label: 'Announcement',
-      bg: Color(0xFFDBEAFE),
-      text: kPrimary600,
-    ),
-    'discussion': _CategoryStyle(
-      label: 'Discussion',
-      bg: Color(0xFFEDE9FE),
-      text: Color(0xFF7C3AED),
-    ),
-    'help': _CategoryStyle(
-      label: 'Help',
-      bg: Color(0xFFFEF3C7),
-      text: Color(0xFF92400E),
-    ),
-    'lost_found': _CategoryStyle(
-      label: 'Lost & Found',
-      bg: Color(0xFFFEE2E2),
-      text: kRed600,
-    ),
-    'buy_sell': _CategoryStyle(
-      label: 'Buy / Sell',
-      bg: Color(0xFFD1FAE5),
-      text: Color(0xFF065F46),
-    ),
-    'general': _CategoryStyle(
-      label: 'General',
-      bg: Color(0xFFF3F4F6),
-      text: kTextSecondary,
-    ),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final style = _styles[category] ??
-        const _CategoryStyle(
-          label: 'General',
-          bg: Color(0xFFF3F4F6),
-          text: kTextSecondary,
-        );
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: style.bg,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        style.label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: style.text,
-          letterSpacing: 0.3,
         ),
       ),
     );
   }
 }
 
-class _CategoryStyle {
+class _CatStyle {
   final String label;
-  final Color bg;
-  final Color text;
-  const _CategoryStyle({
-    required this.label,
-    required this.bg,
-    required this.text,
-  });
+  final Color color;
+  const _CatStyle({required this.label, required this.color});
 }
 
-// ---------------------------------------------------------------------------
-// Edit post modal (owner-only)
-// ---------------------------------------------------------------------------
+// ─── Listing Card ─────────────────────────────────────────────────────────────
+
+class _ListingCard extends StatelessWidget {
+  final MarketplaceListing listing;
+  final bool isDark;
+  const _ListingCard(
+      {required this.listing, required this.isDark});
+
+  Color get _catColor => switch (listing.category) {
+        'Electronics' => dsColorIndigo600,
+        'Furniture'   => dsColorViolet600,
+        'Books'       => dsColorTeal600,
+        'Vehicles'    => dsColorTerra600,
+        'Services'    => dsColorEmerald600,
+        _             => dsTextSecondary,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final catColor = _catColor;
+
+    return DSScalePress(
+      onTap: () {},
+      child: Container(
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border: isDark
+              ? Border.all(color: dsDarkBorderSubtle, width: 1)
+              : null,
+        ),
+        padding: const EdgeInsets.all(dsSpace4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: dsSpace2, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: catColor.withValues(
+                        alpha: isDark ? 0.15 : 0.09),
+                    borderRadius:
+                        BorderRadius.circular(dsRadiusXs),
+                  ),
+                  child: Text(
+                    listing.categoryLabel,
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(10),
+                      fontWeight: FontWeight.w700,
+                      color: catColor,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                if (listing.price != null)
+                  Text(
+                    '₹${NumberFormat('#,##,##0', 'en_IN').format(listing.price)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: context.sp(16),
+                      fontWeight: FontWeight.w700,
+                      color: dsColorEmerald600,
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: dsSpace2, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: dsColorEmerald600.withValues(
+                          alpha: isDark ? 0.15 : 0.09),
+                      borderRadius:
+                          BorderRadius.circular(dsRadiusXs),
+                    ),
+                    child: Text(
+                      'FREE',
+                      style: GoogleFonts.inter(
+                        fontSize: context.sp(10),
+                        fontWeight: FontWeight.w700,
+                        color: dsColorEmerald600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: dsSpace3),
+            Text(
+              listing.title,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(14),
+                fontWeight: FontWeight.w600,
+                color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (listing.description != null &&
+                listing.description!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                listing.description!,
+                style: GoogleFonts.inter(
+                  fontSize: context.sp(12),
+                  color: isDark
+                      ? dsDarkTextSecondary
+                      : dsTextSecondary,
+                  height: 1.4,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            const SizedBox(height: dsSpace3),
+            Row(
+              children: [
+                Icon(Icons.schedule_rounded,
+                    size: context.si(13),
+                    color: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  timeago.format(listing.createdAt),
+                  style: GoogleFonts.inter(
+                    fontSize: context.sp(11),
+                    color: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary,
+                  ),
+                ),
+                const Spacer(),
+                Icon(Icons.chat_bubble_outline_rounded,
+                    size: context.si(13),
+                    color: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  listing.contactPreference == 'phone'
+                      ? 'Call seller'
+                      : 'In-app',
+                  style: GoogleFonts.inter(
+                    fontSize: context.sp(11),
+                    color: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Edit Post Modal ──────────────────────────────────────────────────────────
 
 class _EditPostModal extends ConsumerStatefulWidget {
   final CommunityPost post;
+  final bool isDark;
   final VoidCallback onSaved;
-  const _EditPostModal({required this.post, required this.onSaved});
+  const _EditPostModal(
+      {required this.post,
+      required this.isDark,
+      required this.onSaved});
 
   @override
-  ConsumerState<_EditPostModal> createState() => _EditPostModalState();
+  ConsumerState<_EditPostModal> createState() =>
+      _EditPostModalState();
 }
 
-class _EditPostModalState extends ConsumerState<_EditPostModal> {
+class _EditPostModalState
+    extends ConsumerState<_EditPostModal> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleCtrl;
   late final TextEditingController _bodyCtrl;
@@ -679,7 +925,8 @@ class _EditPostModalState extends ConsumerState<_EditPostModal> {
   void initState() {
     super.initState();
     _titleCtrl = TextEditingController(text: widget.post.title);
-    _bodyCtrl = TextEditingController(text: widget.post.body ?? '');
+    _bodyCtrl =
+        TextEditingController(text: widget.post.body ?? '');
   }
 
   @override
@@ -701,24 +948,22 @@ class _EditPostModalState extends ConsumerState<_EditPostModal> {
       widget.onSaved();
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Post updated',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-            backgroundColor: kSecondary500,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Post updated',
+              style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w500)),
+          backgroundColor: dsColorEmerald600,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed: $e', style: GoogleFonts.inter()),
-            backgroundColor: kRed600,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text('Failed: $e', style: GoogleFonts.inter()),
+          backgroundColor: dsColorRed600,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -727,15 +972,20 @@ class _EditPostModalState extends ConsumerState<_EditPostModal> {
 
   @override
   Widget build(BuildContext context) {
+    final bg =
+        widget.isDark ? const Color(0xFF1C1C1E) : Colors.white;
+
     return Padding(
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(dsRadiusXl)),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding:
+            const EdgeInsets.fromLTRB(20, 16, 20, 32),
         child: Form(
           key: _formKey,
           child: Column(
@@ -747,8 +997,11 @@ class _EditPostModalState extends ConsumerState<_EditPostModal> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                      color: kBorderLight,
-                      borderRadius: BorderRadius.circular(2)),
+                    color: widget.isDark
+                        ? dsDarkBorderLight
+                        : const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -757,15 +1010,18 @@ class _EditPostModalState extends ConsumerState<_EditPostModal> {
                   Text(
                     'Edit Post',
                     style: GoogleFonts.poppins(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: kPrimary600),
+                      fontSize: context.sp(17),
+                      fontWeight: FontWeight.w700,
+                      color: dsColorIndigo600,
+                    ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
-                    color: kTextSecondary,
+                    color: widget.isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary,
                   ),
                 ],
               ),
@@ -776,13 +1032,15 @@ class _EditPostModalState extends ConsumerState<_EditPostModal> {
                 decoration: InputDecoration(
                   labelText: 'Title *',
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius:
+                          BorderRadius.circular(dsRadiusMd)),
                   contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                      horizontal: dsSpace4, vertical: 14),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Title is required'
-                    : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty)
+                        ? 'Title is required'
+                        : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -792,24 +1050,39 @@ class _EditPostModalState extends ConsumerState<_EditPostModal> {
                 decoration: InputDecoration(
                   labelText: 'Body',
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius:
+                          BorderRadius.circular(dsRadiusMd)),
                   contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                      horizontal: dsSpace4, vertical: 14),
                 ),
               ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
+                height: 52,
                 child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: dsColorIndigo600,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(dsRadiusMd),
+                    ),
+                    elevation: 0,
+                  ),
                   onPressed: _saving ? null : _save,
                   child: _saving
                       ? const SizedBox(
-                          height: 20,
                           width: 20,
+                          height: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white),
                         )
-                      : const Text('Save Changes'),
+                      : Text('Save Changes',
+                          style: GoogleFonts.inter(
+                              fontSize: context.sp(15),
+                              fontWeight: FontWeight.w700)),
                 ),
               ),
             ],
@@ -820,20 +1093,21 @@ class _EditPostModalState extends ConsumerState<_EditPostModal> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Report post modal
-// ---------------------------------------------------------------------------
+// ─── Report Post Modal ────────────────────────────────────────────────────────
 
 class _ReportPostModal extends ConsumerStatefulWidget {
   final String postId;
-  final VoidCallback onReported;
-  const _ReportPostModal({required this.postId, required this.onReported});
+  final bool isDark;
+  const _ReportPostModal(
+      {required this.postId, required this.isDark});
 
   @override
-  ConsumerState<_ReportPostModal> createState() => _ReportPostModalState();
+  ConsumerState<_ReportPostModal> createState() =>
+      _ReportPostModalState();
 }
 
-class _ReportPostModalState extends ConsumerState<_ReportPostModal> {
+class _ReportPostModalState
+    extends ConsumerState<_ReportPostModal> {
   static const _reasons = [
     ('spam', 'Spam'),
     ('offensive', 'Offensive content'),
@@ -862,27 +1136,24 @@ class _ReportPostModalState extends ConsumerState<_ReportPostModal> {
                 ? null
                 : _detailsCtrl.text.trim(),
           );
-      widget.onReported();
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Report submitted',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-            backgroundColor: kSecondary500,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Report submitted',
+              style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w500)),
+          backgroundColor: dsColorEmerald600,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed: $e', style: GoogleFonts.inter()),
-            backgroundColor: kRed600,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text('Failed: $e', style: GoogleFonts.inter()),
+          backgroundColor: dsColorRed600,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -891,15 +1162,20 @@ class _ReportPostModalState extends ConsumerState<_ReportPostModal> {
 
   @override
   Widget build(BuildContext context) {
+    final bg =
+        widget.isDark ? const Color(0xFF1C1C1E) : Colors.white;
+
     return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(dsRadiusXl)),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding:
+            const EdgeInsets.fromLTRB(20, 16, 20, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -909,8 +1185,11 @@ class _ReportPostModalState extends ConsumerState<_ReportPostModal> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                    color: kBorderLight,
-                    borderRadius: BorderRadius.circular(2)),
+                  color: widget.isDark
+                      ? dsDarkBorderLight
+                      : const Color(0xFFE5E7EB),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -919,38 +1198,38 @@ class _ReportPostModalState extends ConsumerState<_ReportPostModal> {
                 Text(
                   'Report Post',
                   style: GoogleFonts.poppins(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: kRed600),
+                    fontSize: context.sp(17),
+                    fontWeight: FontWeight.w700,
+                    color: dsColorRed600,
+                  ),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.close_rounded),
                   onPressed: () => Navigator.pop(context),
-                  color: kTextSecondary,
+                  color: widget.isDark
+                      ? dsDarkTextSecondary
+                      : dsTextSecondary,
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text('Reason',
-                style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: kTextSecondary)),
-            const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _reason,
+              initialValue: _reason,
               decoration: InputDecoration(
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                labelText: 'Reason',
+                border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(dsRadiusMd)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: dsSpace4, vertical: 14),
               ),
               items: _reasons
                   .map((r) => DropdownMenuItem(
                       value: r.$1,
-                      child:
-                          Text(r.$2, style: GoogleFonts.inter(fontSize: 14))))
+                      child: Text(r.$2,
+                          style:
+                              GoogleFonts.inter(fontSize: 14))))
                   .toList(),
               onChanged: (v) {
                 if (v != null) setState(() => _reason = v);
@@ -964,29 +1243,40 @@ class _ReportPostModalState extends ConsumerState<_ReportPostModal> {
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 labelText: 'Additional details (optional)',
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(dsRadiusMd)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: dsSpace4, vertical: 14),
               ),
             ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
+              height: 52,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kRed600,
+                  backgroundColor: dsColorRed600,
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(dsRadiusMd),
+                  ),
+                  elevation: 0,
                 ),
                 onPressed: _submitting ? null : _submit,
                 child: _submitting
                     ? const SizedBox(
-                        height: 20,
                         width: 20,
+                        height: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white),
                       )
-                    : const Text('Submit Report'),
+                    : Text('Submit Report',
+                        style: GoogleFonts.inter(
+                            fontSize: context.sp(15),
+                            fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -996,26 +1286,28 @@ class _ReportPostModalState extends ConsumerState<_ReportPostModal> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Moderation sheet (exec only)
-// ---------------------------------------------------------------------------
+// ─── Moderation Sheet (exec only) ────────────────────────────────────────────
 
 class _ModerationSheet extends ConsumerWidget {
+  final bool isDark;
   final VoidCallback onChanged;
-  const _ModerationSheet({required this.onChanged});
+  const _ModerationSheet(
+      {required this.isDark, required this.onChanged});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final queueAsync = ref.watch(moderationQueueProvider);
+    final bg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.4,
       maxChildSize: 0.92,
       builder: (_, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(dsRadiusXl)),
         ),
         child: Column(
           children: [
@@ -1026,7 +1318,9 @@ class _ModerationSheet extends ConsumerWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: kBorderLight,
+                    color: isDark
+                        ? dsDarkBorderLight
+                        : const Color(0xFFE5E7EB),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1039,16 +1333,18 @@ class _ModerationSheet extends ConsumerWidget {
                   Text(
                     'Moderation Queue',
                     style: GoogleFonts.poppins(
-                      fontSize: 17,
+                      fontSize: context.sp(17),
                       fontWeight: FontWeight.w700,
-                      color: kRed600,
+                      color: dsColorRed600,
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
-                    color: kTextSecondary,
+                    color: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary,
                   ),
                 ],
               ),
@@ -1058,38 +1354,53 @@ class _ModerationSheet extends ConsumerWidget {
               child: Text(
                 'Posts with 3 or more reports',
                 style: GoogleFonts.inter(
-                    fontSize: 13, color: kTextSecondary),
+                  fontSize: context.sp(12),
+                  color: isDark
+                      ? dsDarkTextSecondary
+                      : dsTextSecondary,
+                ),
               ),
             ),
-            const Divider(height: 1),
+            Divider(
+              height: 1,
+              color: isDark
+                  ? dsDarkBorderSubtle
+                  : const Color(0xFFE5E7EB),
+            ),
             Expanded(
               child: queueAsync.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(
+                    child: CircularProgressIndicator()),
                 error: (e, _) => Center(
                   child: Text(e.toString(),
-                      style: GoogleFonts.inter(color: kRed600)),
+                      style: GoogleFonts.inter(
+                          color: dsColorRed600)),
                 ),
                 data: (items) {
                   if (items.isEmpty) {
-                    return const EmptyState(
-                      icon: Icons.check_circle_outline,
+                    return const DsEmptyPlaceholder(
+                      icon: Icons.check_circle_rounded,
                       title: 'No flagged posts',
-                      subtitle:
+                      message:
                           'Posts with 3+ reports will appear here.',
                     );
                   }
                   return ListView.separated(
                     controller: scrollCtrl,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(dsSpace4),
                     itemCount: items.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: 10),
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: dsSpace3),
                     itemBuilder: (context, i) =>
-                        _ModerationCard(item: items[i], onChanged: () {
-                      ref.invalidate(moderationQueueProvider);
-                      onChanged();
-                    }),
+                        _ModerationCard(
+                      item: items[i],
+                      isDark: isDark,
+                      onChanged: () {
+                        ref.invalidate(
+                            moderationQueueProvider);
+                        onChanged();
+                      },
+                    ),
                   );
                 },
               ),
@@ -1103,41 +1414,59 @@ class _ModerationSheet extends ConsumerWidget {
 
 class _ModerationCard extends ConsumerWidget {
   final ReportedPost item;
+  final bool isDark;
   final VoidCallback onChanged;
-  const _ModerationCard({required this.item, required this.onChanged});
+  const _ModerationCard(
+      {required this.item,
+      required this.isDark,
+      required this.onChanged});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return AppCard(
+    final surface = isDark ? dsDarkSurface : dsSurface;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        border: Border.all(
+          color: dsColorRed600.withValues(
+              alpha: isDark ? 0.25 : 0.15),
+        ),
+      ),
+      padding: const EdgeInsets.all(dsSpace4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: dsSpace2, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEE2E2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: dsColorRed600.withValues(
+                      alpha: isDark ? 0.15 : 0.09),
+                  borderRadius: BorderRadius.circular(dsRadiusXs),
                 ),
                 child: Text(
                   '${item.reportCount} report${item.reportCount != 1 ? 's' : ''}',
                   style: GoogleFonts.inter(
-                    fontSize: 11,
+                    fontSize: context.sp(11),
                     fontWeight: FontWeight.w700,
-                    color: kRed600,
+                    color: dsColorRed600,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: dsSpace2),
               Expanded(
                 child: Text(
                   item.post.title,
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    fontSize: context.sp(13),
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: isDark
+                        ? dsDarkTextPrimary
+                        : dsTextPrimary,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -1149,23 +1478,35 @@ class _ModerationCard extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               item.post.body!,
-              style:
-                  GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+              style: GoogleFonts.inter(
+                fontSize: context.sp(12),
+                color: isDark
+                    ? dsDarkTextSecondary
+                    : dsTextSecondary,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: dsSpace3),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: kTextSecondary,
-                    side: const BorderSide(color: kBorderLight),
+                    foregroundColor: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary,
+                    side: BorderSide(
+                      color: isDark
+                          ? dsDarkBorderLight
+                          : const Color(0xFFE5E7EB),
+                    ),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                        borderRadius:
+                            BorderRadius.circular(dsRadiusSm)),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 8),
                   ),
                   onPressed: () async {
                     try {
@@ -1175,10 +1516,11 @@ class _ModerationCard extends ConsumerWidget {
                       onChanged();
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(
                           content: Text('Failed: $e',
                               style: GoogleFonts.inter()),
-                          backgroundColor: kRed600,
+                          backgroundColor: dsColorRed600,
                           behavior: SnackBarBehavior.floating,
                         ));
                       }
@@ -1186,18 +1528,22 @@ class _ModerationCard extends ConsumerWidget {
                   },
                   child: Text('Clear Reports',
                       style: GoogleFonts.inter(
-                          fontSize: 12, fontWeight: FontWeight.w600)),
+                          fontSize: context.sp(12),
+                          fontWeight: FontWeight.w600)),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: dsSpace2),
               Expanded(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kRed600,
+                    backgroundColor: dsColorRed600,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                        borderRadius:
+                            BorderRadius.circular(dsRadiusSm)),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 8),
+                    elevation: 0,
                   ),
                   onPressed: () async {
                     try {
@@ -1207,10 +1553,11 @@ class _ModerationCard extends ConsumerWidget {
                       onChanged();
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(
                           content: Text('Failed: $e',
                               style: GoogleFonts.inter()),
-                          backgroundColor: kRed600,
+                          backgroundColor: dsColorRed600,
                           behavior: SnackBarBehavior.floating,
                         ));
                       }
@@ -1218,7 +1565,8 @@ class _ModerationCard extends ConsumerWidget {
                   },
                   child: Text('Remove Post',
                       style: GoogleFonts.inter(
-                          fontSize: 12, fontWeight: FontWeight.w600)),
+                          fontSize: context.sp(12),
+                          fontWeight: FontWeight.w600)),
                 ),
               ),
             ],

@@ -4,107 +4,155 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
-import '../../../../shared/widgets/status_badge.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/vendor_repository.dart';
 
-class VendorsScreen extends ConsumerStatefulWidget {
+class VendorsScreen extends ConsumerWidget {
   const VendorsScreen({super.key});
 
-  @override
-  ConsumerState<VendorsScreen> createState() => _VendorsScreenState();
-}
-
-class _VendorsScreenState extends ConsumerState<VendorsScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
   static Future<void> _openPortal(String path) async {
-    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    final uri =
+        Uri.parse('https://portal.utamacs.org/portal/$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('Vendors'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          if (isExec)
-            IconButton(
-              icon: const Icon(Icons.shopping_cart_outlined),
-              tooltip: 'Procurement',
-              onPressed: () => _openPortal('vendors?tab=procurement'),
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: isDark ? dsDarkBackground : dsBackground,
+        body: NestedScrollView(
+          headerSliverBuilder: (context, _) => [
+            SliverAppBar(
+              pinned: true,
+              floating: false,
+              backgroundColor: surface,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: isDark ? 0.5 : 1,
+              shadowColor: borderColor,
+              automaticallyImplyLeading: false,
+              titleSpacing: dsSpace4,
+              title: Text(
+                'Vendors',
+                style: GoogleFonts.poppins(
+                  fontSize: context.sp(17),
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                  height: 1,
+                ),
+              ),
+              actions: [
+                if (isExec)
+                  DsActionButton(
+                    icon: Icons.shopping_cart_outlined,
+                    onTap: () =>
+                        _openPortal('vendors?tab=procurement'),
+                  ),
+                DsActionButton(
+                  icon: Icons.refresh_rounded,
+                  onTap: () {
+                    ref.invalidate(vendorsProvider);
+                    ref.invalidate(workOrdersProvider);
+                  },
+                ),
+                const SizedBox(width: dsSpace2),
+              ],
+              bottom: TabBar(
+                labelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: context.sp(13)),
+                unselectedLabelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w400,
+                    fontSize: context.sp(13)),
+                labelColor: dsColorIndigo600,
+                unselectedLabelColor:
+                    isDark ? dsDarkTextSecondary : dsTextSecondary,
+                indicatorColor: dsColorIndigo600,
+                indicatorWeight: 2.5,
+                dividerColor: borderColor,
+                tabs: const [
+                  Tab(text: 'Vendors'),
+                  Tab(text: 'Work Orders'),
+                ],
+              ),
             ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(vendorsProvider);
-              ref.invalidate(workOrdersProvider);
+          ],
+          body: Builder(
+            builder: (context) {
+              final tabCtrl = DefaultTabController.of(context);
+              return Stack(
+                children: [
+                  TabBarView(
+                    children: [
+                      _VendorsTab(isExec: isExec),
+                      _WorkOrdersTab(isExec: isExec),
+                    ],
+                  ),
+                  if (isExec)
+                    Positioned(
+                      bottom: 80 +
+                          MediaQuery.paddingOf(context).bottom,
+                      right: dsSpace4,
+                      child: AnimatedBuilder(
+                        animation: tabCtrl,
+                        builder: (_, _) => AnimatedScale(
+                          scale: tabCtrl.index == 1 ? 1.0 : 0.0,
+                          duration: dsDurationFast,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              boxShadow: dsShadowBrand,
+                              borderRadius: BorderRadius.circular(
+                                  dsRadiusFull),
+                            ),
+                            child: FloatingActionButton.extended(
+                              elevation: 0,
+                              highlightElevation: 0,
+                              backgroundColor: dsColorIndigo600,
+                              icon: const Icon(Icons.add_rounded,
+                                  color: Colors.white),
+                              label: Text(
+                                'New Work Order',
+                                style: GoogleFonts.inter(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: context.sp(13),
+                                ),
+                              ),
+                              onPressed: () =>
+                                  _showCreateWorkOrderSheet(
+                                      context, ref),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
             },
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: kPrimary600,
-          unselectedLabelColor: kTextSecondary,
-          indicatorColor: kPrimary600,
-          labelStyle:
-              GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
-          tabs: const [
-            Tab(text: 'Vendors'),
-            Tab(text: 'Work Orders'),
-          ],
         ),
-      ),
-      floatingActionButton: isExec &&
-              _tabController.index == 1
-          ? FloatingActionButton.extended(
-              onPressed: () => _showCreateWorkOrderSheet(context),
-              backgroundColor: kPrimary600,
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: Text(
-                'New Work Order',
-                style: GoogleFonts.inter(
-                    color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-            )
-          : null,
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _VendorsTab(isExec: isExec),
-          _WorkOrdersTab(isExec: isExec),
-        ],
       ),
     );
   }
 
-  void _showCreateWorkOrderSheet(BuildContext context) {
+  void _showCreateWorkOrderSheet(
+      BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -116,9 +164,7 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen>
   }
 }
 
-// ---------------------------------------------------------------------------
-// Vendors Tab
-// ---------------------------------------------------------------------------
+// ─── Vendors Tab ─────────────────────────────────────────────────────────────
 
 class _VendorsTab extends ConsumerWidget {
   final bool isExec;
@@ -126,25 +172,32 @@ class _VendorsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final vendorsAsync = ref.watch(vendorsProvider);
 
     return vendorsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
-        title: 'Could not load vendors',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(vendorsProvider),
-          child: const Text('Retry'),
-        ),
+      error: (e, _) => ListView(
+        children: [
+          DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load vendors',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () => ref.invalidate(vendorsProvider),
+          ),
+        ],
       ),
       data: (vendors) {
         if (vendors.isEmpty) {
-          return const EmptyState(
-            icon: Icons.handyman,
-            title: 'No vendors registered',
-            subtitle: 'Approved vendor details will appear here.',
+          return ListView(
+            children: const [
+              DsEmptyPlaceholder(
+                icon: Icons.handyman_outlined,
+                title: 'No vendors registered',
+                message: 'Approved vendor details will appear here.',
+              ),
+            ],
           );
         }
 
@@ -152,34 +205,43 @@ class _VendorsTab extends ConsumerWidget {
         for (final v in vendors) {
           grouped.putIfAbsent(v.category, () => []).add(v);
         }
-
         final categories = grouped.keys.toList()..sort();
 
-        final items = <_ListItem>[];
-        for (final cat in categories) {
-          items.add(_ListItem.header(cat));
-          for (final v in grouped[cat]!) {
-            items.add(_ListItem.vendor(v));
-          }
-        }
+        final bottomPad =
+            80 + MediaQuery.paddingOf(context).bottom;
 
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(vendorsProvider),
           child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: items.length,
+            padding: EdgeInsets.fromLTRB(dsSpace4, dsSpace4,
+                dsSpace4, bottomPad.toDouble()),
+            itemCount: categories.fold<int>(
+              0,
+              (sum, cat) => sum + 1 + grouped[cat]!.length,
+            ),
             itemBuilder: (context, index) {
-              final item = items[index];
-              if (item.isHeader) {
-                return _CategoryHeader(category: item.header!);
+              int cursor = 0;
+              for (final cat in categories) {
+                if (index == cursor) {
+                  return _CategoryHeader(
+                      category: cat, isDark: isDark);
+                }
+                cursor++;
+                final list = grouped[cat]!;
+                if (index < cursor + list.length) {
+                  return Padding(
+                    padding:
+                        const EdgeInsets.only(bottom: dsSpace2),
+                    child: _VendorCard(
+                      vendor: list[index - cursor],
+                      isExec: isExec,
+                      isDark: isDark,
+                    ),
+                  );
+                }
+                cursor += list.length;
               }
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _VendorCard(
-                  vendor: item.vendor!,
-                  isExec: isExec,
-                ),
-              );
+              return const SizedBox.shrink();
             },
           ),
         );
@@ -188,30 +250,22 @@ class _VendorsTab extends ConsumerWidget {
   }
 }
 
-class _ListItem {
-  final String? header;
-  final Vendor? vendor;
-
-  const _ListItem.header(this.header) : vendor = null;
-  const _ListItem.vendor(this.vendor) : header = null;
-
-  bool get isHeader => header != null;
-}
-
 class _CategoryHeader extends StatelessWidget {
   final String category;
-  const _CategoryHeader({required this.category});
+  final bool isDark;
+  const _CategoryHeader(
+      {required this.category, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      padding: const EdgeInsets.only(top: dsSpace4, bottom: dsSpace2),
       child: Text(
         category.replaceAll('_', ' ').toUpperCase(),
         style: GoogleFonts.inter(
-          fontSize: 11,
+          fontSize: context.sp(10),
           fontWeight: FontWeight.w700,
-          color: kTextSecondary,
+          color: isDark ? dsDarkTextSecondary : dsTextSecondary,
           letterSpacing: 1.0,
         ),
       ),
@@ -222,108 +276,160 @@ class _CategoryHeader extends StatelessWidget {
 class _VendorCard extends StatelessWidget {
   final Vendor vendor;
   final bool isExec;
-  const _VendorCard({required this.vendor, required this.isExec});
+  final bool isDark;
+
+  const _VendorCard({
+    required this.vendor,
+    required this.isExec,
+    required this.isDark,
+  });
 
   static IconData _iconForCategory(String category) {
     return switch (category.toLowerCase()) {
-      'construction' || 'civil' => Icons.construction,
-      'cleaning' || 'housekeeping' => Icons.cleaning_services,
-      'security' => Icons.security,
-      'plumbing' => Icons.plumbing,
-      'electrical' => Icons.electric_bolt,
+      'construction' || 'civil' => Icons.construction_outlined,
+      'cleaning' || 'housekeeping' => Icons.cleaning_services_outlined,
+      'security' => Icons.security_outlined,
+      'plumbing' => Icons.plumbing_outlined,
+      'electrical' => Icons.electric_bolt_outlined,
       'lift' => Icons.elevator_outlined,
-      'pest_control' => Icons.pest_control,
-      'landscaping' => Icons.grass,
+      'pest_control' => Icons.pest_control_outlined,
+      'landscaping' => Icons.grass_outlined,
       'it' => Icons.computer_outlined,
       'cctv' => Icons.videocam_outlined,
-      _ => Icons.handyman,
+      _ => Icons.handyman_outlined,
     };
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor = isDark ? dsDarkBorderSubtle : dsBorderSubtle;
+
+    return DSScalePress(
       onTap: () => _showDetail(context),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: kPrimary50,
-              borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(dsSpace4),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border: isDark ? Border.all(color: borderColor) : null,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: context.si(44),
+              height: context.si(44),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? dsColorIndigo600.withValues(alpha: 0.2)
+                    : dsColorIndigo50,
+                borderRadius: BorderRadius.circular(dsRadiusMd),
+              ),
+              child: Icon(
+                _iconForCategory(vendor.category),
+                color: isDark
+                    ? dsColorIndigo300
+                    : dsColorIndigo600,
+                size: context.si(20),
+              ),
             ),
-            child: Icon(_iconForCategory(vendor.category),
-                color: kPrimary600, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  vendor.name,
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: kSectionAlt,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: kBorderLight),
-                  ),
-                  child: Text(
-                    vendor.category.replaceAll('_', ' '),
+            const SizedBox(width: dsSpace3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    vendor.name,
                     style: GoogleFonts.inter(
-                      fontSize: 10,
+                      fontSize: context.sp(14),
                       fontWeight: FontWeight.w600,
-                      color: kTextSecondary,
-                      letterSpacing: 0.4,
+                      color: isDark
+                          ? dsDarkTextPrimary
+                          : dsTextPrimary,
                     ),
                   ),
-                ),
-                if (vendor.contactPerson != null) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.person_outline,
-                          size: 13, color: kTextSecondary),
-                      const SizedBox(width: 4),
-                      Text(
-                        vendor.contactPerson!,
-                        style: GoogleFonts.inter(
-                            fontSize: 12, color: kTextSecondary),
+                  const SizedBox(height: dsSpace1),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: dsSpace2, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? dsDarkSurfaceMuted
+                          : dsSurfaceMuted,
+                      borderRadius:
+                          BorderRadius.circular(dsRadiusXs),
+                      border: Border.all(
+                          color: isDark
+                              ? dsDarkBorderLight
+                              : dsBorderLight),
+                    ),
+                    child: Text(
+                      vendor.category.replaceAll('_', ' '),
+                      style: GoogleFonts.inter(
+                        fontSize: context.sp(10),
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? dsDarkTextSecondary
+                            : dsTextSecondary,
+                        letterSpacing: 0.4,
                       ),
-                    ],
+                    ),
                   ),
+                  if (vendor.contactPerson != null) ...[
+                    const SizedBox(height: dsSpace1 + 2),
+                    Row(
+                      children: [
+                        Icon(Icons.person_outline_rounded,
+                            size: context.si(12),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          vendor.contactPerson!,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(12),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (vendor.phone != null) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.phone_outlined,
+                            size: context.si(12),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          vendor.phone!,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(12),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
-                if (vendor.phone != null) ...[
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.phone_outlined,
-                          size: 13, color: kTextSecondary),
-                      const SizedBox(width: 4),
-                      Text(
-                        vendor.phone!,
-                        style: GoogleFonts.inter(
-                            fontSize: 12, color: kTextSecondary),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: kTextSecondary, size: 18),
-        ],
+            Icon(Icons.chevron_right_rounded,
+                color:
+                    isDark ? dsDarkTextSecondary : dsTextSecondary,
+                size: context.si(18)),
+          ],
+        ),
       ),
     );
   }
@@ -333,14 +439,13 @@ class _VendorCard extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _VendorDetailSheet(vendor: vendor, isExec: isExec),
+      builder: (_) =>
+          _VendorDetailSheet(vendor: vendor, isExec: isExec),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Work Orders Tab
-// ---------------------------------------------------------------------------
+// ─── Work Orders Tab ─────────────────────────────────────────────────────────
 
 class _WorkOrdersTab extends ConsumerWidget {
   final bool isExec;
@@ -348,26 +453,34 @@ class _WorkOrdersTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final workOrdersAsync = ref.watch(workOrdersProvider);
     final vendorsAsync = ref.watch(vendorsProvider);
 
     return workOrdersAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
-        title: 'Could not load work orders',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(workOrdersProvider),
-          child: const Text('Retry'),
-        ),
+      error: (e, _) => ListView(
+        children: [
+          DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load work orders',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () => ref.invalidate(workOrdersProvider),
+          ),
+        ],
       ),
       data: (workOrders) {
         if (workOrders.isEmpty) {
-          return const EmptyState(
-            icon: Icons.work_outline,
-            title: 'No active work orders',
-            subtitle: 'Work orders raised with vendors will appear here.',
+          return ListView(
+            children: const [
+              DsEmptyPlaceholder(
+                icon: Icons.work_outline_rounded,
+                title: 'No active work orders',
+                message:
+                    'Work orders raised with vendors will appear here.',
+              ),
+            ],
           );
         }
 
@@ -378,17 +491,24 @@ class _WorkOrdersTab extends ConsumerWidget {
           }
         });
 
+        final bottomPad =
+            100 + MediaQuery.paddingOf(context).bottom;
+
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(workOrdersProvider),
           child: ListView.separated(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(dsSpace4, dsSpace4,
+                dsSpace4, bottomPad.toDouble()),
             itemCount: workOrders.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (_, _) =>
+                const SizedBox(height: dsSpace2),
             itemBuilder: (context, i) => _WorkOrderCard(
               workOrder: workOrders[i],
               vendorName: vendorNames[workOrders[i].vendorId],
               isExec: isExec,
-              onStatusChanged: () => ref.invalidate(workOrdersProvider),
+              isDark: isDark,
+              onStatusChanged: () =>
+                  ref.invalidate(workOrdersProvider),
             ),
           ),
         );
@@ -401,33 +521,46 @@ class _WorkOrderCard extends ConsumerStatefulWidget {
   final WorkOrder workOrder;
   final String? vendorName;
   final bool isExec;
+  final bool isDark;
   final VoidCallback onStatusChanged;
 
   const _WorkOrderCard({
     required this.workOrder,
     this.vendorName,
     required this.isExec,
+    required this.isDark,
     required this.onStatusChanged,
   });
 
   @override
-  ConsumerState<_WorkOrderCard> createState() => _WorkOrderCardState();
+  ConsumerState<_WorkOrderCard> createState() =>
+      _WorkOrderCardState();
 }
 
 class _WorkOrderCardState extends ConsumerState<_WorkOrderCard> {
   bool _updating = false;
 
   static Future<void> _openPortal(String path) async {
-    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    final uri =
+        Uri.parse('https://portal.utamacs.org/portal/$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   static String _formatAmount(double amount) {
-    final formatter = NumberFormat('#,##,###', 'en_IN');
-    return '₹${formatter.format(amount)}';
+    final fmt = NumberFormat('#,##,###', 'en_IN');
+    return '₹${fmt.format(amount)}';
   }
+
+  Color _statusStripColor() => switch (widget.workOrder.status) {
+        'issued' => dsColorIndigo500,
+        'in_progress' => dsColorAmber500,
+        'completed' => dsColorEmerald500,
+        'disputed' => dsColorRed500,
+        'closed' => dsColorSlate400,
+        _ => dsBorderLight,
+      };
 
   List<(String label, String newStatus)> get _transitions {
     return switch (widget.workOrder.status) {
@@ -462,292 +595,443 @@ class _WorkOrderCardState extends ConsumerState<_WorkOrderCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor = isDark ? dsDarkBorderSubtle : dsBorderSubtle;
+    final dividerColor = isDark ? dsDarkBorderLight : dsBorderLight;
     final displayAmount =
         widget.workOrder.finalAmount ?? widget.workOrder.quotedAmount;
-    final transitions = widget.isExec ? _transitions : <(String, String)>[];
+    final transitions =
+        widget.isExec ? _transitions : <(String, String)>[];
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return DSFadeSlide(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Container(
+                  width: 4, color: _statusStripColor()),
               Expanded(
-                child: Text(
-                  widget.workOrder.title,
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              StatusBadge.forStatus(widget.workOrder.status),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.store_outlined,
-                  size: 13, color: kTextSecondary),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  widget.vendorName ?? widget.workOrder.vendorId,
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: kTextSecondary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          // TDS flag + linked item badges
-          if (widget.workOrder.tdsFlag ||
-              widget.workOrder.complaintId != null ||
-              widget.workOrder.snagId != null) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                if (widget.workOrder.tdsFlag)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.all(dsSpace4),
+                  decoration: BoxDecoration(
+                    color: surface,
+                    boxShadow: isDark ? [] : dsShadowSm,
+                    border: isDark
+                        ? Border.all(color: borderColor)
+                        : null,
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(dsRadiusCard),
+                      bottomRight: Radius.circular(dsRadiusCard),
                     ),
-                    child: Text(
-                      'TDS may apply',
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: kAccent500,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.workOrder.title,
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(14),
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? dsDarkTextPrimary
+                                    : dsTextPrimary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: dsSpace2),
+                          _WoStatusChip(
+                              status: widget.workOrder.status),
+                        ],
                       ),
-                    ),
-                  ),
-                if (widget.workOrder.complaintId != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.report_outlined,
-                            size: 11, color: kRed600),
-                        const SizedBox(width: 3),
-                        Text(
-                          'Linked Complaint',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: kRed600,
+                      const SizedBox(height: dsSpace2),
+                      Row(
+                        children: [
+                          Icon(Icons.store_outlined,
+                              size: context.si(12),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              widget.vendorName ??
+                                  widget.workOrder.vendorId,
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(12),
+                                color: isDark
+                                    ? dsDarkTextSecondary
+                                    : dsTextSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (widget.workOrder.tdsFlag ||
+                          widget.workOrder.complaintId != null ||
+                          widget.workOrder.snagId != null) ...[
+                        const SizedBox(height: dsSpace2),
+                        Wrap(
+                          spacing: dsSpace1 + 2,
+                          runSpacing: 4,
+                          children: [
+                            if (widget.workOrder.tdsFlag)
+                              _MicroBadge(
+                                label: 'TDS may apply',
+                                bg: isDark
+                                    ? dsColorAmber700.withValues(alpha: 0.25)
+                                    : dsColorAmber50,
+                                fg: isDark
+                                    ? dsColorAmber300
+                                    : dsColorAmber700,
+                              ),
+                            if (widget.workOrder.complaintId !=
+                                null)
+                              _MicroBadge(
+                                icon: Icons.report_outlined,
+                                label: 'Linked Complaint',
+                                bg: isDark
+                                    ? dsColorRed700.withValues(alpha: 0.25)
+                                    : dsColorRed50,
+                                fg: isDark
+                                    ? dsColorRed100
+                                    : dsColorRed600,
+                              ),
+                            if (widget.workOrder.snagId != null)
+                              _MicroBadge(
+                                icon: Icons.bug_report_outlined,
+                                label: 'Linked Snag',
+                                bg: isDark
+                                    ? dsColorIndigo600.withValues(alpha: 0.2)
+                                    : dsColorIndigo50,
+                                fg: isDark
+                                    ? dsColorIndigo300
+                                    : dsColorIndigo600,
+                              ),
+                          ],
+                        ),
+                      ],
+                      if (displayAmount != null ||
+                          widget.workOrder.deadline != null) ...[
+                        const SizedBox(height: dsSpace2),
+                        Divider(
+                            height: 1, color: dividerColor),
+                        const SizedBox(height: dsSpace2),
+                        Row(
+                          children: [
+                            if (displayAmount != null) ...[
+                              Icon(Icons.currency_rupee_rounded,
+                                  size: context.si(12),
+                                  color: dsColorEmerald600),
+                              const SizedBox(width: 2),
+                              Text(
+                                _formatAmount(displayAmount),
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(12),
+                                  fontWeight: FontWeight.w600,
+                                  color: dsColorEmerald600,
+                                ),
+                              ),
+                            ],
+                            if (displayAmount != null &&
+                                widget.workOrder.deadline !=
+                                    null)
+                              const SizedBox(width: dsSpace4),
+                            if (widget.workOrder.deadline !=
+                                null) ...[
+                              Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: context.si(12),
+                                  color: isDark
+                                      ? dsDarkTextSecondary
+                                      : dsTextSecondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Due ${DateFormat('d MMM y').format(widget.workOrder.deadline!)}',
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(11),
+                                  color: isDark
+                                      ? dsDarkTextSecondary
+                                      : dsTextSecondary,
+                                ),
+                              ),
+                            ],
+                            const Spacer(),
+                            Text(
+                              timeago.format(
+                                  widget.workOrder.createdAt),
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(10),
+                                color: isDark
+                                    ? dsDarkTextSecondary
+                                    : dsTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (transitions.isNotEmpty) ...[
+                        const SizedBox(height: dsSpace2),
+                        Divider(height: 1, color: dividerColor),
+                        const SizedBox(height: dsSpace2),
+                        if (_updating)
+                          const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2),
+                            ),
+                          )
+                        else
+                          Wrap(
+                            spacing: dsSpace2,
+                            children: transitions.map((t) {
+                              final isDestructive =
+                                  t.$2 == 'disputed';
+                              return OutlinedButton(
+                                onPressed: () =>
+                                    _updateStatus(t.$2),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: isDestructive
+                                      ? dsColorRed600
+                                      : dsColorIndigo600,
+                                  side: BorderSide(
+                                    color: isDestructive
+                                        ? dsColorRed600
+                                        : dsColorIndigo600,
+                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize
+                                      .shrinkWrap,
+                                  textStyle: GoogleFonts.inter(
+                                    fontSize: context.sp(12),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                child: Text(t.$1),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                      if (widget.isExec &&
+                          ['in_progress', 'completed'].contains(
+                              widget.workOrder.status)) ...[
+                        const SizedBox(height: dsSpace2),
+                        Divider(height: 1, color: dividerColor),
+                        const SizedBox(height: dsSpace2),
+                        OutlinedButton.icon(
+                          onPressed: () => _openPortal(
+                              'vendors/work-orders/${widget.workOrder.id}?action=upload-invoice'),
+                          icon: Icon(
+                              Icons.upload_file_outlined,
+                              size: context.si(15)),
+                          label: const Text('Upload Invoice'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: dsColorIndigo600,
+                            side: const BorderSide(
+                                color: dsColorIndigo600),
+                            padding:
+                                const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize
+                                .shrinkWrap,
+                            textStyle: GoogleFonts.inter(
+                              fontSize: context.sp(12),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                if (widget.workOrder.snagId != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: kPrimary50,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.bug_report_outlined,
-                            size: 11, color: kPrimary600),
-                        const SizedBox(width: 3),
-                        Text(
-                          'Linked Snag',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: kPrimary600,
+                      if (['completed', 'closed'].contains(
+                          widget.workOrder.status)) ...[
+                        const SizedBox(height: dsSpace2),
+                        Divider(height: 1, color: dividerColor),
+                        const SizedBox(height: dsSpace2),
+                        if (widget.workOrder.vendorRating != null)
+                          Row(
+                            children: [
+                              ...List.generate(
+                                5,
+                                (i) => Icon(
+                                  i < widget.workOrder.vendorRating!
+                                      ? Icons.star_rounded
+                                      : Icons.star_outline_rounded,
+                                  size: context.si(15),
+                                  color: dsColorAmber500,
+                                ),
+                              ),
+                              const SizedBox(width: dsSpace2),
+                              Expanded(
+                                child: Text(
+                                  widget.workOrder.vendorReview ??
+                                      'Rated ${widget.workOrder.vendorRating}/5',
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(11),
+                                    color: isDark
+                                        ? dsDarkTextSecondary
+                                        : dsTextSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          )
+                        else if (widget.isExec)
+                          TextButton.icon(
+                            onPressed: () => showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) => _RateVendorSheet(
+                                workOrder: widget.workOrder,
+                                onRated: widget.onStatusChanged,
+                              ),
+                            ),
+                            icon: Icon(
+                                Icons.star_outline_rounded,
+                                size: context.si(14)),
+                            label: const Text('Rate Vendor'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: dsColorAmber600,
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize
+                                  .shrinkWrap,
+                              textStyle: GoogleFonts.inter(
+                                fontSize: context.sp(12),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
                       ],
-                    ),
-                  ),
-              ],
-            ),
-          ],
-          if (displayAmount != null || widget.workOrder.deadline != null) ...[
-            const SizedBox(height: 8),
-            const Divider(height: 1, color: kBorderLight),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (displayAmount != null) ...[
-                  const Icon(Icons.currency_rupee,
-                      size: 13, color: kSecondary500),
-                  const SizedBox(width: 2),
-                  Text(
-                    _formatAmount(displayAmount),
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: kSecondary500,
-                    ),
-                  ),
-                ],
-                if (displayAmount != null && widget.workOrder.deadline != null)
-                  const SizedBox(width: 16),
-                if (widget.workOrder.deadline != null) ...[
-                  const Icon(Icons.calendar_today_outlined,
-                      size: 13, color: kTextSecondary),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Due ${DateFormat('d MMM y').format(widget.workOrder.deadline!)}',
-                    style: GoogleFonts.inter(
-                        fontSize: 12, color: kTextSecondary),
-                  ),
-                ],
-                const Spacer(),
-                Text(
-                  timeago.format(widget.workOrder.createdAt),
-                  style: GoogleFonts.inter(
-                      fontSize: 11, color: kTextSecondary),
-                ),
-              ],
-            ),
-          ],
-          if (transitions.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 1, color: kBorderLight),
-            const SizedBox(height: 8),
-            if (_updating)
-              const Center(
-                  child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2)))
-            else
-              Wrap(
-                spacing: 8,
-                children: transitions.map((t) {
-                  final isDestructive = t.$2 == 'disputed';
-                  return OutlinedButton(
-                    onPressed: () => _updateStatus(t.$2),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor:
-                          isDestructive ? kRed600 : kPrimary600,
-                      side: BorderSide(
-                          color: isDestructive ? kRed600 : kPrimary600),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      textStyle: GoogleFonts.inter(
-                          fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                    child: Text(t.$1),
-                  );
-                }).toList(),
-              ),
-          ],
-          // Invoice upload — exec, for in_progress or completed WOs
-          if (widget.isExec &&
-              ['in_progress', 'completed']
-                  .contains(widget.workOrder.status)) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 1, color: kBorderLight),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => _openPortal(
-                  'vendors/work-orders/${widget.workOrder.id}?action=upload-invoice'),
-              icon: const Icon(Icons.upload_file_outlined, size: 16),
-              label: const Text('Upload Invoice'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: kPrimary600,
-                side: const BorderSide(color: kPrimary600),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                textStyle: GoogleFonts.inter(
-                    fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-          // Vendor rating section — show on completed/closed WOs
-          if (['completed', 'closed'].contains(widget.workOrder.status)) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 1, color: kBorderLight),
-            const SizedBox(height: 8),
-            if (widget.workOrder.vendorRating != null)
-              Row(
-                children: [
-                  ...List.generate(5, (i) => Icon(
-                    i < widget.workOrder.vendorRating!
-                        ? Icons.star_rounded
-                        : Icons.star_outline_rounded,
-                    size: 16,
-                    color: kAccent500,
-                  )),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.workOrder.vendorReview ?? 'Rated ${widget.workOrder.vendorRating}/5',
-                    style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              )
-            else if (widget.isExec)
-              TextButton.icon(
-                onPressed: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => _RateVendorSheet(
-                    workOrder: widget.workOrder,
-                    onRated: widget.onStatusChanged,
+                    ],
                   ),
                 ),
-                icon: const Icon(Icons.star_outline_rounded, size: 15),
-                label: const Text('Rate Vendor'),
-                style: TextButton.styleFrom(
-                  foregroundColor: kAccent500,
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── WO Status Chip ──────────────────────────────────────────────────────────
+
+class _WoStatusChip extends StatelessWidget {
+  final String status;
+  const _WoStatusChip({required this.status});
+
+  (Color bg, Color fg, String label) _style() =>
+      switch (status) {
+        'issued' => (dsColorIndigo50, dsColorIndigo600, 'Issued'),
+        'in_progress' => (dsColorAmber50, dsColorAmber700, 'In Progress'),
+        'completed' => (dsColorEmerald50, dsColorEmerald700, 'Completed'),
+        'disputed' => (dsColorRed50, dsColorRed600, 'Disputed'),
+        'closed' => (dsColorSlate100, dsColorSlate600, 'Closed'),
+        _ => (dsColorSlate100, dsColorSlate600, status),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg, label) = _style();
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(dsRadiusFull),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: context.sp(10),
+          fontWeight: FontWeight.w700,
+          color: fg,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Micro Badge ─────────────────────────────────────────────────────────────
+
+class _MicroBadge extends StatelessWidget {
+  final IconData? icon;
+  final String label;
+  final Color bg;
+  final Color fg;
+
+  const _MicroBadge({
+    required this.label,
+    required this.bg,
+    required this.fg,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(dsRadiusXs),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon!, size: context.si(10), color: fg),
+            const SizedBox(width: 3),
           ],
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: context.sp(10),
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Rate vendor bottom sheet
-// ---------------------------------------------------------------------------
+// ─── Rate Vendor Sheet ────────────────────────────────────────────────────────
 
 class _RateVendorSheet extends ConsumerStatefulWidget {
   final WorkOrder workOrder;
   final VoidCallback onRated;
-  const _RateVendorSheet({required this.workOrder, required this.onRated});
+  const _RateVendorSheet(
+      {required this.workOrder, required this.onRated});
 
   @override
-  ConsumerState<_RateVendorSheet> createState() => _RateVendorSheetState();
+  ConsumerState<_RateVendorSheet> createState() =>
+      _RateVendorSheetState();
 }
 
-class _RateVendorSheetState extends ConsumerState<_RateVendorSheet> {
+class _RateVendorSheetState
+    extends ConsumerState<_RateVendorSheet> {
   int _rating = 0;
   final _reviewCtrl = TextEditingController();
   bool _submitting = false;
@@ -761,7 +1045,8 @@ class _RateVendorSheetState extends ConsumerState<_RateVendorSheet> {
   Future<void> _submit() async {
     if (_rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a star rating')),
+        const SnackBar(
+            content: Text('Please select a star rating')),
       );
       return;
     }
@@ -770,7 +1055,9 @@ class _RateVendorSheetState extends ConsumerState<_RateVendorSheet> {
       await ref.read(vendorRepositoryProvider).submitVendorRating(
             workOrderId: widget.workOrder.id,
             rating: _rating,
-            review: _reviewCtrl.text.trim().isEmpty ? null : _reviewCtrl.text.trim(),
+            review: _reviewCtrl.text.trim().isEmpty
+                ? null
+                : _reviewCtrl.text.trim(),
           );
       widget.onRated();
       if (mounted) Navigator.pop(context);
@@ -787,14 +1074,23 @@ class _RateVendorSheetState extends ConsumerState<_RateVendorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor =
+        isDark ? dsDarkBorderLight : dsBorderLight;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(dsRadiusXxl)),
       ),
       padding: EdgeInsets.only(
-        left: 24, right: 24, top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        left: dsSpace5,
+        right: dsSpace5,
+        top: dsSpace4,
+        bottom: MediaQuery.of(context).viewInsets.bottom +
+            dsSpace6,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -802,60 +1098,125 @@ class _RateVendorSheetState extends ConsumerState<_RateVendorSheet> {
         children: [
           Center(
             child: Container(
-              width: 36, height: 4,
+              width: 36,
+              height: 4,
               decoration: BoxDecoration(
-                color: kBorderLight,
-                borderRadius: BorderRadius.circular(2),
+                color: borderColor,
+                borderRadius:
+                    BorderRadius.circular(dsRadiusFull),
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Text('Rate Vendor', style: GoogleFonts.poppins(
-            fontSize: 17, fontWeight: FontWeight.w700, color: kPrimary600)),
+          const SizedBox(height: dsSpace4),
+          Text(
+            'Rate Vendor',
+            style: GoogleFonts.poppins(
+              fontSize: context.sp(17),
+              fontWeight: FontWeight.w700,
+              color: dsColorIndigo600,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(widget.workOrder.title, style: GoogleFonts.inter(
-            fontSize: 13, color: kTextSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 20),
+          Text(
+            widget.workOrder.title,
+            style: GoogleFonts.inter(
+              fontSize: context.sp(13),
+              color: isDark
+                  ? dsDarkTextSecondary
+                  : dsTextSecondary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: dsSpace5),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(5, (i) => GestureDetector(
-              onTap: () => setState(() => _rating = i + 1),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Icon(
-                  i < _rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                  size: 40,
-                  color: kAccent500,
+            children: List.generate(
+              5,
+              (i) => GestureDetector(
+                onTap: () => setState(() => _rating = i + 1),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6),
+                  child: Icon(
+                    i < _rating
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    size: context.si(36),
+                    color: dsColorAmber500,
+                  ),
                 ),
               ),
-            )),
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: dsSpace5),
           TextField(
             controller: _reviewCtrl,
             maxLines: 3,
             maxLength: 500,
             textCapitalization: TextCapitalization.sentences,
+            style: GoogleFonts.inter(
+              fontSize: context.sp(14),
+              color:
+                  isDark ? dsDarkTextPrimary : dsTextPrimary,
+            ),
             decoration: InputDecoration(
               hintText: 'Write a review (optional)…',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              hintStyle: GoogleFonts.inter(
+                fontSize: context.sp(13),
+                color: isDark
+                    ? dsDarkTextSecondary
+                    : dsTextSecondary,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius:
+                    BorderRadius.circular(dsRadiusInput),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius:
+                    BorderRadius.circular(dsRadiusInput),
+                borderSide: const BorderSide(
+                    color: dsColorIndigo600, width: 1.5),
+              ),
+              filled: isDark,
+              fillColor: isDark
+                  ? dsDarkSurfaceMuted
+                  : Colors.transparent,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: dsSpace3, vertical: dsSpace3),
             ),
-            style: GoogleFonts.inter(fontSize: 14),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: dsSpace4),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: FilledButton(
               onPressed: _submitting ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              style: FilledButton.styleFrom(
+                backgroundColor: dsColorIndigo600,
+                padding: const EdgeInsets.symmetric(
+                    vertical: dsSpace4),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(dsRadiusButton),
+                ),
               ),
               child: _submitting
-                  ? const SizedBox(width: 20, height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Submit Rating'),
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white),
+                    )
+                  : Text(
+                      'Submit Rating',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        fontSize: context.sp(14),
+                      ),
+                    ),
             ),
           ),
         ],
@@ -864,35 +1225,50 @@ class _RateVendorSheetState extends ConsumerState<_RateVendorSheet> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Vendor detail bottom sheet
-// ---------------------------------------------------------------------------
+// ─── Vendor Detail Sheet ──────────────────────────────────────────────────────
 
-class _VendorDetailSheet extends StatelessWidget {
+class _VendorDetailSheet extends ConsumerWidget {
   final Vendor vendor;
   final bool isExec;
-  const _VendorDetailSheet({required this.vendor, required this.isExec});
+  const _VendorDetailSheet(
+      {required this.vendor, required this.isExec});
 
-  Widget _row(BuildContext context, IconData icon, String label, String value) {
+  Widget _row(BuildContext context, bool isDark, IconData icon,
+      String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: dsSpace2 + 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 15, color: kTextSecondary),
-          const SizedBox(width: 10),
+          Icon(icon,
+              size: context.si(14),
+              color: isDark
+                  ? dsDarkTextSecondary
+                  : dsTextSecondary),
+          const SizedBox(width: dsSpace2 + 2),
           SizedBox(
             width: 72,
-            child: Text(label,
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: kTextSecondary)),
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(12),
+                color: isDark
+                    ? dsDarkTextSecondary
+                    : dsTextSecondary,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: kTextPrimary,
-                    fontWeight: FontWeight.w500)),
+            child: Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(13),
+                color: isDark
+                    ? dsDarkTextPrimary
+                    : dsTextPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ],
       ),
@@ -900,17 +1276,24 @@ class _VendorDetailSheet extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor =
+        isDark ? dsDarkBorderLight : dsBorderLight;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(dsRadiusXxl)),
       ),
       padding: EdgeInsets.only(
-        top: 20,
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        top: dsSpace5,
+        left: dsSpace5,
+        right: dsSpace5,
+        bottom:
+            MediaQuery.of(context).viewInsets.bottom + dsSpace6,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -922,80 +1305,111 @@ class _VendorDetailSheet extends StatelessWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: kBorderLight,
-                  borderRadius: BorderRadius.circular(2),
+                  color: borderColor,
+                  borderRadius:
+                      BorderRadius.circular(dsRadiusFull),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: dsSpace4),
             Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: context.si(48),
+                  height: context.si(48),
                   decoration: BoxDecoration(
-                    color: kPrimary50,
-                    borderRadius: BorderRadius.circular(14),
+                    color: isDark
+                        ? dsColorIndigo600.withValues(alpha: 0.2)
+                        : dsColorIndigo50,
+                    borderRadius:
+                        BorderRadius.circular(dsRadiusMd + 2),
                   ),
                   child: Icon(
-                      _VendorCard._iconForCategory(vendor.category),
-                      color: kPrimary600,
-                      size: 24),
+                    _VendorCard._iconForCategory(vendor.category),
+                    color: isDark
+                        ? dsColorIndigo300
+                        : dsColorIndigo600,
+                    size: context.si(24),
+                  ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: dsSpace3),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
                       Text(
                         vendor.name,
                         style: GoogleFonts.poppins(
-                          fontSize: 17,
+                          fontSize: context.sp(17),
                           fontWeight: FontWeight.w700,
-                          color: kTextPrimary,
+                          color: isDark
+                              ? dsDarkTextPrimary
+                              : dsTextPrimary,
                         ),
                       ),
                       Text(
                         vendor.category.replaceAll('_', ' '),
                         style: GoogleFonts.inter(
-                            fontSize: 12, color: kTextSecondary),
+                          fontSize: context.sp(12),
+                          color: isDark
+                              ? dsDarkTextSecondary
+                              : dsTextSecondary,
+                        ),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            const Divider(height: 1),
-            const SizedBox(height: 16),
+            const SizedBox(height: dsSpace5),
+            Divider(height: 1, color: borderColor),
+            const SizedBox(height: dsSpace4),
             if (vendor.contactPerson != null)
-              _row(context, Icons.person_outline, 'Contact',
-                  vendor.contactPerson!),
+              _row(context, isDark, Icons.person_outline_rounded,
+                  'Contact', vendor.contactPerson!),
             if (vendor.phone != null)
-              _row(context, Icons.phone_outlined, 'Phone', vendor.phone!),
+              _row(context, isDark, Icons.phone_outlined,
+                  'Phone', vendor.phone!),
             if (vendor.email != null)
-              _row(context, Icons.email_outlined, 'Email', vendor.email!),
+              _row(context, isDark, Icons.email_outlined,
+                  'Email', vendor.email!),
             if (isExec) ...[
               if (vendor.gstin != null)
-                _row(context, Icons.receipt_long_outlined, 'GSTIN',
+                _row(context, isDark,
+                    Icons.receipt_long_outlined, 'GSTIN',
                     vendor.gstin!),
               if (vendor.pan != null)
-                _row(context, Icons.credit_card_outlined, 'PAN', vendor.pan!),
+                _row(context, isDark,
+                    Icons.credit_card_outlined, 'PAN',
+                    vendor.pan!),
               if (vendor.bankIfsc != null)
-                _row(context, Icons.account_balance_outlined, 'Bank IFSC',
-                    vendor.bankIfsc!),
+                _row(context, isDark,
+                    Icons.account_balance_outlined,
+                    'Bank IFSC', vendor.bankIfsc!),
             ],
             if (vendor.contractEnd != null)
               _row(
-                  context,
-                  Icons.event_outlined,
-                  'Contract',
-                  'Expires ${DateFormat('d MMM yyyy').format(vendor.contractEnd!)}'),
-            const SizedBox(height: 8),
+                context,
+                isDark,
+                Icons.event_outlined,
+                'Contract',
+                'Expires ${DateFormat('d MMM yyyy').format(vendor.contractEnd!)}',
+              ),
+            const SizedBox(height: dsSpace2),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: dsColorIndigo600,
+                  side: const BorderSide(
+                      color: dsColorIndigo600),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(dsRadiusButton),
+                  ),
+                ),
                 child: const Text('Close'),
               ),
             ),
@@ -1006,9 +1420,7 @@ class _VendorDetailSheet extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Create work order sheet
-// ---------------------------------------------------------------------------
+// ─── Create Work Order Sheet ──────────────────────────────────────────────────
 
 class _CreateWorkOrderSheet extends ConsumerStatefulWidget {
   final VoidCallback onCreated;
@@ -1019,7 +1431,8 @@ class _CreateWorkOrderSheet extends ConsumerStatefulWidget {
       _CreateWorkOrderSheetState();
 }
 
-class _CreateWorkOrderSheetState extends ConsumerState<_CreateWorkOrderSheet> {
+class _CreateWorkOrderSheetState
+    extends ConsumerState<_CreateWorkOrderSheet> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
@@ -1042,7 +1455,8 @@ class _CreateWorkOrderSheetState extends ConsumerState<_CreateWorkOrderSheet> {
       context: context,
       initialDate: DateTime.now().add(const Duration(days: 7)),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate:
+          DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) setState(() => _deadline = picked);
   }
@@ -1092,20 +1506,50 @@ class _CreateWorkOrderSheetState extends ConsumerState<_CreateWorkOrderSheet> {
     }
   }
 
+  InputDecoration _inputDec(
+          String hint, bool isDark, Color borderColor) =>
+      InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.inter(
+          fontSize: 13,
+          color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusInput),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusInput),
+          borderSide:
+              const BorderSide(color: dsColorIndigo600, width: 1.5),
+        ),
+        filled: isDark,
+        fillColor:
+            isDark ? dsDarkSurfaceMuted : Colors.transparent,
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: dsSpace3, vertical: dsSpace3),
+      );
+
   @override
   Widget build(BuildContext context) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor =
+        isDark ? dsDarkBorderLight : dsBorderLight;
     final vendorsAsync = ref.watch(vendorsProvider);
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(dsRadiusXxl)),
       ),
       padding: EdgeInsets.only(
-        top: 20,
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        top: dsSpace5,
+        left: dsSpace5,
+        right: dsSpace5,
+        bottom:
+            MediaQuery.of(context).viewInsets.bottom + dsSpace6,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -1117,172 +1561,193 @@ class _CreateWorkOrderSheetState extends ConsumerState<_CreateWorkOrderSheet> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: kBorderLight,
-                  borderRadius: BorderRadius.circular(2),
+                  color: borderColor,
+                  borderRadius:
+                      BorderRadius.circular(dsRadiusFull),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text('New Work Order',
-                style: GoogleFonts.poppins(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: kTextPrimary)),
-            const SizedBox(height: 16),
-            // Vendor dropdown
-            Text('Vendor *',
-                style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: kTextSecondary)),
-            const SizedBox(height: 6),
+            const SizedBox(height: dsSpace4),
+            Text(
+              'New Work Order',
+              style: GoogleFonts.poppins(
+                fontSize: context.sp(17),
+                fontWeight: FontWeight.w700,
+                color: isDark
+                    ? dsDarkTextPrimary
+                    : dsTextPrimary,
+              ),
+            ),
+            const SizedBox(height: dsSpace4),
+            _FieldLabel('Vendor *', isDark, context),
+            const SizedBox(height: dsSpace1 + 2),
             vendorsAsync.when(
-              loading: () => const LinearProgressIndicator(),
-              error: (_, __) =>
+              loading: () =>
+                  const LinearProgressIndicator(),
+              error: (_, _) =>
                   const Text('Failed to load vendors'),
-              data: (vendors) => DropdownButtonFormField<String>(
-                value: _selectedVendorId,
-                hint: Text('Select vendor',
-                    style: GoogleFonts.inter(
-                        fontSize: 14, color: kTextSecondary)),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: kBgWarm,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: kBorderLight)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+              data: (vendors) =>
+                  DropdownButtonFormField<String>(
+                initialValue: _selectedVendorId,
+                hint: Text(
+                  'Select vendor',
+                  style: GoogleFonts.inter(
+                    fontSize: context.sp(13),
+                    color: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary,
+                  ),
                 ),
+                decoration: InputDecoration(
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(dsRadiusInput),
+                    borderSide:
+                        BorderSide(color: borderColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(dsRadiusInput),
+                    borderSide: const BorderSide(
+                        color: dsColorIndigo600, width: 1.5),
+                  ),
+                  filled: isDark,
+                  fillColor: isDark
+                      ? dsDarkSurfaceMuted
+                      : Colors.transparent,
+                  contentPadding:
+                      const EdgeInsets.symmetric(
+                          horizontal: dsSpace3,
+                          vertical: dsSpace3),
+                ),
+                dropdownColor: surface,
                 items: vendors
-                    .map((v) => DropdownMenuItem(
-                          value: v.id,
-                          child: Text(v.name,
-                              style: GoogleFonts.inter(fontSize: 14)),
-                        ))
+                    .map(
+                      (v) => DropdownMenuItem(
+                        value: v.id,
+                        child: Text(
+                          v.name,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(13),
+                            color: isDark
+                                ? dsDarkTextPrimary
+                                : dsTextPrimary,
+                          ),
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (val) =>
                     setState(() => _selectedVendorId = val),
               ),
             ),
-            const SizedBox(height: 12),
-            // Title
-            Text('Title *',
-                style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: kTextSecondary)),
-            const SizedBox(height: 6),
+            const SizedBox(height: dsSpace3),
+            _FieldLabel('Title *', isDark, context),
+            const SizedBox(height: dsSpace1 + 2),
             TextField(
               controller: _titleCtrl,
-              decoration: InputDecoration(
-                hintText: 'e.g. Lift maintenance Q2',
-                filled: true,
-                fillColor: kBgWarm,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: kBorderLight)),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
+              textCapitalization: TextCapitalization.sentences,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(14),
+                color: isDark
+                    ? dsDarkTextPrimary
+                    : dsTextPrimary,
               ),
-              style: GoogleFonts.inter(fontSize: 14),
+              decoration: _inputDec(
+                  'e.g. Lift maintenance Q2', isDark, borderColor),
             ),
-            const SizedBox(height: 12),
-            // Description
-            Text('Description',
-                style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: kTextSecondary)),
-            const SizedBox(height: 6),
+            const SizedBox(height: dsSpace3),
+            _FieldLabel('Description', isDark, context),
+            const SizedBox(height: dsSpace1 + 2),
             TextField(
               controller: _descCtrl,
               maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Scope of work…',
-                filled: true,
-                fillColor: kBgWarm,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: kBorderLight)),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
+              textCapitalization: TextCapitalization.sentences,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(14),
+                color: isDark
+                    ? dsDarkTextPrimary
+                    : dsTextPrimary,
               ),
-              style: GoogleFonts.inter(fontSize: 14),
+              decoration: _inputDec(
+                  'Scope of work…', isDark, borderColor),
             ),
-            const SizedBox(height: 12),
-            // Quoted amount + deadline
+            const SizedBox(height: dsSpace3),
             Row(
               children: [
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
-                      Text('Quoted Amount (₹)',
-                          style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: kTextSecondary)),
-                      const SizedBox(height: 6),
+                      _FieldLabel('Quoted Amount (₹)', isDark,
+                          context),
+                      const SizedBox(height: dsSpace1 + 2),
                       TextField(
                         controller: _amountCtrl,
                         keyboardType:
                             const TextInputType.numberWithOptions(
                                 decimal: true),
-                        decoration: InputDecoration(
-                          hintText: '0.00',
-                          filled: true,
-                          fillColor: kBgWarm,
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(
-                                  color: kBorderLight)),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(14),
+                          color: isDark
+                              ? dsDarkTextPrimary
+                              : dsTextPrimary,
                         ),
-                        style: GoogleFonts.inter(fontSize: 14),
+                        decoration: _inputDec(
+                            '0.00', isDark, borderColor),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: dsSpace3),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
-                      Text('Deadline',
-                          style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: kTextSecondary)),
-                      const SizedBox(height: 6),
+                      _FieldLabel(
+                          'Deadline', isDark, context),
+                      const SizedBox(height: dsSpace1 + 2),
                       GestureDetector(
                         onTap: _pickDeadline,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 11),
+                              horizontal: dsSpace3,
+                              vertical: 11),
                           decoration: BoxDecoration(
-                            color: kBgWarm,
-                            borderRadius: BorderRadius.circular(10),
-                            border:
-                                Border.all(color: kBorderLight),
+                            color: isDark
+                                ? dsDarkSurfaceMuted
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(
+                                dsRadiusInput),
+                            border: Border.all(
+                                color: borderColor),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.calendar_today_outlined,
-                                  size: 14, color: kTextSecondary),
-                              const SizedBox(width: 6),
+                              Icon(
+                                  Icons
+                                      .calendar_today_outlined,
+                                  size: context.si(13),
+                                  color: isDark
+                                      ? dsDarkTextSecondary
+                                      : dsTextSecondary),
+                              const SizedBox(width: dsSpace1 + 2),
                               Text(
                                 _deadline != null
                                     ? DateFormat('d MMM y')
                                         .format(_deadline!)
                                     : 'Pick date',
                                 style: GoogleFonts.inter(
-                                  fontSize: 13,
+                                  fontSize: context.sp(13),
                                   color: _deadline != null
-                                      ? kTextPrimary
-                                      : kTextSecondary,
+                                      ? (isDark
+                                          ? dsDarkTextPrimary
+                                          : dsTextPrimary)
+                                      : (isDark
+                                          ? dsDarkTextSecondary
+                                          : dsTextSecondary),
                                 ),
                               ),
                             ],
@@ -1294,51 +1759,74 @@ class _CreateWorkOrderSheetState extends ConsumerState<_CreateWorkOrderSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            // Notes
-            Text('Notes',
-                style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: kTextSecondary)),
-            const SizedBox(height: 6),
+            const SizedBox(height: dsSpace3),
+            _FieldLabel('Notes', isDark, context),
+            const SizedBox(height: dsSpace1 + 2),
             TextField(
               controller: _notesCtrl,
               maxLines: 2,
-              decoration: InputDecoration(
-                hintText: 'Additional notes…',
-                filled: true,
-                fillColor: kBgWarm,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: kBorderLight)),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
+              style: GoogleFonts.inter(
+                fontSize: context.sp(14),
+                color: isDark
+                    ? dsDarkTextPrimary
+                    : dsTextPrimary,
               ),
-              style: GoogleFonts.inter(fontSize: 14),
+              decoration: _inputDec(
+                  'Additional notes…', isDark, borderColor),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: dsSpace5),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
                 onPressed: _saving ? null : _save,
                 style: FilledButton.styleFrom(
-                    backgroundColor: kPrimary600,
-                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                  backgroundColor: dsColorIndigo600,
+                  padding: const EdgeInsets.symmetric(
+                      vertical: dsSpace4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                        dsRadiusButton),
+                  ),
+                ),
                 child: _saving
                     ? const SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : Text('Create Work Order',
+                            strokeWidth: 2,
+                            color: Colors.white),
+                      )
+                    : Text(
+                        'Create Work Order',
                         style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white)),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          fontSize: context.sp(14),
+                        ),
+                      ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FieldLabel extends StatelessWidget {
+  final String text;
+  final bool isDark;
+  final BuildContext ctx;
+  const _FieldLabel(this.text, this.isDark, this.ctx);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: GoogleFonts.inter(
+        fontSize: ctx.sp(12),
+        fontWeight: FontWeight.w600,
+        color: isDark ? dsDarkTextSecondary : dsTextSecondary,
       ),
     );
   }

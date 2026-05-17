@@ -2,387 +2,578 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/event_repository.dart';
 import 'event_detail_screen.dart';
 
-/// Formats a [DateTime] to "Sat, 15 Jun • 6:00 PM"
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 String _formatEventDate(DateTime dt) {
-  final dayName = DateFormat('EEE').format(dt);      // "Sat"
-  final dayNum  = DateFormat('d').format(dt);         // "15"
-  final month   = DateFormat('MMM').format(dt);       // "Jun"
-  final time    = DateFormat('h:mm a').format(dt);    // "6:00 PM"
-  return '$dayName, $dayNum $month • $time';
+  final day  = DateFormat('EEE, d MMM').format(dt);
+  final time = DateFormat('h:mm a').format(dt);
+  return '$day • $time';
 }
 
-const List<String> _kEventCategories = [
-  'cultural',
-  'sports',
-  'governance',
-  'social',
-  'maintenance',
-  'health',
-  'education',
-  'other',
+const _kCategories = [
+  'cultural', 'sports', 'governance', 'social',
+  'maintenance', 'health', 'education', 'other',
 ];
 
-class EventsScreen extends ConsumerWidget {
+Color _categoryColor(String cat) => switch (cat) {
+      'cultural'    => dsColorViolet600,
+      'sports'      => dsColorEmerald600,
+      'governance'  => dsColorIndigo600,
+      'social'      => dsColorSky600,
+      'maintenance' => dsColorTerra600,
+      'health'      => dsColorRed600,
+      'education'   => dsColorTeal600,
+      _             => dsTextSecondary,
+    };
+
+// ─── Events Screen ────────────────────────────────────────────────────────────
+
+class EventsScreen extends ConsumerStatefulWidget {
   const EventsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final eventsAsync = ref.watch(eventsProvider);
-    final registrationsAsync = ref.watch(myEventRegistrationsProvider);
-    final isExec =
-        ref.watch(authNotifierProvider).profile?.isExec ?? false;
-
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('Events'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(eventsProvider);
-              ref.invalidate(myEventRegistrationsProvider);
-            },
-          ),
-        ],
-      ),
-      floatingActionButton: isExec
-          ? FloatingActionButton.extended(
-              onPressed: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => _CreateEventModal(
-                  onCreated: () {
-                    ref.invalidate(eventsProvider);
-                  },
-                ),
-              ),
-              icon: const Icon(Icons.add),
-              label: Text(
-                'Create Event',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-              ),
-              backgroundColor: kPrimary600,
-              foregroundColor: Colors.white,
-            )
-          : null,
-      body: eventsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load events',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(eventsProvider),
-            child: const Text('Retry'),
-          ),
-        ),
-        data: (events) {
-          if (events.isEmpty) {
-            return const EmptyState(
-              icon: Icons.event_outlined,
-              title: 'No events yet',
-              subtitle:
-                  'Community events and society programmes will appear here.',
-            );
-          }
-
-          // Extract my active registration IDs — show loading state until ready
-          final Set<String> registeredEventIds = registrationsAsync.when(
-            data: (regs) => regs
-                .where((r) => r.isActive)
-                .map((r) => r.eventId)
-                .toSet(),
-            loading: () => {},
-            error: (_, __) => {},
-          );
-
-          final upcoming = events.where((e) => e.isUpcoming).toList();
-          final past = events.where((e) => e.isPast).toList();
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(eventsProvider);
-              ref.invalidate(myEventRegistrationsProvider);
-            },
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // ── Upcoming banner header ─────────────────────────────
-                if (upcoming.isNotEmpty) ...[
-                  _UpcomingBanner(count: upcoming.length),
-                  const SizedBox(height: 16),
-                ],
-
-                // ── Upcoming events ────────────────────────────────────
-                if (upcoming.isNotEmpty) ...[
-                  _SectionHeader('Upcoming Events'),
-                  const SizedBox(height: 10),
-                  ...upcoming.map(
-                    (event) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _EventCard(
-                        event: event,
-                        isRegistered:
-                            registeredEventIds.contains(event.id),
-                        isPast: false,
-                      ),
-                    ),
-                  ),
-                ],
-
-                // ── Past events ────────────────────────────────────────
-                if (past.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _SectionHeader('Past Events'),
-                  const SizedBox(height: 10),
-                  ...past.map(
-                    (event) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Opacity(
-                        opacity: 0.55,
-                        child: _EventCard(
-                          event: event,
-                          isRegistered:
-                              registeredEventIds.contains(event.id),
-                          isPast: true,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+  ConsumerState<EventsScreen> createState() => _EventsScreenState();
 }
 
-// ---------------------------------------------------------------------------
-// Banner
-// ---------------------------------------------------------------------------
-
-class _UpcomingBanner extends StatelessWidget {
-  final int count;
-  const _UpcomingBanner({required this.count});
+class _EventsScreenState extends ConsumerState<EventsScreen> {
+  String? _categoryFilter;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [kPrimary600, Color(0xFF2D4FA5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    final isDark = ref.watch(isDarkModeProvider);
+    final eventsAsync = ref.watch(eventsProvider);
+    final regsAsync = ref.watch(myEventRegistrationsProvider);
+    final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
+
+    final Set<String> regIds = regsAsync.when(
+      data: (r) => r.where((x) => x.isActive).map((x) => x.eventId).toSet(),
+      loading: () => {},
+      error: (_, _) => {},
+    );
+
+    return DsScreenShell(
+      title: 'Events',
+      subtitle: 'Community events & programmes',
+      headerStyle: DsHeaderStyle.solid,
+      actions: [
+        DsActionButton(
+          icon: Icons.refresh_rounded,
+          onTap: () {
+            ref.invalidate(eventsProvider);
+            ref.invalidate(myEventRegistrationsProvider);
+          },
         ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.celebration_outlined,
-              color: Colors.white, size: 32),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$count upcoming event${count == 1 ? '' : 's'}',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              Text(
-                'Don\'t miss out on community activities',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.8),
-                ),
-              ),
-            ],
+      ],
+      floatingActionButton: isExec ? _CreateEventFab(isDark: isDark) : null,
+      slivers: [
+        // ── Category filter ───────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.only(top: dsSpace4),
+          child: DsFilterRow(
+            options: _kCategories
+                .map((c) => c[0].toUpperCase() + c.substring(1))
+                .toList(),
+            selected: _categoryFilter == null
+                ? null
+                : _categoryFilter![0].toUpperCase() +
+                    _categoryFilter!.substring(1),
+            onChanged: (label) {
+              setState(() {
+                if (label == null) {
+                  _categoryFilter = null;
+                } else {
+                  _categoryFilter = label.toLowerCase();
+                }
+              });
+            },
+            padding: const EdgeInsets.symmetric(
+                horizontal: dsSpace4, vertical: 0),
           ),
-        ],
+        ),
+        const SizedBox(height: dsSpace4),
+
+        // ── Stats ─────────────────────────────────────────────────────
+        eventsAsync.when(
+          loading: () => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
+          data: (events) {
+            final upcoming = events.where((e) => e.isUpcoming).length;
+            final registered = regIds.length;
+            return DSFadeSlide(
+              child: DsStatsRow(stats: [
+                DsStatItem(
+                  label: 'Upcoming',
+                  value: '$upcoming',
+                  icon: Icons.event_rounded,
+                  color: dsColorIndigo600,
+                ),
+                DsStatItem(
+                  label: 'Registered',
+                  value: '$registered',
+                  icon: Icons.how_to_reg_rounded,
+                  color: dsColorEmerald600,
+                ),
+                DsStatItem(
+                  label: 'This Month',
+                  value: '${events.where((e) {
+                    final now = DateTime.now();
+                    return e.startsAt.month == now.month &&
+                        e.startsAt.year == now.year;
+                  }).length}',
+                  icon: Icons.calendar_month_rounded,
+                  color: dsColorAmber600,
+                ),
+              ]),
+            );
+          },
+        ),
+
+        const SizedBox(height: dsSpace4),
+
+        // ── List ──────────────────────────────────────────────────────
+        eventsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: 80),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load events',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () => ref.invalidate(eventsProvider),
+          ),
+          data: (events) {
+            var filtered = _categoryFilter == null
+                ? events
+                : events
+                    .where((e) => e.category == _categoryFilter)
+                    .toList();
+
+            if (filtered.isEmpty) {
+              return DsEmptyPlaceholder(
+                icon: Icons.event_outlined,
+                title: _categoryFilter == null
+                    ? 'No events yet'
+                    : 'No ${_categoryFilter!} events',
+                message: _categoryFilter == null
+                    ? 'Community events and programmes will appear here.'
+                    : 'Try selecting a different category filter.',
+              );
+            }
+
+            final upcoming = filtered.where((e) => e.isUpcoming).toList();
+            final past = filtered.where((e) => e.isPast).toList();
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (upcoming.isNotEmpty) ...[
+                  _SectionLabel('Upcoming', isDark: isDark),
+                  const SizedBox(height: dsSpace3),
+                  ...upcoming.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final event = entry.value;
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(
+                          dsSpace4, 0, dsSpace4,
+                          i == upcoming.length - 1 ? 0 : dsSpace3),
+                      child: DSFadeSlide(
+                        delay: Duration(milliseconds: i * 40),
+                        child: _EventCard(
+                          event: event,
+                          isRegistered: regIds.contains(event.id),
+                          isPast: false,
+                          isDark: isDark,
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+                if (past.isNotEmpty) ...[
+                  SizedBox(height: upcoming.isEmpty ? 0 : dsSpace5),
+                  _SectionLabel('Past Events', isDark: isDark),
+                  const SizedBox(height: dsSpace3),
+                  ...past.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final event = entry.value;
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(
+                          dsSpace4, 0, dsSpace4,
+                          i == past.length - 1 ? 0 : dsSpace3),
+                      child: DSFadeSlide(
+                        delay: Duration(milliseconds: i * 40),
+                        child: Opacity(
+                          opacity: 0.6,
+                          child: _EventCard(
+                            event: event,
+                            isRegistered: regIds.contains(event.id),
+                            isPast: true,
+                            isDark: isDark,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Section Label ────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final bool isDark;
+  const _SectionLabel(this.text, {required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: dsSpace4),
+      child: Text(
+        text,
+        style: GoogleFonts.poppins(
+          fontSize: context.sp(13),
+          fontWeight: FontWeight.w600,
+          color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Event Card
-// ---------------------------------------------------------------------------
+// ─── FAB ─────────────────────────────────────────────────────────────────────
+
+class _CreateEventFab extends ConsumerWidget {
+  final bool isDark;
+  const _CreateEventFab({required this.isDark});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(dsRadiusXl),
+        boxShadow: dsShadowBrand,
+      ),
+      child: FloatingActionButton.extended(
+        onPressed: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => _CreateEventModal(
+            onCreated: () {
+              ref.invalidate(eventsProvider);
+            },
+          ),
+        ),
+        backgroundColor: dsColorIndigo600,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        icon: Icon(Icons.add_rounded, size: context.si(20)),
+        label: Text(
+          'Create Event',
+          style: GoogleFonts.inter(
+              fontSize: context.sp(14), fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Event Card ───────────────────────────────────────────────────────────────
 
 class _EventCard extends StatelessWidget {
   final Event event;
   final bool isRegistered;
   final bool isPast;
+  final bool isDark;
 
   const _EventCard({
     required this.event,
     required this.isRegistered,
     required this.isPast,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final catColor = _categoryColor(event.category ?? 'other');
+
+    return DSScalePress(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => EventDetailScreen(event: event),
-        ),
+            builder: (_) => EventDetailScreen(event: event)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  event.title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+      child: Container(
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border: isDark
+              ? Border.all(color: dsDarkBorderSubtle, width: 1)
+              : null,
+        ),
+        child: Column(
+          children: [
+            // Category color strip
+            Container(
+              height: 4,
+              decoration: BoxDecoration(
+                color: catColor,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(dsRadiusCard)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(dsSpace4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top row: category badge + paid badge
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: dsSpace2, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: catColor.withValues(
+                              alpha: isDark ? 0.15 : 0.09),
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusXs),
+                        ),
+                        child: Text(
+                          (event.category ?? 'other')
+                              .toUpperCase()
+                              .replaceAll('_', ' '),
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(9),
+                            fontWeight: FontWeight.w700,
+                            color: catColor,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      if (event.isPaid && event.ticketPrice != null) ...[
+                        const SizedBox(width: dsSpace2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: dsSpace2, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: dsColorAmber600.withValues(
+                                alpha: isDark ? 0.15 : 0.09),
+                            borderRadius:
+                                BorderRadius.circular(dsRadiusXs),
+                          ),
+                          child: Text(
+                            '₹${event.ticketPrice!.toStringAsFixed(0)}',
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(9),
+                              fontWeight: FontWeight.w700,
+                              color: dsColorAmber600,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (event.category != null) ...[
-                const SizedBox(width: 8),
-                _CategoryBadge(event.category!),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Date/time
-          Row(
-            children: [
-              const Icon(Icons.schedule_outlined,
-                  size: 14, color: kTextSecondary),
-              const SizedBox(width: 5),
-              Text(
-                _formatEventDate(event.startsAt),
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: kTextSecondary),
-              ),
-            ],
-          ),
-          // Location
-          if (event.location != null && event.location!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(Icons.place_outlined,
-                    size: 14, color: kTextSecondary),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: Text(
-                    event.location!,
-                    style: GoogleFonts.inter(
-                        fontSize: 12, color: kTextSecondary),
-                    maxLines: 1,
+                  const SizedBox(height: dsSpace2),
+                  // Title
+                  Text(
+                    event.title,
+                    style: GoogleFonts.poppins(
+                      fontSize: context.sp(14),
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                  const SizedBox(height: dsSpace2),
+                  // Date
+                  Row(
+                    children: [
+                      Icon(Icons.schedule_rounded,
+                          size: context.si(13),
+                          color: isDark
+                              ? dsDarkTextSecondary
+                              : dsTextSecondary),
+                      const SizedBox(width: 5),
+                      Text(
+                        _formatEventDate(event.startsAt),
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(12),
+                          color: isDark
+                              ? dsDarkTextSecondary
+                              : dsTextSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Location
+                  if (event.location != null &&
+                      event.location!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.place_rounded,
+                            size: context.si(13),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            event.location!,
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(12),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: dsSpace3),
+                  // Bottom row: registration state
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (event.capacity != null)
+                        Row(
+                          children: [
+                            Icon(Icons.people_rounded,
+                                size: context.si(13),
+                                color: isDark
+                                    ? dsDarkTextSecondary
+                                    : dsTextSecondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Cap. ${event.capacity}',
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(11),
+                                color: isDark
+                                    ? dsDarkTextSecondary
+                                    : dsTextSecondary,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      _RegistrationChip(
+                          isPast: isPast,
+                          isRegistered: isRegistered,
+                          isDark: isDark,
+                          context: context),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
-          const SizedBox(height: 12),
-          // Action row
-          Row(
-            children: [
-              if (event.isPaid && event.ticketPrice != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: kAccent500.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                        color: kAccent500.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    '₹${event.ticketPrice!.toStringAsFixed(0)}',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: kAccent500,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              const Spacer(),
-              if (isPast)
-                _PastChip()
-              else if (isRegistered)
-                _RegisteredChip()
-              else
-                _RsvpChip(),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CategoryBadge extends StatelessWidget {
-  final String category;
-  const _CategoryBadge(this.category);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: kPrimary50,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: kPrimary100),
-      ),
-      child: Text(
-        category.toUpperCase(),
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: kPrimary600,
-          letterSpacing: 0.5,
         ),
       ),
     );
   }
 }
 
-class _RsvpChip extends StatelessWidget {
+class _RegistrationChip extends StatelessWidget {
+  final bool isPast;
+  final bool isRegistered;
+  final bool isDark;
+  final BuildContext context;
+
+  const _RegistrationChip({
+    required this.isPast,
+    required this.isRegistered,
+    required this.isDark,
+    required this.context,
+  });
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
+    if (isPast) {
+      return Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: dsSpace3, vertical: 5),
+        decoration: BoxDecoration(
+          color: isDark
+              ? dsDarkBorderLight
+              : const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(dsRadiusFull),
+        ),
+        child: Text(
+          'Concluded',
+          style: GoogleFonts.inter(
+            fontSize: context.sp(11),
+            color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+          ),
+        ),
+      );
+    }
+    if (isRegistered) {
+      return Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: dsSpace3, vertical: 5),
+        decoration: BoxDecoration(
+          color: dsColorEmerald600.withValues(
+              alpha: isDark ? 0.15 : 0.10),
+          borderRadius: BorderRadius.circular(dsRadiusFull),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_rounded,
+                size: context.si(12), color: dsColorEmerald600),
+            const SizedBox(width: 4),
+            Text(
+              'Registered',
+              style: GoogleFonts.inter(
+                fontSize: context.sp(11),
+                fontWeight: FontWeight.w600,
+                color: dsColorEmerald600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+          horizontal: dsSpace3, vertical: 5),
       decoration: BoxDecoration(
-        color: kPrimary600,
-        borderRadius: BorderRadius.circular(20),
+        color: dsColorIndigo600,
+        borderRadius: BorderRadius.circular(dsRadiusFull),
+        boxShadow: dsShadowBrand,
       ),
       child: Text(
         'RSVP',
         style: GoogleFonts.inter(
-          fontSize: 12,
+          fontSize: context.sp(11),
           fontWeight: FontWeight.w700,
           color: Colors.white,
           letterSpacing: 0.5,
@@ -392,99 +583,30 @@ class _RsvpChip extends StatelessWidget {
   }
 }
 
-class _RegisteredChip extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD1FAE5),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_circle_outline,
-              size: 13, color: kSecondary500),
-          const SizedBox(width: 4),
-          Text(
-            'Registered',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: kSecondary500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PastChip extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: kSectionAlt,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorderLight),
-      ),
-      child: Text(
-        'Concluded',
-        style: GoogleFonts.inter(
-            fontSize: 11, color: kTextSecondary),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Section header
-// ---------------------------------------------------------------------------
-
-class _SectionHeader extends StatelessWidget {
-  final String text;
-  const _SectionHeader(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.poppins(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: kTextSecondary,
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Create event modal (exec-only)
-// ---------------------------------------------------------------------------
+// ─── Create Event Modal (exec-only) ──────────────────────────────────────────
 
 class _CreateEventModal extends ConsumerStatefulWidget {
   final VoidCallback onCreated;
   const _CreateEventModal({required this.onCreated});
 
   @override
-  ConsumerState<_CreateEventModal> createState() => _CreateEventModalState();
+  ConsumerState<_CreateEventModal> createState() =>
+      _CreateEventModalState();
 }
 
-class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
+class _CreateEventModalState
+    extends ConsumerState<_CreateEventModal> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _locationCtrl = TextEditingController();
-  final _descriptionCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
   final _capacityCtrl = TextEditingController();
-  final _ticketPriceCtrl = TextEditingController();
+  final _priceCtrl = TextEditingController();
 
   String _category = 'cultural';
   DateTime? _startsAt;
   DateTime? _endsAt;
-  DateTime? _registrationDeadline;
+  DateTime? _deadline;
   bool _isPaid = false;
   bool _saving = false;
 
@@ -492,47 +614,31 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
   void dispose() {
     _titleCtrl.dispose();
     _locationCtrl.dispose();
-    _descriptionCtrl.dispose();
+    _descCtrl.dispose();
     _capacityCtrl.dispose();
-    _ticketPriceCtrl.dispose();
+    _priceCtrl.dispose();
     super.dispose();
   }
 
-  InputDecoration _inputDeco(String label) => InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      );
-
-  Future<void> _pickDateTime({
-    required bool isStart,
-    bool isDeadline = false,
+  Future<void> _pickDt({
+    required void Function(DateTime) onPicked,
+    DateTime? initial,
   }) async {
     final now = DateTime.now();
     final date = await showDatePicker(
       context: context,
-      initialDate: now,
-      firstDate: now,
+      initialDate: initial ?? now,
+      firstDate: now.subtract(const Duration(days: 1)),
       lastDate: now.add(const Duration(days: 730)),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: const TimeOfDay(hour: 18, minute: 0),
     );
     if (time == null || !mounted) return;
-    final dt =
-        DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    setState(() {
-      if (isDeadline) {
-        _registrationDeadline = dt;
-      } else if (isStart) {
-        _startsAt = dt;
-      } else {
-        _endsAt = dt;
-      }
-    });
+    onPicked(DateTime(
+        date.year, date.month, date.day, time.hour, time.minute));
   }
 
   Future<void> _save() async {
@@ -540,9 +646,9 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
     if (_startsAt == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please select a start date and time',
+          content: Text('Please select a start date',
               style: GoogleFonts.inter()),
-          backgroundColor: kRed600,
+          backgroundColor: dsColorRed600,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -558,26 +664,28 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
             location: _locationCtrl.text.trim().isEmpty
                 ? null
                 : _locationCtrl.text.trim(),
-            description: _descriptionCtrl.text.trim().isEmpty
+            description: _descCtrl.text.trim().isEmpty
                 ? null
-                : _descriptionCtrl.text.trim(),
+                : _descCtrl.text.trim(),
             capacity: _capacityCtrl.text.trim().isEmpty
                 ? null
                 : int.tryParse(_capacityCtrl.text.trim()),
-            registrationDeadline: _registrationDeadline,
+            registrationDeadline: _deadline,
             isPaid: _isPaid,
-            ticketPrice: _isPaid && _ticketPriceCtrl.text.isNotEmpty
-                ? double.tryParse(_ticketPriceCtrl.text.trim())
-                : null,
+            ticketPrice:
+                _isPaid && _priceCtrl.text.isNotEmpty
+                    ? double.tryParse(_priceCtrl.text.trim())
+                    : null,
           );
       widget.onCreated();
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Event created successfully',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-            backgroundColor: kSecondary500,
+            content: Text('Event created',
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500)),
+            backgroundColor: dsColorEmerald600,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -586,9 +694,8 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create event: $e',
-                style: GoogleFonts.inter()),
-            backgroundColor: kRed600,
+            content: Text('Failed: $e', style: GoogleFonts.inter()),
+            backgroundColor: dsColorRed600,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -598,18 +705,32 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
     }
   }
 
+  InputDecoration _deco(String label, {IconData? icon}) =>
+      InputDecoration(
+        labelText: label,
+        prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(dsRadiusMd)),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: dsSpace4, vertical: 14),
+      );
+
   @override
   Widget build(BuildContext context) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final bg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
     final fmt = DateFormat('EEE, d MMM yyyy • h:mm a');
+
     return DraggableScrollableSheet(
       initialChildSize: 0.92,
       minChildSize: 0.5,
       maxChildSize: 0.97,
       expand: false,
       builder: (_, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(dsRadiusXl)),
         ),
         child: Column(
           children: [
@@ -620,12 +741,13 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: kBorderLight,
+                  color: isDark
+                      ? dsDarkBorderLight
+                      : const Color(0xFFE5E7EB),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
               child: Row(
@@ -633,22 +755,26 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
                   Text(
                     'Create Event',
                     style: GoogleFonts.poppins(
-                      fontSize: 18,
+                      fontSize: context.sp(18),
                       fontWeight: FontWeight.w700,
-                      color: kPrimary600,
+                      color: dsColorIndigo600,
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
-                    color: kTextSecondary,
+                    color: isDark
+                        ? dsDarkTextSecondary
+                        : dsTextSecondary,
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
-            // Form
+            Divider(
+                height: 1,
+                color:
+                    isDark ? dsDarkBorderSubtle : const Color(0xFFE5E7EB)),
             Expanded(
               child: Form(
                 key: _formKey,
@@ -656,64 +782,69 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
                   controller: scrollCtrl,
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
                   children: [
-                    // Title
                     TextFormField(
                       controller: _titleCtrl,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: _inputDeco('Event Title *'),
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Title is required'
-                          : null,
+                      decoration:
+                          _deco('Event Title *', icon: Icons.event_rounded),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty)
+                              ? 'Title is required'
+                              : null,
                     ),
-                    const SizedBox(height: 14),
-
-                    // Category dropdown
+                    const SizedBox(height: dsSpace4),
                     DropdownButtonFormField<String>(
-                      value: _category,
-                      decoration: _inputDeco('Category *'),
-                      items: _kEventCategories
+                      initialValue: _category,
+                      decoration: _deco('Category *',
+                          icon: Icons.category_rounded),
+                      items: _kCategories
                           .map((c) => DropdownMenuItem(
                                 value: c,
                                 child: Text(
-                                  c[0].toUpperCase() + c.substring(1),
-                                  style: GoogleFonts.inter(fontSize: 14),
-                                ),
+                                    c[0].toUpperCase() + c.substring(1),
+                                    style:
+                                        GoogleFonts.inter(fontSize: context.sp(14))),
                               ))
                           .toList(),
                       onChanged: (v) => setState(() => _category = v!),
                     ),
-                    const SizedBox(height: 14),
-
-                    // Starts at
+                    const SizedBox(height: dsSpace4),
                     InkWell(
-                      onTap: () => _pickDateTime(isStart: true),
-                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => _pickDt(
+                          onPicked: (dt) => setState(() => _startsAt = dt)),
+                      borderRadius: BorderRadius.circular(dsRadiusMd),
                       child: InputDecorator(
-                        decoration: _inputDeco('Start Date & Time *'),
+                        decoration: _deco('Start Date & Time *',
+                            icon: Icons.schedule_rounded),
                         child: Text(
-                          _startsAt != null ? fmt.format(_startsAt!) : 'Tap to select',
+                          _startsAt != null
+                              ? fmt.format(_startsAt!)
+                              : 'Tap to select',
                           style: GoogleFonts.inter(
-                            fontSize: 14,
+                            fontSize: context.sp(14),
                             color: _startsAt != null
-                                ? kTextPrimary
-                                : kTextSecondary,
+                                ? (isDark
+                                    ? dsDarkTextPrimary
+                                    : dsTextPrimary)
+                                : (isDark
+                                    ? dsDarkTextTertiary
+                                    : dsTextTertiary),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
-
-                    // Ends at
+                    const SizedBox(height: dsSpace4),
                     InkWell(
-                      onTap: () => _pickDateTime(isStart: false),
-                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => _pickDt(
+                          onPicked: (dt) => setState(() => _endsAt = dt),
+                          initial: _startsAt),
+                      borderRadius: BorderRadius.circular(dsRadiusMd),
                       child: InputDecorator(
                         decoration: InputDecoration(
                           labelText: 'End Date & Time (optional)',
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
+                          prefixIcon: const Icon(
+                              Icons.schedule_outlined,
+                              size: 18),
                           suffixIcon: _endsAt != null
                               ? IconButton(
                                   icon: const Icon(Icons.close, size: 18),
@@ -721,67 +852,41 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
                                       setState(() => _endsAt = null),
                                 )
                               : null,
-                        ),
-                        child: Text(
-                          _endsAt != null ? fmt.format(_endsAt!) : 'Tap to select',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: _endsAt != null
-                                ? kTextPrimary
-                                : kTextSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Registration deadline
-                    InkWell(
-                      onTap: () =>
-                          _pickDateTime(isStart: false, isDeadline: true),
-                      borderRadius: BorderRadius.circular(10),
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'Registration Deadline (optional)',
                           border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                              borderRadius:
+                                  BorderRadius.circular(dsRadiusMd)),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          suffixIcon: _registrationDeadline != null
-                              ? IconButton(
-                                  icon: const Icon(Icons.close, size: 18),
-                                  onPressed: () => setState(
-                                      () => _registrationDeadline = null),
-                                )
-                              : null,
+                              horizontal: dsSpace4, vertical: 14),
                         ),
                         child: Text(
-                          _registrationDeadline != null
-                              ? fmt.format(_registrationDeadline!)
+                          _endsAt != null
+                              ? fmt.format(_endsAt!)
                               : 'Tap to select',
                           style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: _registrationDeadline != null
-                                ? kTextPrimary
-                                : kTextSecondary,
+                            fontSize: context.sp(14),
+                            color: _endsAt != null
+                                ? (isDark
+                                    ? dsDarkTextPrimary
+                                    : dsTextPrimary)
+                                : (isDark
+                                    ? dsDarkTextTertiary
+                                    : dsTextTertiary),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
-
-                    // Location
+                    const SizedBox(height: dsSpace4),
                     TextFormField(
                       controller: _locationCtrl,
-                      decoration: _inputDeco('Location (optional)'),
+                      decoration: _deco('Location (optional)',
+                          icon: Icons.place_rounded),
                     ),
-                    const SizedBox(height: 14),
-
-                    // Capacity
+                    const SizedBox(height: dsSpace4),
                     TextFormField(
                       controller: _capacityCtrl,
                       keyboardType: TextInputType.number,
-                      decoration: _inputDeco('Capacity (optional)'),
+                      decoration: _deco('Capacity (optional)',
+                          icon: Icons.people_rounded),
                       validator: (v) {
                         if (v == null || v.isEmpty) return null;
                         if (int.tryParse(v) == null || int.parse(v) <= 0) {
@@ -790,49 +895,67 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 14),
-
-                    // Description
+                    const SizedBox(height: dsSpace4),
                     TextFormField(
-                      controller: _descriptionCtrl,
-                      maxLines: 4,
+                      controller: _descCtrl,
+                      maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: _inputDeco('Description (optional)'),
+                      decoration: _deco('Description (optional)',
+                          icon: Icons.notes_rounded),
                     ),
-                    const SizedBox(height: 14),
-
+                    const SizedBox(height: dsSpace4),
                     // Paid toggle
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 4),
+                          horizontal: dsSpace4, vertical: 4),
                       decoration: BoxDecoration(
-                        border: Border.all(color: kBorderLight),
-                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark
+                              ? dsDarkBorderLight
+                              : const Color(0xFFE5E7EB),
+                        ),
+                        borderRadius:
+                            BorderRadius.circular(dsRadiusMd),
                       ),
                       child: Row(
                         children: [
+                          Icon(Icons.payments_rounded,
+                              size: 18,
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary),
+                          const SizedBox(width: dsSpace3),
                           Text('Paid Event',
-                              style: GoogleFonts.inter(fontSize: 14)),
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(14),
+                                color: isDark
+                                    ? dsDarkTextPrimary
+                                    : dsTextPrimary,
+                              )),
                           const Spacer(),
                           Switch(
                             value: _isPaid,
-                            onChanged: (v) => setState(() => _isPaid = v),
-                            activeColor: kPrimary600,
+                            onChanged: (v) =>
+                                setState(() => _isPaid = v),
+                            activeThumbColor: dsColorIndigo600,
                           ),
                         ],
                       ),
                     ),
-
                     if (_isPaid) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: dsSpace4),
                       TextFormField(
-                        controller: _ticketPriceCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: _inputDeco('Ticket Price (₹)'),
+                        controller: _priceCtrl,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(
+                                decimal: true),
+                        decoration: _deco('Ticket Price (₹)',
+                            icon: Icons.currency_rupee_rounded),
                         validator: (v) {
-                          if (!_isPaid) return null;
-                          if (v == null || v.isEmpty) return 'Enter ticket price';
+                          if (!_isPaid) { return null; }
+                          if (v == null || v.isEmpty) {
+                            return 'Enter ticket price';
+                          }
                           if (double.tryParse(v) == null ||
                               double.parse(v) <= 0) {
                             return 'Enter a valid amount';
@@ -841,20 +964,35 @@ class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
                         },
                       ),
                     ],
-
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _saving ? null : _save,
-                      child: _saving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('Create Event'),
+                    const SizedBox(height: dsSpace5),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: dsColorIndigo600,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(dsRadiusMd),
+                          ),
+                          elevation: 0,
+                          textStyle: GoogleFonts.inter(
+                            fontSize: context.sp(15),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onPressed: _saving ? null : _save,
+                        child: _saving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white),
+                              )
+                            : const Text('Create Event'),
+                      ),
                     ),
                   ],
                 ),

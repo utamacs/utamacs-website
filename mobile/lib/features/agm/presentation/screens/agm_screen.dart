@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
-import '../../../../shared/widgets/status_badge.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/agm_repository.dart';
 import 'agm_detail_screen.dart';
@@ -15,113 +16,180 @@ class AgmScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final sessionsAsync = ref.watch(agmSessionsProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('AGM & Governance'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(agmSessionsProvider),
-          ),
-        ],
-      ),
+    return DsScreenShell(
+      title: 'AGM & Governance',
+      subtitle: 'Annual & general meetings',
+      actions: [
+        DsActionButton(
+          icon: Icons.refresh_rounded,
+          onTap: () => ref.invalidate(agmSessionsProvider),
+        ),
+      ],
+      onRefresh: () async => ref.invalidate(agmSessionsProvider),
+      extraBottomPadding: isExec ? dsSpace16 : 0,
       floatingActionButton: isExec
-          ? FloatingActionButton.extended(
-              backgroundColor: kPrimary600,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.add),
-              label: Text('New Meeting',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-              onPressed: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => _CreateSessionModal(
-                  onCreated: () => ref.invalidate(agmSessionsProvider),
+          ? Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(dsRadiusXl),
+                boxShadow: dsShadowBrand,
+              ),
+              child: FloatingActionButton.extended(
+                backgroundColor: dsColorIndigo600,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                focusElevation: 0,
+                hoverElevation: 0,
+                highlightElevation: 0,
+                icon: Icon(Icons.add_rounded, size: context.si(20)),
+                label: Text(
+                  'New Meeting',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: context.sp(14),
+                  ),
+                ),
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => _CreateSessionModal(
+                    onCreated: () => ref.invalidate(agmSessionsProvider),
+                  ),
                 ),
               ),
             )
           : null,
-      body: sessionsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load meetings',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(agmSessionsProvider),
-            child: const Text('Retry'),
+      slivers: [
+        sessionsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: 80),
+            child: Center(child: CircularProgressIndicator()),
           ),
-        ),
-        data: (sessions) {
-          if (sessions.isEmpty) {
-            return const EmptyState(
-              icon: Icons.meeting_room_outlined,
-              title: 'No meetings recorded',
-              subtitle: 'Annual and general meetings will appear here.',
-            );
-          }
+          error: (e, _) => DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load meetings',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () => ref.invalidate(agmSessionsProvider),
+          ),
+          data: (sessions) {
+            if (sessions.isEmpty) {
+              return const DsEmptyPlaceholder(
+                icon: Icons.meeting_room_outlined,
+                title: 'No meetings recorded',
+                message: 'Annual and general meetings will appear here.',
+              );
+            }
 
-          // Partition into upcoming and past
-          final upcoming = sessions
-              .where((s) => s.status == 'scheduled' && s.isUpcoming)
-              .toList();
-          final past = sessions
-              .where((s) => s.status != 'scheduled' || !s.isUpcoming)
-              .toList();
+            final upcoming = sessions
+                .where((s) => s.status == 'scheduled' && s.isUpcoming)
+                .toList();
+            final past = sessions
+                .where((s) =>
+                    s.status != 'scheduled' || !s.isUpcoming)
+                .toList();
 
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(agmSessionsProvider),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
+            // Stats
+            final completedCount =
+                sessions.where((s) => s.status == 'completed').length;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Stats row
+                const SizedBox(height: dsSpace3),
+                DsStatsRow(stats: [
+                  DsStatItem(
+                    label: 'Total Meetings',
+                    value: '${sessions.length}',
+                    icon: Icons.meeting_room_rounded,
+                    color: dsColorIndigo600,
+                  ),
+                  DsStatItem(
+                    label: 'Upcoming',
+                    value: '${upcoming.length}',
+                    icon: Icons.upcoming_rounded,
+                    color: dsColorAmber600,
+                  ),
+                  DsStatItem(
+                    label: 'Completed',
+                    value: '$completedCount',
+                    icon: Icons.check_circle_rounded,
+                    color: dsColorEmerald600,
+                  ),
+                ]),
+
                 if (upcoming.isNotEmpty) ...[
-                  _SectionHeader(label: 'Upcoming'),
-                  const SizedBox(height: 8),
-                  ...upcoming.map((s) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _SessionCard(session: s),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                        dsSpace4, dsSpace5, dsSpace4, dsSpace2),
+                    child: Text(
+                      'Upcoming',
+                      style: GoogleFonts.poppins(
+                        fontSize: context.sp(13),
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? dsDarkTextPrimary
+                            : dsTextPrimary,
+                      ),
+                    ),
+                  ),
+                  ...upcoming.asMap().entries.map((e) => Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          dsSpace4,
+                          e.key == 0 ? 0 : dsSpace2,
+                          dsSpace4,
+                          0,
+                        ),
+                        child: DSFadeSlide(
+                          delay:
+                              Duration(milliseconds: e.key * 40),
+                          child: _SessionCard(session: e.value),
+                        ),
                       )),
-                  const SizedBox(height: 8),
                 ],
+
                 if (past.isNotEmpty) ...[
-                  _SectionHeader(label: 'Past Meetings'),
-                  const SizedBox(height: 8),
-                  ...past.map((s) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _SessionCard(session: s),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                        dsSpace4, dsSpace5, dsSpace4, dsSpace2),
+                    child: Text(
+                      'Past Meetings',
+                      style: GoogleFonts.poppins(
+                        fontSize: context.sp(13),
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? dsDarkTextPrimary
+                            : dsTextPrimary,
+                      ),
+                    ),
+                  ),
+                  ...past.asMap().entries.map((e) => Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          dsSpace4,
+                          e.key == 0 ? 0 : dsSpace2,
+                          dsSpace4,
+                          0,
+                        ),
+                        child: DSFadeSlide(
+                          delay: Duration(
+                              milliseconds:
+                                  (upcoming.length + e.key) * 30),
+                          child: _SessionCard(session: e.value),
+                        ),
                       )),
                 ],
+                const SizedBox(height: dsSpace4),
               ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  const _SectionHeader({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: GoogleFonts.inter(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: kTextSecondary,
-        letterSpacing: 0.4,
-      ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -130,169 +198,268 @@ class _SectionHeader extends StatelessWidget {
 // Session card
 // ---------------------------------------------------------------------------
 
-class _SessionCard extends StatelessWidget {
+class _SessionCard extends ConsumerWidget {
   final AgmSession session;
   const _SessionCard({required this.session});
 
-  @override
-  Widget build(BuildContext context) {
-    final dateStr = DateFormat('EEE, dd MMM yyyy').format(session.meetingDate);
-    final isUpcoming = session.status == 'scheduled' && session.isUpcoming;
+  (Color bg, Color text) _statusColors(String status) => switch (status) {
+        'scheduled'  => (dsColorAmber50, dsColorAmber700),
+        'completed'  => (dsColorEmerald50, dsColorEmerald700),
+        'cancelled'  => (dsColorRed50, dsColorRed700),
+        'postponed'  => (dsColorTerra50, dsColorTerra600),
+        _            => (dsColorSlate100, dsColorSlate600),
+      };
 
-    return AppCard(
+  String _statusLabel(String s) => switch (s) {
+        'scheduled'  => 'Scheduled',
+        'completed'  => 'Completed',
+        'cancelled'  => 'Cancelled',
+        'postponed'  => 'Postponed',
+        _            => s[0].toUpperCase() + s.substring(1),
+      };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final isUpcoming =
+        session.status == 'scheduled' && session.isUpcoming;
+    final dateStr =
+        DateFormat('EEE, dd MMM yyyy').format(session.meetingDate);
+    final (statusBg, statusText) = _statusColors(session.status);
+    final stripColor = isUpcoming ? dsColorAmber600 : dsColorEmerald600;
+
+    return DSScalePress(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => AgmDetailScreen(session: session),
-        ),
+        DSSlideRoute(page: AgmDetailScreen(session: session)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Upcoming banner
-          if (isUpcoming) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFDE68A)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.upcoming_outlined,
-                      color: kAccent500, size: 14),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Upcoming Meeting',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: kAccent500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // Year heading + status badge
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  'AGM ${session.agmYear}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: kPrimary600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              StatusBadge.forStatus(session.status),
-            ],
-          ),
-
-          const SizedBox(height: 4),
-
-          // Type label
-          Text(
-            session.typeLabel,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: kTextSecondary,
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // Date + venue
-          Row(
-            children: [
-              const Icon(Icons.calendar_today_outlined,
-                  size: 13, color: kTextSecondary),
-              const SizedBox(width: 5),
-              Text(
-                dateStr,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: kTextPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-
-          if (session.venue != null) ...[
-            const SizedBox(height: 4),
-            Row(
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? dsDarkSurface : dsSurface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border: isDark
+              ? Border.all(color: dsDarkBorderSubtle)
+              : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.location_on_outlined,
-                    size: 13, color: kTextSecondary),
-                const SizedBox(width: 5),
+                Container(width: 4, color: stripColor),
                 Expanded(
-                  child: Text(
-                    session.venue!,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: kTextSecondary,
+                  child: Padding(
+                    padding: const EdgeInsets.all(dsSpace4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Upcoming banner
+                        if (isUpcoming) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            margin: const EdgeInsets.only(
+                                bottom: dsSpace3),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? dsColorAmber600.withValues(alpha: 0.12)
+                                  : dsColorAmber50,
+                              borderRadius:
+                                  BorderRadius.circular(dsRadiusSm),
+                              border: Border.all(
+                                  color: isDark
+                                      ? dsColorAmber600.withValues(alpha: 0.3)
+                                      : dsColorAmber100),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.upcoming_outlined,
+                                    color: dsColorAmber600,
+                                    size: context.si(13)),
+                                const SizedBox(width: dsSpace2),
+                                Text(
+                                  'Upcoming Meeting',
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(11),
+                                    fontWeight: FontWeight.w600,
+                                    color: dsColorAmber700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // Year + status
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'AGM ${session.agmYear}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: context.sp(15),
+                                  fontWeight: FontWeight.w700,
+                                  color: dsColorIndigo600,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? statusText.withValues(alpha: 0.15)
+                                    : statusBg,
+                                borderRadius:
+                                    BorderRadius.circular(dsRadiusFull),
+                              ),
+                              child: Text(
+                                _statusLabel(session.status),
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(11),
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? statusText.withValues(alpha: 0.9)
+                                      : statusText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: dsSpace1),
+
+                        // Type label
+                        Text(
+                          session.typeLabel,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(12),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: dsSpace3),
+
+                        // Date
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today_outlined,
+                                size: context.si(13),
+                                color: isDark
+                                    ? dsDarkTextSecondary
+                                    : dsTextSecondary),
+                            const SizedBox(width: dsSpace2),
+                            Text(
+                              dateStr,
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(13),
+                                fontWeight: FontWeight.w500,
+                                color: isDark
+                                    ? dsDarkTextPrimary
+                                    : dsTextPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        if (session.venue != null) ...[
+                          const SizedBox(height: dsSpace1),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on_outlined,
+                                  size: context.si(13),
+                                  color: isDark
+                                      ? dsDarkTextSecondary
+                                      : dsTextSecondary),
+                              const SizedBox(width: dsSpace2),
+                              Expanded(
+                                child: Text(
+                                  session.venue!,
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(12),
+                                    color: isDark
+                                        ? dsDarkTextSecondary
+                                        : dsTextSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        if (session.status == 'completed' &&
+                            session.attendeesCount != null) ...[
+                          const SizedBox(height: dsSpace1),
+                          Row(
+                            children: [
+                              Icon(Icons.people_outline_rounded,
+                                  size: context.si(13),
+                                  color: isDark
+                                      ? dsDarkTextSecondary
+                                      : dsTextSecondary),
+                              const SizedBox(width: dsSpace2),
+                              Text(
+                                '${session.attendeesCount} attended',
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(12),
+                                  color: isDark
+                                      ? dsDarkTextSecondary
+                                      : dsTextSecondary,
+                                ),
+                              ),
+                              if (session.quorumMet != null) ...[
+                                const SizedBox(width: dsSpace3),
+                                Icon(
+                                  session.quorumMet!
+                                      ? Icons.check_circle_rounded
+                                      : Icons.cancel_outlined,
+                                  size: context.si(13),
+                                  color: session.quorumMet!
+                                      ? dsColorEmerald600
+                                      : dsColorRed600,
+                                ),
+                                const SizedBox(width: dsSpace1),
+                                Text(
+                                  session.quorumMet!
+                                      ? 'Quorum met'
+                                      : 'Quorum not met',
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(12),
+                                    color: session.quorumMet!
+                                        ? dsColorEmerald600
+                                        : dsColorRed600,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+
+                        const SizedBox(height: dsSpace2),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Icon(
+                            Icons.chevron_right_rounded,
+                            size: context.si(18),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-          ],
-
-          if (session.status == 'completed' &&
-              session.attendeesCount != null) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(Icons.people_outline,
-                    size: 13, color: kTextSecondary),
-                const SizedBox(width: 5),
-                Text(
-                  '${session.attendeesCount} attended',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: kTextSecondary,
-                  ),
-                ),
-                if (session.quorumMet != null) ...[
-                  const SizedBox(width: 10),
-                  Icon(
-                    session.quorumMet!
-                        ? Icons.check_circle
-                        : Icons.cancel_outlined,
-                    size: 13,
-                    color:
-                        session.quorumMet! ? kSecondary500 : kRed600,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    session.quorumMet! ? 'Quorum met' : 'Quorum not met',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: session.quorumMet! ? kSecondary500 : kRed600,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-
-          const SizedBox(height: 6),
-          const Align(
-            alignment: Alignment.centerRight,
-            child: Icon(Icons.chevron_right, color: kTextSecondary, size: 18),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -311,12 +478,14 @@ class _CreateSessionModal extends ConsumerStatefulWidget {
       _CreateSessionModalState();
 }
 
-class _CreateSessionModalState extends ConsumerState<_CreateSessionModal> {
+class _CreateSessionModalState
+    extends ConsumerState<_CreateSessionModal> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _venueCtrl;
   late final TextEditingController _notesCtrl;
   String _agmType = 'annual';
-  DateTime _meetingDate = DateTime.now().add(const Duration(days: 7));
+  DateTime _meetingDate =
+      DateTime.now().add(const Duration(days: 7));
   bool _saving = false;
 
   @override
@@ -361,7 +530,7 @@ class _CreateSessionModalState extends ConsumerState<_CreateSessionModal> {
           SnackBar(
             content: Text('Meeting created.',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-            backgroundColor: kSecondary500,
+            backgroundColor: dsColorEmerald600,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -371,7 +540,7 @@ class _CreateSessionModalState extends ConsumerState<_CreateSessionModal> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed: $e', style: GoogleFonts.inter()),
-            backgroundColor: kRed600,
+            backgroundColor: dsColorRed600,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -383,18 +552,26 @@ class _CreateSessionModalState extends ConsumerState<_CreateSessionModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
     final dateFmt = DateFormat('dd MMM yyyy');
+
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       minChildSize: 0.5,
       maxChildSize: 0.92,
       builder: (_, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(dsRadiusXxl)),
         ),
         child: Column(
           children: [
+            // Handle
             Padding(
               padding: const EdgeInsets.only(top: 12, bottom: 4),
               child: Center(
@@ -402,154 +579,181 @@ class _CreateSessionModalState extends ConsumerState<_CreateSessionModal> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: kBorderLight,
+                    color: borderColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
             ),
+            // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+              padding: const EdgeInsets.fromLTRB(
+                  dsSpace5, dsSpace2, dsSpace2, 0),
               child: Row(
                 children: [
                   Text(
                     'Schedule Meeting',
                     style: GoogleFonts.poppins(
-                      fontSize: 17,
+                      fontSize: context.sp(16),
                       fontWeight: FontWeight.w700,
-                      color: kPrimary600,
+                      color: dsColorIndigo600,
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: Icon(Icons.close_rounded,
+                        size: context.si(22)),
                     onPressed: () => Navigator.pop(context),
-                    color: kTextSecondary,
+                    color: textSecondary,
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
+            Divider(height: 1, color: borderColor),
+            // Form
             Expanded(
               child: Form(
                 key: _formKey,
                 child: ListView(
                   controller: scrollCtrl,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                  padding: const EdgeInsets.fromLTRB(
+                      dsSpace5, dsSpace4, dsSpace5, dsSpace8),
                   children: [
                     // Meeting type
-                    Text('Meeting Type',
-                        style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: kTextSecondary)),
+                    _ModalLabel(
+                        label: 'Meeting Type', isDark: isDark),
                     const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      value: _agmType,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? dsDarkSurfaceMuted
+                            : dsSurfaceMuted,
+                        borderRadius:
+                            BorderRadius.circular(dsRadiusMd),
+                        border: Border.all(color: borderColor),
                       ),
-                      items: const [
-                        DropdownMenuItem(
-                            value: 'annual',
-                            child: Text('Annual General Meeting')),
-                        DropdownMenuItem(
-                            value: 'extraordinary',
-                            child:
-                                Text('Extraordinary General Meeting')),
-                        DropdownMenuItem(
-                            value: 'special',
-                            child: Text('Special General Meeting')),
-                      ],
-                      onChanged: (v) =>
-                          setState(() => _agmType = v ?? _agmType),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: dsSpace4),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _agmType,
+                          isExpanded: true,
+                          style: GoogleFonts.inter(
+                              fontSize: context.sp(14),
+                              color: textPrimary),
+                          dropdownColor: surface,
+                          items: [
+                            DropdownMenuItem(
+                              value: 'annual',
+                              child: Text('Annual General Meeting',
+                                  style: GoogleFonts.inter(
+                                      fontSize: context.sp(14),
+                                      color: textPrimary)),
+                            ),
+                            DropdownMenuItem(
+                              value: 'extraordinary',
+                              child: Text(
+                                  'Extraordinary General Meeting',
+                                  style: GoogleFonts.inter(
+                                      fontSize: context.sp(14),
+                                      color: textPrimary)),
+                            ),
+                            DropdownMenuItem(
+                              value: 'special',
+                              child: Text('Special General Meeting',
+                                  style: GoogleFonts.inter(
+                                      fontSize: context.sp(14),
+                                      color: textPrimary)),
+                            ),
+                          ],
+                          onChanged: (v) =>
+                              setState(() => _agmType = v ?? _agmType),
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: dsSpace3),
 
                     // Meeting date
-                    Text('Meeting Date',
-                        style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: kTextSecondary)),
+                    _ModalLabel(label: 'Meeting Date', isDark: isDark),
                     const SizedBox(height: 6),
                     GestureDetector(
                       onTap: _pickDate,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
+                            horizontal: dsSpace4,
+                            vertical: dsSpace3),
                         decoration: BoxDecoration(
-                          border: Border.all(color: kBorderLight),
-                          borderRadius: BorderRadius.circular(10),
+                          color: isDark
+                              ? dsDarkSurfaceMuted
+                              : dsSurfaceMuted,
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusMd),
+                          border: Border.all(color: borderColor),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_today_outlined,
-                                size: 16, color: kTextSecondary),
-                            const SizedBox(width: 10),
+                            Icon(Icons.calendar_today_outlined,
+                                size: context.si(16),
+                                color: textSecondary),
+                            const SizedBox(width: dsSpace3),
                             Text(
                               dateFmt.format(_meetingDate),
                               style: GoogleFonts.inter(
-                                  fontSize: 14, color: kTextPrimary),
+                                fontSize: context.sp(14),
+                                color: textPrimary,
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: dsSpace3),
 
                     // Venue
-                    Text('Venue (optional)',
-                        style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: kTextSecondary)),
+                    _ModalLabel(
+                        label: 'Venue (optional)', isDark: isDark),
                     const SizedBox(height: 6),
-                    TextFormField(
+                    _ModalTextField(
                       controller: _venueCtrl,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'e.g. Community Hall',
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                      ),
+                      hint: 'e.g. Community Hall',
+                      isDark: isDark,
+                      textCapitalization:
+                          TextCapitalization.sentences,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: dsSpace3),
 
                     // Notes
-                    Text('Notes (optional)',
-                        style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: kTextSecondary)),
+                    _ModalLabel(
+                        label: 'Notes (optional)', isDark: isDark),
                     const SizedBox(height: 6),
-                    TextFormField(
+                    _ModalTextField(
                       controller: _notesCtrl,
+                      hint: 'Agenda or additional notes…',
+                      isDark: isDark,
                       maxLines: 3,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'Agenda or additional notes…',
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                      ),
+                      textCapitalization:
+                          TextCapitalization.sentences,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: dsSpace6),
 
-                    SizedBox(
+                    Container(
                       width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            BorderRadius.circular(dsRadiusButton),
+                        boxShadow: dsShadowBrand,
+                      ),
                       child: ElevatedButton(
                         onPressed: _saving ? null : _save,
                         style: ElevatedButton.styleFrom(
+                          backgroundColor: dsColorIndigo600,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           minimumSize: const Size(double.infinity, 48),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(
+                                dsRadiusButton),
+                          ),
                         ),
                         child: _saving
                             ? const SizedBox(
@@ -557,9 +761,14 @@ class _CreateSessionModalState extends ConsumerState<_CreateSessionModal> {
                                 width: 20,
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Colors.white),
-                              )
-                            : const Text('Schedule Meeting'),
+                                    color: Colors.white))
+                            : Text(
+                                'Schedule Meeting',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: context.sp(15),
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -569,6 +778,78 @@ class _CreateSessionModalState extends ConsumerState<_CreateSessionModal> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ModalLabel extends StatelessWidget {
+  final String label;
+  final bool isDark;
+  const _ModalLabel({required this.label, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: GoogleFonts.inter(
+        fontSize: context.sp(12),
+        fontWeight: FontWeight.w600,
+        color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+      ),
+    );
+  }
+}
+
+class _ModalTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final bool isDark;
+  final int maxLines;
+  final TextCapitalization textCapitalization;
+
+  const _ModalTextField({
+    required this.controller,
+    required this.hint,
+    required this.isDark,
+    this.maxLines = 1,
+    this.textCapitalization = TextCapitalization.none,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      textCapitalization: textCapitalization,
+      style: GoogleFonts.inter(
+          fontSize: context.sp(14), color: textPrimary),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.inter(
+            fontSize: context.sp(13), color: textSecondary),
+        filled: true,
+        fillColor: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: dsSpace4, vertical: dsSpace3),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide:
+              const BorderSide(color: dsColorIndigo600, width: 2),
+        ),
+      ),
+      validator: null,
     );
   }
 }

@@ -320,7 +320,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           // ── Registration status indicator ─────────────────────────────
           if (isRegistered) ...[
             const SizedBox(height: 12),
-            if (registration?.status == 'waitlisted')
+            if (registration.status == 'waitlisted')
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -482,7 +482,7 @@ class _AttendeesSection extends ConsumerWidget {
                     fontWeight: FontWeight.w600),
               ),
               loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
             ),
             const Spacer(),
             IconButton(
