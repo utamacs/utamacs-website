@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/status_badge.dart';
 import '../../../auth/domain/auth_notifier.dart';
@@ -11,6 +12,13 @@ import '../../data/snag_repository.dart';
 class SnagDetailScreen extends ConsumerWidget {
   final SnagItem snag;
   const SnagDetailScreen({super.key, required this.snag});
+
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -188,6 +196,49 @@ class SnagDetailScreen extends ConsumerWidget {
               ),
             ),
           ],
+
+          // ── Photo / document upload actions ───────────────────────────
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _openPortal('snags/${snag.id}?action=upload-photos'),
+                  icon: const Icon(Icons.add_photo_alternate_outlined,
+                      size: 16),
+                  label: const Text('Add Photos'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kPrimary600,
+                    side: const BorderSide(color: kPrimary600),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    textStyle: GoogleFonts.inter(
+                        fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _openPortal('snags/${snag.id}?action=upload-docs'),
+                  icon: const Icon(Icons.upload_file_outlined, size: 16),
+                  label: const Text('Add Documents'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kTextSecondary,
+                    side: const BorderSide(color: kBorderLight),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    textStyle: GoogleFonts.inter(
+                        fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ),
+            ],
+          ),
 
           // ── Linked HOTO items (exec only) ─────────────────────────────
           if (isExec) ...[

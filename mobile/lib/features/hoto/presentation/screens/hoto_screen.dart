@@ -39,6 +39,16 @@ class HotoScreen extends ConsumerWidget {
         actions: [
           if (isExec) ...[
             IconButton(
+              icon: const Icon(Icons.how_to_vote_outlined),
+              tooltip: 'Elections',
+              onPressed: () => _openPortal('hoto?tab=elections'),
+            ),
+            IconButton(
+              icon: const Icon(Icons.account_balance_outlined),
+              tooltip: 'Finance & Resolutions',
+              onPressed: () => _openPortal('hoto?tab=finance'),
+            ),
+            IconButton(
               icon: const Icon(Icons.group_add_outlined),
               tooltip: 'Invite Participants',
               onPressed: () => _openPortal('hoto?action=invite'),

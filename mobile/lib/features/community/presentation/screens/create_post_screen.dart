@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/community_repository.dart';
 
@@ -136,6 +137,48 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   alignLabelWithHint: true,
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // Image upload — opens portal
+              GestureDetector(
+                onTap: () async {
+                  final uri = Uri.parse(
+                      'https://portal.utamacs.org/portal/community?action=create-post-with-images');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: kPrimary50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kPrimary100),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.add_photo_alternate_outlined,
+                          color: kPrimary600, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Add Images (up to 5) — tap to open portal',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: kPrimary600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.open_in_new,
+                          color: kPrimary600, size: 14),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 24),
 
               // Submit button

@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -197,10 +199,10 @@ class _AlbumHeader extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Photo placeholder tile
+// Photo tile (tappable, opens lightbox)
 // ---------------------------------------------------------------------------
 
-class _PhotoTile extends StatelessWidget {
+class _PhotoTile extends ConsumerWidget {
   final GalleryPhoto photo;
   final int index;
 
@@ -225,27 +227,56 @@ class _PhotoTile extends StatelessWidget {
     Color(0xFFEA580C),
   ];
 
+  void _showLightbox(BuildContext context, String? signedUrl) {
+    showDialog(
+      context: context,
+      builder: (_) => _PhotoLightbox(photo: photo, signedUrl: signedUrl),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorIdx = index % _palette.length;
     final bgColor = _palette[colorIdx];
     final iconColor = _iconColors[colorIdx];
+    final urlAsync = ref.watch(galleryPhotoUrlProvider(photo.storageKey));
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _showLightbox(context, urlAsync.valueOrNull),
+      child: Container(
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Stack(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Stack(
         children: [
-          // Photo icon centred
-          Center(
-            child: Icon(
-              Icons.photo_outlined,
-              size: 28,
-              color: iconColor.withValues(alpha: 0.7),
+          // Real photo if URL loaded
+          if (urlAsync.valueOrNull != null)
+            CachedNetworkImage(
+              imageUrl: urlAsync.valueOrNull!,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              placeholder: (_, __) => Center(
+                child: Icon(Icons.photo_outlined, size: 28,
+                    color: iconColor.withValues(alpha: 0.7)),
+              ),
+              errorWidget: (_, __, ___) => Center(
+                child: Icon(Icons.photo_outlined, size: 28,
+                    color: iconColor.withValues(alpha: 0.7)),
+              ),
+            )
+          else
+            // Photo icon centred (placeholder)
+            Center(
+              child: Icon(
+                Icons.photo_outlined,
+                size: 28,
+                color: iconColor.withValues(alpha: 0.7),
+              ),
             ),
-          ),
 
           // Photo number label (bottom-left)
           Positioned(
@@ -256,7 +287,9 @@ class _PhotoTile extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: iconColor,
+                color: urlAsync.valueOrNull != null
+                    ? Colors.white
+                    : iconColor,
               ),
             ),
           ),
@@ -273,21 +306,18 @@ class _PhotoTile extends StatelessWidget {
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      iconColor.withValues(alpha: 0.25),
+                      Colors.black.withValues(alpha: 0.5),
                       Colors.transparent,
                     ],
-                  ),
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(10),
                   ),
                 ),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Text(
                   photo.caption!,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 9,
-                    color: iconColor,
+                    color: Colors.white,
                     fontWeight: FontWeight.w500,
                   ),
                   maxLines: 1,
@@ -296,6 +326,101 @@ class _PhotoTile extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+        ),
+      ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Photo lightbox dialog
+// ---------------------------------------------------------------------------
+
+class _PhotoLightbox extends StatelessWidget {
+  final GalleryPhoto photo;
+  final String? signedUrl;
+
+  const _PhotoLightbox({required this.photo, this.signedUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: EdgeInsets.zero,
+      child: Stack(
+        children: [
+          // Full-screen photo or placeholder
+          Center(
+            child: signedUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: signedUrl!,
+                    fit: BoxFit.contain,
+                    placeholder: (_, __) => const Center(
+                      child: CircularProgressIndicator(
+                          color: Colors.white),
+                    ),
+                    errorWidget: (_, __, ___) => const Icon(
+                      Icons.broken_image_outlined,
+                      color: Colors.white54,
+                      size: 60,
+                    ),
+                  )
+                : const Icon(
+                    Icons.photo_outlined,
+                    color: Colors.white54,
+                    size: 60,
+                  ),
+          ),
+
+          // Caption at bottom
+          if (photo.caption != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.75),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: Text(
+                  photo.caption!,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+
+          // Close button
+          Positioned(
+            top: 16,
+            right: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
         ],
       ),
     );

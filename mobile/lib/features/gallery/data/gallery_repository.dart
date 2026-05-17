@@ -111,6 +111,16 @@ class GalleryRepository {
     }
   }
 
+  Future<String?> fetchPhotoUrl(String storageKey) async {
+    try {
+      return await _client.storage
+          .from('gallery-photos')
+          .createSignedUrl(storageKey, 3600);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<GalleryAlbum> createAlbum({
     required String title,
     String? description,
@@ -156,4 +166,10 @@ final albumCoverUrlProvider =
     FutureProvider.autoDispose.family<String?, String>(
   (ref, coverKey) =>
       ref.read(galleryRepositoryProvider).fetchCoverUrl(coverKey),
+);
+
+final galleryPhotoUrlProvider =
+    FutureProvider.autoDispose.family<String?, String>(
+  (ref, storageKey) =>
+      ref.read(galleryRepositoryProvider).fetchPhotoUrl(storageKey),
 );
