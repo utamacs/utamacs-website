@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/gallery_repository.dart';
 
 class AlbumDetailScreen extends ConsumerWidget {
@@ -12,9 +14,18 @@ class AlbumDetailScreen extends ConsumerWidget {
 
   const AlbumDetailScreen({super.key, required this.album});
 
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final photosAsync = ref.watch(albumPhotosProvider(album.id));
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -34,6 +45,13 @@ class AlbumDetailScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (isExec)
+            IconButton(
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              tooltip: 'Upload Photos',
+              onPressed: () => _openPortal(
+                  'gallery/${album.id}?action=upload-photos'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(albumPhotosProvider(album.id)),

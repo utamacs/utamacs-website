@@ -2,11 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/finance_repository.dart';
+
+Future<void> _openPortal(String path) async {
+  final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
 
 /// Formats a [double] amount as an Indian-locale rupee string.
 /// e.g. 12500.0 → "₹12,500"
@@ -31,6 +40,9 @@ class FinanceScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -54,6 +66,23 @@ class FinanceScreen extends ConsumerWidget {
             ],
           ),
           actions: [
+            if (isExec) ...[
+              IconButton(
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                tooltip: 'Expense Approvals',
+                onPressed: () => _openPortal('finance?tab=expenses'),
+              ),
+              IconButton(
+                icon: const Icon(Icons.receipt_long_outlined),
+                tooltip: 'Reports & Ledger',
+                onPressed: () => _openPortal('finance?tab=reports'),
+              ),
+              IconButton(
+                icon: const Icon(Icons.savings_outlined),
+                tooltip: 'TDS & Billing Periods',
+                onPressed: () => _openPortal('admin/tds'),
+              ),
+            ],
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () {
@@ -191,6 +220,7 @@ class _DueCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOverdue = due.status == 'overdue';
+    final isOutstanding = due.isOutstanding;
     return AppCard(
       color: isOverdue
           ? const Color(0xFFFFF5F5)
@@ -247,6 +277,44 @@ class _DueCard extends StatelessWidget {
               ),
             ],
           ),
+          if (isOutstanding) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openPortal(
+                        'finance?action=pay&id=${due.id}'),
+                    icon: const Icon(Icons.payment_outlined, size: 15),
+                    label: const Text('Pay Now'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kPrimary600,
+                      side: const BorderSide(color: kPrimary600),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      textStyle: GoogleFonts.inter(
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openPortal(
+                        'finance?action=invoice&id=${due.id}'),
+                    icon: const Icon(Icons.description_outlined, size: 15),
+                    label: const Text('View Invoice'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kTextSecondary,
+                      side: const BorderSide(color: kBorderLight),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      textStyle: GoogleFonts.inter(
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -401,6 +469,20 @@ class _PaymentCard extends StatelessWidget {
                 _formatDate(payment.paidAt),
                 style: GoogleFonts.inter(
                     fontSize: 11, color: kTextSecondary),
+              ),
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: () => _openPortal(
+                    'finance?action=receipt&id=${payment.id}'),
+                child: Text(
+                  'Download Receipt',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: kPrimary600,
+                    fontWeight: FontWeight.w600,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
               ),
             ],
           ),
