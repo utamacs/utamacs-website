@@ -8,6 +8,7 @@ import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
 import '../../data/snag_repository.dart';
 import 'report_snag_screen.dart';
+import 'snag_detail_screen.dart';
 
 class SnagsScreen extends ConsumerStatefulWidget {
   const SnagsScreen({super.key});
@@ -206,6 +207,10 @@ class _SnagCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => SnagDetailScreen(snag: snag)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

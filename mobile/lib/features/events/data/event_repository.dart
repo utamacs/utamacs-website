@@ -95,6 +95,45 @@ class EventRegistration {
 }
 
 // ---------------------------------------------------------------------------
+// Attendee model (exec-only view)
+// ---------------------------------------------------------------------------
+
+class EventAttendee {
+  final String id;
+  final String userId;
+  final String? fullName;
+  final int attendeesCount;
+  final String status;
+  final DateTime? checkedInAt;
+  final DateTime registeredAt;
+
+  const EventAttendee({
+    required this.id,
+    required this.userId,
+    this.fullName,
+    required this.attendeesCount,
+    required this.status,
+    this.checkedInAt,
+    required this.registeredAt,
+  });
+
+  factory EventAttendee.fromJson(Map<String, dynamic> j) {
+    final profileMap = j['profiles'] as Map<String, dynamic>?;
+    return EventAttendee(
+      id: j['id'] as String,
+      userId: j['user_id'] as String,
+      fullName: profileMap?['full_name'] as String?,
+      attendeesCount: j['attendees_count'] as int? ?? 1,
+      status: j['status'] as String,
+      checkedInAt: j['checked_in_at'] != null
+          ? DateTime.parse(j['checked_in_at'] as String)
+          : null,
+      registeredAt: DateTime.parse(j['registered_at'] as String),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
 
@@ -153,6 +192,16 @@ class EventRepository {
         .eq('user_id', uid);
   }
 
+  Future<List<EventAttendee>> fetchEventAttendees(String eventId) async {
+    final data = await _client
+        .from('event_registrations')
+        .select('*, profiles:user_id(full_name)')
+        .eq('event_id', eventId)
+        .neq('status', 'cancelled')
+        .order('registered_at', ascending: true);
+    return (data as List).map((e) => EventAttendee.fromJson(e)).toList();
+  }
+
   Future<Event> createEvent({
     required String title,
     required String category,
@@ -206,3 +255,8 @@ final myEventRegistrationsProvider =
     FutureProvider.autoDispose<List<EventRegistration>>((ref) {
   return ref.read(eventRepositoryProvider).fetchMyRegistrations();
 });
+
+final eventAttendeesProvider =
+    FutureProvider.autoDispose.family<List<EventAttendee>, String>(
+        (ref, eventId) =>
+            ref.read(eventRepositoryProvider).fetchEventAttendees(eventId));
