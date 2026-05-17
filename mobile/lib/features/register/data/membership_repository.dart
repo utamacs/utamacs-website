@@ -17,6 +17,7 @@ class Membership {
   final bool admissionFeePaid;
   final double shareCapitalAmount;
   final bool shareCapitalPaid;
+  final List<String> jointOwnerNames;
   final String? membershipNumber;
   final String? shareCertNumber;
   final DateTime? submittedAt;
@@ -33,6 +34,7 @@ class Membership {
     required this.admissionFeePaid,
     required this.shareCapitalAmount,
     required this.shareCapitalPaid,
+    this.jointOwnerNames = const [],
     this.membershipNumber,
     this.shareCertNumber,
     this.submittedAt,
@@ -40,7 +42,8 @@ class Membership {
   });
 
   bool get isApproved => status == 'approved';
-  bool get isPending => status == 'pending' || status == 'under_review';
+  bool get isPending =>
+      ['applied', 'fees_pending', 'fees_confirmed'].contains(status);
 
   factory Membership.fromJson(Map<String, dynamic> j) => Membership(
         id: j['id'] as String,
@@ -48,7 +51,11 @@ class Membership {
         profileId: j['profile_id'] as String?,
         memberName: j['member_name'] as String,
         memberType: j['member_type'] as String? ?? 'original_owner',
-        status: j['status'] as String? ?? 'pending',
+        jointOwnerNames: (j['joint_owner_names'] as List?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
+        status: j['status'] as String? ?? 'applied',
         admissionFeeAmount:
             (j['admission_fee_amount'] as num?)?.toDouble() ?? 1000.0,
         admissionFeePaid: j['admission_fee_paid'] as bool? ?? false,
@@ -87,6 +94,7 @@ class MembershipRepository {
   Future<Membership> applyForMembership({
     required String memberName,
     required String memberType,
+    List<String> jointOwnerNames = const [],
   }) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw Exception('Not authenticated');
@@ -108,11 +116,14 @@ class MembershipRepository {
           'profile_id': uid,
           'member_name': memberName,
           'member_type': memberType,
-          'status': 'pending',
+          'status': 'applied',
           'admission_fee_amount': 1000,
           'admission_fee_paid': false,
           'share_capital_amount': 1000,
           'share_capital_paid': false,
+          'submitted_at': DateTime.now().toIso8601String(),
+          if (jointOwnerNames.isNotEmpty)
+            'joint_owner_names': jointOwnerNames,
         })
         .select()
         .single();

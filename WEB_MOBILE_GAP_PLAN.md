@@ -31,13 +31,13 @@
 | 20 Security Patrol | 6 | 3 | 3 |
 | 21 Staff Management | 9 | 2 | 7 |
 | 22 Policies | 4 | 2 | 2 |
-| 23 Register / Membership | 6 | 2 | 4 |
+| 23 Register / Membership | 6 | 5 | 1 |
 | 24 AGM | 5 | 3 | 2 |
-| 25 Tenant KYC | 5 | 4 | 1 |
+| 25 Tenant KYC | 5 | 5 | 0 |
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
-| 28 Profile & Auth | 6 | 3 | 3 |
-| **TOTAL** | **234** | **122** | **112** |
+| 28 Profile & Auth | 6 | 4 | 2 |
+| **TOTAL** | **234** | **127** | **107** |
 
 ---
 
@@ -353,9 +353,9 @@
 - [x] 🔴 Public self-registration form — Step 1 (name / email / phone / occupancy_type), Step 2 (flat / move-in date / ID type+number / vehicle), Step 3 (DPDPA consent review + submit)
 - [ ] 🟡 Sale deed upload — PDF/JPG/PNG, max 10 MB (for membership application)
 - [x] 🟡 Member type alignment — add: original_owner / purchaser / successor / heir / joint_owner_nominee (currently only resident_owner / investor_owner)
-- [ ] 🟡 Membership status timeline — Application Submitted → Fee Confirmed → Approved → Share Cert Issued
-- [ ] 🟡 Joint owners names field
-- [ ] 🟢 Fee payment notice (₹1,000 admission + ₹1,000 share capital with direct-pay instructions)
+- [x] 🟡 Membership status timeline — Application Submitted → Fee Confirmed → Approved → Share Cert Issued
+- [x] 🟡 Joint owners names field
+- [x] 🟢 Fee payment notice (₹1,000 admission + ₹1,000 share capital with direct-pay instructions)
 
 ---
 
@@ -375,7 +375,7 @@
 - [x] 🟠 Police verification form — police_station, verification_date, reference#, "Mark Police Verified" button
 - [x] 🟡 Owner consent toggle + date stamp
 - [x] 🟡 Status transition buttons — Pending → Submitted → Police Verified → Completed
-- [ ] 🟡 As-Tenant tab — full implementation (tenant views own KYC record)
+- [x] 🟡 As-Tenant tab — full implementation (tenant views own KYC record)
 
 ---
 
@@ -407,7 +407,7 @@
 
 - [x] 🟠 Edit own profile — bio, preferred_language (en/te/hi), WhatsApp number, emergency contact (name / phone / relation)
 - [ ] 🟠 Avatar upload — JPEG/PNG/WebP with upload progress; stored via GitHub Docs `avatar(profileId, ext)` path
-- [ ] 🟡 Unit details view — building, floor, area_sqft, residency_type, move_in_date, num_occupants
+- [x] 🟡 Unit details view — building, floor, area_sqft, residency_type, move_in_date, num_occupants
 - [ ] 🟡 Password reset flow — forgot-password email → reset-password token screen
 - [ ] 🟢 NRI flag and occupant count display
 - [ ] 🟢 Consent version and date display (DPDPA)
