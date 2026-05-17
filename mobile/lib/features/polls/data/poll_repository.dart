@@ -201,6 +201,66 @@ class PollRepository {
       'voted_at': DateTime.now().toIso8601String(),
     });
   }
+
+  Future<Poll> createPoll({
+    required String title,
+    String? description,
+    required String pollType,
+    required bool isAnonymous,
+    required bool oneVotePerUnit,
+    DateTime? endsAt,
+    String resultVisibility = 'after_vote',
+    int? maxChoices,
+    List<String> options = const [],
+  }) async {
+    // Insert poll
+    final pollData = await _client
+        .from('polls')
+        .insert({
+          'society_id': env.societyId,
+          'title': title,
+          if (description != null && description.isNotEmpty)
+            'description': description,
+          'poll_type': pollType,
+          'is_anonymous': isAnonymous,
+          'one_vote_per_unit': oneVotePerUnit,
+          if (endsAt != null) 'ends_at': endsAt.toIso8601String(),
+          'result_visibility': resultVisibility,
+          if (pollType == 'multiple_choice' && maxChoices != null)
+            'max_choices': maxChoices,
+          'is_published': true,
+        })
+        .select()
+        .single();
+    final poll = Poll.fromJson(pollData);
+
+    // Insert options for non-system poll types
+    final needsOptions =
+        pollType != 'yes_no' && pollType != 'rating' && options.isNotEmpty;
+    if (needsOptions) {
+      final optionRows = options
+          .asMap()
+          .entries
+          .where((e) => e.value.trim().isNotEmpty)
+          .map((e) => {
+                'poll_id': poll.id,
+                'option_text': e.value.trim(),
+                'order_index': e.key,
+              })
+          .toList();
+      if (optionRows.isNotEmpty) {
+        await _client.from('poll_options').insert(optionRows);
+      }
+    } else if (pollType == 'yes_no') {
+      // Insert Yes/No options automatically
+      await _client.from('poll_options').insert([
+        {'poll_id': poll.id, 'option_text': 'Yes', 'order_index': 0},
+        {'poll_id': poll.id, 'option_text': 'No', 'order_index': 1},
+      ]);
+    }
+
+    return poll;
+  }
 }
 
 // ---------------------------------------------------------------------------
