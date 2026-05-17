@@ -16,6 +16,7 @@ class VisitorPreApproval {
   final bool isRecurring;
   final String? qrToken;
   final String? otpCode;
+  final String? notes;
 
   const VisitorPreApproval({
     required this.id,
@@ -29,6 +30,7 @@ class VisitorPreApproval {
     this.isRecurring = false,
     this.qrToken,
     this.otpCode,
+    this.notes,
   });
 
   bool get isActive {
@@ -53,6 +55,7 @@ class VisitorPreApproval {
         isRecurring: j['is_recurring'] as bool? ?? false,
         qrToken: j['qr_token'] as String?,
         otpCode: j['otp_code'] as String?,
+        notes: j['notes'] as String?,
       );
 }
 
@@ -114,6 +117,7 @@ class VisitorRepository {
     String? purpose,
     required DateTime expectedDate,
     DateTime? expiresAt,
+    String? notes,
   }) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw Exception('Not authenticated');
@@ -154,6 +158,7 @@ class VisitorRepository {
           'expires_at': (expiresAt ?? expectedDate.add(const Duration(hours: 24))).toIso8601String(),
           'status': 'pending',
           'otp_code': otp,
+          if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
         })
         .select()
         .single();

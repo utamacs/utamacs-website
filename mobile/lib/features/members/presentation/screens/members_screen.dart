@@ -227,6 +227,26 @@ class _MemberCard extends StatelessWidget {
               ],
             ),
           ),
+          // NRI badge
+          if (member.isNri)
+            Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Text(
+                'NRI',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1D4ED8),
+                ),
+              ),
+            ),
           // Role chip — only for exec roles
           if (member.isExec)
             _RoleChip(label: member.roleLabel),

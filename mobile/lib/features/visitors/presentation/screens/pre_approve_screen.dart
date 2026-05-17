@@ -16,6 +16,7 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
   final _phoneCtrl = TextEditingController();
   final _vehicleCtrl = TextEditingController();
   final _purposeCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
   DateTime _validFrom = DateTime.now();
   DateTime? _expiresAt;
   bool _loading = false;
@@ -26,6 +27,7 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
     _phoneCtrl.dispose();
     _vehicleCtrl.dispose();
     _purposeCtrl.dispose();
+    _notesCtrl.dispose();
     super.dispose();
   }
 
@@ -65,6 +67,9 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
                 : _purposeCtrl.text.trim(),
             expectedDate: _validFrom,
             expiresAt: _expiresAt,
+            notes: _notesCtrl.text.trim().isEmpty
+                ? null
+                : _notesCtrl.text.trim(),
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,6 +140,17 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Purpose of visit (optional)',
                   prefixIcon: Icon(Icons.info_outline),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _notesCtrl,
+                maxLines: 2,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Notes for guard (optional)',
+                  hintText: 'e.g. Allow access to Flat 201',
+                  prefixIcon: Icon(Icons.note_outlined),
                 ),
               ),
               const SizedBox(height: 28),
