@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
@@ -14,112 +15,297 @@ class CommunityScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final postsAsync = ref.watch(communityPostsProvider);
-    final currentLimit = ref.watch(communityLimitProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('Community Board'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          if (isExec)
-            IconButton(
-              tooltip: 'Moderation Queue',
-              icon: const Icon(Icons.admin_panel_settings_outlined),
-              onPressed: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => _ModerationSheet(
-                  onChanged: () {
-                    ref.invalidate(communityPostsProvider);
-                    ref.invalidate(moderationQueueProvider);
-                  },
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: kBgWarm,
+        appBar: AppBar(
+          title: const Text('Community Board'),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          actions: [
+            if (isExec)
+              IconButton(
+                tooltip: 'Moderation Queue',
+                icon: const Icon(Icons.admin_panel_settings_outlined),
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => _ModerationSheet(
+                    onChanged: () {
+                      ref.invalidate(communityPostsProvider);
+                      ref.invalidate(moderationQueueProvider);
+                    },
+                  ),
                 ),
               ),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                ref.read(communityLimitProvider.notifier).state = 30;
+                ref.invalidate(communityPostsProvider);
+                ref.invalidate(marketplaceListingsProvider);
+              },
             ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.read(communityLimitProvider.notifier).state = 30;
-              ref.invalidate(communityPostsProvider);
-            },
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreatePostScreen()),
-          );
-          ref.invalidate(communityPostsProvider);
-        },
-        backgroundColor: kPrimary600,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.edit_outlined),
-        label: const Text('Post'),
-      ),
-      body: postsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load posts',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(communityPostsProvider),
-            child: const Text('Retry'),
+          ],
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Board'),
+              Tab(text: 'Marketplace'),
+            ],
+            labelStyle: TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
-        data: (posts) {
-          if (posts.isEmpty) {
-            return const EmptyState(
-              icon: Icons.forum_outlined,
-              title: 'No posts yet',
-              subtitle: 'Be the first to share something with the community.',
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreatePostScreen()),
             );
-          }
-          final hasMore = posts.length >= currentLimit;
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.read(communityLimitProvider.notifier).state = 30;
-              ref.invalidate(communityPostsProvider);
-            },
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-              children: [
-                ...posts.map((post) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _PostCard(post: post),
-                    )),
-                if (hasMore)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4, bottom: 8),
-                    child: Center(
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.expand_more, size: 18),
-                        label: Text(
-                          'Load more',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+            ref.invalidate(communityPostsProvider);
+          },
+          backgroundColor: kPrimary600,
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Post'),
+        ),
+        body: const TabBarView(
+          children: [
+            _BoardTab(),
+            _MarketplaceTab(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Board tab
+// ---------------------------------------------------------------------------
+
+class _BoardTab extends ConsumerWidget {
+  const _BoardTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final postsAsync = ref.watch(communityPostsProvider);
+    final currentLimit = ref.watch(communityLimitProvider);
+
+    return postsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load posts',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(communityPostsProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (posts) {
+        if (posts.isEmpty) {
+          return const EmptyState(
+            icon: Icons.forum_outlined,
+            title: 'No posts yet',
+            subtitle: 'Be the first to share something with the community.',
+          );
+        }
+        final hasMore = posts.length >= currentLimit;
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.read(communityLimitProvider.notifier).state = 30;
+            ref.invalidate(communityPostsProvider);
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+            children: [
+              ...posts.map((post) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _PostCard(post: post),
+                  )),
+              if (hasMore)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 8),
+                  child: Center(
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.expand_more, size: 18),
+                      label: Text(
+                        'Load more',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
-                        onPressed: () {
-                          ref.read(communityLimitProvider.notifier).state =
-                              currentLimit + 10;
-                        },
                       ),
+                      onPressed: () {
+                        ref.read(communityLimitProvider.notifier).state =
+                            currentLimit + 10;
+                      },
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Marketplace tab
+// ---------------------------------------------------------------------------
+
+class _MarketplaceTab extends ConsumerWidget {
+  const _MarketplaceTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final listingsAsync = ref.watch(marketplaceListingsProvider);
+
+    return listingsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load listings',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(marketplaceListingsProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (listings) {
+        if (listings.isEmpty) {
+          return const EmptyState(
+            icon: Icons.storefront_outlined,
+            title: 'No listings yet',
+            subtitle:
+                'Neighbours will post items for sale, giveaway, or services here.',
           );
-        },
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(marketplaceListingsProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+            itemCount: listings.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (_, i) => _ListingCard(listing: listings[i]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Marketplace listing card
+// ---------------------------------------------------------------------------
+
+class _ListingCard extends StatelessWidget {
+  final MarketplaceListing listing;
+  const _ListingCard({required this.listing});
+
+  Color get _categoryColor => switch (listing.category) {
+        'Electronics' => kPrimary600,
+        'Furniture' => const Color(0xFF7C3AED),
+        'Books' => const Color(0xFF065F46),
+        'Vehicles' => const Color(0xFF92400E),
+        'Services' => kSecondary500,
+        _ => kTextSecondary,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _categoryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  listing.categoryLabel,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _categoryColor,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (listing.price != null)
+                Text(
+                  '₹${NumberFormat('#,##0').format(listing.price)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: kSecondary500,
+                  ),
+                )
+              else
+                Text(
+                  'FREE',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: kSecondary500,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            listing.title,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: kTextPrimary,
+            ),
+          ),
+          if (listing.description != null &&
+              listing.description!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              listing.description!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: kTextSecondary, height: 1.4),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.schedule_outlined,
+                  size: 13, color: kTextSecondary),
+              const SizedBox(width: 4),
+              Text(
+                timeago.format(listing.createdAt),
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: kTextSecondary),
+              ),
+              const Spacer(),
+              const Icon(Icons.chat_bubble_outline,
+                  size: 13, color: kTextSecondary),
+              const SizedBox(width: 4),
+              Text(
+                listing.contactPreference == 'phone' ? 'Call seller' : 'In-app',
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: kTextSecondary),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -93,9 +93,100 @@ class SnagDetailScreen extends ConsumerWidget {
                     label: 'Verified at',
                     value: DateFormat('d MMM yyyy').format(snag.verifiedAt!),
                   ),
+                if (snag.responsibleRole != null) ...[
+                  const SizedBox(height: 4),
+                  const Divider(height: 1, color: kBorderLight),
+                  const SizedBox(height: 10),
+                  _DetailRow(
+                    icon: Icons.person_outlined,
+                    label: 'Assigned Role',
+                    value: snag.responsibleRole!,
+                  ),
+                ],
               ],
             ),
           ),
+
+          // ── Builder reference card ──────────────────────────────────────
+          if (snag.builderRef != null ||
+              snag.builderCommittedDate != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFED7AA)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.construction_outlined,
+                          size: 16, color: Color(0xFFEA580C)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Builder Reference',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFEA580C),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (snag.builderRef != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Ref #',
+                            style: GoogleFonts.inter(
+                                fontSize: 12, color: kTextSecondary),
+                          ),
+                          const Spacer(),
+                          Text(
+                            snag.builderRef!,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kTextPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (snag.builderCommittedDate != null)
+                    Row(
+                      children: [
+                        Text(
+                          'Committed Date',
+                          style: GoogleFonts.inter(
+                              fontSize: 12, color: kTextSecondary),
+                        ),
+                        const Spacer(),
+                        Text(
+                          DateFormat('d MMM yyyy')
+                              .format(snag.builderCommittedDate!),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: snag.builderCommittedDate!
+                                    .isBefore(DateTime.now())
+                                ? kRed600
+                                : kTextPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ],
 
           // ── Comments thread (exec only) ────────────────────────────────
           if (isExec) ...[
