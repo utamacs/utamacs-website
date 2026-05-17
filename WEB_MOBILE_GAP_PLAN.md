@@ -14,9 +14,9 @@
 | 03 Complaints | 13 | 13 | 0 |
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 8 | 1 |
-| 06 Polls | 9 | 8 | 1 |
+| 06 Polls | 9 | 9 | 0 |
 | 07 Community Board | 11 | 10 | 1 |
-| 08 Documents | 11 | 7 | 4 |
+| 08 Documents | 11 | 11 | 0 |
 | 09 Gallery | 5 | 3 | 2 |
 | 10 Facilities | 6 | 6 | 0 |
 | 11 Parking | 12 | 10 | 2 |
@@ -26,18 +26,18 @@
 | 15 Feedback | 8 | 8 | 0 |
 | 16 Water Tankers | 11 | 10 | 1 |
 | 17 Snags | 11 | 9 | 2 |
-| 18 HOTO | 8 | 4 | 4 |
+| 18 HOTO | 8 | 6 | 2 |
 | 19 Analytics | 8 | 7 | 1 |
 | 20 Security Patrol | 6 | 6 | 0 |
 | 21 Staff Management | 9 | 6 | 3 |
 | 22 Policies | 4 | 4 | 0 |
-| 23 Register / Membership | 6 | 5 | 1 |
+| 23 Register / Membership | 6 | 6 | 0 |
 | 24 AGM | 5 | 5 | 0 |
 | 25 Tenant KYC | 5 | 5 | 0 |
-| 26 Letters | 5 | 1 | 4 |
+| 26 Letters | 5 | 5 | 0 |
 | 27 Vendors & Work Orders | 9 | 7 | 2 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **234** | **179** | **55** |
+| **TOTAL** | **234** | **191** | **43** |
 
 ---
 
@@ -129,7 +129,7 @@
 - [x] 🟡 Yes/No poll type UI variant
 - [x] 🟡 Multi-choice limit enforcement (`max_choices` 2–20, disable submit if over limit)
 - [x] 🟡 Close poll early button (exec) with confirmation dialog
-- [ ] 🟡 PDF export of results (exec) — signed PDF with society letterhead
+- [x] 🟡 PDF export of results (exec) — signed PDF with society letterhead
 - [x] 🟡 Anonymous voting — display layer hides voter identity
 - [x] 🟡 Result visibility modes fully enforced: `after_vote` / `after_close` / `executive_only`
 - [x] 🟢 AGM session linkage on poll create
@@ -155,16 +155,16 @@
 ## 08 · DOCUMENTS
 
 - [x] 🟠 View full document content — PDF in viewer, video player for video-type docs
-- [ ] 🟠 Upload document modal (exec) — file, title, category, description, access level, is_public flag
+- [x] 🟠 Upload document modal (exec) — file, title, category, description, access level, is_public flag
 - [x] 🟡 Search input with debounce (real-time filter against title/description)
-- [ ] 🟡 Version history drawer — all versions with download links + change notes
-- [ ] 🟡 Upload new version + change notes (auto-increments version number)
+- [x] 🟡 Version history drawer — all versions with download links + change notes
+- [x] 🟡 Upload new version + change notes (auto-increments version number)
 - [x] 🟡 10-category filter tabs (Bylaws, Minutes, Financial, Legal, Circulars, Governance, HOTO, Maintenance, Forms, Other)
 - [x] 🟡 Access control badge (`requires_role` member/executive, `is_public` indicator)
 - [x] 🟢 MIME type icons (PDF=red, Word=blue, Excel=green, CSV, Image)
 - [x] 🟢 File size and upload date displayed on card
 - [x] 🟢 Archive document (exec)
-- [ ] 🟢 Download audit log entry (exec downloads logged in `audit_logs`)
+- [x] 🟢 Download audit log entry (exec downloads logged in `audit_logs`)
 
 ---
 
@@ -293,11 +293,11 @@
 - [x] 🔴 HOTO item detail screen — full status workflow: NOT_STARTED → IN_PROGRESS → UNDER_REVIEW → PENDING_SECRETARY / PENDING_PRESIDENT → APPROVED / REJECTED → CLOSED
 - [x] 🔴 Snag ↔ HOTO bidirectional linking (attach snag to HOTO item; block HOTO review if snag open)
 - [x] 🟠 Status transition buttons (advance / submit for review / approve / reject)
-- [ ] 🟠 Delegation management — assign authority to committee member
+- [x] 🟠 Delegation management — assign authority to committee member
 - [ ] 🟠 Elections workflow screen
 - [ ] 🟠 Finance tab — resolutions, budget approvals, funding decisions
 - [x] 🟡 Comments on HOTO items
-- [ ] 🟡 User invitations to HOTO process
+- [x] 🟡 User invitations to HOTO process
 
 ---
 
@@ -351,7 +351,7 @@
 ## 23 · REGISTER / MEMBERSHIP
 
 - [x] 🔴 Public self-registration form — Step 1 (name / email / phone / occupancy_type), Step 2 (flat / move-in date / ID type+number / vehicle), Step 3 (DPDPA consent review + submit)
-- [ ] 🟡 Sale deed upload — PDF/JPG/PNG, max 10 MB (for membership application)
+- [x] 🟡 Sale deed upload — PDF/JPG/PNG, max 10 MB (for membership application)
 - [x] 🟡 Member type alignment — add: original_owner / purchaser / successor / heir / joint_owner_nominee (currently only resident_owner / investor_owner)
 - [x] 🟡 Membership status timeline — Application Submitted → Fee Confirmed → Approved → Share Cert Issued
 - [x] 🟡 Joint owners names field
@@ -381,11 +381,11 @@
 
 ## 26 · LETTERS
 
-- [ ] 🔴 PDF generation and download (exec) — society letterhead, sequential reference#, secretary sign-off
-- [ ] 🟠 Template system — select template, fill variables (resident name / unit / date / amount), auto render, reference# auto-generation
-- [ ] 🟡 Secretary sign-off step before PDF issue
+- [x] 🔴 PDF generation and download (exec) — society letterhead, sequential reference#, secretary sign-off
+- [x] 🟠 Template system — select template, fill variables (resident name / unit / date / amount), auto render, reference# auto-generation
+- [x] 🟡 Secretary sign-off step before PDF issue
 - [x] 🟡 Letter detail / full-content view on mobile
-- [ ] 🟡 Cross-module linking — AGM notice → AGM session, demand notice → Finance due, RERA notice → Snag/HOTO item
+- [x] 🟡 Cross-module linking — AGM notice → AGM session, demand notice → Finance due, RERA notice → Snag/HOTO item
 
 ---
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -322,6 +323,32 @@ class _MembershipStatusView extends StatelessWidget {
             ],
           ),
         ),
+
+        if (!membership.isApproved) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: kPrimary600,
+                side: const BorderSide(color: kPrimary600),
+                minimumSize: const Size(double.infinity, 46),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.upload_file_outlined, size: 18),
+              label: const Text('Upload Sale Deed'),
+              onPressed: () async {
+                final uri = Uri.parse(
+                    'https://portal.utamacs.org/portal/register?action=upload-sale-deed');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri,
+                      mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ),
+        ],
       ],
     );
   }
