@@ -13,6 +13,10 @@ class GeneratedLetter {
   final String? recipient;
   final String createdBy;
   final DateTime createdAt;
+  final String? referenceNumber;
+  final String? letterType;
+  final String? status;
+  final DateTime? letterDate;
 
   const GeneratedLetter({
     required this.id,
@@ -21,6 +25,10 @@ class GeneratedLetter {
     this.recipient,
     required this.createdBy,
     required this.createdAt,
+    this.referenceNumber,
+    this.letterType,
+    this.status,
+    this.letterDate,
   });
 
   factory GeneratedLetter.fromJson(Map<String, dynamic> j) => GeneratedLetter(
@@ -30,6 +38,12 @@ class GeneratedLetter {
         recipient: j['recipient'] as String?,
         createdBy: j['created_by'] as String,
         createdAt: DateTime.parse(j['created_at'] as String),
+        referenceNumber: j['reference_number'] as String?,
+        letterType: j['letter_type'] as String?,
+        status: j['status'] as String?,
+        letterDate: j['letter_date'] != null
+            ? DateTime.tryParse(j['letter_date'] as String)
+            : null,
       );
 }
 
@@ -43,7 +57,7 @@ class LetterRepository {
   Future<List<GeneratedLetter>> fetchLetters({int limit = 30}) async {
     final data = await _client
         .from('generated_letters')
-        .select()
+        .select('id, title, subject, recipient, created_by, created_at, reference_number, letter_type, status, letter_date')
         .eq('society_id', env.societyId)
         .order('created_at', ascending: false)
         .limit(limit);

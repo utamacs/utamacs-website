@@ -621,6 +621,11 @@ class _HotoItemDetailSheetState extends ConsumerState<_HotoItemDetailSheet> {
                   const SizedBox(height: 20),
                   const Divider(height: 1, color: kBorderLight),
                   const SizedBox(height: 12),
+                  // Linked snags section
+                  _LinkedSnagsSection(hotoItemId: item.id),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: kBorderLight),
+                  const SizedBox(height: 12),
                   Text(
                     'Comments',
                     style: GoogleFonts.poppins(
@@ -713,6 +718,141 @@ class _HotoItemDetailSheetState extends ConsumerState<_HotoItemDetailSheet> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Linked snags section
+// ---------------------------------------------------------------------------
+
+class _LinkedSnagsSection extends ConsumerWidget {
+  final String hotoItemId;
+  const _LinkedSnagsSection({required this.hotoItemId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snagsAsync = ref.watch(hotoLinkedSnagsProvider(hotoItemId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Linked Snags',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: kTextPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        snagsAsync.when(
+          loading: () => const Center(
+              child: Padding(
+            padding: EdgeInsets.all(12),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )),
+          error: (e, _) => Text('Could not load snags: $e',
+              style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary)),
+          data: (snags) {
+            if (snags.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'No linked snags.',
+                  style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+                ),
+              );
+            }
+            return Column(
+              children: snags.map((s) => _LinkedSnagTile(snag: s)).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _LinkedSnagTile extends StatelessWidget {
+  final LinkedSnagItem snag;
+  const _LinkedSnagTile({required this.snag});
+
+  Color get _severityColor {
+    return switch (snag.severity) {
+      'critical' => kRed600,
+      'high' => kAccent500,
+      'medium' => kPrimary600,
+      _ => kTextSecondary,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: kSectionAlt,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kBorderLight),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _severityColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  snag.description,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: kTextPrimary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Text(
+                      snag.category.replaceAll('_', ' '),
+                      style: GoogleFonts.inter(
+                          fontSize: 11, color: kTextSecondary),
+                    ),
+                    const SizedBox(width: 6),
+                    Text('·',
+                        style:
+                            GoogleFonts.inter(fontSize: 11, color: kTextSecondary)),
+                    const SizedBox(width: 6),
+                    Text(
+                      snag.severity,
+                      style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: _severityColor,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          StatusBadge.forStatus(snag.status),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 class _CommentTile extends StatelessWidget {
   final HotoComment comment;
