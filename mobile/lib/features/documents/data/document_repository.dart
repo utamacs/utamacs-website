@@ -83,6 +83,18 @@ class DocumentRepository {
         .eq('id', documentId)
         .eq('society_id', env.societyId);
   }
+
+  Future<void> logDocumentAccess(String documentId) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return;
+    await _client.from('audit_logs').insert({
+      'society_id': env.societyId,
+      'user_id': uid,
+      'action': 'view',
+      'resource_type': 'document',
+      'resource_id': documentId,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

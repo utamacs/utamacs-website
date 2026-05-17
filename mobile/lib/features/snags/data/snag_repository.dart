@@ -99,6 +99,34 @@ class SnagComment {
 }
 
 // ---------------------------------------------------------------------------
+// Linked HOTO item model
+// ---------------------------------------------------------------------------
+
+class LinkedHotoItem {
+  final String hotoItemId;
+  final String title;
+  final String status;
+  final String category;
+
+  const LinkedHotoItem({
+    required this.hotoItemId,
+    required this.title,
+    required this.status,
+    required this.category,
+  });
+
+  factory LinkedHotoItem.fromJson(Map<String, dynamic> j) {
+    final hotoMap = j['hoto_items'] as Map<String, dynamic>?;
+    return LinkedHotoItem(
+      hotoItemId: j['hoto_item_id'] as String,
+      title: hotoMap?['title'] as String? ?? 'HOTO Item',
+      status: hotoMap?['status'] as String? ?? 'unknown',
+      category: hotoMap?['ascenza_category'] as String? ?? 'Uncategorised',
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
 
@@ -159,6 +187,16 @@ class SnagRepository {
     return SnagComment.fromJson(data);
   }
 
+  Future<List<LinkedHotoItem>> fetchLinkedHotoItems(String snagId) async {
+    final data = await _client
+        .from('hoto_item_snag_links')
+        .select(
+            'hoto_item_id, hoto_items:hoto_item_id(title, status, ascenza_category)')
+        .eq('snag_item_id', snagId)
+        .eq('society_id', env.societyId);
+    return (data as List).map((e) => LinkedHotoItem.fromJson(e)).toList();
+  }
+
   Future<SnagItem> reportSnag({
     required String description,
     required String category,
@@ -217,3 +255,9 @@ final snagCommentsProvider =
     FutureProvider.autoDispose.family<List<SnagComment>, String>((ref, snagId) {
   return ref.read(snagRepositoryProvider).fetchSnagComments(snagId);
 });
+
+final snagLinkedHotoItemsProvider =
+    FutureProvider.autoDispose.family<List<LinkedHotoItem>, String>(
+  (ref, snagId) =>
+      ref.read(snagRepositoryProvider).fetchLinkedHotoItems(snagId),
+);
