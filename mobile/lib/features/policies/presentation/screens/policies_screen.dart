@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/policy_repository.dart';
 
 class PoliciesScreen extends ConsumerWidget {
@@ -14,6 +15,7 @@ class PoliciesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final policiesAsync = ref.watch(activePoliciesProvider);
     final acksAsync = ref.watch(myAcknowledgementsProvider);
+    final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -85,12 +87,14 @@ class PoliciesScreen extends ConsumerWidget {
                       child: _PolicyCard(
                         policy: policy,
                         isAcked: ackedIds.contains(policy.id),
+                        isExec: isExec,
                         onAcknowledge: () async {
                           await ref
                               .read(policyRepositoryProvider)
                               .acknowledge(policy.id);
                           ref.invalidate(myAcknowledgementsProvider);
                         },
+                        onEdited: () => ref.invalidate(activePoliciesProvider),
                       ),
                     )),
               ],
@@ -181,12 +185,16 @@ class _AckSummaryCard extends StatelessWidget {
 class _PolicyCard extends StatefulWidget {
   final Policy policy;
   final bool isAcked;
+  final bool isExec;
   final VoidCallback onAcknowledge;
+  final VoidCallback onEdited;
 
   const _PolicyCard({
     required this.policy,
     required this.isAcked,
+    required this.isExec,
     required this.onAcknowledge,
+    required this.onEdited,
   });
 
   @override
@@ -215,7 +223,7 @@ class _PolicyCardState extends State<_PolicyCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row: type badge + ack indicator
+          // Top row: type badge + ack indicator + exec edit
           Row(
             children: [
               _PolicyTypeBadge(policyType: policy.policyType),
@@ -245,6 +253,22 @@ class _PolicyCardState extends State<_PolicyCard> {
                     ),
                   ],
                 ),
+              if (widget.isExec) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => _EditPolicySheet(
+                      policy: policy,
+                      onSaved: widget.onEdited,
+                    ),
+                  ),
+                  child: const Icon(Icons.edit_outlined,
+                      size: 18, color: kTextSecondary),
+                ),
+              ],
             ],
           ),
 
@@ -388,6 +412,233 @@ class _PolicyTypeBadge extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: kPrimary600,
           letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Edit Policy Sheet (exec only)
+// ---------------------------------------------------------------------------
+
+class _EditPolicySheet extends ConsumerStatefulWidget {
+  final Policy policy;
+  final VoidCallback onSaved;
+  const _EditPolicySheet({required this.policy, required this.onSaved});
+
+  @override
+  ConsumerState<_EditPolicySheet> createState() => _EditPolicySheetState();
+}
+
+class _EditPolicySheetState extends ConsumerState<_EditPolicySheet> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _descCtrl;
+  late final TextEditingController _versionCtrl;
+  late DateTime _effectiveDate;
+  late bool _gatePortalAccess;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.policy.title);
+    _descCtrl =
+        TextEditingController(text: widget.policy.description ?? '');
+    _versionCtrl =
+        TextEditingController(text: '${widget.policy.version}');
+    _effectiveDate = widget.policy.effectiveDate;
+    _gatePortalAccess = widget.policy.gatePortalAccess;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    _versionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_titleCtrl.text.trim().isEmpty) return;
+    final version = int.tryParse(_versionCtrl.text.trim()) ?? widget.policy.version;
+    setState(() => _saving = true);
+    try {
+      await ref.read(policyRepositoryProvider).updatePolicy(
+            policyId: widget.policy.id,
+            title: _titleCtrl.text.trim(),
+            description: _descCtrl.text.trim().isEmpty
+                ? null
+                : _descCtrl.text.trim(),
+            effectiveDate: _effectiveDate,
+            version: version,
+            gatePortalAccess: _gatePortalAccess,
+          );
+      widget.onSaved();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: kRed600,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (_, controller) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorderLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  Text(
+                    'Edit Policy',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _saving ? null : _save,
+                    child: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: kPrimary600),
+                          )
+                        : Text('Save',
+                            style: GoogleFonts.inter(
+                                color: kPrimary600,
+                                fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            Expanded(
+              child: ListView(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                children: [
+                  TextField(
+                    controller: _titleCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Title *',
+                      labelStyle: GoogleFonts.inter(
+                          fontSize: 13, color: kTextSecondary),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _descCtrl,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Description',
+                      labelStyle: GoogleFonts.inter(
+                          fontSize: 13, color: kTextSecondary),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _versionCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Version',
+                            labelStyle: GoogleFonts.inter(
+                                fontSize: 13, color: kTextSecondary),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _effectiveDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2030),
+                            );
+                            if (picked != null) {
+                              setState(() => _effectiveDate = picked);
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Effective Date',
+                              labelStyle: GoogleFonts.inter(
+                                  fontSize: 13, color: kTextSecondary),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: Text(
+                              DateFormat('d MMM yyyy')
+                                  .format(_effectiveDate),
+                              style: GoogleFonts.inter(
+                                  fontSize: 13, color: kTextPrimary),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  SwitchListTile(
+                    value: _gatePortalAccess,
+                    onChanged: (v) =>
+                        setState(() => _gatePortalAccess = v),
+                    title: Text(
+                      'Block portal access until acknowledged',
+                      style: GoogleFonts.inter(
+                          fontSize: 13, color: kTextPrimary),
+                    ),
+                    subtitle: Text(
+                      'Members who have not acknowledged this policy will be blocked from accessing the portal.',
+                      style: GoogleFonts.inter(
+                          fontSize: 11, color: kTextSecondary),
+                    ),
+                    activeColor: kRed600,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

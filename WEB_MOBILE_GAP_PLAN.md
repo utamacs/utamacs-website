@@ -27,17 +27,17 @@
 | 16 Water Tankers | 11 | 8 | 3 |
 | 17 Snags | 11 | 7 | 4 |
 | 18 HOTO | 8 | 2 | 6 |
-| 19 Analytics | 8 | 1 | 7 |
-| 20 Security Patrol | 6 | 4 | 2 |
+| 19 Analytics | 8 | 2 | 6 |
+| 20 Security Patrol | 6 | 5 | 1 |
 | 21 Staff Management | 9 | 2 | 7 |
-| 22 Policies | 4 | 2 | 2 |
+| 22 Policies | 4 | 3 | 1 |
 | 23 Register / Membership | 6 | 5 | 1 |
 | 24 AGM | 5 | 5 | 0 |
 | 25 Tenant KYC | 5 | 5 | 0 |
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 4 | 2 |
-| **TOTAL** | **234** | **135** | **99** |
+| **TOTAL** | **234** | **138** | **96** |
 
 ---
 
@@ -308,7 +308,7 @@
 - [ ] 🟠 Filtered data CSV export
 - [ ] 🟠 Executive PDF report (`/api/v1/reports/executive-pdf`)
 - [ ] 🟡 Wing / block / billing-period filters
-- [ ] 🟡 Real-time KPI refresh
+- [x] 🟡 Real-time KPI refresh
 - [ ] 🟡 All 11 report types — Collection, Pending Dues, Complaint Resolution, Facility Utilisation, Visitor Log, Tenant Expiry, Member Directory, Trends, Expense Breakdown, Occupancy
 - [ ] 🟢 Occupancy heatmap by unit status
 
@@ -319,7 +319,7 @@
 - [x] 🔴 Log patrol form — patrol_date, shift, guard_name, remarks, incident flag, incident_type, severity, location, description
 - [x] 🟠 Incident management — view open incidents list (exec)
 - [x] 🟠 Guard attendance dashboard — days worked / absent / late over 7 / 30 / 60 / 90-day windows
-- [ ] 🟡 Shift schedule — view and create shifts (exec)
+- [x] 🟡 Shift schedule — view and create shifts (exec)
 - [ ] 🟡 CSV export of patrol logs (exec)
 - [x] 🟢 Open incident count badge on tab
 
@@ -343,7 +343,7 @@
 
 - [x] 🟠 Policy detail / full-content view — render HTML body, embed PDF iframe, YouTube/video player
 - [ ] 🟡 PDF upload / replace (exec) — max 20 MB via GitHub Docs
-- [ ] 🟡 Policy edit form (title, description, effective_date, version, gate_portal_access toggle)
+- [x] 🟡 Policy edit form (title, description, effective_date, version, gate_portal_access toggle)
 - [x] 🟡 `gate_portal_access` indicator clearly surfaced on policy card ("Blocks portal access until acknowledged")
 
 ---

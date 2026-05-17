@@ -20,7 +20,7 @@ class SecurityPatrolScreen extends ConsumerWidget {
 
     if (isExec) {
       return DefaultTabController(
-        length: 3,
+        length: 4,
         child: Scaffold(
           backgroundColor: kBgWarm,
           appBar: AppBar(
@@ -34,10 +34,12 @@ class SecurityPatrolScreen extends ConsumerWidget {
                   ref.invalidate(patrolLogsProvider);
                   ref.invalidate(incidentLogsProvider);
                   ref.invalidate(guardSummariesProvider);
+                  ref.invalidate(patrolSchedulesProvider);
                 },
               ),
             ],
             bottom: TabBar(
+              isScrollable: true,
               labelStyle: GoogleFonts.inter(
                   fontWeight: FontWeight.w600, fontSize: 14),
               unselectedLabelStyle: GoogleFonts.inter(
@@ -76,6 +78,7 @@ class SecurityPatrolScreen extends ConsumerWidget {
                   ),
                 ),
                 const Tab(text: 'Guards'),
+                const Tab(text: 'Schedule'),
               ],
             ),
           ),
@@ -84,6 +87,7 @@ class SecurityPatrolScreen extends ConsumerWidget {
               _PatrolLogsTab(),
               _IncidentsTab(),
               _GuardsTab(),
+              _ScheduleTab(),
             ],
           ),
         ),
@@ -829,6 +833,405 @@ class _PatrolLogCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Schedule Tab (exec only — shows patrol_schedules)
+// ---------------------------------------------------------------------------
+
+class _ScheduleTab extends ConsumerWidget {
+  const _ScheduleTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final schedulesAsync = ref.watch(patrolSchedulesProvider);
+
+    return Scaffold(
+      backgroundColor: kBgWarm,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: kPrimary600,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
+        onPressed: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => _AddScheduleSheet(
+            onSaved: () => ref.invalidate(patrolSchedulesProvider),
+          ),
+        ),
+      ),
+      body: schedulesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => EmptyState(
+          icon: Icons.error_outline,
+          title: 'Could not load schedules',
+          subtitle: e.toString(),
+          action: ElevatedButton(
+            onPressed: () => ref.invalidate(patrolSchedulesProvider),
+            child: const Text('Retry'),
+          ),
+        ),
+        data: (schedules) {
+          if (schedules.isEmpty) {
+            return const EmptyState(
+              icon: Icons.schedule_outlined,
+              title: 'No shift schedules',
+              subtitle: 'Add recurring guard shift assignments using the + button.',
+            );
+          }
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(patrolSchedulesProvider),
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              itemCount: schedules.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) => _ScheduleCard(schedule: schedules[i]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ScheduleCard extends StatelessWidget {
+  final PatrolSchedule schedule;
+  const _ScheduleCard({required this.schedule});
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = DateFormat('d MMM yyyy');
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  schedule.guardName,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: schedule.isActive ? kPrimary50 : kSectionAlt,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: schedule.isActive ? kPrimary100 : kBorderLight),
+                ),
+                child: Text(
+                  schedule.isActive ? 'Active' : 'Ended',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: schedule.isActive ? kPrimary600 : kTextSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.wb_sunny_outlined,
+                  size: 14, color: kTextSecondary),
+              const SizedBox(width: 6),
+              Text(
+                schedule.shift.replaceAll('_', ' ').toUpperCase(),
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary),
+              ),
+              const SizedBox(width: 16),
+              const Icon(Icons.calendar_today_outlined,
+                  size: 14, color: kTextSecondary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  schedule.daysLabel,
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: kTextSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.date_range_outlined,
+                  size: 14, color: kTextSecondary),
+              const SizedBox(width: 6),
+              Text(
+                schedule.effectiveTo != null
+                    ? '${fmt.format(schedule.effectiveFrom)} – ${fmt.format(schedule.effectiveTo!)}'
+                    : 'From ${fmt.format(schedule.effectiveFrom)}',
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: kTextSecondary),
+              ),
+            ],
+          ),
+          if (schedule.notes != null && schedule.notes!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              schedule.notes!,
+              style: GoogleFonts.inter(
+                  fontSize: 12, color: kTextSecondary, fontStyle: FontStyle.italic),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Add schedule bottom sheet
+// ---------------------------------------------------------------------------
+
+class _AddScheduleSheet extends ConsumerStatefulWidget {
+  final VoidCallback onSaved;
+  const _AddScheduleSheet({required this.onSaved});
+
+  @override
+  ConsumerState<_AddScheduleSheet> createState() => _AddScheduleSheetState();
+}
+
+class _AddScheduleSheetState extends ConsumerState<_AddScheduleSheet> {
+  final _guardCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  String _shift = 'morning';
+  final Set<int> _days = {1, 2, 3, 4, 5};
+  DateTime _from = DateTime.now();
+  bool _saving = false;
+
+  static const _dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  static const _shifts = [
+    'morning', 'afternoon', 'evening', 'night', 'full_day'
+  ];
+
+  @override
+  void dispose() {
+    _guardCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_guardCtrl.text.trim().isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(patrolRepositoryProvider).createSchedule(
+            guardName: _guardCtrl.text.trim(),
+            shift: _shift,
+            daysOfWeek: _days.toList(),
+            effectiveFrom: _from,
+            notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+          );
+      widget.onSaved();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: kRed600,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (_, controller) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorderLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  Text(
+                    'Add Shift Schedule',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _saving ? null : _save,
+                    child: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: kPrimary600),
+                          )
+                        : Text('Save',
+                            style: GoogleFonts.inter(
+                                color: kPrimary600,
+                                fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            Expanded(
+              child: ListView(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                children: [
+                  TextField(
+                    controller: _guardCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Guard Name *',
+                      labelStyle: GoogleFonts.inter(
+                          fontSize: 13, color: kTextSecondary),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Shift',
+                      style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kTextPrimary)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _shifts.map((s) => ChoiceChip(
+                      label: Text(s.replaceAll('_', ' ')),
+                      selected: _shift == s,
+                      onSelected: (_) => setState(() => _shift = s),
+                      selectedColor: kPrimary50,
+                      labelStyle: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: _shift == s ? kPrimary600 : kTextPrimary,
+                        fontWeight: _shift == s ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    )).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Days of Week',
+                      style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kTextPrimary)),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: List.generate(7, (i) {
+                      final selected = _days.contains(i);
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          if (selected) {
+                            _days.remove(i);
+                          } else {
+                            _days.add(i);
+                          }
+                        }),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: selected ? kPrimary600 : kSectionAlt,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: selected ? kPrimary600 : kBorderLight),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _dayNames[i],
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: selected ? Colors.white : kTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text('Effective From: ',
+                          style: GoogleFonts.inter(
+                              fontSize: 13, color: kTextSecondary)),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _from,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) {
+                            setState(() => _from = picked);
+                          }
+                        },
+                        child: Text(
+                          DateFormat('d MMM yyyy').format(_from),
+                          style: GoogleFonts.inter(
+                              color: kPrimary600,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _notesCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Notes (optional)',
+                      labelStyle: GoogleFonts.inter(
+                          fontSize: 13, color: kTextSecondary),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

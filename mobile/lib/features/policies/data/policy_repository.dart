@@ -103,6 +103,29 @@ class PolicyRepository {
       'acked_at': DateTime.now().toIso8601String(),
     });
   }
+
+  Future<Policy> updatePolicy({
+    required String policyId,
+    required String title,
+    String? description,
+    required DateTime effectiveDate,
+    required int version,
+    required bool gatePortalAccess,
+  }) async {
+    final data = await _client
+        .from('policies')
+        .update({
+          'title': title,
+          'description': description,
+          'effective_date': effectiveDate.toIso8601String().substring(0, 10),
+          'version': version,
+          'gate_portal_access': gatePortalAccess,
+        })
+        .eq('id', policyId)
+        .select()
+        .single();
+    return Policy.fromJson(data);
+  }
 }
 
 // ---------------------------------------------------------------------------
