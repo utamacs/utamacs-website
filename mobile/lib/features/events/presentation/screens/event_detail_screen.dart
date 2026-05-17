@@ -46,9 +46,18 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   }
 
   Future<void> _rsvp() async {
+    final guestCount = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _GuestCountModal(),
+    );
+    if (guestCount == null) return;
+
     setState(() => _actionLoading = true);
     try {
-      await ref.read(eventRepositoryProvider).register(event.id);
+      await ref
+          .read(eventRepositoryProvider)
+          .register(event.id, attendees: guestCount);
       ref.invalidate(myEventRegistrationsProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -645,6 +654,102 @@ class _BadgeChip extends StatelessWidget {
           color: textColor,
           letterSpacing: 0.5,
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Guest count modal for RSVP
+// ---------------------------------------------------------------------------
+
+class _GuestCountModal extends StatefulWidget {
+  const _GuestCountModal();
+
+  @override
+  State<_GuestCountModal> createState() => _GuestCountModalState();
+}
+
+class _GuestCountModalState extends State<_GuestCountModal> {
+  int _count = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: kBorderLight, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'How many guests?',
+            style: GoogleFonts.poppins(
+                fontSize: 17, fontWeight: FontWeight.w700, color: kPrimary600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Including yourself (1–5)',
+            style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton.outlined(
+                onPressed:
+                    _count > 1 ? () => setState(() => _count--) : null,
+                icon: const Icon(Icons.remove),
+                style: IconButton.styleFrom(
+                  foregroundColor: kPrimary600,
+                  side: const BorderSide(color: kPrimary600),
+                ),
+              ),
+              const SizedBox(width: 24),
+              Text(
+                '$_count',
+                style: GoogleFonts.poppins(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary),
+              ),
+              const SizedBox(width: 24),
+              IconButton.outlined(
+                onPressed:
+                    _count < 5 ? () => setState(() => _count++) : null,
+                icon: const Icon(Icons.add),
+                style: IconButton.styleFrom(
+                  foregroundColor: kPrimary600,
+                  side: const BorderSide(color: kPrimary600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context, _count),
+              child: Text(
+                'Confirm RSVP for $_count',
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

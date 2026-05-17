@@ -11,9 +11,9 @@
 |--------|-------|------|-----------|
 | 01 Notices | 9 | 4 | 5 |
 | 02 Visitors | 14 | 0 | 14 |
-| 03 Complaints | 13 | 7 | 6 |
+| 03 Complaints | 13 | 13 | 0 |
 | 04 Finance | 12 | 0 | 12 |
-| 05 Events | 9 | 6 | 3 |
+| 05 Events | 9 | 7 | 2 |
 | 06 Polls | 9 | 7 | 2 |
 | 07 Community Board | 11 | 7 | 4 |
 | 08 Documents | 11 | 5 | 6 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 3 | 3 |
-| **TOTAL** | **234** | **95** | **139** |
+| **TOTAL** | **234** | **102** | **132** |
 
 ---
 
@@ -82,12 +82,12 @@
 - [x] 🟠 Comments thread — view thread, add comment, internal-note checkbox (exec-only comments hidden from member)
 - [ ] 🟠 Attachments viewer in detail screen (tap to open signed URL)
 - [x] 🟠 Status update + assignee sidebar (exec) — status dropdown + note + assign-to dropdown
-- [ ] 🟡 Star rating widget (1–5 stars) + feedback textarea on resolved complaints
-- [ ] 🟡 SLA deadline display and breach indicator (red if past deadline)
-- [ ] 🟡 Reopen complaint within SLA window
-- [ ] 🟢 Resolved date display in detail
-- [ ] 🟢 Reopen count display in detail
-- [ ] 🟢 Ticket number display
+- [x] 🟡 Star rating widget (1–5 stars) + feedback textarea on resolved complaints
+- [x] 🟡 SLA deadline display and breach indicator (red if past deadline)
+- [x] 🟡 Reopen complaint within SLA window
+- [x] 🟢 Resolved date display in detail
+- [x] 🟢 Reopen count display in detail
+- [x] 🟢 Ticket number display
 
 ---
 
@@ -115,7 +115,7 @@
 - [ ] 🟠 Banner image — display in list and detail; upload (exec)
 - [x] 🟠 Attendee list — name, unit, guest count, check-in status (exec-only)
 - [x] 🟠 Create event form — title, category (8 types), capacity, start/end datetime, location, description, registration_deadline, ticket_price
-- [ ] 🟡 Guest count selection (1–5 attendees) in RSVP modal
+- [x] 🟡 Guest count selection (1–5 attendees) in RSVP modal
 - [x] 🟡 Registration deadline enforcement (disable RSVP after deadline)
 - [x] 🟡 Cancel RSVP button
 - [x] 🟡 8 event categories rendered as filter/badge chips

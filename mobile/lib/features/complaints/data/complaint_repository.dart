@@ -19,6 +19,9 @@ class Complaint {
   final DateTime updatedAt;
   final DateTime? resolvedAt;
   final DateTime? slaDeadline;
+  final int? satisfactionRating;
+  final String? satisfactionComment;
+  final int reopenCount;
 
   const Complaint({
     required this.id,
@@ -33,6 +36,9 @@ class Complaint {
     required this.updatedAt,
     this.resolvedAt,
     this.slaDeadline,
+    this.satisfactionRating,
+    this.satisfactionComment,
+    this.reopenCount = 0,
   });
 
   factory Complaint.fromJson(Map<String, dynamic> j) => Complaint(
@@ -52,6 +58,9 @@ class Complaint {
         slaDeadline: j['sla_deadline'] != null
             ? DateTime.parse(j['sla_deadline'] as String)
             : null,
+        satisfactionRating: j['satisfaction_rating'] as int?,
+        satisfactionComment: j['satisfaction_comment'] as String?,
+        reopenCount: j['reopen_count'] as int? ?? 0,
       );
 }
 
@@ -199,6 +208,45 @@ class ComplaintRepository {
         .eq('complaint_id', complaintId)
         .order('changed_at', ascending: true);
     return (data as List).map((e) => ComplaintHistory.fromJson(e)).toList();
+  }
+
+  Future<void> submitFeedback({
+    required String complaintId,
+    required int rating,
+    String? comment,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    await _client.from('complaints').update({
+      'satisfaction_rating': rating,
+      if (comment != null && comment.trim().isNotEmpty)
+        'satisfaction_comment': comment.trim(),
+    }).eq('id', complaintId).eq('raised_by', uid);
+  }
+
+  Future<void> reopenComplaint(String complaintId) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final current = await _client
+        .from('complaints')
+        .select('reopen_count')
+        .eq('id', complaintId)
+        .eq('raised_by', uid)
+        .single();
+    final count = (current['reopen_count'] as int? ?? 0) + 1;
+    await _client.from('complaints').update({
+      'status': 'open',
+      'reopen_count': count,
+      'resolved_at': null,
+    }).eq('id', complaintId).eq('raised_by', uid);
+    await _client.from('complaint_status_history').insert({
+      'complaint_id': complaintId,
+      'old_status': 'resolved',
+      'new_status': 'open',
+      'changed_by': uid,
+      'note': 'Reopened by resident',
+      'changed_at': DateTime.now().toIso8601String(),
+    });
   }
 }
 

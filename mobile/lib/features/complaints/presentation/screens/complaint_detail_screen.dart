@@ -17,14 +17,18 @@ class ComplaintDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync =
         ref.watch(complaintHistoryProvider(complaint.id));
+    final myId = ref.watch(authNotifierProvider).profile?.id;
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
+    final isOwner = myId == complaint.raisedBy;
     final isOverdue = complaint.slaDeadline != null &&
         complaint.resolvedAt == null &&
         complaint.slaDeadline!.isBefore(DateTime.now());
     final slaDue = complaint.slaDeadline != null &&
         complaint.resolvedAt == null &&
         !isOverdue;
+    final isResolved = complaint.status == 'resolved';
+    final canReopen = isOwner && isResolved;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -116,6 +120,15 @@ class ComplaintDetailScreen extends ConsumerWidget {
                     valueColor: kSecondary500,
                   ),
                 ],
+                if (complaint.reopenCount > 0) ...[
+                  const Divider(height: 20),
+                  _MetaRow(
+                    label: 'Reopened',
+                    value: '${complaint.reopenCount} time${complaint.reopenCount != 1 ? 's' : ''}',
+                    icon: Icons.refresh_outlined,
+                    valueColor: kAccent500,
+                  ),
+                ],
               ],
             ),
           ),
@@ -167,6 +180,126 @@ class ComplaintDetailScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
+          ],
+
+          // ── Reopen button (owner, resolved only) ─────────────────────────
+          if (canReopen) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: kAccent500,
+                side: const BorderSide(color: kAccent500),
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.refresh_outlined, size: 18),
+              label: Text('Reopen Complaint',
+                  style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600, fontSize: 14)),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text('Reopen Complaint',
+                        style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
+                    content: Text(
+                        'Are you sure you want to reopen this complaint?',
+                        style: GoogleFonts.inter(fontSize: 14)),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: Text('Cancel',
+                              style: GoogleFonts.inter(
+                                  color: kTextSecondary))),
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: Text('Reopen',
+                              style: GoogleFonts.inter(
+                                  color: kAccent500,
+                                  fontWeight: FontWeight.w600))),
+                    ],
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                );
+                if (confirm != true || !context.mounted) return;
+                try {
+                  await ref
+                      .read(complaintRepositoryProvider)
+                      .reopenComplaint(complaint.id);
+                  ref.invalidate(myComplaintsProvider);
+                  ref.invalidate(complaintHistoryProvider(complaint.id));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Complaint reopened',
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w500)),
+                        backgroundColor: kAccent500,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    Navigator.pop(context);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text('Failed: $e', style: GoogleFonts.inter()),
+                        backgroundColor: kRed600,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+
+          // ── Satisfaction feedback (owner, resolved, no rating yet) ─────────
+          if (isOwner && isResolved && complaint.satisfactionRating == null) ...[
+            const SizedBox(height: 12),
+            _FeedbackSection(complaint: complaint),
+          ],
+
+          // ── Existing rating display ───────────────────────────────────────
+          if (complaint.satisfactionRating != null) ...[
+            const SizedBox(height: 12),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Your Feedback',
+                      style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kTextSecondary)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: List.generate(
+                      5,
+                      (i) => Icon(
+                        i < complaint.satisfactionRating!
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
+                        color: kAccent500,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  if (complaint.satisfactionComment != null &&
+                      complaint.satisfactionComment!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(complaint.satisfactionComment!,
+                        style: GoogleFonts.inter(
+                            fontSize: 13, color: kTextSecondary, height: 1.4)),
+                  ],
                 ],
               ),
             ),
@@ -388,6 +521,149 @@ class _PriorityChip extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: color,
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Satisfaction feedback section (member-only, resolved complaints)
+// ---------------------------------------------------------------------------
+
+class _FeedbackSection extends ConsumerStatefulWidget {
+  final Complaint complaint;
+  const _FeedbackSection({required this.complaint});
+
+  @override
+  ConsumerState<_FeedbackSection> createState() => _FeedbackSectionState();
+}
+
+class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
+  int _hoveredRating = 0;
+  int _selectedRating = 0;
+  final _commentCtrl = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _commentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_selectedRating == 0) return;
+    setState(() => _submitting = true);
+    try {
+      await ref.read(complaintRepositoryProvider).submitFeedback(
+            complaintId: widget.complaint.id,
+            rating: _selectedRating,
+            comment: _commentCtrl.text.trim().isEmpty
+                ? null
+                : _commentCtrl.text.trim(),
+          );
+      ref.invalidate(myComplaintsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Feedback submitted. Thank you!',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: kSecondary500,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e', style: GoogleFonts.inter()),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Rate Resolution',
+            style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: kTextSecondary),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'How satisfied are you with the resolution?',
+            style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(5, (i) {
+              final star = i + 1;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedRating = star),
+                child: MouseRegion(
+                  onEnter: (_) => setState(() => _hoveredRating = star),
+                  onExit: (_) => setState(() => _hoveredRating = 0),
+                  child: Icon(
+                    star <= (_hoveredRating > 0
+                            ? _hoveredRating
+                            : _selectedRating)
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    color: kAccent500,
+                    size: 32,
+                  ),
+                ),
+              );
+            }),
+          ),
+          if (_selectedRating > 0) ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _commentCtrl,
+              maxLines: 3,
+              maxLength: 300,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: 'Additional comments (optional)',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kSecondary500,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _submitting ? null : _submit,
+                child: _submitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Submit Feedback'),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
