@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/event_repository.dart';
 import 'event_detail_screen.dart';
 
@@ -17,6 +18,17 @@ String _formatEventDate(DateTime dt) {
   return '$dayName, $dayNum $month • $time';
 }
 
+const List<String> _kEventCategories = [
+  'cultural',
+  'sports',
+  'governance',
+  'social',
+  'maintenance',
+  'health',
+  'education',
+  'other',
+];
+
 class EventsScreen extends ConsumerWidget {
   const EventsScreen({super.key});
 
@@ -24,6 +36,8 @@ class EventsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(eventsProvider);
     final registrationsAsync = ref.watch(myEventRegistrationsProvider);
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -41,6 +55,27 @@ class EventsScreen extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButton: isExec
+          ? FloatingActionButton.extended(
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => _CreateEventModal(
+                  onCreated: () {
+                    ref.invalidate(eventsProvider);
+                  },
+                ),
+              ),
+              icon: const Icon(Icons.add),
+              label: Text(
+                'Create Event',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: kPrimary600,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: eventsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => EmptyState(
@@ -421,6 +456,412 @@ class _SectionHeader extends StatelessWidget {
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: kTextSecondary,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Create event modal (exec-only)
+// ---------------------------------------------------------------------------
+
+class _CreateEventModal extends ConsumerStatefulWidget {
+  final VoidCallback onCreated;
+  const _CreateEventModal({required this.onCreated});
+
+  @override
+  ConsumerState<_CreateEventModal> createState() => _CreateEventModalState();
+}
+
+class _CreateEventModalState extends ConsumerState<_CreateEventModal> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleCtrl = TextEditingController();
+  final _locationCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
+  final _capacityCtrl = TextEditingController();
+  final _ticketPriceCtrl = TextEditingController();
+
+  String _category = 'cultural';
+  DateTime? _startsAt;
+  DateTime? _endsAt;
+  DateTime? _registrationDeadline;
+  bool _isPaid = false;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _locationCtrl.dispose();
+    _descriptionCtrl.dispose();
+    _capacityCtrl.dispose();
+    _ticketPriceCtrl.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _inputDeco(String label) => InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      );
+
+  Future<void> _pickDateTime({
+    required bool isStart,
+    bool isDeadline = false,
+  }) async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 730)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (time == null || !mounted) return;
+    final dt =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    setState(() {
+      if (isDeadline) {
+        _registrationDeadline = dt;
+      } else if (isStart) {
+        _startsAt = dt;
+      } else {
+        _endsAt = dt;
+      }
+    });
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_startsAt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please select a start date and time',
+              style: GoogleFonts.inter()),
+          backgroundColor: kRed600,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ref.read(eventRepositoryProvider).createEvent(
+            title: _titleCtrl.text.trim(),
+            category: _category,
+            startsAt: _startsAt!,
+            endsAt: _endsAt,
+            location: _locationCtrl.text.trim().isEmpty
+                ? null
+                : _locationCtrl.text.trim(),
+            description: _descriptionCtrl.text.trim().isEmpty
+                ? null
+                : _descriptionCtrl.text.trim(),
+            capacity: _capacityCtrl.text.trim().isEmpty
+                ? null
+                : int.tryParse(_capacityCtrl.text.trim()),
+            registrationDeadline: _registrationDeadline,
+            isPaid: _isPaid,
+            ticketPrice: _isPaid && _ticketPriceCtrl.text.isNotEmpty
+                ? double.tryParse(_ticketPriceCtrl.text.trim())
+                : null,
+          );
+      widget.onCreated();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Event created successfully',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: kSecondary500,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create event: $e',
+                style: GoogleFonts.inter()),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = DateFormat('EEE, d MMM yyyy • h:mm a');
+    return DraggableScrollableSheet(
+      initialChildSize: 0.92,
+      minChildSize: 0.5,
+      maxChildSize: 0.97,
+      expand: false,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 4),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: kBorderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
+              child: Row(
+                children: [
+                  Text(
+                    'Create Event',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimary600,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                    color: kTextSecondary,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Form
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                  children: [
+                    // Title
+                    TextFormField(
+                      controller: _titleCtrl,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: _inputDeco('Event Title *'),
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Title is required'
+                          : null,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Category dropdown
+                    DropdownButtonFormField<String>(
+                      value: _category,
+                      decoration: _inputDeco('Category *'),
+                      items: _kEventCategories
+                          .map((c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(
+                                  c[0].toUpperCase() + c.substring(1),
+                                  style: GoogleFonts.inter(fontSize: 14),
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() => _category = v!),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Starts at
+                    InkWell(
+                      onTap: () => _pickDateTime(isStart: true),
+                      borderRadius: BorderRadius.circular(10),
+                      child: InputDecorator(
+                        decoration: _inputDeco('Start Date & Time *'),
+                        child: Text(
+                          _startsAt != null ? fmt.format(_startsAt!) : 'Tap to select',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: _startsAt != null
+                                ? kTextPrimary
+                                : kTextSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Ends at
+                    InkWell(
+                      onTap: () => _pickDateTime(isStart: false),
+                      borderRadius: BorderRadius.circular(10),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'End Date & Time (optional)',
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          suffixIcon: _endsAt != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.close, size: 18),
+                                  onPressed: () =>
+                                      setState(() => _endsAt = null),
+                                )
+                              : null,
+                        ),
+                        child: Text(
+                          _endsAt != null ? fmt.format(_endsAt!) : 'Tap to select',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: _endsAt != null
+                                ? kTextPrimary
+                                : kTextSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Registration deadline
+                    InkWell(
+                      onTap: () =>
+                          _pickDateTime(isStart: false, isDeadline: true),
+                      borderRadius: BorderRadius.circular(10),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Registration Deadline (optional)',
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          suffixIcon: _registrationDeadline != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.close, size: 18),
+                                  onPressed: () => setState(
+                                      () => _registrationDeadline = null),
+                                )
+                              : null,
+                        ),
+                        child: Text(
+                          _registrationDeadline != null
+                              ? fmt.format(_registrationDeadline!)
+                              : 'Tap to select',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: _registrationDeadline != null
+                                ? kTextPrimary
+                                : kTextSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Location
+                    TextFormField(
+                      controller: _locationCtrl,
+                      decoration: _inputDeco('Location (optional)'),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Capacity
+                    TextFormField(
+                      controller: _capacityCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: _inputDeco('Capacity (optional)'),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return null;
+                        if (int.tryParse(v) == null || int.parse(v) <= 0) {
+                          return 'Enter a valid number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Description
+                    TextFormField(
+                      controller: _descriptionCtrl,
+                      maxLines: 4,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: _inputDeco('Description (optional)'),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Paid toggle
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: kBorderLight),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Text('Paid Event',
+                              style: GoogleFonts.inter(fontSize: 14)),
+                          const Spacer(),
+                          Switch(
+                            value: _isPaid,
+                            onChanged: (v) => setState(() => _isPaid = v),
+                            activeColor: kPrimary600,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (_isPaid) ...[
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _ticketPriceCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: _inputDeco('Ticket Price (₹)'),
+                        validator: (v) {
+                          if (!_isPaid) return null;
+                          if (v == null || v.isEmpty) return 'Enter ticket price';
+                          if (double.tryParse(v) == null ||
+                              double.parse(v) <= 0) {
+                            return 'Enter a valid amount';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _saving ? null : _save,
+                      child: _saving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Create Event'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
