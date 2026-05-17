@@ -224,6 +224,98 @@ class StaffRepository {
         .eq('date', today)
         .eq('society_id', env.societyId);
   }
+
+  Future<List<StaffShift>> fetchShifts() async {
+    final data = await _client
+        .from('staff_shifts')
+        .select()
+        .eq('society_id', env.societyId)
+        .order('staff_id', ascending: true)
+        .order('shift_name', ascending: true);
+    return (data as List).map((e) => StaffShift.fromJson(e)).toList();
+  }
+
+  Future<StaffShift> createShift({
+    required String staffId,
+    required String shiftName,
+    required String startTime,
+    required String endTime,
+    required List<int> daysOfWeek,
+    required DateTime effectiveFrom,
+    String? notes,
+  }) async {
+    final data = await _client
+        .from('staff_shifts')
+        .insert({
+          'society_id': env.societyId,
+          'staff_id': staffId,
+          'shift_name': shiftName,
+          'start_time': startTime,
+          'end_time': endTime,
+          'days_of_week': daysOfWeek,
+          'effective_from': effectiveFrom.toIso8601String().substring(0, 10),
+          if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+        })
+        .select()
+        .single();
+    return StaffShift.fromJson(data);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Staff shift model
+// ---------------------------------------------------------------------------
+
+class StaffShift {
+  final String id;
+  final String staffId;
+  final String shiftName;
+  final String startTime;
+  final String endTime;
+  final List<int> daysOfWeek;
+  final DateTime effectiveFrom;
+  final DateTime? effectiveTo;
+  final String? notes;
+  final DateTime createdAt;
+
+  const StaffShift({
+    required this.id,
+    required this.staffId,
+    required this.shiftName,
+    required this.startTime,
+    required this.endTime,
+    required this.daysOfWeek,
+    required this.effectiveFrom,
+    this.effectiveTo,
+    this.notes,
+    required this.createdAt,
+  });
+
+  bool get isActive =>
+      effectiveTo == null || effectiveTo!.isAfter(DateTime.now());
+
+  String get dayLabels {
+    const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return daysOfWeek.map((d) => names[d % 7]).join(', ');
+  }
+
+  factory StaffShift.fromJson(Map<String, dynamic> j) => StaffShift(
+        id: j['id'] as String,
+        staffId: j['staff_id'] as String,
+        shiftName: j['shift_name'] as String? ?? 'Shift',
+        startTime: j['start_time'] as String? ?? '09:00',
+        endTime: j['end_time'] as String? ?? '18:00',
+        daysOfWeek: (j['days_of_week'] as List?)
+                ?.map((e) => (e as num).toInt())
+                .toList() ??
+            const [],
+        effectiveFrom: DateTime.parse(j['effective_from'] as String),
+        effectiveTo: j['effective_to'] != null
+            ? DateTime.tryParse(j['effective_to'] as String)
+            : null,
+        notes: j['notes'] as String?,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -247,4 +339,9 @@ final staffTasksProvider =
 final staffAttendanceProvider =
     FutureProvider.autoDispose<List<StaffAttendance>>((ref) {
   return ref.read(staffRepositoryProvider).fetchAttendance();
+});
+
+final staffShiftsProvider =
+    FutureProvider.autoDispose<List<StaffShift>>((ref) {
+  return ref.read(staffRepositoryProvider).fetchShifts();
 });

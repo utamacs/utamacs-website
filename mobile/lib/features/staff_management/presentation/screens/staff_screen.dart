@@ -25,7 +25,7 @@ class _StaffScreenState extends ConsumerState<StaffScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() => setState(() {}));
   }
 
@@ -67,6 +67,7 @@ class _StaffScreenState extends ConsumerState<StaffScreen>
             Tab(text: 'Directory'),
             Tab(text: 'Tasks'),
             Tab(text: 'Attendance'),
+            Tab(text: 'Shifts'),
           ],
         ),
       ),
@@ -81,14 +82,37 @@ class _StaffScreenState extends ConsumerState<StaffScreen>
                     color: Colors.white, fontWeight: FontWeight.w600),
               ),
             )
-          : null,
+          : isExec && _tabController.index == 3
+              ? FloatingActionButton.extended(
+                  onPressed: () => _showCreateShiftSheet(context),
+                  backgroundColor: kPrimary600,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: Text(
+                    'Add Shift',
+                    style: GoogleFonts.inter(
+                        color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                )
+              : null,
       body: TabBarView(
         controller: _tabController,
         children: const [
           _DirectoryTab(),
           _TasksTab(),
           _AttendanceTab(),
+          _ShiftsTab(),
         ],
+      ),
+    );
+  }
+
+  void _showCreateShiftSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CreateShiftSheet(
+        onCreated: () => ref.invalidate(staffShiftsProvider),
       ),
     );
   }
@@ -872,6 +896,544 @@ class _AttendanceCardState extends ConsumerState<_AttendanceCard> {
                     ),
                   ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shifts tab
+// ---------------------------------------------------------------------------
+
+class _ShiftsTab extends ConsumerWidget {
+  const _ShiftsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final shiftsAsync = ref.watch(staffShiftsProvider);
+    final staffAsync = ref.watch(activeStaffProvider);
+
+    return shiftsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load shifts',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(staffShiftsProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (shifts) {
+        if (shifts.isEmpty) {
+          return const EmptyState(
+            icon: Icons.schedule_outlined,
+            title: 'No shifts defined',
+            subtitle: 'Staff shift schedules will appear here once created.',
+          );
+        }
+
+        final Map<String, String> staffNames = {};
+        staffAsync.whenData((staff) {
+          for (final s in staff) {
+            staffNames[s.id] = s.name;
+          }
+        });
+
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(staffShiftsProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: shifts.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, i) => _ShiftCard(
+              shift: shifts[i],
+              staffName: staffNames[shifts[i].staffId],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ShiftCard extends StatelessWidget {
+  final StaffShift shift;
+  final String? staffName;
+  const _ShiftCard({required this.shift, this.staffName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: shift.isActive ? kBorderLight : const Color(0xFFFECACA),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  shift.shiftName,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: shift.isActive
+                      ? const Color(0xFFD1FAE5)
+                      : const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  shift.isActive ? 'ACTIVE' : 'ENDED',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: shift.isActive ? kSecondary500 : kRed600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.person_outline, size: 13, color: kTextSecondary),
+              const SizedBox(width: 4),
+              Text(
+                staffName ?? 'Staff member',
+                style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.schedule_outlined,
+                  size: 13, color: kTextSecondary),
+              const SizedBox(width: 4),
+              Text(
+                '${shift.startTime} – ${shift.endTime}',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: kTextPrimary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Icon(Icons.calendar_today_outlined,
+                  size: 13, color: kTextSecondary),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  shift.dayLabels.isEmpty ? 'No days set' : shift.dayLabels,
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: kTextSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (shift.notes != null && shift.notes!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              shift.notes!,
+              style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Create shift sheet
+// ---------------------------------------------------------------------------
+
+class _CreateShiftSheet extends ConsumerStatefulWidget {
+  final VoidCallback onCreated;
+  const _CreateShiftSheet({required this.onCreated});
+
+  @override
+  ConsumerState<_CreateShiftSheet> createState() => _CreateShiftSheetState();
+}
+
+class _CreateShiftSheetState extends ConsumerState<_CreateShiftSheet> {
+  final _nameCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  String? _selectedStaffId;
+  TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _endTime = const TimeOfDay(hour: 18, minute: 0);
+  final Set<int> _selectedDays = {1, 2, 3, 4, 5};
+  DateTime _effectiveFrom = DateTime.now();
+  bool _saving = false;
+
+  static const _dayNames = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  String _fmtTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _pickStart() async {
+    final picked =
+        await showTimePicker(context: context, initialTime: _startTime);
+    if (picked != null) setState(() => _startTime = picked);
+  }
+
+  Future<void> _pickEnd() async {
+    final picked =
+        await showTimePicker(context: context, initialTime: _endTime);
+    if (picked != null) setState(() => _endTime = picked);
+  }
+
+  Future<void> _pickEffectiveFrom() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _effectiveFrom,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+    );
+    if (picked != null) setState(() => _effectiveFrom = picked);
+  }
+
+  Future<void> _save() async {
+    if (_nameCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Shift name is required')),
+      );
+      return;
+    }
+    if (_selectedStaffId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a staff member')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ref.read(staffRepositoryProvider).createShift(
+            staffId: _selectedStaffId!,
+            shiftName: _nameCtrl.text.trim(),
+            startTime: _fmtTime(_startTime),
+            endTime: _fmtTime(_endTime),
+            daysOfWeek: _selectedDays.toList()..sort(),
+            effectiveFrom: _effectiveFrom,
+            notes:
+                _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+          );
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onCreated();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Shift created')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final staffAsync = ref.watch(activeStaffProvider);
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: kBorderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Add Shift',
+                style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary)),
+            const SizedBox(height: 16),
+            // Staff member
+            Text('Staff member *',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            staffAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const Text('Failed to load staff'),
+              data: (staff) => DropdownButtonFormField<String>(
+                value: _selectedStaffId,
+                hint: Text('Select staff member',
+                    style: GoogleFonts.inter(
+                        fontSize: 14, color: kTextSecondary)),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: kBgWarm,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: kBorderLight)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                ),
+                items: staff
+                    .map((s) => DropdownMenuItem(
+                          value: s.id,
+                          child:
+                              Text(s.name, style: GoogleFonts.inter(fontSize: 14)),
+                        ))
+                    .toList(),
+                onChanged: (val) => setState(() => _selectedStaffId = val),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Shift name
+            Text('Shift name *',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _nameCtrl,
+              decoration: InputDecoration(
+                hintText: 'e.g. Morning Shift',
+                filled: true,
+                fillColor: kBgWarm,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kBorderLight)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: GoogleFonts.inter(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            // Start / end time
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Start time',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kTextSecondary)),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: _pickStart,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 11),
+                          decoration: BoxDecoration(
+                            color: kBgWarm,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: kBorderLight),
+                          ),
+                          child: Text(_fmtTime(_startTime),
+                              style: GoogleFonts.inter(
+                                  fontSize: 14, color: kTextPrimary)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('End time',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kTextSecondary)),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: _pickEnd,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 11),
+                          decoration: BoxDecoration(
+                            color: kBgWarm,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: kBorderLight),
+                          ),
+                          child: Text(_fmtTime(_endTime),
+                              style: GoogleFonts.inter(
+                                  fontSize: 14, color: kTextPrimary)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Days of week
+            Text('Days of week',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(7, (i) {
+                final selected = _selectedDays.contains(i);
+                return GestureDetector(
+                  onTap: () => setState(() {
+                    if (selected) {
+                      _selectedDays.remove(i);
+                    } else {
+                      _selectedDays.add(i);
+                    }
+                  }),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: selected ? kPrimary600 : kBgWarm,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected ? kPrimary600 : kBorderLight,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _dayNames[i],
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? Colors.white : kTextSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 12),
+            // Effective from
+            Text('Effective from',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: _pickEffectiveFrom,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 11),
+                decoration: BoxDecoration(
+                  color: kBgWarm,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kBorderLight),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        size: 14, color: kTextSecondary),
+                    const SizedBox(width: 6),
+                    Text(
+                      DateFormat('d MMM y').format(_effectiveFrom),
+                      style:
+                          GoogleFonts.inter(fontSize: 13, color: kTextPrimary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Notes
+            Text('Notes',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _notesCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Optional notes…',
+                filled: true,
+                fillColor: kBgWarm,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kBorderLight)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: GoogleFonts.inter(fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                style: FilledButton.styleFrom(
+                    backgroundColor: kPrimary600,
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : Text('Create Shift',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600, color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

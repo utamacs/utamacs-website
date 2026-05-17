@@ -16,10 +16,12 @@ class AnalyticsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(societyStatsProvider);
     final breakdownAsync = ref.watch(complaintBreakdownProvider);
+    final visitorAsync = ref.watch(visitorTypeBreakdownProvider);
 
     void refresh() {
       ref.invalidate(societyStatsProvider);
       ref.invalidate(complaintBreakdownProvider);
+      ref.invalidate(visitorTypeBreakdownProvider);
     }
 
     return Scaffold(
@@ -71,6 +73,15 @@ class AnalyticsScreen extends ConsumerWidget {
                   error: (_, __) => const SizedBox.shrink(),
                   data: (bd) => bd.total > 0
                       ? _ComplaintBreakdownCard(breakdown: bd)
+                      : const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 16),
+                // Visitor type breakdown chart
+                visitorAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (vb) => vb.total > 0
+                      ? _VisitorTypeBreakdownCard(breakdown: vb)
                       : const SizedBox.shrink(),
                 ),
               ],
@@ -298,6 +309,127 @@ class _ComplaintBreakdownCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                             color: color),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      minHeight: 8,
+                      backgroundColor: kBorderLight,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Visitor type breakdown chart
+// ---------------------------------------------------------------------------
+
+class _VisitorTypeBreakdownCard extends StatelessWidget {
+  final VisitorTypeBreakdown breakdown;
+  const _VisitorTypeBreakdownCard({required this.breakdown});
+
+  static const _typeOrder = [
+    'guest', 'delivery', 'domestic_help', 'vendor', 'cab', 'other',
+  ];
+
+  static const _typeColors = {
+    'guest': kPrimary600,
+    'delivery': kSecondary500,
+    'domestic_help': kAccent500,
+    'vendor': Color(0xFF7C3AED),
+    'cab': Color(0xFFEA580C),
+    'other': kTextSecondary,
+  };
+
+  static const _typeLabels = {
+    'guest': 'Guest',
+    'delivery': 'Delivery',
+    'domestic_help': 'Domestic Help',
+    'vendor': 'Vendor',
+    'cab': 'Cab / Vehicle',
+    'other': 'Other',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final total = breakdown.total;
+    final knownTypes = _typeOrder
+        .where((t) => (breakdown.countsByType[t] ?? 0) > 0)
+        .toList();
+    final otherTypes = breakdown.countsByType.keys
+        .where((t) => !_typeOrder.contains(t))
+        .toList();
+
+    final allTypes = [...knownTypes, ...otherTypes];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: kPrimary50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.badge_outlined,
+                    size: 18, color: kPrimary600),
+              ),
+              const SizedBox(width: 10),
+              Text('Visitors by Type',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
+              const Spacer(),
+              Text('$total total',
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: kTextSecondary)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...allTypes.map((t) {
+            final count = breakdown.countsByType[t] ?? 0;
+            final pct = count / total;
+            final color = _typeColors[t] ?? kTextSecondary;
+            final label = _typeLabels[t] ??
+                t.replaceAll('_', ' ')[0].toUpperCase() +
+                    t.replaceAll('_', ' ').substring(1);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Text(label,
+                          style: GoogleFonts.inter(
+                              fontSize: 12, color: kTextSecondary)),
+                      const Spacer(),
+                      Text('$count',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: color)),
                     ],
                   ),
                   const SizedBox(height: 4),
