@@ -9,7 +9,7 @@
 
 | Module | Total | Done | Remaining |
 |--------|-------|------|-----------|
-| 01 Notices | 9 | 1 | 8 |
+| 01 Notices | 9 | 3 | 6 |
 | 02 Visitors | 14 | 0 | 14 |
 | 03 Complaints | 13 | 7 | 6 |
 | 04 Finance | 12 | 0 | 12 |
@@ -36,17 +36,17 @@
 | 25 Tenant KYC | 5 | 1 | 4 |
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
-| 28 Profile & Auth | 6 | 2 | 4 |
-| **TOTAL** | **234** | **70** | **164** |
+| 28 Profile & Auth | 6 | 3 | 3 |
+| **TOTAL** | **234** | **74** | **160** |
 
 ---
 
 ## 01 · NOTICES
 
 - [x] 🔴 Acknowledge notice — button + modal, writes `notice_acknowledgements` with timestamp
-- [ ] 🔴 Acknowledgement tracking panel (exec) — total / acknowledged / pending count per notice
+- [x] 🔴 Acknowledgement tracking panel (exec) — total / acknowledged / pending count per notice
 - [ ] 🟠 Scheduled notices tab — list scheduled notices with countdown + "Publish now" button
-- [ ] 🟠 Create notice form — title, category, audience (all/owners/tenants), target blocks/wings, body HTML, is_pinned, requires_acknowledgement, scheduled_at, draft mode
+- [x] 🟠 Create notice form — title, category, audience (all/owners/tenants), target blocks/wings, body HTML, is_pinned, requires_acknowledgement, scheduled_at, draft mode
 - [ ] 🟠 Attachment viewer — tap to open/download PDF or image via signed URL
 - [ ] 🟠 Target audience & wing/block field on create form
 - [ ] 🟡 Video URL field + embedded player in notice detail
@@ -405,7 +405,7 @@
 
 ## 28 · PROFILE & AUTH
 
-- [ ] 🟠 Edit own profile — bio, preferred_language (en/te/hi), WhatsApp number, emergency contact (name / phone / relation)
+- [x] 🟠 Edit own profile — bio, preferred_language (en/te/hi), WhatsApp number, emergency contact (name / phone / relation)
 - [ ] 🟠 Avatar upload — JPEG/PNG/WebP with upload progress; stored via GitHub Docs `avatar(profileId, ext)` path
 - [ ] 🟡 Unit details view — building, floor, area_sqft, residency_type, move_in_date, num_occupants
 - [ ] 🟡 Password reset flow — forgot-password email → reset-password token screen

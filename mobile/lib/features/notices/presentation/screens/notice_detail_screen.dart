@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/notice_repository.dart';
 
-class NoticeDetailScreen extends StatelessWidget {
+class NoticeDetailScreen extends ConsumerWidget {
   final Notice notice;
   const NoticeDetailScreen({super.key, required this.notice});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Notice')),
       body: SingleChildScrollView(
@@ -16,6 +21,7 @@ class NoticeDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Category chip
             if (notice.category != null)
               Container(
                 padding:
@@ -34,9 +40,11 @@ class NoticeDetailScreen extends StatelessWidget {
                 ),
               ),
             if (notice.category != null) const SizedBox(height: 12),
+
             Text(notice.title,
                 style: Theme.of(context).textTheme.headlineLarge),
             const SizedBox(height: 8),
+
             Row(
               children: [
                 const Icon(Icons.schedule, size: 14, color: kTextSecondary),
@@ -55,11 +63,38 @@ class NoticeDetailScreen extends StatelessWidget {
                   const Text('Pinned',
                       style: TextStyle(fontSize: 12, color: kAccent500)),
                 ],
+                if (notice.requiresAcknowledgement) ...[
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'ACK REQUIRED',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
+
+            // Exec: acknowledgement stats panel
+            if (isExec && notice.requiresAcknowledgement) ...[
+              const SizedBox(height: 20),
+              _AcknowledgementStatsCard(noticeId: notice.id),
+            ],
+
             const SizedBox(height: 24),
             const Divider(),
             const SizedBox(height: 24),
+
             if (notice.body != null)
               Text(notice.body!,
                   style: Theme.of(context)
@@ -74,6 +109,7 @@ class NoticeDetailScreen extends StatelessWidget {
                     .bodyMedium
                     ?.copyWith(color: kTextSecondary),
               ),
+
             if (notice.expiresAt != null) ...[
               const SizedBox(height: 24),
               Container(
@@ -98,6 +134,117 @@ class NoticeDetailScreen extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Exec acknowledgement stats card
+// ---------------------------------------------------------------------------
+
+class _AcknowledgementStatsCard extends ConsumerWidget {
+  final String noticeId;
+  const _AcknowledgementStatsCard({required this.noticeId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final countAsync =
+        ref.watch(noticeAcknowledgementCountProvider(noticeId));
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kPrimary50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kPrimary100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.how_to_vote_outlined,
+                  size: 18, color: kPrimary600),
+              const SizedBox(width: 8),
+              Text(
+                'Acknowledgement Status',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: kPrimary600,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 18, color: kPrimary600),
+                onPressed: () =>
+                    ref.invalidate(noticeAcknowledgementCountProvider),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          countAsync.when(
+            loading: () => const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: kPrimary600),
+            ),
+            error: (e, _) => Text(
+              'Could not load acknowledgements',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: kRed600),
+            ),
+            data: (count) => Row(
+              children: [
+                _StatPill(
+                  label: 'Acknowledged',
+                  value: '$count',
+                  color: kSecondary500,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _StatPill(
+      {required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorderLight),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+                fontSize: 22, fontWeight: FontWeight.w700, color: color),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+                fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }

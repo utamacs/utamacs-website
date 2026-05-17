@@ -46,4 +46,38 @@ class AuthRepository {
     if (data == null) return null;
     return Profile.fromJson(data);
   }
+
+  Future<Profile?> updateProfile({
+    String? fullName,
+    String? bio,
+    String? whatsappNumber,
+    String? preferredLanguage,
+    Map<String, dynamic>? emergencyContact,
+  }) async {
+    final uid = currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+
+    final updates = <String, dynamic>{};
+    if (fullName != null) {
+      updates['full_name'] = fullName.trim().isEmpty ? null : fullName.trim();
+    }
+    if (bio != null) {
+      updates['bio'] = bio.trim().isEmpty ? null : bio.trim();
+    }
+    if (whatsappNumber != null) {
+      updates['whatsapp_number'] =
+          whatsappNumber.trim().isEmpty ? null : whatsappNumber.trim();
+    }
+    if (preferredLanguage != null) {
+      updates['preferred_language'] = preferredLanguage;
+    }
+    if (emergencyContact != null) {
+      updates['emergency_contact'] = emergencyContact;
+    }
+
+    if (updates.isNotEmpty) {
+      await _client.from('profiles').update(updates).eq('id', uid);
+    }
+    return fetchProfile();
+  }
 }

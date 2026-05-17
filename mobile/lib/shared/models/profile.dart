@@ -9,6 +9,10 @@ class Profile {
   final bool isAdmin;
   final String? avatarKey;
   final String? phone;
+  final String? bio;
+  final String? whatsappNumber;
+  final String preferredLanguage;
+  final Map<String, dynamic>? emergencyContact;
 
   const Profile({
     required this.id,
@@ -21,6 +25,10 @@ class Profile {
     this.isAdmin = false,
     this.avatarKey,
     this.phone,
+    this.bio,
+    this.whatsappNumber,
+    this.preferredLanguage = 'en',
+    this.emergencyContact,
   });
 
   bool get isExec =>
@@ -32,6 +40,30 @@ class Profile {
 
   String get unitDisplay =>
       [if (block != null) block, unitNumber].whereType<String>().join('-');
+
+  Profile copyWith({
+    String? fullName,
+    String? bio,
+    String? whatsappNumber,
+    String? preferredLanguage,
+    Map<String, dynamic>? emergencyContact,
+  }) =>
+      Profile(
+        id: id,
+        societyId: societyId,
+        unitId: unitId,
+        fullName: fullName ?? this.fullName,
+        unitNumber: unitNumber,
+        block: block,
+        portalRole: portalRole,
+        isAdmin: isAdmin,
+        avatarKey: avatarKey,
+        phone: phone,
+        bio: bio ?? this.bio,
+        whatsappNumber: whatsappNumber ?? this.whatsappNumber,
+        preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+        emergencyContact: emergencyContact ?? this.emergencyContact,
+      );
 
   factory Profile.fromJson(Map<String, dynamic> j) {
     // units join may return a nested map with unit_number and block
@@ -47,6 +79,10 @@ class Profile {
       isAdmin: j['is_admin'] as bool? ?? false,
       avatarKey: j['avatar_storage_key'] as String?,
       phone: j['phone_encrypted'] as String?,
+      bio: j['bio'] as String?,
+      whatsappNumber: j['whatsapp_number'] as String?,
+      preferredLanguage: j['preferred_language'] as String? ?? 'en',
+      emergencyContact: j['emergency_contact'] as Map<String, dynamic>?,
     );
   }
 }
