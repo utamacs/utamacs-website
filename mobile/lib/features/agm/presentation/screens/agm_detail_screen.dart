@@ -6,17 +6,34 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/agm_repository.dart';
 
-class AgmDetailScreen extends ConsumerWidget {
+class AgmDetailScreen extends ConsumerStatefulWidget {
   final AgmSession session;
 
   const AgmDetailScreen({super.key, required this.session});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AgmDetailScreen> createState() => _AgmDetailScreenState();
+}
+
+class _AgmDetailScreenState extends ConsumerState<AgmDetailScreen> {
+  late AgmSession _session;
+
+  @override
+  void initState() {
+    super.initState();
+    _session = widget.session;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = _session;
     final resolutionsAsync = ref.watch(agmResolutionsProvider(session.id));
     final dateStr = DateFormat('EEEE, dd MMMM yyyy').format(session.meetingDate);
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -128,6 +145,34 @@ class AgmDetailScreen extends ConsumerWidget {
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       color: kTextPrimary,
+                    ),
+                  ),
+                ],
+
+                // Quorum update button for exec
+                if (isExec) ...[
+                  const SizedBox(height: 14),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kPrimary600,
+                        side: const BorderSide(color: kPrimary600),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.people_alt_outlined, size: 16),
+                      label: const Text('Update Attendance & Quorum'),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => _QuorumDialog(
+                          session: session,
+                          onUpdated: (updated) =>
+                              setState(() => _session = updated),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -404,6 +449,196 @@ class _VotePill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Quorum / Attendance update dialog (exec only)
+// ---------------------------------------------------------------------------
+
+class _QuorumDialog extends ConsumerStatefulWidget {
+  final AgmSession session;
+  final ValueChanged<AgmSession> onUpdated;
+
+  const _QuorumDialog({required this.session, required this.onUpdated});
+
+  @override
+  ConsumerState<_QuorumDialog> createState() => _QuorumDialogState();
+}
+
+class _QuorumDialogState extends ConsumerState<_QuorumDialog> {
+  late final TextEditingController _attendeesCtrl;
+  late bool _quorumMet;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _attendeesCtrl = TextEditingController(
+      text: widget.session.attendeesCount?.toString() ?? '',
+    );
+    _quorumMet = widget.session.quorumMet ?? false;
+  }
+
+  @override
+  void dispose() {
+    _attendeesCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final countText = _attendeesCtrl.text.trim();
+    if (countText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Enter attendee count.',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+          backgroundColor: kRed600,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    final count = int.tryParse(countText);
+    if (count == null || count < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Enter a valid number.',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+          backgroundColor: kRed600,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(agmRepositoryProvider)
+          .updateAttendees(widget.session.id, count, _quorumMet);
+      final updated = AgmSession(
+        id: widget.session.id,
+        agmYear: widget.session.agmYear,
+        agmType: widget.session.agmType,
+        meetingDate: widget.session.meetingDate,
+        venue: widget.session.venue,
+        quorumMet: _quorumMet,
+        attendeesCount: count,
+        status: widget.session.status,
+        notes: widget.session.notes,
+        createdAt: widget.session.createdAt,
+      );
+      widget.onUpdated(updated);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Attendance updated.',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: kSecondary500,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e', style: GoogleFonts.inter()),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        'Update Attendance',
+        style: GoogleFonts.poppins(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: kPrimary600,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Members Attended',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: kTextSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _attendeesCtrl,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: '0',
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Quorum Met',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: kTextPrimary,
+                  ),
+                ),
+              ),
+              Switch(
+                value: _quorumMet,
+                activeColor: kSecondary500,
+                onChanged: (v) => setState(() => _quorumMet = v),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: Text('Cancel',
+              style: GoogleFonts.inter(color: kTextSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kPrimary600,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+          ),
+          child: _saving
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : Text('Save',
+                  style: GoogleFonts.inter(
+                      color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+      ],
     );
   }
 }

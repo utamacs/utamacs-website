@@ -93,6 +93,63 @@ class PatrolRepository {
         .limit(limit);
     return (data as List).map((e) => PatrolLog.fromJson(e)).toList();
   }
+
+  Future<List<GuardAttendanceSummary>> fetchGuardSummaries() async {
+    final data = await _client
+        .from('patrol_logs')
+        .select('guard_name, patrol_date, is_incident')
+        .eq('society_id', env.societyId)
+        .order('patrol_date', ascending: false)
+        .limit(500);
+
+    final Map<String, GuardAttendanceSummary> map = {};
+    for (final row in (data as List)) {
+      final name = row['guard_name'] as String? ?? 'Unknown';
+      final date = DateTime.parse(row['patrol_date'] as String);
+      final isIncident = row['is_incident'] as bool? ?? false;
+      final prev = map[name];
+      if (prev == null) {
+        map[name] = GuardAttendanceSummary(
+          guardName: name,
+          totalShifts: 1,
+          incidentCount: isIncident ? 1 : 0,
+          lastPatrolDate: date,
+        );
+      } else {
+        final later = (prev.lastPatrolDate != null &&
+                prev.lastPatrolDate!.isAfter(date))
+            ? prev.lastPatrolDate
+            : date;
+        map[name] = GuardAttendanceSummary(
+          guardName: name,
+          totalShifts: prev.totalShifts + 1,
+          incidentCount: prev.incidentCount + (isIncident ? 1 : 0),
+          lastPatrolDate: later,
+        );
+      }
+    }
+    final result = map.values.toList();
+    result.sort((a, b) => b.totalShifts.compareTo(a.totalShifts));
+    return result;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Guard attendance summary model
+// ---------------------------------------------------------------------------
+
+class GuardAttendanceSummary {
+  final String guardName;
+  final int totalShifts;
+  final int incidentCount;
+  final DateTime? lastPatrolDate;
+
+  const GuardAttendanceSummary({
+    required this.guardName,
+    required this.totalShifts,
+    required this.incidentCount,
+    this.lastPatrolDate,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -110,3 +167,7 @@ final patrolLogsProvider =
 final incidentLogsProvider =
     FutureProvider.autoDispose<List<PatrolLog>>((ref) =>
         ref.read(patrolRepositoryProvider).fetchIncidentLogs());
+
+final guardSummariesProvider =
+    FutureProvider.autoDispose<List<GuardAttendanceSummary>>((ref) =>
+        ref.read(patrolRepositoryProvider).fetchGuardSummaries());
