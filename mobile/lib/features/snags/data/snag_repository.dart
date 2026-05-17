@@ -57,6 +57,37 @@ class SnagItem {
 }
 
 // ---------------------------------------------------------------------------
+// Snag Comment model (uses hoto_comments with item_type='snag_item')
+// ---------------------------------------------------------------------------
+
+class SnagComment {
+  final String id;
+  final String content;
+  final String authorId;
+  final String? authorName;
+  final DateTime createdAt;
+
+  const SnagComment({
+    required this.id,
+    required this.content,
+    required this.authorId,
+    this.authorName,
+    required this.createdAt,
+  });
+
+  factory SnagComment.fromJson(Map<String, dynamic> j) {
+    final profileMap = j['profiles'] as Map<String, dynamic>?;
+    return SnagComment(
+      id: j['id'] as String,
+      content: j['content'] as String,
+      authorId: j['author_id'] as String,
+      authorName: profileMap?['full_name'] as String?,
+      createdAt: DateTime.parse(j['created_at'] as String),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
 
@@ -88,6 +119,33 @@ class SnagRepository {
         .order('created_at', ascending: false)
         .limit(50);
     return (data as List).map((e) => SnagItem.fromJson(e)).toList();
+  }
+
+  Future<List<SnagComment>> fetchSnagComments(String snagId) async {
+    final data = await _client
+        .from('hoto_comments')
+        .select('*, profiles:author_id(full_name)')
+        .eq('item_type', 'snag_item')
+        .eq('item_id', snagId)
+        .order('created_at', ascending: true);
+    return (data as List).map((e) => SnagComment.fromJson(e)).toList();
+  }
+
+  Future<SnagComment> addSnagComment({
+    required String snagId,
+    required String content,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final commentId = 'CMT-${DateTime.now().millisecondsSinceEpoch}';
+    final data = await _client.from('hoto_comments').insert({
+      'id': commentId,
+      'item_type': 'snag_item',
+      'item_id': snagId,
+      'author_id': uid,
+      'content': content.trim(),
+    }).select('*, profiles:author_id(full_name)').single();
+    return SnagComment.fromJson(data);
   }
 
   Future<SnagItem> reportSnag({
@@ -143,3 +201,8 @@ final mySnagItemsProvider =
 final allSnagItemsProvider =
     FutureProvider.autoDispose<List<SnagItem>>((ref) =>
         ref.read(snagRepositoryProvider).fetchAllSnags());
+
+final snagCommentsProvider =
+    FutureProvider.autoDispose.family<List<SnagComment>, String>((ref, snagId) {
+  return ref.read(snagRepositoryProvider).fetchSnagComments(snagId);
+});

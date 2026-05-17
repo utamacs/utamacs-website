@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/event_repository.dart';
 
 /// Formats a [DateTime] to "Saturday, 15 June 2026 at 6:00 PM"
@@ -161,6 +162,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     );
     final isRegistered = registration != null;
     final isPast = event.isPast;
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -378,7 +381,188 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         onPressed: _rsvp,
                       ),
 
+          // ── Exec-only attendee list ───────────────────────────────────
+          if (isExec) ...[
+            const SizedBox(height: 12),
+            _AttendeesSection(eventId: event.id),
+          ],
+
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Attendees section (exec-only)
+// ---------------------------------------------------------------------------
+
+class _AttendeesSection extends ConsumerWidget {
+  final String eventId;
+  const _AttendeesSection({required this.eventId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final attendeesAsync = ref.watch(eventAttendeesProvider(eventId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'ATTENDEES',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: kPrimary600,
+                letterSpacing: 1.0,
+              ),
+            ),
+            const SizedBox(width: 8),
+            attendeesAsync.when(
+              data: (list) => Text(
+                '${list.length}',
+                style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: kTextSecondary,
+                    fontWeight: FontWeight.w600),
+              ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.refresh, size: 18, color: kTextSecondary),
+              onPressed: () => ref.invalidate(eventAttendeesProvider(eventId)),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        attendeesAsync.when(
+          loading: () =>
+              const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Text(
+            'Could not load attendees: $e',
+            style: GoogleFonts.inter(color: kRed600, fontSize: 13),
+          ),
+          data: (attendees) => attendees.isEmpty
+              ? Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kBorderLight),
+                  ),
+                  child: Text(
+                    'No registrations yet.',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: kTextSecondary),
+                  ),
+                )
+              : Column(
+                  children: attendees
+                      .map((a) => _AttendeeTile(attendee: a))
+                      .toList(),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AttendeeTile extends StatelessWidget {
+  final EventAttendee attendee;
+  const _AttendeeTile({required this.attendee});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = attendee.fullName ?? 'Resident';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'R';
+    final isCheckedIn = attendee.checkedInAt != null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorderLight),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: kPrimary100,
+            child: Text(
+              initial,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: kPrimary600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                  ),
+                ),
+                Text(
+                  '${attendee.attendeesCount} attendee${attendee.attendeesCount == 1 ? '' : 's'}',
+                  style: GoogleFonts.inter(
+                      fontSize: 11, color: kTextSecondary),
+                ),
+              ],
+            ),
+          ),
+          if (isCheckedIn)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD1FAE5),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'CHECKED IN',
+                style: GoogleFonts.inter(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: kSecondary500,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            )
+          else
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: kPrimary50,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                attendee.status.toUpperCase(),
+                style: GoogleFonts.inter(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
         ],
       ),
     );
