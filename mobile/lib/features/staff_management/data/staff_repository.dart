@@ -235,6 +235,15 @@ class StaffRepository {
     return (data as List).map((e) => StaffShift.fromJson(e)).toList();
   }
 
+  Future<List<StaffAgency>> fetchAgencies() async {
+    final data = await _client
+        .from('staff_agencies')
+        .select()
+        .eq('society_id', env.societyId)
+        .order('name', ascending: true);
+    return (data as List).map((e) => StaffAgency.fromJson(e)).toList();
+  }
+
   Future<StaffShift> createShift({
     required String staffId,
     required String shiftName,
@@ -260,6 +269,96 @@ class StaffRepository {
         .single();
     return StaffShift.fromJson(data);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Staff agency model
+// ---------------------------------------------------------------------------
+
+class StaffAgency {
+  final String id;
+  final String name;
+  final String type;
+  final String? contactName;
+  final String? contactPhone;
+  final String? contactEmail;
+  final String? psaraNumber;
+  final DateTime? psaraExpiry;
+  final String? pfNumber;
+  final String? esicNumber;
+  final String? gstNumber;
+  final String? panNumber;
+  final DateTime? contractStart;
+  final DateTime? contractEnd;
+  final double? monthlyRate;
+  final bool isActive;
+  final String? notes;
+  final DateTime createdAt;
+
+  const StaffAgency({
+    required this.id,
+    required this.name,
+    required this.type,
+    this.contactName,
+    this.contactPhone,
+    this.contactEmail,
+    this.psaraNumber,
+    this.psaraExpiry,
+    this.pfNumber,
+    this.esicNumber,
+    this.gstNumber,
+    this.panNumber,
+    this.contractStart,
+    this.contractEnd,
+    this.monthlyRate,
+    required this.isActive,
+    this.notes,
+    required this.createdAt,
+  });
+
+  bool get contractExpiringSoon {
+    if (contractEnd == null) return false;
+    return contractEnd!
+        .isBefore(DateTime.now().add(const Duration(days: 30)));
+  }
+
+  bool get psaraExpiringSoon {
+    if (psaraExpiry == null) return false;
+    return psaraExpiry!
+        .isBefore(DateTime.now().add(const Duration(days: 30)));
+  }
+
+  bool get hasComplianceWarning =>
+      contractExpiringSoon || psaraExpiringSoon;
+
+  factory StaffAgency.fromJson(Map<String, dynamic> j) => StaffAgency(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        type: j['type'] as String,
+        contactName: j['contact_name'] as String?,
+        contactPhone: j['contact_phone'] as String?,
+        contactEmail: j['contact_email'] as String?,
+        psaraNumber: j['psara_number'] as String?,
+        psaraExpiry: j['psara_expiry'] != null
+            ? DateTime.tryParse(j['psara_expiry'] as String)
+            : null,
+        pfNumber: j['pf_number'] as String?,
+        esicNumber: j['esic_number'] as String?,
+        gstNumber: j['gst_number'] as String?,
+        panNumber: j['pan_number'] as String?,
+        contractStart: j['contract_start'] != null
+            ? DateTime.tryParse(j['contract_start'] as String)
+            : null,
+        contractEnd: j['contract_end'] != null
+            ? DateTime.tryParse(j['contract_end'] as String)
+            : null,
+        monthlyRate: j['monthly_rate'] != null
+            ? (j['monthly_rate'] as num).toDouble()
+            : null,
+        isActive: j['is_active'] as bool? ?? true,
+        notes: j['notes'] as String?,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -344,4 +443,9 @@ final staffAttendanceProvider =
 final staffShiftsProvider =
     FutureProvider.autoDispose<List<StaffShift>>((ref) {
   return ref.read(staffRepositoryProvider).fetchShifts();
+});
+
+final staffAgenciesProvider =
+    FutureProvider.autoDispose<List<StaffAgency>>((ref) {
+  return ref.read(staffRepositoryProvider).fetchAgencies();
 });
