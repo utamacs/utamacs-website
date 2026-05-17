@@ -9,7 +9,7 @@
 
 | Module | Total | Done | Remaining |
 |--------|-------|------|-----------|
-| 01 Notices | 9 | 5 | 4 |
+| 01 Notices | 9 | 6 | 3 |
 | 02 Visitors | 14 | 0 | 14 |
 | 03 Complaints | 13 | 13 | 0 |
 | 04 Finance | 12 | 0 | 12 |
@@ -21,12 +21,12 @@
 | 10 Facilities | 6 | 6 | 0 |
 | 11 Parking | 12 | 7 | 5 |
 | 12 Maids | 9 | 8 | 1 |
-| 13 Members | 8 | 4 | 4 |
+| 13 Members | 8 | 5 | 3 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
 | 16 Water Tankers | 11 | 8 | 3 |
 | 17 Snags | 11 | 7 | 4 |
-| 18 HOTO | 8 | 2 | 6 |
+| 18 HOTO | 8 | 3 | 5 |
 | 19 Analytics | 8 | 2 | 6 |
 | 20 Security Patrol | 6 | 5 | 1 |
 | 21 Staff Management | 9 | 3 | 6 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 3 | 6 |
 | 28 Profile & Auth | 6 | 4 | 2 |
-| **TOTAL** | **234** | **143** | **91** |
+| **TOTAL** | **234** | **146** | **88** |
 
 ---
 
@@ -48,7 +48,7 @@
 - [x] 🟠 Scheduled notices tab — list scheduled notices with countdown + "Publish now" button
 - [x] 🟠 Create notice form — title, category, audience (all/owners/tenants), target blocks/wings, body HTML, is_pinned, requires_acknowledgement, scheduled_at, draft mode
 - [ ] 🟠 Attachment viewer — tap to open/download PDF or image via signed URL
-- [ ] 🟠 Target audience & wing/block field on create form
+- [x] 🟠 Target audience & wing/block field on create form
 - [x] 🟡 Video URL field + embedded player in notice detail
 - [x] 🟢 Full category colour-coding (Urgent=red, Financial=amber, Governance=blue, Maintenance=orange, Events=purple, General=grey)
 
@@ -228,7 +228,7 @@
 - [x] 🟡 Role badge on member card (member / executive / secretary / president)
 - [x] 🟡 Move-in date ("Member since MMM YYYY") on profile
 - [x] 🟡 Vehicle details section (reg_no, make, model) in own profile
-- [ ] 🟢 Tenancy expiry filter ("Expiring in 30 days")
+- [x] 🟢 Tenancy expiry filter ("Expiring in 30 days")
 - [ ] 🟢 CSV export (exec)
 
 ---
@@ -296,7 +296,7 @@
 - [ ] 🟠 Delegation management — assign authority to committee member
 - [ ] 🟠 Elections workflow screen
 - [ ] 🟠 Finance tab — resolutions, budget approvals, funding decisions
-- [ ] 🟡 Comments on HOTO items
+- [x] 🟡 Comments on HOTO items
 - [ ] 🟡 User invitations to HOTO process
 
 ---

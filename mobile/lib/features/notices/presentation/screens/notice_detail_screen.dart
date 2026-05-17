@@ -156,6 +156,64 @@ class NoticeDetailScreen extends ConsumerWidget {
                 },
               ),
             ],
+
+            // Attachment info
+            if (notice.attachmentKey != null) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: kPrimary50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kPrimary100),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.attach_file,
+                        size: 16, color: kPrimary600),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Attachment available — open portal.utamacs.org to download',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: kPrimary600,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Target audience (non-all)
+            if (notice.targetAudience != 'all') ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: kSectionAlt,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kBorderLight),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.group_outlined,
+                        size: 15, color: kTextSecondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        notice.targetBlocks.isNotEmpty
+                            ? '${notice.targetAudienceLabel}: ${notice.targetBlocks.join(', ')}'
+                            : notice.targetAudienceLabel,
+                        style: const TextStyle(
+                            fontSize: 13, color: kTextSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
