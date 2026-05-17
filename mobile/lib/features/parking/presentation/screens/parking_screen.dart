@@ -14,6 +14,7 @@ class ParkingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final parkingAsync = ref.watch(myParkingProvider);
+    final historyAsync = ref.watch(myParkingHistoryProvider);
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -24,7 +25,10 @@ class ParkingScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(myParkingProvider),
+            onPressed: () {
+              ref.invalidate(myParkingProvider);
+              ref.invalidate(myParkingHistoryProvider);
+            },
           ),
         ],
       ),
@@ -40,18 +44,53 @@ class ParkingScreen extends ConsumerWidget {
           ),
         ),
         data: (allocation) {
-          if (allocation == null) {
-            return const EmptyState(
-              icon: Icons.local_parking_outlined,
-              title: 'No parking slot allocated',
-              subtitle:
-                  'No active parking slot is assigned to your account. '
-                  'Please contact society management to request an allocation.',
-            );
-          }
+          final history = historyAsync.valueOrNull ?? [];
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            child: _ParkingCard(allocation: allocation),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (allocation != null)
+                  _ParkingCard(allocation: allocation)
+                else
+                  AppCard(
+                    color: kSectionAlt,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.local_parking_outlined,
+                            color: kTextSecondary, size: 28),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'No active parking slot assigned. Contact society management to request an allocation.',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: kTextSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                if (history.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    'Past Allocations',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimary600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...history.map((h) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _PastAllocationCard(allocation: h),
+                      )),
+                ],
+              ],
+            ),
           );
         },
       ),
@@ -178,6 +217,108 @@ class _ParkingCard extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Past allocation compact card
+// ---------------------------------------------------------------------------
+
+class _PastAllocationCard extends StatelessWidget {
+  final ParkingAllocation allocation;
+  const _PastAllocationCard({required this.allocation});
+
+  String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  @override
+  Widget build(BuildContext context) {
+    final allocatedDate = DateFormat('dd MMM yyyy').format(allocation.allocatedAt);
+    final releasedDate = allocation.expiresAt != null
+        ? DateFormat('dd MMM yyyy').format(allocation.expiresAt!)
+        : null;
+
+    return AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: kSectionAlt,
+              shape: BoxShape.circle,
+              border: Border.all(color: kBorderLight),
+            ),
+            child: const Center(
+              child: Icon(Icons.local_parking, size: 22, color: kTextSecondary),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      allocation.slotNumber ?? 'Slot —',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary,
+                      ),
+                    ),
+                    const Spacer(),
+                    StatusBadge.forStatus(allocation.status),
+                  ],
+                ),
+                if (allocation.slotType != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _capitalize(allocation.slotType!),
+                    style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        size: 13, color: kTextSecondary),
+                    const SizedBox(width: 4),
+                    Text(
+                      releasedDate != null
+                          ? '$allocatedDate – $releasedDate'
+                          : 'From $allocatedDate',
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: kTextSecondary),
+                    ),
+                  ],
+                ),
+                if (allocation.vehicleNumber != null &&
+                    allocation.vehicleNumber!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.pin_outlined,
+                          size: 13, color: kTextSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        allocation.vehicleNumber!,
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: kTextSecondary),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 class _DetailRow extends StatelessWidget {
   final IconData icon;

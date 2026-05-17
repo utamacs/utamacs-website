@@ -15,6 +15,7 @@ class ProfileScreen extends ConsumerWidget {
     final authState = ref.watch(authNotifierProvider);
     final profile = authState.profile;
     final unitDetails = ref.watch(_unitDetailsProvider).valueOrNull;
+    final vehicleInfo = ref.watch(_vehicleProvider).valueOrNull;
 
     final initial = (profile?.fullName?.isNotEmpty == true)
         ? profile!.fullName![0].toUpperCase()
@@ -185,6 +186,12 @@ class ProfileScreen extends ConsumerWidget {
             if (unitDetails != null) ...[
               const SizedBox(height: 16),
               _UnitDetailsCard(details: unitDetails),
+            ],
+
+            // Vehicle / parking card
+            if (vehicleInfo != null) ...[
+              const SizedBox(height: 16),
+              _VehicleInfoCard(info: vehicleInfo),
             ],
 
             // Emergency contact card (if set)
@@ -767,6 +774,143 @@ class _UnitDetailsCard extends StatelessWidget {
   String _residencyLabel(String type) {
     const labels = {'owner': 'Owner Occupied', 'tenant': 'Tenant Occupied'};
     return labels[type] ?? type;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle info model + provider
+// ---------------------------------------------------------------------------
+
+class _VehicleInfo {
+  final String? slotNumber;
+  final String? vehicleNumber;
+  final String? vehicleMake;
+  final String? slotType;
+
+  const _VehicleInfo({
+    this.slotNumber,
+    this.vehicleNumber,
+    this.vehicleMake,
+    this.slotType,
+  });
+
+  bool get hasAnyData =>
+      slotNumber != null || vehicleNumber != null || vehicleMake != null;
+
+  factory _VehicleInfo.fromJson(Map<String, dynamic> j) {
+    final slotMap = j['parking_slots'] as Map<String, dynamic>?;
+    return _VehicleInfo(
+      slotNumber: slotMap?['slot_number'] as String?,
+      vehicleNumber: j['vehicle_number'] as String?,
+      vehicleMake: j['vehicle_make'] as String?,
+      slotType: slotMap?['slot_type'] as String?,
+    );
+  }
+}
+
+final _vehicleProvider = FutureProvider.autoDispose<_VehicleInfo?>(
+  (ref) async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return null;
+    final data = await Supabase.instance.client
+        .from('parking_allocations')
+        .select('vehicle_number, vehicle_make, parking_slots(slot_number, slot_type)')
+        .eq('user_id', uid)
+        .eq('status', 'active')
+        .maybeSingle();
+    if (data == null) return null;
+    final v = _VehicleInfo.fromJson(data);
+    return v.hasAnyData ? v : null;
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Vehicle info card
+// ---------------------------------------------------------------------------
+
+class _VehicleInfoCard extends StatelessWidget {
+  final _VehicleInfo info;
+  const _VehicleInfoCard({required this.info});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: kPrimary50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.directions_car_outlined,
+                      size: 18, color: kPrimary600),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Vehicle & Parking',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (info.slotNumber != null) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.local_parking_outlined,
+              label: 'Slot No.',
+              value: info.slotNumber!,
+            ),
+          ],
+          if (info.vehicleNumber != null &&
+              info.vehicleNumber!.isNotEmpty) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.pin_outlined,
+              label: 'Reg. Number',
+              value: info.vehicleNumber!,
+            ),
+          ],
+          if (info.vehicleMake != null && info.vehicleMake!.isNotEmpty) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.directions_car,
+              label: 'Vehicle Make',
+              value: info.vehicleMake!,
+            ),
+          ],
+          if (info.slotType != null) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.garage_outlined,
+              label: 'Slot Type',
+              value: info.slotType![0].toUpperCase() +
+                  info.slotType!.substring(1),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 

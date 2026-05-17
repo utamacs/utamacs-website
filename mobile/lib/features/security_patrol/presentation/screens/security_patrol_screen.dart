@@ -15,6 +15,8 @@ class SecurityPatrolScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
+    final incidentCount =
+        ref.watch(incidentLogsProvider).valueOrNull?.length ?? 0;
 
     if (isExec) {
       return DefaultTabController(
@@ -44,10 +46,36 @@ class SecurityPatrolScreen extends ConsumerWidget {
               unselectedLabelColor: kTextSecondary,
               indicatorColor: kPrimary600,
               indicatorWeight: 2.5,
-              tabs: const [
-                Tab(text: 'Patrol Logs'),
-                Tab(text: 'Incidents'),
-                Tab(text: 'Guards'),
+              tabs: [
+                const Tab(text: 'Patrol Logs'),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Incidents'),
+                      if (incidentCount > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: kRed600,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$incidentCount',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Tab(text: 'Guards'),
               ],
             ),
           ),
