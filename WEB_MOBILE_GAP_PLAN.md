@@ -10,7 +10,7 @@
 | Module | Total | Done | Remaining |
 |--------|-------|------|-----------|
 | 01 Notices | 8 | 8 | 0 |
-| 02 Visitors | 14 | 3 | 11 |
+| 02 Visitors | 14 | 14 | 0 |
 | 03 Complaints | 13 | 13 | 0 |
 | 04 Finance | 12 | 12 | 0 |
 | 05 Events | 9 | 9 | 0 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 5 | 0 |
 | 27 Vendors & Work Orders | 9 | 9 | 0 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **233** | **222** | **11** |
+| **TOTAL** | **233** | **233** | **0** |
 
 ---
 
@@ -56,17 +56,17 @@
 
 ## 02 · VISITORS
 
-- [ ] 🔴 Guard: OTP verification form (6-digit input → verify → admission modal with pass details)
-- [ ] 🔴 Guard: QR camera scan (jsQR) → pass validity check → Admit button
-- [ ] 🔴 Guard: Log walk-in entry form (visitor_name, visitor_type, host unit lookup, gate, vehicle)
-- [ ] 🔴 Guard: Active visitors list with Log Exit per row
-- [ ] 🔴 Resident: Gate approval requests — approve / reject with countdown timer
-- [ ] 🔴 Guard: Submit gate-approval request to resident (awaits resident response)
-- [ ] 🟠 Pass download button (html2canvas) and Share button (Web Share API / share_plus)
-- [ ] 🟠 Guard: Expected Today tab — pre-approved passes valid today, filtered by recurring_days
-- [ ] 🟠 Deliveries tab — log delivery form (courier, tracking#, flat), Mark Collected
-- [ ] 🟠 Visitor logs table with filters (type, gate, date range) and CSV export
-- [ ] 🟡 Frequent visitor shortcuts — pre-fill new pass from visit history
+- [x] 🔴 Guard: OTP verification form (6-digit input → verify → admission modal with pass details)
+- [x] 🔴 Guard: QR camera scan (jsQR) → pass validity check → Admit button
+- [x] 🔴 Guard: Log walk-in entry form (visitor_name, visitor_type, host unit lookup, gate, vehicle)
+- [x] 🔴 Guard: Active visitors list with Log Exit per row
+- [x] 🔴 Resident: Gate approval requests — approve / reject with countdown timer
+- [x] 🔴 Guard: Submit gate-approval request to resident (awaits resident response)
+- [x] 🟠 Pass download button (html2canvas) and Share button (Web Share API / share_plus)
+- [x] 🟠 Guard: Expected Today tab — pre-approved passes valid today, filtered by recurring_days
+- [x] 🟠 Deliveries tab — log delivery form (courier, tracking#, flat), Mark Collected
+- [x] 🟠 Visitor logs table with filters (type, gate, date range) and CSV export
+- [x] 🟡 Frequent visitor shortcuts — pre-fill new pass from visit history
 - [x] 🟢 Guard note displayed on pass screen
 - [x] 🟢 Vehicle number displayed on pass screen
 - [x] 🟢 Recurring pass indicator on pass card
