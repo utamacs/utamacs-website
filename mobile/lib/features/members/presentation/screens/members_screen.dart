@@ -191,31 +191,65 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
 // Member card
 // ---------------------------------------------------------------------------
 
-class _MemberCard extends StatelessWidget {
+class _MemberCard extends ConsumerWidget {
   final Member member;
   const _MemberCard({required this.member});
 
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final initial = member.fullName.isNotEmpty
         ? member.fullName[0].toUpperCase()
         : '?';
+    final myId = ref.watch(authNotifierProvider).profile?.id;
+    final isOwnProfile = myId == member.id;
 
     return AppCard(
       child: Row(
         children: [
           // Avatar
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: kPrimary600,
-            child: Text(
-              initial,
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: kPrimary600,
+                child: Text(
+                  initial,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            ),
+              if (isOwnProfile)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: GestureDetector(
+                    onTap: () =>
+                        _openPortal('profile?action=upload-avatar'),
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: kPrimary600,
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: const Icon(Icons.camera_alt,
+                          size: 10, color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 14),
           // Name + unit

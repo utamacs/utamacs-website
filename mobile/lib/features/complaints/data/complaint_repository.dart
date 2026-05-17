@@ -91,6 +91,44 @@ class ComplaintHistory {
       );
 }
 
+class ComplaintAttachment {
+  final String id;
+  final String complaintId;
+  final String storageKey;
+  final String? fileName;
+  final String? mimeType;
+  final int? fileSizeBytes;
+  final DateTime createdAt;
+
+  const ComplaintAttachment({
+    required this.id,
+    required this.complaintId,
+    required this.storageKey,
+    this.fileName,
+    this.mimeType,
+    this.fileSizeBytes,
+    required this.createdAt,
+  });
+
+  bool get isImage =>
+      mimeType != null &&
+      (mimeType!.startsWith('image/') ||
+          mimeType == 'image/jpeg' ||
+          mimeType == 'image/png' ||
+          mimeType == 'image/webp');
+
+  factory ComplaintAttachment.fromJson(Map<String, dynamic> j) =>
+      ComplaintAttachment(
+        id: j['id'] as String,
+        complaintId: j['complaint_id'] as String,
+        storageKey: j['storage_key'] as String,
+        fileName: j['file_name'] as String?,
+        mimeType: j['mime_type'] as String?,
+        fileSizeBytes: j['file_size_bytes'] as int?,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
+}
+
 class ComplaintComment {
   final String id;
   final String complaintId;
@@ -224,6 +262,22 @@ class ComplaintRepository {
     }).eq('id', complaintId).eq('raised_by', uid);
   }
 
+  Future<List<ComplaintAttachment>> fetchAttachments(String complaintId) async {
+    final data = await _client
+        .from('complaint_attachments')
+        .select()
+        .eq('complaint_id', complaintId)
+        .order('created_at', ascending: true);
+    return (data as List).map((e) => ComplaintAttachment.fromJson(e)).toList();
+  }
+
+  Future<String?> getAttachmentSignedUrl(String storageKey) async {
+    final res = await _client.storage
+        .from('complaint-attachments')
+        .createSignedUrl(storageKey, 3600);
+    return res;
+  }
+
   Future<void> reopenComplaint(String complaintId) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw Exception('Not authenticated');
@@ -268,4 +322,11 @@ final complaintHistoryProvider = FutureProvider.autoDispose
   return ref
       .read(complaintRepositoryProvider)
       .fetchCommentHistory(complaintId);
+});
+
+final complaintAttachmentsProvider = FutureProvider.autoDispose
+    .family<List<ComplaintAttachment>, String>((ref, complaintId) {
+  return ref
+      .read(complaintRepositoryProvider)
+      .fetchAttachments(complaintId);
 });

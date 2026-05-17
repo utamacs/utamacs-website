@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -20,6 +21,13 @@ class VendorsScreen extends ConsumerStatefulWidget {
 class _VendorsScreenState extends ConsumerState<VendorsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   void initState() {
@@ -46,6 +54,12 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen>
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (isExec)
+            IconButton(
+              icon: const Icon(Icons.shopping_cart_outlined),
+              tooltip: 'Procurement',
+              onPressed: () => _openPortal('vendors?tab=procurement'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -403,6 +417,13 @@ class _WorkOrderCard extends ConsumerStatefulWidget {
 class _WorkOrderCardState extends ConsumerState<_WorkOrderCard> {
   bool _updating = false;
 
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   static String _formatAmount(double amount) {
     final formatter = NumberFormat('#,##,###', 'en_IN');
     return '₹${formatter.format(amount)}';
@@ -636,6 +657,30 @@ class _WorkOrderCardState extends ConsumerState<_WorkOrderCard> {
                   );
                 }).toList(),
               ),
+          ],
+          // Invoice upload — exec, for in_progress or completed WOs
+          if (widget.isExec &&
+              ['in_progress', 'completed']
+                  .contains(widget.workOrder.status)) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: kBorderLight),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _openPortal(
+                  'vendors/work-orders/${widget.workOrder.id}?action=upload-invoice'),
+              icon: const Icon(Icons.upload_file_outlined, size: 16),
+              label: const Text('Upload Invoice'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: kPrimary600,
+                side: const BorderSide(color: kPrimary600),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: GoogleFonts.inter(
+                    fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
           // Vendor rating section — show on completed/closed WOs
           if (['completed', 'closed'].contains(widget.workOrder.status)) ...[

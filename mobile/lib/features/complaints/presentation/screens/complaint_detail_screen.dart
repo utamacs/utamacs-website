@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -307,6 +308,11 @@ class ComplaintDetailScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
+          // ── Attachments section ───────────────────────────────────────────
+          _AttachmentsSection(complaintId: complaint.id),
+
+          const SizedBox(height: 20),
+
           // ── Timeline section ─────────────────────────────────────────────
           Text(
             'Status Timeline',
@@ -454,6 +460,129 @@ class ComplaintDetailScreen extends ConsumerWidget {
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}, '
         '${dt.hour.toString().padLeft(2, '0')}:'
         '${dt.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Attachments section
+// ---------------------------------------------------------------------------
+
+class _AttachmentsSection extends ConsumerWidget {
+  final String complaintId;
+  const _AttachmentsSection({required this.complaintId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final attachmentsAsync = ref.watch(complaintAttachmentsProvider(complaintId));
+
+    return attachmentsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (attachments) {
+        if (attachments.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Attachments (${attachments.length})',
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: kPrimary600,
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 90,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: attachments.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, i) =>
+                    _AttachmentTile(attachment: attachments[i], ref: ref),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _AttachmentTile extends StatefulWidget {
+  final ComplaintAttachment attachment;
+  final WidgetRef ref;
+  const _AttachmentTile({required this.attachment, required this.ref});
+
+  @override
+  State<_AttachmentTile> createState() => _AttachmentTileState();
+}
+
+class _AttachmentTileState extends State<_AttachmentTile> {
+  bool _loading = false;
+
+  Future<void> _open() async {
+    setState(() => _loading = true);
+    try {
+      final url = await widget.ref
+          .read(complaintRepositoryProvider)
+          .getAttachmentSignedUrl(widget.attachment.storageKey);
+      if (url != null && mounted) {
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  IconData get _icon {
+    final mime = widget.attachment.mimeType ?? '';
+    if (mime.startsWith('image/')) return Icons.image_outlined;
+    if (mime == 'application/pdf') return Icons.picture_as_pdf_outlined;
+    return Icons.attach_file;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.attachment.fileName ?? 'Attachment';
+    return GestureDetector(
+      onTap: _open,
+      child: Container(
+        width: 80,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kBorderLight),
+        ),
+        child: _loading
+            ? const Center(
+                child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2)))
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(_icon, color: kPrimary600, size: 28),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      name,
+                      style: GoogleFonts.inter(
+                          fontSize: 10, color: kTextSecondary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
   }
 }
 

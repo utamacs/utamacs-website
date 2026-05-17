@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../auth/domain/auth_notifier.dart';
@@ -21,6 +22,13 @@ class StaffScreen extends ConsumerStatefulWidget {
 class _StaffScreenState extends ConsumerState<StaffScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   void initState() {
@@ -47,6 +55,23 @@ class _StaffScreenState extends ConsumerState<StaffScreen>
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (isExec) ...[
+            IconButton(
+              icon: const Icon(Icons.assignment_outlined),
+              tooltip: 'Hiring Proposals',
+              onPressed: () => _openPortal('staff?tab=proposals'),
+            ),
+            IconButton(
+              icon: const Icon(Icons.bar_chart_outlined),
+              tooltip: 'Staff Analytics',
+              onPressed: () => _openPortal('staff?tab=analytics'),
+            ),
+            IconButton(
+              icon: const Icon(Icons.business_outlined),
+              tooltip: 'Departments',
+              onPressed: () => _openPortal('admin/staff-departments'),
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
