@@ -13,6 +13,7 @@ class GalleryAlbum {
   final DateTime? eventDate;
   final bool isPublic;
   final int photoCount;
+  final String? coverKey;
   final DateTime createdAt;
 
   const GalleryAlbum({
@@ -22,6 +23,7 @@ class GalleryAlbum {
     this.eventDate,
     required this.isPublic,
     required this.photoCount,
+    this.coverKey,
     required this.createdAt,
   });
 
@@ -34,6 +36,7 @@ class GalleryAlbum {
             : null,
         isPublic: j['is_public'] as bool? ?? false,
         photoCount: j['photo_count'] as int? ?? 0,
+        coverKey: j['cover_key'] as String?,
         createdAt: DateTime.parse(j['created_at'] as String),
       );
 }
@@ -97,6 +100,17 @@ class GalleryRepository {
     return (data as List).map((e) => GalleryPhoto.fromJson(e)).toList();
   }
 
+  Future<String?> fetchCoverUrl(String coverKey) async {
+    try {
+      final response = await _client.storage
+          .from('gallery-photos')
+          .createSignedUrl(coverKey, 3600);
+      return response;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<GalleryAlbum> createAlbum({
     required String title,
     String? description,
@@ -136,4 +150,10 @@ final albumPhotosProvider =
     FutureProvider.autoDispose.family<List<GalleryPhoto>, String>(
   (ref, albumId) =>
       ref.read(galleryRepositoryProvider).fetchPhotos(albumId),
+);
+
+final albumCoverUrlProvider =
+    FutureProvider.autoDispose.family<String?, String>(
+  (ref, coverKey) =>
+      ref.read(galleryRepositoryProvider).fetchCoverUrl(coverKey),
 );

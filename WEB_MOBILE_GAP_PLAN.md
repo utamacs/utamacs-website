@@ -13,14 +13,14 @@
 | 02 Visitors | 14 | 3 | 11 |
 | 03 Complaints | 13 | 13 | 0 |
 | 04 Finance | 12 | 0 | 12 |
-| 05 Events | 9 | 7 | 2 |
+| 05 Events | 9 | 8 | 1 |
 | 06 Polls | 9 | 8 | 1 |
 | 07 Community Board | 11 | 10 | 1 |
 | 08 Documents | 11 | 7 | 4 |
-| 09 Gallery | 5 | 2 | 3 |
+| 09 Gallery | 5 | 3 | 2 |
 | 10 Facilities | 6 | 6 | 0 |
 | 11 Parking | 12 | 7 | 5 |
-| 12 Maids | 9 | 8 | 1 |
+| 12 Maids | 9 | 9 | 0 |
 | 13 Members | 8 | 5 | 3 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 1 | 4 |
 | 27 Vendors & Work Orders | 9 | 6 | 3 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **234** | **164** | **70** |
+| **TOTAL** | **234** | **167** | **67** |
 
 ---
 
@@ -112,7 +112,7 @@
 
 - [x] 🔴 Capacity management — spots-left counter, capacity progress bar, auto-waitlist when full
 - [ ] 🟠 Waitlist auto-promotion when a spot opens + push notification to next in queue
-- [ ] 🟠 Banner image — display in list and detail; upload (exec)
+- [x] 🟠 Banner image — display in list and detail; upload (exec)
 - [x] 🟠 Attendee list — name, unit, guest count, check-in status (exec-only)
 - [x] 🟠 Create event form — title, category (8 types), capacity, start/end datetime, location, description, registration_deadline, ticket_price
 - [x] 🟡 Guest count selection (1–5 attendees) in RSVP modal
@@ -172,7 +172,7 @@
 
 - [x] 🟠 Create album modal (exec) — title, description, event_date
 - [ ] 🟠 Upload photos to album — multi-file picker (exec), progress indicator
-- [ ] 🟡 Album cover image displayed in grid (currently placeholder colour only)
+- [x] 🟡 Album cover image displayed in grid (currently placeholder colour only)
 - [x] 🟡 Album description and event_date shown in detail view
 - [ ] 🟢 Photo captions in lightbox view
 
