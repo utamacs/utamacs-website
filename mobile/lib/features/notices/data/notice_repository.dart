@@ -99,6 +99,24 @@ class NoticeRepository {
     return Notice.fromJson(data);
   }
 
+  Future<List<Notice>> fetchScheduledNotices() async {
+    final data = await _client
+        .from('notices')
+        .select()
+        .eq('society_id', env.societyId)
+        .eq('status', 'scheduled')
+        .order('scheduled_at', ascending: true)
+        .limit(30);
+    return (data as List).map((e) => Notice.fromJson(e)).toList();
+  }
+
+  Future<void> publishNow(String noticeId) async {
+    await _client.from('notices').update({
+      'status': 'published',
+      'published_at': DateTime.now().toIso8601String(),
+    }).eq('id', noticeId);
+  }
+
   Future<int> fetchAcknowledgementCount(String noticeId) async {
     final data = await _client
         .from('notice_acknowledgements')
@@ -116,3 +134,7 @@ final noticeAcknowledgementCountProvider =
     FutureProvider.autoDispose.family<int, String>((ref, noticeId) {
   return ref.read(noticeRepositoryProvider).fetchAcknowledgementCount(noticeId);
 });
+
+final scheduledNoticesProvider =
+    FutureProvider.autoDispose<List<Notice>>((ref) =>
+        ref.read(noticeRepositoryProvider).fetchScheduledNotices());

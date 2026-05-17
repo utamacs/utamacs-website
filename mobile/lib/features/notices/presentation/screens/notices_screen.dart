@@ -18,12 +18,31 @@ const List<String> _kNoticeCategories = [
   'Governance',
 ];
 
-class NoticesScreen extends ConsumerWidget {
+class NoticesScreen extends ConsumerStatefulWidget {
   const NoticesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final noticesAsync = ref.watch(noticesProvider);
+  ConsumerState<NoticesScreen> createState() => _NoticesScreenState();
+}
+
+class _NoticesScreenState extends ConsumerState<NoticesScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
@@ -33,9 +52,26 @@ class NoticesScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(noticesProvider),
+            onPressed: () {
+              ref.invalidate(noticesProvider);
+              if (isExec) ref.invalidate(scheduledNoticesProvider);
+            },
           ),
         ],
+        bottom: isExec
+            ? TabBar(
+                controller: _tabController,
+                labelColor: kPrimary600,
+                unselectedLabelColor: kTextSecondary,
+                indicatorColor: kPrimary600,
+                labelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600, fontSize: 14),
+                tabs: const [
+                  Tab(text: 'Published'),
+                  Tab(text: 'Scheduled'),
+                ],
+              )
+            : null,
       ),
       floatingActionButton: isExec
           ? FloatingActionButton.extended(
@@ -45,7 +81,10 @@ class NoticesScreen extends ConsumerWidget {
                   isScrollControlled: true,
                   backgroundColor: Colors.transparent,
                   builder: (_) => _CreateNoticeModal(
-                    onCreated: () => ref.invalidate(noticesProvider),
+                    onCreated: () {
+                      ref.invalidate(noticesProvider);
+                      ref.invalidate(scheduledNoticesProvider);
+                    },
                   ),
                 );
               },
@@ -55,35 +94,225 @@ class NoticesScreen extends ConsumerWidget {
               label: const Text('Notice'),
             )
           : null,
-      body: noticesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load notices',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(noticesProvider),
-            child: const Text('Retry'),
-          ),
+      body: isExec
+          ? TabBarView(
+              controller: _tabController,
+              children: const [
+                _PublishedNoticesTab(),
+                _ScheduledNoticesTab(),
+              ],
+            )
+          : const _PublishedNoticesTab(),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Published tab
+// ---------------------------------------------------------------------------
+
+class _PublishedNoticesTab extends ConsumerWidget {
+  const _PublishedNoticesTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final noticesAsync = ref.watch(noticesProvider);
+    return noticesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load notices',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(noticesProvider),
+          child: const Text('Retry'),
         ),
-        data: (notices) {
-          if (notices.isEmpty) {
-            return const EmptyState(
-              icon: Icons.notifications_none,
-              title: 'No notices yet',
-              subtitle: 'Circulars and announcements will appear here.',
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(noticesProvider),
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-              itemCount: notices.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) => _NoticeCard(notice: notices[i]),
-            ),
+      ),
+      data: (notices) {
+        if (notices.isEmpty) {
+          return const EmptyState(
+            icon: Icons.notifications_none,
+            title: 'No notices yet',
+            subtitle: 'Circulars and announcements will appear here.',
           );
-        },
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(noticesProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+            itemCount: notices.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, i) => _NoticeCard(notice: notices[i]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Scheduled tab (exec-only)
+// ---------------------------------------------------------------------------
+
+class _ScheduledNoticesTab extends ConsumerWidget {
+  const _ScheduledNoticesTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheduledAsync = ref.watch(scheduledNoticesProvider);
+    return scheduledAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load scheduled notices',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(scheduledNoticesProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (notices) {
+        if (notices.isEmpty) {
+          return const EmptyState(
+            icon: Icons.schedule,
+            title: 'No scheduled notices',
+            subtitle:
+                'Notices saved as scheduled will appear here.',
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(scheduledNoticesProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+            itemCount: notices.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, i) =>
+                _ScheduledNoticeCard(notice: notices[i]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ScheduledNoticeCard extends ConsumerWidget {
+  final Notice notice;
+  const _ScheduledNoticeCard({required this.notice});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheduledAt = notice.scheduledAt;
+    final countdown = scheduledAt != null
+        ? scheduledAt.isAfter(DateTime.now())
+            ? 'in ${timeago.format(scheduledAt, allowFromNow: true)}'
+            : 'Overdue — ready to publish'
+        : 'No scheduled time set';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: kAccent500.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                      color: kAccent500.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  'SCHEDULED',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: kAccent500,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              const Icon(Icons.schedule, size: 14, color: kTextSecondary),
+              const SizedBox(width: 4),
+              Text(
+                countdown,
+                style: GoogleFonts.inter(
+                    fontSize: 11, color: kTextSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            notice.title,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (notice.category != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              notice.category!.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: _NoticeCard._categoryColor(notice.category),
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.publish, size: 16),
+              label: const Text('Publish Now'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: kSecondary500,
+                side: BorderSide(
+                    color: kSecondary500.withValues(alpha: 0.6)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                minimumSize: const Size(double.infinity, 40),
+              ),
+              onPressed: () async {
+                try {
+                  await ref
+                      .read(noticeRepositoryProvider)
+                      .publishNow(notice.id);
+                  ref.invalidate(scheduledNoticesProvider);
+                  ref.invalidate(noticesProvider);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Notice published',
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w500)),
+                        backgroundColor: kSecondary500,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed: $e',
+                            style: GoogleFonts.inter()),
+                        backgroundColor: kRed600,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

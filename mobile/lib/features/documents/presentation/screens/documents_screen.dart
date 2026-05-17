@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../data/document_repository.dart';
@@ -258,7 +259,7 @@ class _DocumentTile extends StatelessWidget {
               ),
               const SizedBox(width: 14),
 
-              // Title + size
+              // Title + size + date
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,15 +273,55 @@ class _DocumentTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      doc.fileSizeBytes != null
-                          ? _formatSize(doc.fileSizeBytes!)
-                          : doc.displayFileName,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: kTextSecondary),
+                    Row(
+                      children: [
+                        if (doc.fileSizeBytes != null) ...[
+                          Text(
+                            _formatSize(doc.fileSizeBytes!),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: kTextSecondary),
+                          ),
+                          const Text(' · ',
+                              style: TextStyle(
+                                  color: kTextSecondary, fontSize: 11)),
+                        ],
+                        Text(
+                          DateFormat('d MMM yyyy').format(doc.createdAt),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: kTextSecondary),
+                        ),
+                      ],
                     ),
+                    if (doc.requiresRole != 'member' || !doc.isPublic) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: doc.isPublic
+                              ? const Color(0xFFD1FAE5)
+                              : kPrimary50,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          doc.isPublic
+                              ? 'PUBLIC'
+                              : doc.requiresRole.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: doc.isPublic
+                                ? kSecondary500
+                                : kPrimary600,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -312,22 +353,39 @@ class _DocumentTile extends StatelessWidget {
     );
   }
 
+  static bool _isWord(String? mime) =>
+      mime == 'application/msword' ||
+      mime ==
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+  static bool _isExcel(String? mime) =>
+      mime == 'application/vnd.ms-excel' ||
+      mime ==
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mime == 'text/csv';
+
   static IconData _iconForMime(String? mime) {
     if (mime == null) return Icons.description_outlined;
     if (mime == 'application/pdf') return Icons.picture_as_pdf_outlined;
     if (mime.startsWith('image/')) return Icons.image_outlined;
+    if (_isWord(mime)) return Icons.article_outlined;
+    if (_isExcel(mime)) return Icons.table_chart_outlined;
     return Icons.description_outlined;
   }
 
   static Color _iconBgColor(String? mime) {
     if (mime == 'application/pdf') return const Color(0xFFFEE2E2);
     if (mime?.startsWith('image/') == true) return const Color(0xFFD1FAE5);
+    if (_isWord(mime)) return const Color(0xFFDBEAFE);
+    if (_isExcel(mime)) return const Color(0xFFD1FAE5);
     return kPrimary50;
   }
 
   static Color _iconColor(String? mime) {
     if (mime == 'application/pdf') return kRed600;
     if (mime?.startsWith('image/') == true) return kSecondary500;
+    if (_isWord(mime)) return kPrimary600;
+    if (_isExcel(mime)) return const Color(0xFF16A34A);
     return kPrimary600;
   }
 
