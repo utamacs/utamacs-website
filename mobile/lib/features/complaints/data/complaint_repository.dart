@@ -131,6 +131,7 @@ class ComplaintRepository {
     required String description,
     required String category,
     required String priority,
+    String? unitId,
   }) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw Exception('Not authenticated');
@@ -146,10 +147,49 @@ class ComplaintRepository {
           'category': category,
           'priority': priority,
           'status': 'open',
+          if (unitId != null) 'unit_id': unitId,
         })
         .select()
         .single();
     return Complaint.fromJson(data);
+  }
+
+  Future<void> updateComplaintStatus({
+    required String complaintId,
+    required String newStatus,
+    String? note,
+    String? assigneeId,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    await _client.from('complaints').update({
+      'status': newStatus,
+      if (assigneeId != null) 'assigned_to': assigneeId,
+      if (newStatus == 'resolved') 'resolved_at': DateTime.now().toIso8601String(),
+    }).eq('id', complaintId);
+    // Log status change in complaint_status_history
+    await _client.from('complaint_status_history').insert({
+      'complaint_id': complaintId,
+      'new_status': newStatus,
+      'old_status': newStatus, // will be overwritten by DB trigger if one exists
+      'changed_by': uid,
+      if (note != null && note.isNotEmpty) 'note': note,
+      'changed_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<List<Complaint>> fetchAllComplaints({String? statusFilter}) async {
+    var query = _client
+        .from('complaints')
+        .select()
+        .eq('society_id', env.societyId);
+    if (statusFilter != null && statusFilter != 'all') {
+      query = query.eq('status', statusFilter);
+    }
+    final data = await query
+        .order('created_at', ascending: false)
+        .limit(50);
+    return (data as List).map((e) => Complaint.fromJson(e)).toList();
   }
 
   Future<List<ComplaintHistory>> fetchCommentHistory(String complaintId) async {

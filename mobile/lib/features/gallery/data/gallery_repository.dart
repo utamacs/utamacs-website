@@ -96,6 +96,28 @@ class GalleryRepository {
         .limit(100);
     return (data as List).map((e) => GalleryPhoto.fromJson(e)).toList();
   }
+
+  Future<GalleryAlbum> createAlbum({
+    required String title,
+    String? description,
+    DateTime? eventDate,
+  }) async {
+    final data = await _client
+        .from('gallery_albums')
+        .insert({
+          'society_id': env.societyId,
+          'title': title,
+          if (description != null && description.isNotEmpty)
+            'description': description,
+          if (eventDate != null)
+            'event_date': eventDate.toIso8601String().split('T').first,
+          'is_public': true,
+          'photo_count': 0,
+        })
+        .select()
+        .single();
+    return GalleryAlbum.fromJson(data);
+  }
 }
 
 // ---------------------------------------------------------------------------

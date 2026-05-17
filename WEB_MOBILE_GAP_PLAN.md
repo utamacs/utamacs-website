@@ -11,13 +11,13 @@
 |--------|-------|------|-----------|
 | 01 Notices | 9 | 1 | 8 |
 | 02 Visitors | 14 | 0 | 14 |
-| 03 Complaints | 13 | 5 | 8 |
+| 03 Complaints | 13 | 7 | 6 |
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 5 | 4 |
 | 06 Polls | 9 | 5 | 4 |
 | 07 Community Board | 11 | 3 | 8 |
 | 08 Documents | 11 | 1 | 10 |
-| 09 Gallery | 5 | 0 | 5 |
+| 09 Gallery | 5 | 1 | 4 |
 | 10 Facilities | 6 | 1 | 5 |
 | 11 Parking | 12 | 3 | 9 |
 | 12 Maids | 9 | 4 | 5 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 2 | 4 |
-| **TOTAL** | **234** | **64** | **170** |
+| **TOTAL** | **234** | **67** | **167** |
 
 ---
 
@@ -76,12 +76,12 @@
 ## 03 · COMPLAINTS
 
 - [x] 🔴 Sub-category dropdown — dynamic, loaded per category from `GET /api/v1/complaints/sub-categories?category=X`
-- [ ] 🔴 Unit selection field (`unit_id`) in submit form
+- [x] 🔴 Unit selection field (`unit_id`) in submit form
 - [ ] 🔴 Photo / document attachment upload — 5 files, 5 MB each, JPEG/PNG/WebP/HEIC/PDF
 - [x] 🟠 Category alignment — expand mobile from 6 to 14 categories matching web (Plumbing, Electrical, Lift, Security, Housekeeping, etc.)
 - [x] 🟠 Comments thread — view thread, add comment, internal-note checkbox (exec-only comments hidden from member)
 - [ ] 🟠 Attachments viewer in detail screen (tap to open signed URL)
-- [ ] 🟠 Status update + assignee sidebar (exec) — status dropdown + note + assign-to dropdown
+- [x] 🟠 Status update + assignee sidebar (exec) — status dropdown + note + assign-to dropdown
 - [ ] 🟡 Star rating widget (1–5 stars) + feedback textarea on resolved complaints
 - [ ] 🟡 SLA deadline display and breach indicator (red if past deadline)
 - [ ] 🟡 Reopen complaint within SLA window
@@ -170,7 +170,7 @@
 
 ## 09 · GALLERY
 
-- [ ] 🟠 Create album modal (exec) — title, description, event_date
+- [x] 🟠 Create album modal (exec) — title, description, event_date
 - [ ] 🟠 Upload photos to album — multi-file picker (exec), progress indicator
 - [ ] 🟡 Album cover image displayed in grid (currently placeholder colour only)
 - [ ] 🟡 Album description and event_date shown in detail view
