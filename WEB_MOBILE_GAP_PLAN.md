@@ -11,13 +11,13 @@
 |--------|-------|------|-----------|
 | 01 Notices | 8 | 8 | 0 |
 | 02 Visitors | 14 | 3 | 11 |
-| 03 Complaints | 13 | 12 | 1 |
-| 04 Finance | 12 | 0 | 12 |
+| 03 Complaints | 13 | 13 | 0 |
+| 04 Finance | 12 | 12 | 0 |
 | 05 Events | 9 | 9 | 0 |
 | 06 Polls | 9 | 9 | 0 |
 | 07 Community Board | 11 | 11 | 0 |
 | 08 Documents | 11 | 11 | 0 |
-| 09 Gallery | 5 | 4 | 1 |
+| 09 Gallery | 5 | 5 | 0 |
 | 10 Facilities | 6 | 6 | 0 |
 | 11 Parking | 12 | 12 | 0 |
 | 12 Maids | 9 | 9 | 0 |
@@ -27,7 +27,7 @@
 | 16 Water Tankers | 11 | 11 | 0 |
 | 17 Snags | 11 | 11 | 0 |
 | 18 HOTO | 8 | 8 | 0 |
-| 19 Analytics | 8 | 7 | 1 |
+| 19 Analytics | 8 | 8 | 0 |
 | 20 Security Patrol | 6 | 6 | 0 |
 | 21 Staff Management | 9 | 9 | 0 |
 | 22 Policies | 4 | 4 | 0 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 5 | 0 |
 | 27 Vendors & Work Orders | 9 | 9 | 0 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **233** | **207** | **26** |
+| **TOTAL** | **233** | **222** | **11** |
 
 ---
 
@@ -77,7 +77,7 @@
 
 - [x] 🔴 Sub-category dropdown — dynamic, loaded per category from `GET /api/v1/complaints/sub-categories?category=X`
 - [x] 🔴 Unit selection field (`unit_id`) in submit form
-- [ ] 🔴 Photo / document attachment upload — 5 files, 5 MB each, JPEG/PNG/WebP/HEIC/PDF
+- [x] 🔴 Photo / document attachment upload — 5 files, 5 MB each, JPEG/PNG/WebP/HEIC/PDF
 - [x] 🟠 Category alignment — expand mobile from 6 to 14 categories matching web (Plumbing, Electrical, Lift, Security, Housekeeping, etc.)
 - [x] 🟠 Comments thread — view thread, add comment, internal-note checkbox (exec-only comments hidden from member)
 - [x] 🟠 Attachments viewer in detail screen (tap to open signed URL)
@@ -93,18 +93,18 @@
 
 ## 04 · FINANCE
 
-- [ ] 🔴 Pay dues — Razorpay order creation (`GET /api/v1/finance/dues/{id}/order`) + payment form + webhook verification
-- [ ] 🔴 GST invoice document — HSN 9972, GSTIN, line items, late penalty, GST %, TDS deducted, Net Amount Received
-- [ ] 🟠 Invoice download / print (browser print or PDF share)
-- [ ] 🟠 Payment receipts — view and download per payment
-- [ ] 🟠 Billing period details (period open/close dates, per-category maintenance amounts)
-- [ ] 🟠 TDS deduction tracking on vendor payments >₹30k + certificate generation
-- [ ] 🟡 Aging / overdue dues report
-- [ ] 🟡 Expense approval workflow (exec) — approve / reject pending expenses
-- [ ] 🟡 Credit memo / refund processing
-- [ ] 🟢 GST report (GSTR)
-- [ ] 🟢 TDS report + Form 16A certificate
-- [ ] 🟢 Ledger view and member statement
+- [x] 🔴 Pay dues — Razorpay order creation (`GET /api/v1/finance/dues/{id}/order`) + payment form + webhook verification
+- [x] 🔴 GST invoice document — HSN 9972, GSTIN, line items, late penalty, GST %, TDS deducted, Net Amount Received
+- [x] 🟠 Invoice download / print (browser print or PDF share)
+- [x] 🟠 Payment receipts — view and download per payment
+- [x] 🟠 Billing period details (period open/close dates, per-category maintenance amounts)
+- [x] 🟠 TDS deduction tracking on vendor payments >₹30k + certificate generation
+- [x] 🟡 Aging / overdue dues report
+- [x] 🟡 Expense approval workflow (exec) — approve / reject pending expenses
+- [x] 🟡 Credit memo / refund processing
+- [x] 🟢 GST report (GSTR)
+- [x] 🟢 TDS report + Form 16A certificate
+- [x] 🟢 Ledger view and member statement
 
 ---
 
@@ -171,7 +171,7 @@
 ## 09 · GALLERY
 
 - [x] 🟠 Create album modal (exec) — title, description, event_date
-- [ ] 🟠 Upload photos to album — multi-file picker (exec), progress indicator
+- [x] 🟠 Upload photos to album — multi-file picker (exec), progress indicator
 - [x] 🟡 Album cover image displayed in grid (currently placeholder colour only)
 - [x] 🟡 Album description and event_date shown in detail view
 - [x] 🟢 Photo captions in lightbox view
@@ -310,7 +310,7 @@
 - [x] 🟡 Wing / block / billing-period filters
 - [x] 🟡 Real-time KPI refresh
 - [x] 🟡 All 11 report types — Collection, Pending Dues, Complaint Resolution, Facility Utilisation, Visitor Log, Tenant Expiry, Member Directory, Trends, Expense Breakdown, Occupancy
-- [ ] 🟢 Occupancy heatmap by unit status
+- [x] 🟢 Occupancy heatmap by unit status
 
 ---
 

@@ -33,6 +33,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     ref.invalidate(societyStatsProvider);
     ref.invalidate(complaintBreakdownProvider);
     ref.invalidate(visitorTypeBreakdownProvider);
+    ref.invalidate(unitOccupancyProvider);
   }
 
   @override
@@ -42,6 +43,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     final statsAsync = ref.watch(societyStatsProvider);
     final breakdownAsync = ref.watch(complaintBreakdownProvider);
     final visitorAsync = ref.watch(visitorTypeBreakdownProvider);
+    final occupancyAsync = ref.watch(unitOccupancyProvider);
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -128,6 +130,15 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                   error: (_, __) => const SizedBox.shrink(),
                   data: (vb) => vb.total > 0
                       ? _VisitorTypeBreakdownCard(breakdown: vb)
+                      : const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 16),
+                // Occupancy heatmap
+                occupancyAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (units) => units.isNotEmpty
+                      ? _OccupancyHeatmap(units: units)
                       : const SizedBox.shrink(),
                 ),
                 const SizedBox(height: 24),
@@ -754,6 +765,117 @@ class _VisitorTypeBreakdownCard extends StatelessWidget {
           }),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Occupancy heatmap
+// ---------------------------------------------------------------------------
+
+class _OccupancyHeatmap extends StatelessWidget {
+  final List<UnitOccupancyItem> units;
+  const _OccupancyHeatmap({required this.units});
+
+  static Color _colorFor(String status) => switch (status) {
+        'owner_occupied' => const Color(0xFF059669),
+        'tenant_occupied' => const Color(0xFF2563EB),
+        'vacant' => const Color(0xFFD1D5DB),
+        'under_renovation' => const Color(0xFFF59E0B),
+        _ => const Color(0xFFD1D5DB),
+      };
+
+  static String _label(String status) => switch (status) {
+        'owner_occupied' => 'Owner',
+        'tenant_occupied' => 'Tenant',
+        'vacant' => 'Vacant',
+        'under_renovation' => 'Renovation',
+        _ => status,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final statusCounts = <String, int>{};
+    for (final u in units) {
+      statusCounts[u.occupancyStatus] =
+          (statusCounts[u.occupancyStatus] ?? 0) + 1;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Occupancy Heatmap',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: kTextPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Legend
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: statusCounts.entries.map((e) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: _colorFor(e.key),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${_label(e.key)} (${e.value})',
+                  style: GoogleFonts.inter(
+                      fontSize: 11, color: kTextSecondary),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 10),
+        // Grid
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: units
+              .map(
+                (u) => Tooltip(
+                  message: '${u.unitNumber} · ${_label(u.occupancyStatus)}',
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: _colorFor(u.occupancyStatus),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Center(
+                      child: Text(
+                        u.unitNumber.length <= 3
+                            ? u.unitNumber
+                            : u.unitNumber.substring(
+                                u.unitNumber.length - 3),
+                        style: const TextStyle(
+                          fontSize: 7,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.clip,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ],
     );
   }
 }

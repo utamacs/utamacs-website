@@ -38,6 +38,16 @@ class VisitorTypeBreakdown {
   int get total => countsByType.values.fold(0, (a, b) => a + b);
 }
 
+class UnitOccupancyItem {
+  final String unitNumber;
+  final String occupancyStatus;
+
+  const UnitOccupancyItem({
+    required this.unitNumber,
+    required this.occupancyStatus,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
@@ -142,6 +152,22 @@ class AnalyticsRepository {
     }
     return VisitorTypeBreakdown(countsByType: counts);
   }
+
+  Future<List<UnitOccupancyItem>> fetchUnitOccupancy() async {
+    final data = await _client
+        .from('units')
+        .select('unit_number, occupancy_status')
+        .eq('society_id', env.societyId)
+        .order('unit_number', ascending: true)
+        .limit(200);
+    return (data as List)
+        .map((r) => UnitOccupancyItem(
+              unitNumber: r['unit_number'] as String,
+              occupancyStatus:
+                  (r['occupancy_status'] as String?) ?? 'vacant',
+            ))
+        .toList();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -165,4 +191,9 @@ final complaintBreakdownProvider =
 final visitorTypeBreakdownProvider =
     FutureProvider.autoDispose<VisitorTypeBreakdown>((ref) {
   return ref.read(analyticsRepositoryProvider).fetchVisitorTypeBreakdown();
+});
+
+final unitOccupancyProvider =
+    FutureProvider.autoDispose<List<UnitOccupancyItem>>((ref) {
+  return ref.read(analyticsRepositoryProvider).fetchUnitOccupancy();
 });
