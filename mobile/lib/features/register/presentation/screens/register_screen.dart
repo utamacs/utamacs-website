@@ -19,6 +19,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _jointOwnersController = TextEditingController();
   String _memberType = 'original_owner';
   bool _submitting = false;
 
@@ -36,6 +37,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _jointOwnersController.dispose();
     super.dispose();
   }
 
@@ -46,6 +48,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       await ref.read(membershipRepositoryProvider).applyForMembership(
             memberName: _nameController.text.trim(),
             memberType: _memberType,
+            jointOwnerNames: _jointOwnersController.text.trim().isEmpty
+                ? []
+                : _jointOwnersController.text
+                    .split(',')
+                    .map((s) => s.trim())
+                    .where((s) => s.isNotEmpty)
+                    .toList(),
           );
       ref.invalidate(myMembershipProvider);
       if (mounted) {
@@ -107,6 +116,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           return _ApplicationForm(
             formKey: _formKey,
             nameController: _nameController,
+            jointOwnersController: _jointOwnersController,
             memberType: _memberType,
             onMemberTypeChanged: (v) => setState(() => _memberType = v!),
             submitting: _submitting,
@@ -167,7 +177,28 @@ class _MembershipStatusView extends StatelessWidget {
               ],
             ),
           )
-        else if (membership.isPending)
+        else if (membership.status == 'fees_confirmed')
+          AppCard(
+            color: kPrimary50,
+            child: Row(
+              children: [
+                const Icon(Icons.task_alt_outlined,
+                    color: kPrimary600, size: 28),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    'Fees received — awaiting executive approval',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: kPrimary600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (['applied', 'fees_pending'].contains(membership.status))
           AppCard(
             color: const Color(0xFFFFFBEB),
             child: Row(
@@ -208,6 +239,16 @@ class _MembershipStatusView extends StatelessWidget {
 
         const SizedBox(height: 16),
 
+        // Progress timeline
+        AppCard(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: _StatusTimeline(membership: membership),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
         // Details card
         AppCard(
           child: Column(
@@ -236,6 +277,11 @@ class _MembershipStatusView extends StatelessWidget {
                         : w)
                     .join(' '),
               ),
+              if (membership.jointOwnerNames.isNotEmpty)
+                _DetailRow(
+                  label: 'Joint Owners',
+                  value: membership.jointOwnerNames.join(', '),
+                ),
               _DetailRow(
                 label: 'Status',
                 valueWidget: StatusBadge.forStatus(membership.status),
@@ -405,6 +451,7 @@ class _PaymentRow extends StatelessWidget {
 class _ApplicationForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController nameController;
+  final TextEditingController jointOwnersController;
   final String memberType;
   final ValueChanged<String?> onMemberTypeChanged;
   final bool submitting;
@@ -413,6 +460,7 @@ class _ApplicationForm extends StatelessWidget {
   const _ApplicationForm({
     required this.formKey,
     required this.nameController,
+    required this.jointOwnersController,
     required this.memberType,
     required this.onMemberTypeChanged,
     required this.submitting,
@@ -463,6 +511,45 @@ class _ApplicationForm extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: kTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: kPrimary100.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kPrimary100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.account_balance_outlined,
+                            size: 14, color: kPrimary600),
+                        const SizedBox(width: 6),
+                        Text(
+                          'How to pay',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: kPrimary600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'After approval, the executive committee will share bank/UPI '
+                      'payment details via your registered contact. Payment may also '
+                      'be made in person at the society office.',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: kTextSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -559,6 +646,36 @@ class _ApplicationForm extends StatelessWidget {
                   onChanged: onMemberTypeChanged,
                 ),
 
+                const SizedBox(height: 16),
+
+                // Joint owners
+                Text(
+                  'Joint Owner Names (optional)',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: kTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: jointOwnersController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    hintText: 'e.g. Priya Reddy, Arjun Reddy',
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Separate multiple names with commas',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: kTextSecondary,
+                    ),
+                  ),
+                ),
+
                 const SizedBox(height: 24),
 
                 ElevatedButton(
@@ -582,6 +699,117 @@ class _ApplicationForm extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Membership status timeline
+// ---------------------------------------------------------------------------
+
+class _StatusTimeline extends StatelessWidget {
+  final Membership membership;
+  const _StatusTimeline({required this.membership});
+
+  @override
+  Widget build(BuildContext context) {
+    final step1Done = true;
+    final step2Done =
+        ['fees_confirmed', 'approved'].contains(membership.status);
+    final step3Done = membership.isApproved;
+    final step4Done = membership.shareCertNumber != null;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _StepCircle(
+            number: 1, label: 'Application\nSubmitted', done: step1Done),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Container(
+                height: 2,
+                color: step2Done ? kPrimary600 : kBorderLight),
+          ),
+        ),
+        _StepCircle(number: 2, label: 'Fee\nConfirmed', done: step2Done),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Container(
+                height: 2,
+                color: step3Done ? kPrimary600 : kBorderLight),
+          ),
+        ),
+        _StepCircle(
+            number: 3, label: 'Application\nApproved', done: step3Done),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Container(
+                height: 2,
+                color: step4Done ? kPrimary600 : kBorderLight),
+          ),
+        ),
+        _StepCircle(number: 4, label: 'Share Cert\nIssued', done: step4Done),
+      ],
+    );
+  }
+}
+
+class _StepCircle extends StatelessWidget {
+  final int number;
+  final String label;
+  final bool done;
+  const _StepCircle(
+      {required this.number, required this.label, required this.done});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 60,
+      child: Column(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: done ? kPrimary600 : kSectionAlt,
+              border: Border.all(
+                color: done ? kPrimary600 : kBorderLight,
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: done
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : Text(
+                      '$number',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kTextSecondary,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: done ? kPrimary600 : kTextSecondary,
+              fontWeight: done ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fee row helper
+// ---------------------------------------------------------------------------
 
 class _FeeRow extends StatelessWidget {
   final String label;

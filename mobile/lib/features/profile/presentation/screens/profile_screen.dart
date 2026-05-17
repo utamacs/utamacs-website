@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/profile.dart';
 import '../../../auth/domain/auth_notifier.dart';
@@ -12,6 +14,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authNotifierProvider);
     final profile = authState.profile;
+    final unitDetails = ref.watch(_unitDetailsProvider).valueOrNull;
 
     final initial = (profile?.fullName?.isNotEmpty == true)
         ? profile!.fullName![0].toUpperCase()
@@ -177,6 +180,12 @@ class ProfileScreen extends ConsumerWidget {
                 ],
               ),
             ),
+
+            // Unit details card
+            if (unitDetails != null) ...[
+              const SizedBox(height: 16),
+              _UnitDetailsCard(details: unitDetails),
+            ],
 
             // Emergency contact card (if set)
             if (profile?.emergencyContact != null) ...[
@@ -593,6 +602,177 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Unit details model + provider
+// ---------------------------------------------------------------------------
+
+class _UnitDetails {
+  final double? areaSqft;
+  final int? floor;
+  final String? residencyType;
+  final DateTime? moveInDate;
+  final int? numOccupants;
+
+  const _UnitDetails({
+    this.areaSqft,
+    this.floor,
+    this.residencyType,
+    this.moveInDate,
+    this.numOccupants,
+  });
+
+  bool get hasAnyData =>
+      areaSqft != null ||
+      floor != null ||
+      residencyType != null ||
+      moveInDate != null ||
+      numOccupants != null;
+
+  factory _UnitDetails.fromJson(Map<String, dynamic> j) {
+    final unitsMap = j['units'] as Map<String, dynamic>?;
+    return _UnitDetails(
+      floor: unitsMap?['floor'] as int?,
+      areaSqft: (unitsMap?['area_sqft'] as num?)?.toDouble(),
+      residencyType: j['residency_type'] as String?,
+      moveInDate: j['move_in_date'] != null
+          ? DateTime.parse(j['move_in_date'] as String)
+          : null,
+      numOccupants: j['num_occupants'] as int?,
+    );
+  }
+}
+
+final _unitDetailsProvider = FutureProvider.autoDispose<_UnitDetails?>(
+  (ref) async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return null;
+    final data = await Supabase.instance.client
+        .from('profiles')
+        .select('residency_type, move_in_date, num_occupants, units(floor, area_sqft)')
+        .eq('id', uid)
+        .maybeSingle();
+    if (data == null) return null;
+    final d = _UnitDetails.fromJson(data);
+    return d.hasAnyData ? d : null;
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Unit details card
+// ---------------------------------------------------------------------------
+
+class _UnitDetailsCard extends StatelessWidget {
+  final _UnitDetails details;
+  const _UnitDetailsCard({required this.details});
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFormat = DateFormat('dd MMM yyyy');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: kPrimary50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child:
+                      const Icon(Icons.info_outline, size: 18, color: kPrimary600),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Unit Details',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (details.floor != null) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.layers_outlined,
+              label: 'Floor',
+              value: _floorLabel(details.floor!),
+            ),
+          ],
+          if (details.areaSqft != null) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.square_foot_outlined,
+              label: 'Area',
+              value: '${details.areaSqft!.toStringAsFixed(0)} sq ft',
+            ),
+          ],
+          if (details.residencyType != null) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.home_work_outlined,
+              label: 'Occupancy',
+              value: _residencyLabel(details.residencyType!),
+            ),
+          ],
+          if (details.moveInDate != null) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.calendar_today_outlined,
+              label: 'Move-in',
+              value: dateFormat.format(details.moveInDate!),
+            ),
+          ],
+          if (details.numOccupants != null) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.people_outlined,
+              label: 'Occupants',
+              value:
+                  '${details.numOccupants} person${details.numOccupants != 1 ? 's' : ''}',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _floorLabel(int floor) {
+    if (floor == 0) return 'Ground Floor';
+    final suffix = (floor % 100 >= 11 && floor % 100 <= 13)
+        ? 'th'
+        : ['th', 'st', 'nd', 'rd', 'th', 'th', 'th', 'th', 'th', 'th'][floor % 10];
+    return '$floor$suffix Floor';
+  }
+
+  String _residencyLabel(String type) {
+    const labels = {'owner': 'Owner Occupied', 'tenant': 'Tenant Occupied'};
+    return labels[type] ?? type;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Info row helper
+// ---------------------------------------------------------------------------
 
 class _InfoRow extends StatelessWidget {
   final IconData icon;
