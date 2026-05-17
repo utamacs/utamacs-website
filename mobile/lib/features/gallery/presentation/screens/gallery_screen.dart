@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/gallery_repository.dart';
 import 'album_detail_screen.dart';
 
@@ -12,6 +14,8 @@ class GalleryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final albumsAsync = ref.watch(albumsProvider);
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -26,6 +30,23 @@ class GalleryScreen extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButton: isExec
+          ? FloatingActionButton.extended(
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => _CreateAlbumModal(
+                  onCreated: () => ref.invalidate(albumsProvider),
+                ),
+              ),
+              icon: const Icon(Icons.create_new_folder_outlined),
+              label: Text('New Album',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+              backgroundColor: kPrimary600,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: albumsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => EmptyState(
@@ -188,6 +209,198 @@ class _AlbumCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Create album modal (exec-only)
+// ---------------------------------------------------------------------------
+
+class _CreateAlbumModal extends ConsumerStatefulWidget {
+  final VoidCallback onCreated;
+  const _CreateAlbumModal({required this.onCreated});
+
+  @override
+  ConsumerState<_CreateAlbumModal> createState() => _CreateAlbumModalState();
+}
+
+class _CreateAlbumModalState extends ConsumerState<_CreateAlbumModal> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  DateTime? _eventDate;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(2020),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (date != null) setState(() => _eventDate = date);
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(galleryRepositoryProvider).createAlbum(
+            title: _titleCtrl.text.trim(),
+            description: _descCtrl.text.trim().isEmpty
+                ? null
+                : _descCtrl.text.trim(),
+            eventDate: _eventDate,
+          );
+      widget.onCreated();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Album created',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: kSecondary500,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e', style: GoogleFonts.inter()),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: kBorderLight,
+                      borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Create Album',
+                style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: kPrimary600),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _titleCtrl,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  labelText: 'Album Title *',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Title is required'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _descCtrl,
+                maxLines: 2,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  labelText: 'Description (optional)',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: _pickDate,
+                borderRadius: BorderRadius.circular(10),
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: 'Event Date (optional)',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    suffixIcon: _eventDate != null
+                        ? IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () =>
+                                setState(() => _eventDate = null),
+                          )
+                        : null,
+                  ),
+                  child: Text(
+                    _eventDate != null
+                        ? DateFormat('d MMM yyyy').format(_eventDate!)
+                        : 'Tap to select',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: _eventDate != null
+                          ? kTextPrimary
+                          : kTextSecondary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Create Album'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

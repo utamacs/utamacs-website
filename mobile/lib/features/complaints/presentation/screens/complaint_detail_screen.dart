@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/complaint_repository.dart';
 
 class ComplaintDetailScreen extends ConsumerWidget {
@@ -16,6 +17,8 @@ class ComplaintDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync =
         ref.watch(complaintHistoryProvider(complaint.id));
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final isOverdue = complaint.slaDeadline != null &&
         complaint.resolvedAt == null &&
         complaint.slaDeadline!.isBefore(DateTime.now());
@@ -34,6 +37,22 @@ class ComplaintDetailScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
       ),
+      floatingActionButton: isExec &&
+              !['closed', 'resolved'].contains(complaint.status)
+          ? FloatingActionButton.extended(
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => _StatusUpdateModal(complaint: complaint),
+              ),
+              icon: const Icon(Icons.update),
+              label: Text('Update Status',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+              backgroundColor: kPrimary600,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -368,6 +387,175 @@ class _PriorityChip extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: color,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Status update modal (exec-only)
+// ---------------------------------------------------------------------------
+
+class _StatusUpdateModal extends ConsumerStatefulWidget {
+  final Complaint complaint;
+  const _StatusUpdateModal({required this.complaint});
+
+  @override
+  ConsumerState<_StatusUpdateModal> createState() =>
+      _StatusUpdateModalState();
+}
+
+class _StatusUpdateModalState extends ConsumerState<_StatusUpdateModal> {
+  late String _newStatus;
+  final _noteCtrl = TextEditingController();
+  bool _saving = false;
+
+  static const _statuses = [
+    'open',
+    'in_progress',
+    'resolved',
+    'closed',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _newStatus = widget.complaint.status;
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await ref.read(complaintRepositoryProvider).updateComplaintStatus(
+            complaintId: widget.complaint.id,
+            newStatus: _newStatus,
+            note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+          );
+      ref.invalidate(complaintHistoryProvider(widget.complaint.id));
+      ref.invalidate(myComplaintsProvider);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Status updated to $_newStatus',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: kSecondary500,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e', style: GoogleFonts.inter()),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: kBorderLight,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Update Status',
+              style: GoogleFonts.poppins(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.complaint.ticketNumber,
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: kTextSecondary),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _newStatus,
+              decoration: InputDecoration(
+                labelText: 'New Status',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+              ),
+              items: _statuses
+                  .map((s) => DropdownMenuItem(
+                        value: s,
+                        child: Text(
+                          s.replaceAll('_', ' ')[0].toUpperCase() +
+                              s.replaceAll('_', ' ').substring(1),
+                          style: GoogleFonts.inter(fontSize: 14),
+                        ),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => _newStatus = v!),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _noteCtrl,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: 'Note (optional)',
+                hintText: 'Add a status update note...',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Update Status'),
+              ),
+            ),
+          ],
         ),
       ),
     );

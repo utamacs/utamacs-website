@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/complaint_repository.dart';
 
 class SubmitComplaintScreen extends ConsumerStatefulWidget {
@@ -43,12 +44,14 @@ class _SubmitComplaintScreenState
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
+    final unitId = ref.read(authNotifierProvider).profile?.unitId;
     try {
       await ref.read(complaintRepositoryProvider).submitComplaint(
             title: _titleController.text.trim(),
             description: _descriptionController.text.trim(),
             category: _category,
             priority: _priority,
+            unitId: unitId,
           );
       ref.invalidate(myComplaintsProvider);
       if (mounted) {
@@ -88,6 +91,9 @@ class _SubmitComplaintScreenState
 
   @override
   Widget build(BuildContext context) {
+    final profile = ref.watch(authNotifierProvider).profile;
+    final unitDisplay = profile?.unitDisplay;
+
     return Scaffold(
       backgroundColor: kBgWarm,
       appBar: AppBar(
@@ -100,6 +106,39 @@ class _SubmitComplaintScreenState
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            // Unit info row
+            if (unitDisplay != null && unitDisplay.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: kPrimary50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kPrimary100),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.apartment_outlined,
+                        size: 16, color: kPrimary600),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Filing for unit: ',
+                      style: GoogleFonts.inter(
+                          fontSize: 13, color: kTextSecondary),
+                    ),
+                    Text(
+                      unitDisplay,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: kPrimary600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
             _SectionLabel('Title'),
             const SizedBox(height: 6),
             TextFormField(
