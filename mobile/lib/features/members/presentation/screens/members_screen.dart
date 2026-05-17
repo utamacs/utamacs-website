@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/member_repository.dart';
 
@@ -44,144 +46,260 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isExec =
-        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+    final isDark = ref.watch(isDarkModeProvider);
+    final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final membersAsync = ref.watch(membersProvider);
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('Member Directory'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          if (isExec)
-            IconButton(
-              icon: const Icon(Icons.download_outlined),
-              tooltip: 'Export CSV',
-              onPressed: () async {
-                final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/members?export=csv');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri,
-                      mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(membersProvider),
+    return DsScreenShell(
+      title: 'Member Directory',
+      subtitle: 'Registered flat owners & tenants',
+      actions: [
+        if (isExec)
+          DsActionButton(
+            icon: Icons.download_outlined,
+            onTap: () async {
+              final uri = Uri.parse(
+                  'https://portal.utamacs.org/portal/members?export=csv');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
           ),
-        ],
-      ),
-      body: membersAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load members',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(membersProvider),
-            child: const Text('Retry'),
+        DsActionButton(
+          icon: Icons.refresh_rounded,
+          onTap: () => ref.invalidate(membersProvider),
+        ),
+      ],
+      onRefresh: () async => ref.invalidate(membersProvider),
+      slivers: [
+        // Search bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              dsSpace4, dsSpace3, dsSpace4, 0),
+          child: _SearchBar(
+            controller: _searchController,
+            isDark: isDark,
+            onChanged: (v) => setState(() => _query = v.trim()),
+            onClear: () {
+              _searchController.clear();
+              setState(() => _query = '');
+            },
           ),
         ),
-        data: (members) {
-          final expiringIds =
-              ref.watch(expiringTenancyUnitIdsProvider).valueOrNull ?? {};
-          final filtered = _filtered(members, expiringIds);
-          return Column(
-            children: [
-              // Search bar
-              Container(
-                color: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (v) => setState(() => _query = v.trim()),
-                  style: GoogleFonts.inter(fontSize: 14, color: kTextPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or unit…',
-                    prefixIcon: const Icon(Icons.search, color: kTextSecondary),
-                    suffixIcon: _query.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear,
-                                color: kTextSecondary, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _query = '');
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    filled: true,
-                    fillColor: kSectionAlt,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: kBorderLight),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: kBorderLight),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: kPrimary600, width: 2),
+        // Expiring tenancy filter chip
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              dsSpace4, dsSpace2, dsSpace4, dsSpace3),
+          child: _ExpiringChip(
+            selected: _filterExpiring,
+            isDark: isDark,
+            onTap: () =>
+                setState(() => _filterExpiring = !_filterExpiring),
+          ),
+        ),
+        // Main content
+        membersAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: 80),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load members',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () => ref.invalidate(membersProvider),
+          ),
+          data: (members) {
+            final expiringIds =
+                ref.watch(expiringTenancyUnitIdsProvider).valueOrNull ?? {};
+            final filtered = _filtered(members, expiringIds);
+            final nriCount = members.where((m) => m.isNri).length;
+            final execCount = members.where((m) => m.isExec).length;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DsStatsRow(stats: [
+                  DsStatItem(
+                    label: 'Total Members',
+                    value: '${members.length}',
+                    icon: Icons.people_alt_rounded,
+                    color: dsColorIndigo600,
+                  ),
+                  DsStatItem(
+                    label: 'NRI Members',
+                    value: '$nriCount',
+                    icon: Icons.flight_rounded,
+                    color: dsColorSky600,
+                  ),
+                  DsStatItem(
+                    label: 'Executives',
+                    value: '$execCount',
+                    icon: Icons.verified_user_rounded,
+                    color: dsColorEmerald600,
+                  ),
+                ]),
+                const SizedBox(height: dsSpace4),
+                if (filtered.isEmpty)
+                  DsEmptyPlaceholder(
+                    icon: Icons.people_outline_rounded,
+                    title: _filterExpiring
+                        ? 'No expiring tenancies'
+                        : _query.isEmpty
+                            ? 'No members found'
+                            : 'No results for "$_query"',
+                    message: _filterExpiring
+                        ? 'No tenant KYC records expire within 30 days.'
+                        : _query.isEmpty
+                            ? 'The member directory is currently empty.'
+                            : 'Try a different name or unit number.',
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: dsSpace4),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: dsSpace2),
+                    itemBuilder: (context, i) => DSFadeSlide(
+                      delay: Duration(milliseconds: i * 25),
+                      child: _MemberCard(member: filtered[i]),
                     ),
                   ),
-                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Search bar
+// ---------------------------------------------------------------------------
+
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final bool isDark;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _SearchBar({
+    required this.controller,
+    required this.isDark,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? dsDarkSurface : dsSurface,
+        borderRadius: BorderRadius.circular(dsRadiusMd),
+        boxShadow: isDark ? [] : dsShadowSm,
+        border: Border.all(
+          color: isDark ? dsDarkBorderLight : dsBorderLight,
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: GoogleFonts.inter(
+          fontSize: context.sp(14),
+          color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Search by name or unit…',
+          hintStyle: GoogleFonts.inter(
+            fontSize: context.sp(14),
+            color: isDark ? dsDarkTextTertiary : dsTextTertiary,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: context.si(20),
+            color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+          ),
+          suffixIcon: controller.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close_rounded,
+                      size: context.si(18),
+                      color:
+                          isDark ? dsDarkTextSecondary : dsTextSecondary),
+                  onPressed: onClear,
+                )
+              : null,
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: dsSpace4, vertical: dsSpace3),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Expiring tenancy filter chip
+// ---------------------------------------------------------------------------
+
+class _ExpiringChip extends StatelessWidget {
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _ExpiringChip({
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: dsDurationFast,
+        padding:
+            const EdgeInsets.symmetric(horizontal: dsSpace3, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? dsColorAmber600.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(dsRadiusFull),
+          border: Border.all(
+            color: selected
+                ? dsColorAmber600
+                : (isDark ? dsDarkBorderLight : dsBorderLight),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.hourglass_top_rounded,
+              size: context.si(13),
+              color: dsColorAmber600,
+            ),
+            const SizedBox(width: dsSpace1),
+            Text(
+              'Tenancy Expiring (30d)',
+              style: GoogleFonts.inter(
+                fontSize: context.sp(12),
+                fontWeight: FontWeight.w500,
+                color: selected
+                    ? dsColorAmber600
+                    : (isDark ? dsDarkTextSecondary : dsTextSecondary),
               ),
-              // Filter chips
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                child: Row(
-                  children: [
-                    _FilterChip(
-                      label: 'Tenancy Expiring (30d)',
-                      selected: _filterExpiring,
-                      onTap: () => setState(
-                          () => _filterExpiring = !_filterExpiring),
-                      color: kAccent500,
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: kBorderLight),
-              // List
-              Expanded(
-                child: filtered.isEmpty
-                    ? EmptyState(
-                        icon: Icons.people_outline,
-                        title: _filterExpiring
-                            ? 'No expiring tenancies'
-                            : _query.isEmpty
-                                ? 'No members found'
-                                : 'No results for "$_query"',
-                        subtitle: _filterExpiring
-                            ? 'No tenant KYC records expire within 30 days.'
-                            : _query.isEmpty
-                                ? 'The member directory is currently empty.'
-                                : 'Try a different name or unit number.',
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () async =>
-                            ref.invalidate(membersProvider),
-                        child: ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, i) =>
-                              _MemberCard(member: filtered[i]),
-                        ),
-                      ),
-              ),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -204,174 +322,171 @@ class _MemberCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final initial = member.fullName.isNotEmpty
         ? member.fullName[0].toUpperCase()
         : '?';
     final myId = ref.watch(authNotifierProvider).profile?.id;
     final isOwnProfile = myId == member.id;
 
-    return AppCard(
-      child: Row(
-        children: [
-          // Avatar
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: kPrimary600,
-                child: Text(
-                  initial,
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              if (isOwnProfile)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: GestureDetector(
-                    onTap: () =>
-                        _openPortal('profile?action=upload-avatar'),
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: kPrimary600,
-                        shape: BoxShape.circle,
-                        border:
-                            Border.all(color: Colors.white, width: 1.5),
-                      ),
-                      child: const Icon(Icons.camera_alt,
-                          size: 10, color: Colors.white),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 14),
-          // Name + unit
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return DSScalePress(
+      onTap: () => _openPortal('members/${member.id}'),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? dsDarkSurface : dsSurface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border: isDark
+              ? Border.all(color: dsDarkBorderSubtle)
+              : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          child: IntrinsicHeight(
+            child: Row(
               children: [
-                Text(
-                  member.fullName,
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                // 4px brand accent strip
+                Container(
+                  width: 4,
+                  color: dsColorIndigo600,
+                ),
+                const SizedBox(width: dsSpace3),
+                // Avatar
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: dsSpace3),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                          color: dsColorIndigo600,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            initial,
+                            style: GoogleFonts.poppins(
+                              fontSize: context.sp(17),
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (isOwnProfile)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: GestureDetector(
+                            onTap: () => _openPortal(
+                                'profile?action=upload-avatar'),
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: dsColorIndigo600,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isDark
+                                      ? dsDarkSurface
+                                      : dsSurface,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.camera_alt,
+                                size: context.si(10),
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                if (member.unitDisplay.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Unit ${member.unitDisplay}',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: kTextSecondary,
+                const SizedBox(width: dsSpace3),
+                // Name + unit
+                Expanded(
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: dsSpace3),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          member.fullName,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(14),
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? dsDarkTextPrimary
+                                : dsTextPrimary,
+                          ),
+                        ),
+                        if (member.unitDisplay.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Unit ${member.unitDisplay}',
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(12),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                ],
+                ),
+                // NRI badge
+                if (member.isNri)
+                  Container(
+                    margin: const EdgeInsets.only(right: dsSpace2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: dsColorSky50,
+                      borderRadius:
+                          BorderRadius.circular(dsRadiusFull),
+                      border: Border.all(color: dsColorSky100),
+                    ),
+                    child: Text(
+                      'NRI',
+                      style: GoogleFonts.inter(
+                        fontSize: context.sp(10),
+                        fontWeight: FontWeight.w700,
+                        color: dsColorSky700,
+                      ),
+                    ),
+                  ),
+                // Role chip — exec only
+                if (member.isExec)
+                  Container(
+                    margin: const EdgeInsets.only(right: dsSpace3),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: dsColorIndigo50,
+                      borderRadius:
+                          BorderRadius.circular(dsRadiusFull),
+                      border: Border.all(color: dsColorIndigo100),
+                    ),
+                    child: Text(
+                      member.roleLabel,
+                      style: GoogleFonts.inter(
+                        fontSize: context.sp(11),
+                        fontWeight: FontWeight.w600,
+                        color: dsColorIndigo600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
-          // NRI badge
-          if (member.isNri)
-            Container(
-              margin: const EdgeInsets.only(right: 6),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFBFDBFE)),
-              ),
-              child: Text(
-                'NRI',
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1D4ED8),
-                ),
-              ),
-            ),
-          // Role chip — only for exec roles
-          if (member.isExec)
-            _RoleChip(label: member.roleLabel),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final Color color;
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.12) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? color : kBorderLight),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (selected) ...[
-              Icon(Icons.check_circle, size: 13, color: color),
-              const SizedBox(width: 4),
-            ],
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: selected ? color : kTextSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RoleChip extends StatelessWidget {
-  final String label;
-  const _RoleChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: kPrimary50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kPrimary100),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: kPrimary600,
         ),
       ),
     );

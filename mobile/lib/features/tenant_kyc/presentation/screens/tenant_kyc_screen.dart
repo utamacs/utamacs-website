@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
-import '../../../../shared/widgets/status_badge.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/tenant_kyc_repository.dart';
 
@@ -14,41 +15,74 @@ class TenantKycScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isExec =
-        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+    final isDark = ref.watch(isDarkModeProvider);
+    final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
+
+    final tabBar = TabBar(
+      labelStyle: GoogleFonts.inter(
+          fontWeight: FontWeight.w600, fontSize: context.sp(14)),
+      unselectedLabelStyle: GoogleFonts.inter(
+          fontWeight: FontWeight.w400, fontSize: context.sp(14)),
+      labelColor: dsColorIndigo600,
+      unselectedLabelColor: isDark ? dsDarkTextSecondary : dsTextSecondary,
+      indicatorColor: dsColorIndigo600,
+      indicatorWeight: 2.5,
+      dividerColor: isDark ? dsDarkBorderSubtle : dsBorderLight,
+      tabs: const [
+        Tab(text: 'As Owner'),
+        Tab(text: 'As Tenant'),
+      ],
+    );
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: kBgWarm,
-        appBar: AppBar(
-          title: const Text('Tenant KYC'),
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          bottom: TabBar(
-            labelStyle: GoogleFonts.inter(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
+        backgroundColor: isDark ? dsDarkBackground : dsBackground,
+        body: NestedScrollView(
+          headerSliverBuilder: (context, _) => [
+            SliverAppBar(
+              pinned: true,
+              floating: true,
+              snap: true,
+              expandedHeight: 100,
+              backgroundColor: isDark ? dsDarkSurface : dsSurface,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.black26,
+              elevation: 1,
+              flexibleSpace: FlexibleSpaceBar(
+                titlePadding:
+                    const EdgeInsets.fromLTRB(dsSpace4, 0, dsSpace4, 56),
+                title: Text(
+                  'Tenant KYC',
+                  style: GoogleFonts.poppins(
+                    fontSize: context.sp(18),
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                  ),
+                ),
+              ),
+              actions: [
+                DsActionButton(
+                  icon: Icons.refresh_rounded,
+                  onTap: () {
+                    ref.invalidate(myTenantsProvider);
+                    ref.invalidate(myTenancyProvider);
+                  },
+                ),
+                const SizedBox(width: dsSpace2),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: tabBar,
+              ),
             ),
-            unselectedLabelStyle: GoogleFonts.inter(
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-            ),
-            labelColor: kPrimary600,
-            unselectedLabelColor: kTextSecondary,
-            indicatorColor: kPrimary600,
-            indicatorWeight: 2.5,
-            tabs: const [
-              Tab(text: 'As Owner'),
-              Tab(text: 'As Tenant'),
+          ],
+          body: TabBarView(
+            children: [
+              _AsOwnerTab(isExec: isExec, isDark: isDark),
+              _AsTenantTab(isDark: isDark),
             ],
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _AsOwnerTab(isExec: isExec),
-            const _AsTenantTab(),
-          ],
         ),
       ),
     );
@@ -61,7 +95,8 @@ class TenantKycScreen extends ConsumerWidget {
 
 class _AsOwnerTab extends ConsumerWidget {
   final bool isExec;
-  const _AsOwnerTab({required this.isExec});
+  final bool isDark;
+  const _AsOwnerTab({required this.isExec, required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -69,32 +104,40 @@ class _AsOwnerTab extends ConsumerWidget {
 
     return tenantsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load tenants',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(myTenantsProvider),
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(myTenantsProvider),
       ),
       data: (tenants) {
         if (tenants.isEmpty) {
-          return const EmptyState(
-            icon: Icons.people_outline,
+          return const DsEmptyPlaceholder(
+            icon: Icons.people_outline_rounded,
             title: 'No tenants registered',
-            subtitle:
-                'Tenant KYC records for your units will appear here.',
+            message: 'Tenant KYC records for your units will appear here.',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(myTenantsProvider),
           child: ListView.separated(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              dsSpace4,
+              dsSpace3,
+              dsSpace4,
+              80 + MediaQuery.paddingOf(context).bottom,
+            ),
             itemCount: tenants.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 10),
-            itemBuilder: (context, i) =>
-                _TenantCard(tenant: tenants[i], isExec: isExec),
+            separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
+            itemBuilder: (context, i) => DSFadeSlide(
+              delay: Duration(milliseconds: i * 40),
+              child: _TenantCard(
+                tenant: tenants[i],
+                isExec: isExec,
+                isDark: isDark,
+              ),
+            ),
           ),
         );
       },
@@ -107,7 +150,8 @@ class _AsOwnerTab extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _AsTenantTab extends ConsumerWidget {
-  const _AsTenantTab();
+  final bool isDark;
+  const _AsTenantTab({required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -115,30 +159,34 @@ class _AsTenantTab extends ConsumerWidget {
 
     return tenancyAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load tenancy record',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(myTenancyProvider),
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(myTenancyProvider),
       ),
       data: (tenancy) {
         if (tenancy == null) {
-          return const EmptyState(
+          return const DsEmptyPlaceholder(
             icon: Icons.home_work_outlined,
             title: 'No tenancy record found',
-            subtitle:
-                'Contact your owner to register your KYC.',
+            message: 'Contact your owner to register your KYC.',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(myTenancyProvider),
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              dsSpace4,
+              dsSpace3,
+              dsSpace4,
+              80 + MediaQuery.paddingOf(context).bottom,
+            ),
             children: [
-              _TenancyDetailCard(tenancy: tenancy),
+              DSFadeSlide(
+                child: _TenancyDetailCard(tenancy: tenancy, isDark: isDark),
+              ),
             ],
           ),
         );
@@ -154,7 +202,9 @@ class _AsTenantTab extends ConsumerWidget {
 class _TenantCard extends ConsumerStatefulWidget {
   final TenantKyc tenant;
   final bool isExec;
-  const _TenantCard({required this.tenant, required this.isExec});
+  final bool isDark;
+  const _TenantCard(
+      {required this.tenant, required this.isExec, required this.isDark});
 
   @override
   ConsumerState<_TenantCard> createState() => _TenantCardState();
@@ -175,8 +225,10 @@ class _TenantCardState extends ConsumerState<_TenantCard> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Failed: $e', style: GoogleFonts.inter()),
-          backgroundColor: kRed600,
+          backgroundColor: dsColorRed600,
           behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(dsRadiusMd)),
         ));
       }
     } finally {
@@ -195,229 +247,319 @@ class _TenantCardState extends ConsumerState<_TenantCard> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Status updated.',
               style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-          backgroundColor: kSecondary500,
+          backgroundColor: dsColorEmerald600,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(dsRadiusMd)),
         ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Failed: $e', style: GoogleFonts.inter()),
-          backgroundColor: kRed600,
+          backgroundColor: dsColorRed600,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(dsRadiusMd)),
         ));
       }
+    }
+  }
+
+  Color get _stripColor {
+    if (!widget.tenant.isActive) return dsTextTertiary;
+    switch (widget.tenant.status) {
+      case 'verified':
+        return dsColorEmerald600;
+      case 'under_review':
+        return dsColorAmber600;
+      case 'rejected':
+        return dsColorRed600;
+      default:
+        return dsColorIndigo600;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final tenant = widget.tenant;
+    final isDark = widget.isDark;
     final dateFormat = DateFormat('dd MMM yyyy');
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
     final startStr = dateFormat.format(tenant.tenancyStartDate);
     final endStr = tenant.tenancyEndDate != null
         ? dateFormat.format(tenant.tenancyEndDate!)
         : 'Ongoing';
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Name + status badge
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: kPrimary100,
-                child: Text(
-                  tenant.fullName.isNotEmpty
-                      ? tenant.fullName[0].toUpperCase()
-                      : '?',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: kPrimary600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      tenant.fullName,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: kTextPrimary,
-                      ),
-                    ),
-                    if (tenant.nationality != null)
-                      Text(
-                        tenant.nationality!,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: kTextSecondary,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              StatusBadge.forStatus(
-                tenant.isActive ? 'active' : tenant.status,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Tenancy period
-          _InfoRow(
-            icon: Icons.date_range_outlined,
-            text: '$startStr → $endStr',
-          ),
-
-          // Monthly rent
-          if (tenant.monthlyRent != null) ...[
-            const SizedBox(height: 6),
-            _InfoRow(
-              icon: Icons.currency_rupee,
-              text: '₹${tenant.monthlyRent!.toStringAsFixed(0)} / month',
-            ),
-          ],
-
-          // Owner consent row + toggle button
-          const SizedBox(height: 10),
-          const Divider(height: 1),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(
-                tenant.ownerConsent
-                    ? Icons.verified_user_outlined
-                    : Icons.pending_outlined,
-                size: 14,
-                color: tenant.ownerConsent ? kSecondary500 : kAccent500,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  tenant.ownerConsent
-                      ? 'Owner consent given'
-                      : 'Owner consent pending',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: tenant.ownerConsent ? kSecondary500 : kAccent500,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              _toggling
-                  ? const SizedBox(
-                      height: 14,
-                      width: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : TextButton(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      onPressed: _toggleConsent,
-                      child: Text(
-                        tenant.ownerConsent ? 'Revoke' : 'Grant',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: tenant.ownerConsent ? kRed600 : kPrimary600,
-                        ),
-                      ),
-                    ),
-            ],
-          ),
-
-          // Exec actions
-          if (widget.isExec) ...[
-            const SizedBox(height: 8),
-            Row(
+    return DSScalePress(
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? dsDarkSurface : dsSurface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border:
+              isDark ? Border.all(color: dsDarkBorderSubtle) : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: kPrimary600,
-                    side: const BorderSide(color: kPrimary600),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: const Icon(Icons.local_police_outlined, size: 14),
-                  label: Text('Police Verify',
-                      style: GoogleFonts.inter(
-                          fontSize: 12, fontWeight: FontWeight.w600)),
-                  onPressed: () => showDialog(
-                    context: context,
-                    builder: (_) => _PoliceVerificationModal(
-                      tenant: tenant,
-                      onVerified: () => ref.invalidate(myTenantsProvider),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                PopupMenuButton<String>(
-                  tooltip: 'Update Status',
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  onSelected: _updateStatus,
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                        value: 'under_review',
-                        child: Text('Mark: Under Review')),
-                    PopupMenuItem(
-                        value: 'verified',
-                        child: Text('Mark: Verified')),
-                    PopupMenuItem(
-                        value: 'rejected',
-                        child: Text('Mark: Rejected')),
-                    PopupMenuItem(
-                        value: 'expired', child: Text('Mark: Expired')),
-                  ],
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: kBorderLight),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                Container(width: 4, color: _stripColor),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(dsSpace4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.swap_horiz_outlined,
-                            size: 14, color: kTextSecondary),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Status',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: kTextSecondary,
-                          ),
+                        // Avatar + name + status
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                              radius: context.si(20),
+                              backgroundColor: dsColorIndigo600
+                                  .withValues(alpha: 0.12),
+                              child: Text(
+                                tenant.fullName.isNotEmpty
+                                    ? tenant.fullName[0].toUpperCase()
+                                    : '?',
+                                style: GoogleFonts.poppins(
+                                  fontSize: context.sp(15),
+                                  fontWeight: FontWeight.w700,
+                                  color: dsColorIndigo600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: dsSpace3),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    tenant.fullName,
+                                    style: GoogleFonts.inter(
+                                      fontSize: context.sp(15),
+                                      fontWeight: FontWeight.w600,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                  if (tenant.nationality != null)
+                                    Text(
+                                      tenant.nationality!,
+                                      style: GoogleFonts.inter(
+                                        fontSize: context.sp(12),
+                                        color: textSecondary,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            _StatusChip(
+                                status: tenant.isActive
+                                    ? tenant.status
+                                    : 'inactive',
+                                isDark: isDark),
+                          ],
                         ),
-                        const Icon(Icons.arrow_drop_down,
-                            size: 16, color: kTextSecondary),
+
+                        const SizedBox(height: dsSpace3),
+
+                        // Tenancy period
+                        _InfoRow(
+                          icon: Icons.date_range_outlined,
+                          text: '$startStr → $endStr',
+                          isDark: isDark,
+                          context: context,
+                        ),
+
+                        if (tenant.monthlyRent != null) ...[
+                          const SizedBox(height: dsSpace1),
+                          _InfoRow(
+                            icon: Icons.currency_rupee_rounded,
+                            text:
+                                '₹${tenant.monthlyRent!.toStringAsFixed(0)} / month',
+                            isDark: isDark,
+                            context: context,
+                          ),
+                        ],
+
+                        const SizedBox(height: dsSpace3),
+                        Divider(
+                          height: 1,
+                          color: isDark ? dsDarkBorderSubtle : dsBorderLight,
+                        ),
+                        const SizedBox(height: dsSpace2),
+
+                        // Owner consent row
+                        Row(
+                          children: [
+                            Icon(
+                              tenant.ownerConsent
+                                  ? Icons.verified_user_outlined
+                                  : Icons.pending_outlined,
+                              size: context.si(14),
+                              color: tenant.ownerConsent
+                                  ? dsColorEmerald600
+                                  : dsColorAmber600,
+                            ),
+                            const SizedBox(width: dsSpace2),
+                            Expanded(
+                              child: Text(
+                                tenant.ownerConsent
+                                    ? 'Owner consent given'
+                                    : 'Owner consent pending',
+                                style: GoogleFonts.inter(
+                                  fontSize: context.sp(12),
+                                  color: tenant.ownerConsent
+                                      ? dsColorEmerald600
+                                      : dsColorAmber600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            _toggling
+                                ? SizedBox(
+                                    height: context.si(14),
+                                    width: context.si(14),
+                                    child: const CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : TextButton(
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    onPressed: _toggleConsent,
+                                    child: Text(
+                                      tenant.ownerConsent
+                                          ? 'Revoke'
+                                          : 'Grant',
+                                      style: GoogleFonts.inter(
+                                        fontSize: context.sp(12),
+                                        fontWeight: FontWeight.w600,
+                                        color: tenant.ownerConsent
+                                            ? dsColorRed600
+                                            : dsColorIndigo600,
+                                      ),
+                                    ),
+                                  ),
+                          ],
+                        ),
+
+                        // Exec actions
+                        if (widget.isExec) ...[
+                          const SizedBox(height: dsSpace2),
+                          Row(
+                            children: [
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: dsColorIndigo600,
+                                  side: BorderSide(
+                                      color: dsColorIndigo600
+                                          .withValues(alpha: 0.4)),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(dsRadiusSm)),
+                                ),
+                                icon: Icon(Icons.local_police_outlined,
+                                    size: context.si(13)),
+                                label: Text('Police Verify',
+                                    style: GoogleFonts.inter(
+                                        fontSize: context.sp(12),
+                                        fontWeight: FontWeight.w600)),
+                                onPressed: () => showDialog(
+                                  context: context,
+                                  builder: (_) => _PoliceVerificationModal(
+                                    tenant: tenant,
+                                    onVerified: () =>
+                                        ref.invalidate(myTenantsProvider),
+                                    isDark: isDark,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: dsSpace2),
+                              PopupMenuButton<String>(
+                                tooltip: 'Update Status',
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(dsRadiusMd)),
+                                color: isDark ? dsDarkSurface : dsSurface,
+                                onSelected: _updateStatus,
+                                itemBuilder: (_) => [
+                                  'under_review',
+                                  'verified',
+                                  'rejected',
+                                  'expired'
+                                ]
+                                    .map((s) => PopupMenuItem(
+                                          value: s,
+                                          child: Text(
+                                            'Mark: ${s.replaceAll('_', ' ').split(' ').map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}').join(' ')}',
+                                            style: GoogleFonts.inter(
+                                              fontSize: context.sp(13),
+                                              color: isDark
+                                                  ? dsDarkTextPrimary
+                                                  : dsTextPrimary,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: isDark
+                                          ? dsDarkBorderLight
+                                          : dsBorderLight,
+                                    ),
+                                    borderRadius:
+                                        BorderRadius.circular(dsRadiusSm),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.swap_horiz_outlined,
+                                          size: context.si(13),
+                                          color: textSecondary),
+                                      const SizedBox(width: dsSpace1),
+                                      Text(
+                                        'Status',
+                                        style: GoogleFonts.inter(
+                                          fontSize: context.sp(12),
+                                          fontWeight: FontWeight.w600,
+                                          color: textSecondary,
+                                        ),
+                                      ),
+                                      Icon(Icons.arrow_drop_down,
+                                          size: context.si(15),
+                                          color: textSecondary),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 ),
               ],
             ),
-          ],
-        ],
+          ),
+        ),
       ),
     );
   }
@@ -429,7 +571,9 @@ class _TenantCardState extends ConsumerState<_TenantCard> {
 
 class _TenancyDetailCard extends StatelessWidget {
   final TenantKyc tenancy;
-  const _TenancyDetailCard({required this.tenancy});
+  final bool isDark;
+  const _TenancyDetailCard(
+      {required this.tenancy, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -439,64 +583,93 @@ class _TenancyDetailCard extends StatelessWidget {
         ? dateFormat.format(tenancy.tenancyEndDate!)
         : 'Ongoing';
 
-    return AppCard(
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? dsDarkSurface : dsSurface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: isDark ? [] : dsShadowSm,
+        border: isDark ? Border.all(color: dsDarkBorderSubtle) : null,
+      ),
+      padding: const EdgeInsets.all(dsSpace4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status banner
           Row(
             children: [
               Text(
                 'Tenancy Record',
                 style: GoogleFonts.poppins(
-                  fontSize: 15,
+                  fontSize: context.sp(15),
                   fontWeight: FontWeight.w700,
-                  color: kPrimary600,
+                  color: dsColorIndigo600,
                 ),
               ),
               const Spacer(),
-              StatusBadge.forStatus(
-                tenancy.isActive ? 'active' : tenancy.status,
-              ),
+              _StatusChip(
+                  status: tenancy.isActive ? tenancy.status : 'inactive',
+                  isDark: isDark),
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: dsSpace4),
 
-          _DetailRow(label: 'Full Name', value: tenancy.fullName),
+          _DetailRow(
+              label: 'Full Name',
+              value: tenancy.fullName,
+              isDark: isDark,
+              context: context),
 
           if (tenancy.nationality != null)
-            _DetailRow(label: 'Nationality', value: tenancy.nationality!),
+            _DetailRow(
+                label: 'Nationality',
+                value: tenancy.nationality!,
+                isDark: isDark,
+                context: context),
 
-          _DetailRow(label: 'Tenancy Start', value: startStr),
-          _DetailRow(label: 'Tenancy End', value: endStr),
+          _DetailRow(
+              label: 'Tenancy Start',
+              value: startStr,
+              isDark: isDark,
+              context: context),
+          _DetailRow(
+              label: 'Tenancy End',
+              value: endStr,
+              isDark: isDark,
+              context: context),
 
           if (tenancy.monthlyRent != null)
             _DetailRow(
               label: 'Monthly Rent',
               value: '₹${tenancy.monthlyRent!.toStringAsFixed(0)}',
+              isDark: isDark,
+              context: context,
             ),
 
-          const Divider(height: 24),
+          Divider(
+              height: dsSpace6,
+              color: isDark ? dsDarkBorderSubtle : dsBorderLight),
 
-          // Owner consent
           Row(
             children: [
               Icon(
                 tenancy.ownerConsent
                     ? Icons.verified_user_outlined
                     : Icons.pending_outlined,
-                size: 16,
-                color: tenancy.ownerConsent ? kSecondary500 : kAccent500,
+                size: context.si(15),
+                color: tenancy.ownerConsent
+                    ? dsColorEmerald600
+                    : dsColorAmber600,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: dsSpace2),
               Text(
                 tenancy.ownerConsent
                     ? 'Owner consent recorded'
                     : 'Awaiting owner consent',
                 style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: tenancy.ownerConsent ? kSecondary500 : kAccent500,
+                  fontSize: context.sp(13),
+                  color: tenancy.ownerConsent
+                      ? dsColorEmerald600
+                      : dsColorAmber600,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -508,16 +681,76 @@ class _TenancyDetailCard extends StatelessWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-  const _DetailRow({required this.label, required this.value});
+class _StatusChip extends StatelessWidget {
+  final String status;
+  final bool isDark;
+  const _StatusChip({required this.status, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
+    Color bg;
+    Color fg;
+    switch (status) {
+      case 'verified':
+        bg = dsColorEmerald600.withValues(alpha: 0.12);
+        fg = dsColorEmerald600;
+        break;
+      case 'under_review':
+        bg = dsColorAmber600.withValues(alpha: 0.12);
+        fg = dsColorAmber600;
+        break;
+      case 'rejected':
+      case 'inactive':
+        bg = dsColorRed600.withValues(alpha: 0.12);
+        fg = dsColorRed600;
+        break;
+      case 'expired':
+        bg = dsColorSlate400.withValues(alpha: 0.15);
+        fg = isDark ? dsDarkTextSecondary : dsTextSecondary;
+        break;
+      default:
+        bg = dsColorIndigo600.withValues(alpha: 0.10);
+        fg = dsColorIndigo600;
+    }
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(dsRadiusFull),
+      ),
+      child: Text(
+        status.replaceAll('_', ' ').toUpperCase(),
+        style: GoogleFonts.inter(
+          fontSize: context.sp(9),
+          fontWeight: FontWeight.w700,
+          color: fg,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isDark;
+  final BuildContext context;
+  const _DetailRow(
+      {required this.label,
+      required this.value,
+      required this.isDark,
+      required this.context});
+
+  @override
+  Widget build(BuildContext _) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: dsSpace3),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -526,8 +759,8 @@ class _DetailRow extends StatelessWidget {
             child: Text(
               label,
               style: GoogleFonts.inter(
-                fontSize: 13,
-                color: kTextSecondary,
+                fontSize: context.sp(13),
+                color: isDark ? dsDarkTextSecondary : dsTextSecondary,
               ),
             ),
           ),
@@ -535,9 +768,9 @@ class _DetailRow extends StatelessWidget {
             child: Text(
               value,
               style: GoogleFonts.inter(
-                fontSize: 13,
+                fontSize: context.sp(13),
                 fontWeight: FontWeight.w500,
-                color: kTextPrimary,
+                color: isDark ? dsDarkTextPrimary : dsTextPrimary,
               ),
             ),
           ),
@@ -550,20 +783,28 @@ class _DetailRow extends StatelessWidget {
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String text;
-  const _InfoRow({required this.icon, required this.text});
+  final bool isDark;
+  final BuildContext context;
+  const _InfoRow(
+      {required this.icon,
+      required this.text,
+      required this.isDark,
+      required this.context});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: kTextSecondary),
-        const SizedBox(width: 6),
+        Icon(icon,
+            size: context.si(13),
+            color: isDark ? dsDarkTextSecondary : dsTextSecondary),
+        const SizedBox(width: dsSpace2),
         Expanded(
           child: Text(
             text,
             style: GoogleFonts.inter(
-              fontSize: 13,
-              color: kTextPrimary,
+              fontSize: context.sp(13),
+              color: isDark ? dsDarkTextPrimary : dsTextPrimary,
             ),
           ),
         ),
@@ -573,16 +814,18 @@ class _InfoRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Police verification modal (exec only)
+// Police verification modal
 // ---------------------------------------------------------------------------
 
 class _PoliceVerificationModal extends ConsumerStatefulWidget {
   final TenantKyc tenant;
   final VoidCallback onVerified;
+  final bool isDark;
 
   const _PoliceVerificationModal({
     required this.tenant,
     required this.onVerified,
+    required this.isDark,
   });
 
   @override
@@ -614,16 +857,20 @@ class _PoliceVerificationModalState
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Police verification recorded.',
               style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-          backgroundColor: kSecondary500,
+          backgroundColor: dsColorEmerald600,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(dsRadiusMd)),
         ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Failed: $e', style: GoogleFonts.inter()),
-          backgroundColor: kRed600,
+          backgroundColor: dsColorRed600,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(dsRadiusMd)),
         ));
       }
     } finally {
@@ -633,14 +880,20 @@ class _PoliceVerificationModalState
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: isDark ? dsDarkSurface : dsSurface,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(dsRadiusXl)),
       title: Text(
         'Police Verification',
         style: GoogleFonts.poppins(
-          fontSize: 16,
+          fontSize: context.sp(16),
           fontWeight: FontWeight.w700,
-          color: kPrimary600,
+          color: dsColorIndigo600,
         ),
       ),
       content: Column(
@@ -650,59 +903,75 @@ class _PoliceVerificationModalState
           Text(
             'Confirm police verification for:',
             style: GoogleFonts.inter(
-              fontSize: 13,
-              color: kTextSecondary,
-            ),
+                fontSize: context.sp(13), color: textSecondary),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: dsSpace1),
           Text(
             widget.tenant.fullName,
             style: GoogleFonts.inter(
-              fontSize: 14,
+              fontSize: context.sp(14),
               fontWeight: FontWeight.w600,
-              color: kTextPrimary,
+              color: textPrimary,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: dsSpace4),
           Text(
             'Reference Number (optional)',
             style: GoogleFonts.inter(
-              fontSize: 13,
+              fontSize: context.sp(13),
               fontWeight: FontWeight.w500,
-              color: kTextSecondary,
+              color: textSecondary,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: dsSpace2),
           TextField(
             controller: _refCtrl,
             textCapitalization: TextCapitalization.characters,
+            style: GoogleFonts.inter(
+                fontSize: context.sp(14), color: textPrimary),
             decoration: InputDecoration(
               hintText: 'e.g. PVR/2026/001',
+              hintStyle: GoogleFonts.inter(color: textSecondary),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(dsRadiusMd),
+                borderSide: BorderSide(
+                    color: isDark ? dsDarkBorderLight : dsBorderLight),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(dsRadiusMd),
+                borderSide: BorderSide(
+                    color: isDark ? dsDarkBorderLight : dsBorderLight),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(dsRadiusMd),
+                borderSide: const BorderSide(color: dsColorIndigo600),
+              ),
+              filled: true,
+              fillColor: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
               contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 12),
+                  horizontal: dsSpace4, vertical: dsSpace3),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: dsSpace3),
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(dsSpace3),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF86EFAC)),
+              color: dsColorEmerald600.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(dsRadiusSm),
+              border: Border.all(
+                  color: dsColorEmerald600.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline,
-                    size: 14, color: kSecondary500),
-                const SizedBox(width: 8),
+                Icon(Icons.info_outline,
+                    size: context.si(14), color: dsColorEmerald600),
+                const SizedBox(width: dsSpace2),
                 Expanded(
                   child: Text(
                     'This will mark the tenant as Verified.',
                     style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: kSecondary500,
+                      fontSize: context.sp(12),
+                      color: dsColorEmerald600,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -716,25 +985,29 @@ class _PoliceVerificationModalState
         TextButton(
           onPressed: _saving ? null : () => Navigator.pop(context),
           child: Text('Cancel',
-              style: GoogleFonts.inter(color: kTextSecondary)),
+              style: GoogleFonts.inter(color: textSecondary)),
         ),
         ElevatedButton(
           onPressed: _saving ? null : _confirm,
           style: ElevatedButton.styleFrom(
-            backgroundColor: kSecondary500,
+            backgroundColor: dsColorEmerald600,
+            foregroundColor: Colors.white,
+            elevation: 0,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(dsRadiusMd)),
           ),
           child: _saving
-              ? const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(
+              ? SizedBox(
+                  height: context.si(16),
+                  width: context.si(16),
+                  child: const CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white),
                 )
               : Text('Confirm Verified',
                   style: GoogleFonts.inter(
-                      color: Colors.white, fontWeight: FontWeight.w600)),
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: context.sp(14))),
         ),
       ],
     );

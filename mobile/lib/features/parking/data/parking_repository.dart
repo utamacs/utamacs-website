@@ -218,8 +218,8 @@ class ParkingRepository {
           'slot_number': slotNumber.trim().toUpperCase(),
           'slot_type': slotType,
           'vehicle_type': vehicleType,
-          if (level != null) 'level': level,
-          if (monthlyCharge != null) 'monthly_charge': monthlyCharge,
+          'level': ?level,
+          'monthly_charge': ?monthlyCharge,
           'is_active': true,
         })
         .select()

@@ -4,18 +4,23 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/empty_state.dart';
-import '../../../../shared/widgets/status_badge.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/hoto_repository.dart';
 
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
-
-class HotoScreen extends ConsumerWidget {
+class HotoScreen extends ConsumerStatefulWidget {
   const HotoScreen({super.key});
+
+  @override
+  ConsumerState<HotoScreen> createState() => _HotoScreenState();
+}
+
+class _HotoScreenState extends ConsumerState<HotoScreen> {
+  String? _selectedFilter;
 
   static Future<void> _openPortal(String path) async {
     final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
@@ -24,322 +29,155 @@ class HotoScreen extends ConsumerWidget {
     }
   }
 
+  static const _filters = [
+    (label: 'All', value: null as String?),
+    (label: 'Pending', value: 'pending' as String?),
+    (label: 'In Progress', value: 'in_progress' as String?),
+    (label: 'Completed', value: 'completed' as String?),
+    (label: 'Escalated', value: 'escalated' as String?),
+  ];
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final isDark = ref.watch(isDarkModeProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final summaryAsync = ref.watch(hotoSummaryProvider);
+    final itemsAsync = ref.watch(hotoFilteredItemsProvider(_selectedFilter));
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('HOTO Tracker'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          if (isExec) ...[
-            IconButton(
-              icon: const Icon(Icons.how_to_vote_outlined),
-              tooltip: 'Elections',
-              onPressed: () => _openPortal('hoto?tab=elections'),
-            ),
-            IconButton(
-              icon: const Icon(Icons.account_balance_outlined),
-              tooltip: 'Finance & Resolutions',
-              onPressed: () => _openPortal('hoto?tab=finance'),
-            ),
-            IconButton(
-              icon: const Icon(Icons.group_add_outlined),
-              tooltip: 'Invite Participants',
-              onPressed: () => _openPortal('hoto?action=invite'),
-            ),
-            IconButton(
-              icon: const Icon(Icons.supervisor_account_outlined),
-              tooltip: 'Manage Delegation',
-              onPressed: () => _openPortal('hoto?action=delegate'),
-            ),
-          ],
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(hotoSummaryProvider);
-              ref.invalidate(hotoFilteredItemsProvider);
-            },
+    return DsScreenShell(
+      title: 'HOTO Tracker',
+      subtitle: 'Handover-Takeover checklist',
+      actions: [
+        if (isExec) ...[
+          DsActionButton(
+            icon: Icons.how_to_vote_outlined,
+            onTap: () => _openPortal('hoto?tab=elections'),
+          ),
+          DsActionButton(
+            icon: Icons.account_balance_outlined,
+            onTap: () => _openPortal('hoto?tab=finance'),
+          ),
+          DsActionButton(
+            icon: Icons.group_add_outlined,
+            onTap: () => _openPortal('hoto?action=invite'),
           ),
         ],
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Summary cards
-          summaryAsync.when(
-            loading: () => const _SummarySkeleton(),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (counts) {
-              final open = (counts['pending'] ?? 0) +
-                  (counts['in_progress'] ?? 0) +
-                  (counts['escalated'] ?? 0);
-              final completed = counts['completed'] ?? 0;
-              return _SummaryRow(open: open, completed: completed);
-            },
-          ),
-          // Filter chips + list
-          const Expanded(child: _FilterableList()),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Summary row
-// ---------------------------------------------------------------------------
-
-class _SummaryRow extends StatelessWidget {
-  final int open;
-  final int completed;
-  const _SummaryRow({required this.open, required this.completed});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: _SummaryCard(
-              label: 'Open',
-              count: open,
-              countColor: kPrimary600,
-              bgColor: kPrimary50,
-              borderColor: kPrimary100,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _SummaryCard(
-              label: 'Completed',
-              count: completed,
-              countColor: kSecondary500,
-              bgColor: const Color(0xFFD1FAE5),
-              borderColor: const Color(0xFFA7F3D0),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  final String label;
-  final int count;
-  final Color countColor;
-  final Color bgColor;
-  final Color borderColor;
-
-  const _SummaryCard({
-    required this.label,
-    required this.count,
-    required this.countColor,
-    required this.bgColor,
-    required this.borderColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$count',
-            style: GoogleFonts.poppins(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: countColor,
-            ),
-          ),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: kTextSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummarySkeleton extends StatelessWidget {
-  const _SummarySkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 72,
-              decoration: BoxDecoration(
-                color: kBorderLight,
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Container(
-              height: 72,
-              decoration: BoxDecoration(
-                color: kBorderLight,
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Filterable list (StatefulWidget to hold chip selection)
-// ---------------------------------------------------------------------------
-
-const _kFilters = <_ChipDef>[
-  _ChipDef(label: 'All', value: null),
-  _ChipDef(label: 'Pending', value: 'pending'),
-  _ChipDef(label: 'In Progress', value: 'in_progress'),
-  _ChipDef(label: 'Completed', value: 'completed'),
-  _ChipDef(label: 'Escalated', value: 'escalated'),
-];
-
-class _ChipDef {
-  final String label;
-  final String? value;
-  const _ChipDef({required this.label, required this.value});
-}
-
-class _FilterableList extends StatefulWidget {
-  const _FilterableList();
-
-  @override
-  State<_FilterableList> createState() => _FilterableListState();
-}
-
-class _FilterableListState extends State<_FilterableList> {
-  String? _selectedFilter; // null = All
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Chip row
-        Container(
-          color: Colors.white,
-          child: SizedBox(
-            height: 52,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              itemCount: _kFilters.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final chip = _kFilters[i];
-                final selected = _selectedFilter == chip.value;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedFilter = chip.value),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: selected ? kPrimary600 : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: selected ? kPrimary600 : kBorderLight,
-                      ),
-                    ),
-                    child: Text(
-                      chip.label,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color:
-                            selected ? Colors.white : kTextSecondary,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        const Divider(height: 1),
-        // List
-        Expanded(
-          child: _HotoList(filter: _selectedFilter),
+        DsActionButton(
+          icon: Icons.refresh_rounded,
+          onTap: () {
+            ref.invalidate(hotoSummaryProvider);
+            ref.invalidate(hotoFilteredItemsProvider);
+          },
         ),
       ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// List consumer
-// ---------------------------------------------------------------------------
-
-class _HotoList extends ConsumerWidget {
-  final String? filter;
-  const _HotoList({required this.filter});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final itemsAsync = ref.watch(hotoFilteredItemsProvider(filter));
-
-    return itemsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
-        title: 'Could not load items',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(hotoFilteredItemsProvider(filter)),
-          child: const Text('Retry'),
-        ),
-      ),
-      data: (items) {
-        if (items.isEmpty) {
-          return const EmptyState(
-            icon: Icons.checklist_rounded,
-            title: 'No items found',
-            subtitle:
-                'No HOTO items match the selected filter.',
-          );
-        }
-        return RefreshIndicator(
-          onRefresh: () async =>
-              ref.invalidate(hotoFilteredItemsProvider(filter)),
-          child: ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, i) => _HotoItemCard(item: items[i]),
-          ),
-        );
+      onRefresh: () async {
+        ref.invalidate(hotoSummaryProvider);
+        ref.invalidate(hotoFilteredItemsProvider);
       },
+      slivers: [
+        // Stats
+        summaryAsync.when(
+          loading: () => const SizedBox(height: dsSpace3),
+          error: (_, _) => const SizedBox.shrink(),
+          data: (counts) {
+            final open = (counts['pending'] ?? 0) +
+                (counts['in_progress'] ?? 0) +
+                (counts['escalated'] ?? 0);
+            final completed = counts['completed'] ?? 0;
+            final escalated = counts['escalated'] ?? 0;
+            return Column(
+              children: [
+                const SizedBox(height: dsSpace3),
+                DsStatsRow(stats: [
+                  DsStatItem(
+                    label: 'Open',
+                    value: '$open',
+                    icon: Icons.pending_actions_rounded,
+                    color: dsColorIndigo600,
+                  ),
+                  DsStatItem(
+                    label: 'Completed',
+                    value: '$completed',
+                    icon: Icons.check_circle_outline_rounded,
+                    color: dsColorEmerald600,
+                  ),
+                  DsStatItem(
+                    label: 'Escalated',
+                    value: '$escalated',
+                    icon: Icons.warning_amber_rounded,
+                    color: dsColorRed600,
+                  ),
+                ]),
+              ],
+            );
+          },
+        ),
+
+        // Filter chips
+        Padding(
+          padding: const EdgeInsets.only(top: dsSpace4, bottom: dsSpace2),
+          child: DsFilterRow(
+            options: _filters
+                .where((f) => f.value != null)
+                .map((f) => f.label)
+                .toList(),
+            selected: _selectedFilter == null
+                ? null
+                : _filters
+                    .firstWhere(
+                      (f) => f.value == _selectedFilter,
+                      orElse: () =>
+                          (label: 'All', value: null as String?),
+                    )
+                    .label,
+            onChanged: (label) => setState(() => _selectedFilter =
+                label == null
+                    ? null
+                    : _filters
+                        .firstWhere((f) => f.label == label)
+                        .value),
+            includeAll: true,
+          ),
+        ),
+
+        // Items list
+        itemsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: 60),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load items',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () =>
+                ref.invalidate(hotoFilteredItemsProvider(_selectedFilter)),
+          ),
+          data: (items) {
+            if (items.isEmpty) {
+              return const DsEmptyPlaceholder(
+                icon: Icons.checklist_rounded,
+                title: 'No items found',
+                message: 'No HOTO items match the selected filter.',
+              );
+            }
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.only(
+                  bottom: 80 + MediaQuery.paddingOf(context).bottom),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
+              itemBuilder: (context, i) => DSFadeSlide(
+                delay: Duration(milliseconds: i * 30),
+                child: _HotoItemCard(item: items[i], isDark: isDark),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -350,14 +188,15 @@ class _HotoList extends ConsumerWidget {
 
 class _HotoItemCard extends StatelessWidget {
   final HotoItem item;
-  const _HotoItemCard({required this.item});
+  final bool isDark;
+  const _HotoItemCard({required this.item, required this.isDark});
 
-  Color get _priorityBorderColor {
+  Color get _stripColor {
     return switch (item.priority) {
-      'critical' => kRed600,
-      'high' => kAccent500,
-      'medium' => kPrimary600,
-      _ => kBorderLight,
+      'critical' => dsColorRed600,
+      'high' => dsColorAmber600,
+      'medium' => dsColorIndigo600,
+      _ => isDark ? dsDarkBorderLight : dsBorderLight,
     };
   }
 
@@ -366,88 +205,94 @@ class _HotoItemCard extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _HotoItemDetailSheet(item: item),
+      builder: (_) => _HotoItemDetailSheet(item: item, isDark: isDark),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: () => _openDetail(context),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
+    return DSScalePress(
+      onTap: () => _openDetail(context),
+      child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorderLight),
+          color: isDark ? dsDarkSurface : dsSurface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border:
+              isDark ? Border.all(color: dsDarkBorderSubtle) : null,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Priority left border
-              Container(
-                width: 4,
-                color: _priorityBorderColor,
-              ),
-              // Content
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top row: ID + category + status
-                      Row(
-                        children: [
-                          _IdChip(id: item.id),
-                          const SizedBox(width: 6),
-                          _CategoryChip(category: item.category),
-                          const Spacer(),
-                          StatusBadge.forStatus(item.status),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 4, color: _stripColor),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(dsSpace4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top row: ID + category + status
+                        Row(
+                          children: [
+                            _IdChip(id: item.id, isDark: isDark),
+                            const SizedBox(width: dsSpace2),
+                            _CategoryChip(
+                                category: item.category,
+                                isDark: isDark),
+                            const Spacer(),
+                            _StatusChip(
+                                status: item.status, isDark: isDark),
+                          ],
+                        ),
+                        const SizedBox(height: dsSpace2),
+                        Text(
+                          item.title,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(14),
+                            fontWeight: FontWeight.w600,
+                            color: textPrimary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (item.deadline != null) ...[
+                          const SizedBox(height: dsSpace2),
+                          _DeadlineRow(
+                            deadline: item.deadline!,
+                            isOverdue: item.isOverdue,
+                            context: context,
+                            textSecondary: textSecondary,
+                          ),
                         ],
-                      ),
-                      const SizedBox(height: 8),
-                      // Title
-                      Text(
-                        item.title,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: kTextPrimary,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (item.deadline != null) ...[
-                        const SizedBox(height: 6),
-                        _DeadlineRow(
-                          deadline: item.deadline!,
-                          isOverdue: item.isOverdue,
-                        ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );
   }
 }
 
+// ---------------------------------------------------------------------------
+// Chip helpers
+// ---------------------------------------------------------------------------
+
 class _IdChip extends StatelessWidget {
   final String id;
-  const _IdChip({required this.id});
+  final bool isDark;
+  const _IdChip({required this.id, required this.isDark});
 
   String get _short {
-    // Show first 8 chars as prefix
     final s = id.replaceAll('-', '');
     return '#${s.substring(0, s.length >= 8 ? 8 : s.length).toUpperCase()}';
   }
@@ -457,16 +302,15 @@ class _IdChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: kPrimary50,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: kPrimary100),
+        color: dsColorIndigo600.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(dsRadiusSm),
       ),
       child: Text(
         _short,
         style: GoogleFonts.inter(
-          fontSize: 10,
+          fontSize: context.sp(9),
           fontWeight: FontWeight.w700,
-          color: kPrimary600,
+          color: dsColorIndigo600,
           letterSpacing: 0.4,
         ),
       ),
@@ -476,23 +320,25 @@ class _IdChip extends StatelessWidget {
 
 class _CategoryChip extends StatelessWidget {
   final String category;
-  const _CategoryChip({required this.category});
+  final bool isDark;
+  const _CategoryChip({required this.category, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: kSectionAlt,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: kBorderLight),
+        color: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+        borderRadius: BorderRadius.circular(dsRadiusSm),
+        border: Border.all(
+            color: isDark ? dsDarkBorderLight : dsBorderLight),
       ),
       child: Text(
         category.replaceAll('_', ' '),
         style: GoogleFonts.inter(
-          fontSize: 10,
+          fontSize: context.sp(9),
           fontWeight: FontWeight.w600,
-          color: kTextSecondary,
+          color: isDark ? dsDarkTextSecondary : dsTextSecondary,
           letterSpacing: 0.3,
         ),
         maxLines: 1,
@@ -502,27 +348,78 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-class _DeadlineRow extends StatelessWidget {
-  final DateTime deadline;
-  final bool isOverdue;
-  const _DeadlineRow({required this.deadline, required this.isOverdue});
+class _StatusChip extends StatelessWidget {
+  final String status;
+  final bool isDark;
+  const _StatusChip({required this.status, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    final color = isOverdue ? kRed600 : kTextSecondary;
+    Color bg;
+    Color fg;
+    switch (status) {
+      case 'completed':
+        bg = dsColorEmerald600.withValues(alpha: 0.12);
+        fg = dsColorEmerald600;
+        break;
+      case 'escalated':
+        bg = dsColorRed600.withValues(alpha: 0.12);
+        fg = dsColorRed600;
+        break;
+      case 'in_progress':
+        bg = dsColorAmber600.withValues(alpha: 0.12);
+        fg = dsColorAmber600;
+        break;
+      default:
+        bg = dsColorIndigo600.withValues(alpha: 0.10);
+        fg = dsColorIndigo600;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(dsRadiusFull)),
+      child: Text(
+        status.replaceAll('_', ' ').toUpperCase(),
+        style: GoogleFonts.inter(
+          fontSize: context.sp(9),
+          fontWeight: FontWeight.w700,
+          color: fg,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+class _DeadlineRow extends StatelessWidget {
+  final DateTime deadline;
+  final bool isOverdue;
+  final BuildContext context;
+  final Color textSecondary;
+  const _DeadlineRow(
+      {required this.deadline,
+      required this.isOverdue,
+      required this.context,
+      required this.textSecondary});
+
+  @override
+  Widget build(BuildContext _) {
+    final color = isOverdue ? dsColorRed600 : textSecondary;
     final label = isOverdue ? 'Overdue — ' : 'Due ';
     return Row(
       children: [
         Icon(
-          isOverdue ? Icons.warning_amber_rounded : Icons.calendar_today,
-          size: 13,
+          isOverdue
+              ? Icons.warning_amber_rounded
+              : Icons.calendar_today_outlined,
+          size: context.si(13),
           color: color,
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: dsSpace1),
         Text(
           '$label${DateFormat('d MMM yyyy').format(deadline)}',
           style: GoogleFonts.inter(
-            fontSize: 12,
+            fontSize: context.sp(12),
             fontWeight: isOverdue ? FontWeight.w600 : FontWeight.w400,
             color: color,
           ),
@@ -533,19 +430,22 @@ class _DeadlineRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// HOTO item detail + comments bottom sheet
+// Detail bottom sheet
 // ---------------------------------------------------------------------------
 
 class _HotoItemDetailSheet extends ConsumerStatefulWidget {
   final HotoItem item;
-  const _HotoItemDetailSheet({required this.item});
+  final bool isDark;
+  const _HotoItemDetailSheet(
+      {required this.item, required this.isDark});
 
   @override
   ConsumerState<_HotoItemDetailSheet> createState() =>
       _HotoItemDetailSheetState();
 }
 
-class _HotoItemDetailSheetState extends ConsumerState<_HotoItemDetailSheet> {
+class _HotoItemDetailSheetState
+    extends ConsumerState<_HotoItemDetailSheet> {
   final _commentCtrl = TextEditingController();
   bool _posting = false;
 
@@ -579,12 +479,16 @@ class _HotoItemDetailSheetState extends ConsumerState<_HotoItemDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
+    final isDark = widget.isDark;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
     final commentsAsync = ref.watch(hotoCommentsProvider(item.id));
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: isDark ? dsDarkSurface : dsSurface,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(dsRadiusXxl)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -593,15 +497,14 @@ class _HotoItemDetailSheetState extends ConsumerState<_HotoItemDetailSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Handle
           Center(
             child: Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              padding: const EdgeInsets.only(top: dsSpace3, bottom: dsSpace2),
               child: Container(
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: kBorderLight,
+                  color: isDark ? dsDarkBorderLight : dsBorderLight,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -609,137 +512,185 @@ class _HotoItemDetailSheetState extends ConsumerState<_HotoItemDetailSheet> {
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              padding: const EdgeInsets.fromLTRB(
+                  dsSpace5, 0, dsSpace5, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
                   Row(
                     children: [
-                      _IdChip(id: item.id),
-                      const SizedBox(width: 8),
-                      StatusBadge.forStatus(item.status),
+                      _IdChip(id: item.id, isDark: isDark),
+                      const SizedBox(width: dsSpace2),
+                      _StatusChip(status: item.status, isDark: isDark),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: dsSpace3),
                   Text(
                     item.title,
                     style: GoogleFonts.poppins(
-                      fontSize: 16,
+                      fontSize: context.sp(16),
                       fontWeight: FontWeight.w700,
-                      color: kTextPrimary,
+                      color: textPrimary,
                     ),
                   ),
                   if (item.description != null) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: dsSpace2),
                     Text(
                       item.description!,
                       style: GoogleFonts.inter(
-                          fontSize: 13, color: kTextSecondary, height: 1.5),
+                          fontSize: context.sp(13),
+                          color: textSecondary,
+                          height: 1.5),
                     ),
                   ],
-                  const SizedBox(height: 8),
+                  const SizedBox(height: dsSpace2),
                   Row(
                     children: [
-                      _CategoryChip(category: item.category),
+                      _CategoryChip(
+                          category: item.category, isDark: isDark),
                       if (item.deadline != null) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: dsSpace2),
                         _DeadlineRow(
                           deadline: item.deadline!,
                           isOverdue: item.isOverdue,
+                          context: context,
+                          textSecondary: textSecondary,
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  const Divider(height: 1, color: kBorderLight),
-                  const SizedBox(height: 12),
-                  // Linked snags section
-                  _LinkedSnagsSection(hotoItemId: item.id),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1, color: kBorderLight),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: dsSpace5),
+                  Divider(
+                      height: 1,
+                      color: isDark
+                          ? dsDarkBorderSubtle
+                          : dsBorderLight),
+                  const SizedBox(height: dsSpace3),
+                  _LinkedSnagsSection(
+                      hotoItemId: item.id, isDark: isDark),
+                  const SizedBox(height: dsSpace3),
+                  Divider(
+                      height: 1,
+                      color: isDark
+                          ? dsDarkBorderSubtle
+                          : dsBorderLight),
+                  const SizedBox(height: dsSpace3),
                   Text(
                     'Comments',
                     style: GoogleFonts.poppins(
-                      fontSize: 14,
+                      fontSize: context.sp(14),
                       fontWeight: FontWeight.w700,
-                      color: kTextPrimary,
+                      color: textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: dsSpace3),
                   commentsAsync.when(
                     loading: () => const Center(
                         child: Padding(
                       padding: EdgeInsets.all(16),
                       child: CircularProgressIndicator(),
                     )),
-                    error: (e, _) => Text('Could not load comments: $e',
+                    error: (e, _) => Text(
+                        'Could not load comments: $e',
                         style: GoogleFonts.inter(
-                            fontSize: 12, color: kTextSecondary)),
+                            fontSize: context.sp(12),
+                            color: textSecondary)),
                     data: (comments) {
                       if (comments.isEmpty) {
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: dsSpace3),
                           child: Text(
                             'No comments yet. Be the first to add one.',
                             style: GoogleFonts.inter(
-                                fontSize: 13, color: kTextSecondary),
+                                fontSize: context.sp(13),
+                                color: textSecondary),
                           ),
                         );
                       }
                       return Column(
                         children: comments
-                            .map((c) => _CommentTile(comment: c))
+                            .map((c) => _CommentTile(
+                                comment: c, isDark: isDark))
                             .toList(),
                       );
                     },
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: dsSpace4),
                 ],
               ),
             ),
           ),
           // Comment input
           Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: kBorderLight)),
+            decoration: BoxDecoration(
+              color: isDark ? dsDarkSurface : dsSurface,
+              border: Border(
+                  top: BorderSide(
+                      color: isDark
+                          ? dsDarkBorderSubtle
+                          : dsBorderLight)),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            padding: const EdgeInsets.fromLTRB(
+                dsSpace4, dsSpace3, dsSpace4, dsSpace4),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _commentCtrl,
                     maxLines: 1,
+                    style: GoogleFonts.inter(
+                        fontSize: context.sp(14),
+                        color: isDark
+                            ? dsDarkTextPrimary
+                            : dsTextPrimary),
                     decoration: InputDecoration(
                       hintText: 'Add a comment…',
+                      hintStyle: GoogleFonts.inter(
+                          color: isDark
+                              ? dsDarkTextTertiary
+                              : dsTextTertiary),
                       filled: true,
-                      fillColor: kBgWarm,
+                      fillColor: isDark
+                          ? dsDarkSurfaceMuted
+                          : dsSurfaceMuted,
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: const BorderSide(color: kBorderLight)),
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusFull),
+                          borderSide: BorderSide(
+                              color: isDark
+                                  ? dsDarkBorderLight
+                                  : dsBorderLight)),
                       enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: const BorderSide(color: kBorderLight)),
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusFull),
+                          borderSide: BorderSide(
+                              color: isDark
+                                  ? dsDarkBorderLight
+                                  : dsBorderLight)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusFull),
+                          borderSide: const BorderSide(
+                              color: dsColorIndigo600)),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
+                          horizontal: dsSpace4, vertical: 10),
                     ),
-                    style: GoogleFonts.inter(fontSize: 14),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: dsSpace2),
                 _posting
-                    ? const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(strokeWidth: 2))
+                    ? SizedBox(
+                        width: context.si(40),
+                        height: context.si(40),
+                        child: const CircularProgressIndicator(
+                            strokeWidth: 2))
                     : IconButton.filled(
                         onPressed: _postComment,
-                        icon: const Icon(Icons.send, size: 18),
+                        icon: Icon(Icons.send_rounded,
+                            size: context.si(17)),
                         style: IconButton.styleFrom(
-                          backgroundColor: kPrimary600,
+                          backgroundColor: dsColorIndigo600,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -758,10 +709,14 @@ class _HotoItemDetailSheetState extends ConsumerState<_HotoItemDetailSheet> {
 
 class _LinkedSnagsSection extends ConsumerWidget {
   final String hotoItemId;
-  const _LinkedSnagsSection({required this.hotoItemId});
+  final bool isDark;
+  const _LinkedSnagsSection(
+      {required this.hotoItemId, required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
     final snagsAsync = ref.watch(hotoLinkedSnagsProvider(hotoItemId));
 
     return Column(
@@ -770,12 +725,12 @@ class _LinkedSnagsSection extends ConsumerWidget {
         Text(
           'Linked Snags',
           style: GoogleFonts.poppins(
-            fontSize: 14,
+            fontSize: context.sp(14),
             fontWeight: FontWeight.w700,
-            color: kTextPrimary,
+            color: textPrimary,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: dsSpace3),
         snagsAsync.when(
           loading: () => const Center(
               child: Padding(
@@ -783,19 +738,26 @@ class _LinkedSnagsSection extends ConsumerWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           )),
           error: (e, _) => Text('Could not load snags: $e',
-              style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary)),
+              style: GoogleFonts.inter(
+                  fontSize: context.sp(12), color: textSecondary)),
           data: (snags) {
             if (snags.isEmpty) {
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(vertical: dsSpace2),
                 child: Text(
                   'No linked snags.',
-                  style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+                  style: GoogleFonts.inter(
+                      fontSize: context.sp(13),
+                      color: textSecondary),
                 ),
               );
             }
             return Column(
-              children: snags.map((s) => _LinkedSnagTile(snag: s)).toList(),
+              children: snags
+                  .map((s) =>
+                      _LinkedSnagTile(snag: s, isDark: isDark))
+                  .toList(),
             );
           },
         ),
@@ -806,38 +768,43 @@ class _LinkedSnagsSection extends ConsumerWidget {
 
 class _LinkedSnagTile extends StatelessWidget {
   final LinkedSnagItem snag;
-  const _LinkedSnagTile({required this.snag});
+  final bool isDark;
+  const _LinkedSnagTile({required this.snag, required this.isDark});
 
   Color get _severityColor {
     return switch (snag.severity) {
-      'critical' => kRed600,
-      'high' => kAccent500,
-      'medium' => kPrimary600,
-      _ => kTextSecondary,
+      'critical' => dsColorRed600,
+      'high' => dsColorAmber600,
+      'medium' => dsColorIndigo600,
+      _ => dsTextSecondary,
     };
   }
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: dsSpace2),
+      padding: const EdgeInsets.all(dsSpace3),
       decoration: BoxDecoration(
-        color: kSectionAlt,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBorderLight),
+        color: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+        borderRadius: BorderRadius.circular(dsRadiusMd),
+        border: Border.all(
+            color: isDark ? dsDarkBorderLight : dsBorderLight),
       ),
       child: Row(
         children: [
           Container(
-            width: 8,
-            height: 8,
+            width: context.si(8),
+            height: context.si(8),
             decoration: BoxDecoration(
               color: _severityColor,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: dsSpace3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -845,9 +812,9 @@ class _LinkedSnagTile extends StatelessWidget {
                 Text(
                   snag.description,
                   style: GoogleFonts.inter(
-                    fontSize: 13,
+                    fontSize: context.sp(13),
                     fontWeight: FontWeight.w500,
-                    color: kTextPrimary,
+                    color: textPrimary,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -858,17 +825,17 @@ class _LinkedSnagTile extends StatelessWidget {
                     Text(
                       snag.category.replaceAll('_', ' '),
                       style: GoogleFonts.inter(
-                          fontSize: 11, color: kTextSecondary),
+                          fontSize: context.sp(11),
+                          color: textSecondary),
                     ),
-                    const SizedBox(width: 6),
-                    Text('·',
-                        style:
-                            GoogleFonts.inter(fontSize: 11, color: kTextSecondary)),
-                    const SizedBox(width: 6),
+                    Text(' · ',
+                        style: GoogleFonts.inter(
+                            fontSize: context.sp(11),
+                            color: textSecondary)),
                     Text(
                       snag.severity,
                       style: GoogleFonts.inter(
-                          fontSize: 11,
+                          fontSize: context.sp(11),
                           color: _severityColor,
                           fontWeight: FontWeight.w600),
                     ),
@@ -877,8 +844,8 @@ class _LinkedSnagTile extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          StatusBadge.forStatus(snag.status),
+          const SizedBox(width: dsSpace2),
+          _StatusChip(status: snag.status, isDark: isDark),
         ],
       ),
     );
@@ -886,30 +853,36 @@ class _LinkedSnagTile extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Comment tile
+// ---------------------------------------------------------------------------
 
 class _CommentTile extends StatelessWidget {
   final HotoComment comment;
-  const _CommentTile({required this.comment});
+  final bool isDark;
+  const _CommentTile({required this.comment, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: dsSpace3),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            radius: 16,
-            backgroundColor: kPrimary100,
+            radius: context.si(15),
+            backgroundColor: dsColorIndigo600.withValues(alpha: 0.12),
             child: Text(
               (comment.authorName ?? 'U')[0].toUpperCase(),
               style: GoogleFonts.poppins(
-                  fontSize: 13,
+                  fontSize: context.sp(12),
                   fontWeight: FontWeight.w700,
-                  color: kPrimary600),
+                  color: dsColorIndigo600),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: dsSpace3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -919,15 +892,16 @@ class _CommentTile extends StatelessWidget {
                     Text(
                       comment.authorName ?? 'Member',
                       style: GoogleFonts.inter(
-                          fontSize: 12,
+                          fontSize: context.sp(12),
                           fontWeight: FontWeight.w600,
-                          color: kTextPrimary),
+                          color: textPrimary),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: dsSpace2),
                     Text(
                       timeago.format(comment.createdAt),
                       style: GoogleFonts.inter(
-                          fontSize: 11, color: kTextSecondary),
+                          fontSize: context.sp(11),
+                          color: textSecondary),
                     ),
                   ],
                 ),
@@ -935,7 +909,9 @@ class _CommentTile extends StatelessWidget {
                 Text(
                   comment.content,
                   style: GoogleFonts.inter(
-                      fontSize: 13, color: kTextPrimary, height: 1.4),
+                      fontSize: context.sp(13),
+                      color: textPrimary,
+                      height: 1.4),
                 ),
               ],
             ),

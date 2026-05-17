@@ -163,7 +163,7 @@ class FacilityRepository {
           'booking_date': bookingDate.toIso8601String().substring(0, 10),
           'start_time': startTime.toUtc().toIso8601String(),
           'end_time': endTime.toUtc().toIso8601String(),
-          if (attendeesCount != null) 'attendees_count': attendeesCount,
+          'attendees_count': ?attendeesCount,
           if (purpose != null && purpose.isNotEmpty) 'purpose': purpose,
           'status': 'pending',
         })

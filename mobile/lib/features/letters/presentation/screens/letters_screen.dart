@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/letter_repository.dart';
 
@@ -21,78 +23,99 @@ class LettersScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final lettersAsync = ref.watch(lettersProvider);
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('Official Letters'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          if (isExec)
-            IconButton(
-              icon: const Icon(Icons.description_outlined),
-              tooltip: 'Templates',
-              onPressed: () => _openPortal('letters?tab=templates'),
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(lettersProvider),
+    return DsScreenShell(
+      title: 'Official Letters',
+      subtitle: 'Committee-issued correspondence',
+      actions: [
+        if (isExec)
+          DsActionButton(
+            icon: Icons.description_outlined,
+            onTap: () => _openPortal('letters?tab=templates'),
           ),
-        ],
-      ),
-      floatingActionButton: isExec
-          ? FloatingActionButton.extended(
-              onPressed: () => _openPortal('letters?action=generate'),
-              icon: const Icon(Icons.add),
-              label: const Text('Generate Letter'),
-              backgroundColor: kPrimary600,
-              foregroundColor: Colors.white,
-            )
-          : null,
-      body: lettersAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load letters',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(lettersProvider),
-            child: const Text('Retry'),
-          ),
+        DsActionButton(
+          icon: Icons.refresh_rounded,
+          onTap: () => ref.invalidate(lettersProvider),
         ),
-        data: (letters) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(lettersProvider),
-          child: CustomScrollView(
-            slivers: [
-              // Info banner
-              const SliverToBoxAdapter(child: _InfoBanner()),
-              if (letters.isEmpty)
-                const SliverFillRemaining(
-                  child: EmptyState(
-                    icon: Icons.description_outlined,
-                    title: 'No letters yet',
-                    subtitle:
-                        'Letters issued by the management committee will appear here.',
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  sliver: SliverList.separated(
-                    itemCount: letters.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, i) =>
-                        _LetterCard(letter: letters[i], isExec: isExec),
+      ],
+      onRefresh: () async => ref.invalidate(lettersProvider),
+      extraBottomPadding: isExec ? dsSpace16 : 0,
+      floatingActionButton: isExec
+          ? Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(dsRadiusXl),
+                boxShadow: dsShadowBrand,
+              ),
+              child: FloatingActionButton.extended(
+                backgroundColor: dsColorIndigo600,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                focusElevation: 0,
+                hoverElevation: 0,
+                highlightElevation: 0,
+                icon: Icon(Icons.add_rounded, size: context.si(20)),
+                label: Text(
+                  'Generate Letter',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: context.sp(14),
                   ),
                 ),
-            ],
-          ),
+                onPressed: () =>
+                    _openPortal('letters?action=generate'),
+              ),
+            )
+          : null,
+      slivers: [
+        // Info banner
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              dsSpace4, dsSpace3, dsSpace4, 0),
+          child: _InfoBanner(isDark: isDark),
         ),
-      ),
+        // List
+        lettersAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: 80),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load letters',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () => ref.invalidate(lettersProvider),
+          ),
+          data: (letters) {
+            if (letters.isEmpty) {
+              return const DsEmptyPlaceholder(
+                icon: Icons.description_outlined,
+                title: 'No letters yet',
+                message:
+                    'Letters issued by the management committee will appear here.',
+              );
+            }
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                  dsSpace4, dsSpace3, dsSpace4, 0),
+              itemCount: letters.length,
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: dsSpace2),
+              itemBuilder: (context, i) => DSFadeSlide(
+                delay: Duration(milliseconds: i * 30),
+                child: _LetterCard(
+                    letter: letters[i], isExec: isExec),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -102,29 +125,39 @@ class LettersScreen extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _InfoBanner extends StatelessWidget {
-  const _InfoBanner();
+  final bool isDark;
+  const _InfoBanner({required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+          horizontal: dsSpace4, vertical: dsSpace3),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB), // amber-50
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFDE68A)), // amber-200
+        color: isDark
+            ? dsColorAmber600.withValues(alpha: 0.1)
+            : dsColorAmber50,
+        borderRadius: BorderRadius.circular(dsRadiusMd),
+        border: Border.all(
+          color: isDark
+              ? dsColorAmber600.withValues(alpha: 0.3)
+              : dsColorAmber100,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, color: kAccent500, size: 18),
-          const SizedBox(width: 10),
+          Icon(Icons.info_outline_rounded,
+              color: dsColorAmber600, size: context.si(16)),
+          const SizedBox(width: dsSpace3),
           Expanded(
             child: Text(
               'Letters are generated by the management committee. PDFs are available in the resident portal.',
               style: GoogleFonts.inter(
-                fontSize: 13,
-                color: const Color(0xFF92400E), // amber-800
+                fontSize: context.sp(12),
+                color: isDark
+                    ? dsColorAmber300
+                    : const Color(0xFF92400E),
                 height: 1.45,
               ),
             ),
@@ -139,106 +172,134 @@ class _InfoBanner extends StatelessWidget {
 // Letter card
 // ---------------------------------------------------------------------------
 
-class _LetterCard extends StatelessWidget {
+class _LetterCard extends ConsumerWidget {
   final GeneratedLetter letter;
   final bool isExec;
   const _LetterCard({required this.letter, required this.isExec});
 
-  void _openDetail(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) =>
-          _LetterDetailSheet(letter: letter, isExec: isExec),
-    );
-  }
-
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _openDetail(context),
-      child: AppCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Icon container
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: kPrimary50,
-              borderRadius: BorderRadius.circular(10),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
+
+    return DSScalePress(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) =>
+            _LetterDetailSheet(letter: letter, isExec: isExec),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? dsDarkSurface : dsSurface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border:
+              isDark ? Border.all(color: dsDarkBorderSubtle) : null,
+        ),
+        padding: const EdgeInsets.all(dsSpace4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon container
+            Container(
+              width: context.si(42),
+              height: context.si(42),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? dsColorViolet600.withValues(alpha: 0.15)
+                    : dsColorViolet50,
+                borderRadius:
+                    BorderRadius.circular(dsRadiusMd),
+              ),
+              child: Icon(
+                Icons.description_outlined,
+                color: isDark
+                    ? dsColorViolet500
+                    : dsColorViolet600,
+                size: context.si(20),
+              ),
             ),
-            child: const Icon(
-              Icons.description_outlined,
-              color: kPrimary600,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  letter.title,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (letter.subject != null) ...[
-                  const SizedBox(height: 3),
+            const SizedBox(width: dsSpace3),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    letter.subject!,
+                    letter.title,
                     style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: kTextSecondary,
+                      fontSize: context.sp(14),
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? dsDarkTextPrimary
+                          : dsTextPrimary,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ],
-                if (letter.recipient != null) ...[
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.person_outline,
-                          size: 13, color: kTextSecondary),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          letter.recipient!,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: kTextSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                  if (letter.subject != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      letter.subject!,
+                      style: GoogleFonts.inter(
+                        fontSize: context.sp(12),
+                        color: isDark
+                            ? dsDarkTextSecondary
+                            : dsTextSecondary,
                       ),
-                    ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (letter.recipient != null) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.person_outline_rounded,
+                            size: context.si(12),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary),
+                        const SizedBox(width: dsSpace1),
+                        Expanded(
+                          child: Text(
+                            letter.recipient!,
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(11),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: dsSpace2),
+                  Text(
+                    DateFormat('d MMM yyyy').format(letter.createdAt),
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(11),
+                      color: isDark
+                          ? dsDarkTextSecondary
+                          : dsTextSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
-                const SizedBox(height: 6),
-                Text(
-                  DateFormat('d MMM yyyy').format(letter.createdAt),
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: kTextSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: context.si(18),
+              color:
+                  isDark ? dsDarkTextSecondary : dsTextSecondary,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -248,49 +309,33 @@ class _LetterCard extends StatelessWidget {
 // Letter detail bottom sheet
 // ---------------------------------------------------------------------------
 
-class _LetterDetailSheet extends StatelessWidget {
+class _LetterDetailSheet extends ConsumerWidget {
   final GeneratedLetter letter;
   final bool isExec;
   const _LetterDetailSheet(
       {required this.letter, required this.isExec});
 
-  Widget _row(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 16, color: kTextSecondary),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 90,
-            child: Text(label,
-                style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary)),
-          ),
-          Expanded(
-            child: Text(value,
-                style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary =
+        isDark ? dsDarkTextSecondary : dsTextSecondary;
     final dateFormat = DateFormat('d MMM yyyy');
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(dsRadiusXxl)),
       ),
       padding: EdgeInsets.only(
-        left: 20, right: 20, top: 12,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        left: dsSpace5,
+        right: dsSpace5,
+        top: dsSpace3,
+        bottom: MediaQuery.of(context).viewInsets.bottom + dsSpace6,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -298,71 +343,129 @@ class _LetterDetailSheet extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 36, height: 4,
+              width: 36,
+              height: 4,
               decoration: BoxDecoration(
-                color: kBorderLight, borderRadius: BorderRadius.circular(2)),
+                color: borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: dsSpace4),
           Row(
             children: [
-              const Icon(Icons.description_outlined, color: kPrimary600, size: 20),
-              const SizedBox(width: 10),
-              Text('Letter Details', style: GoogleFonts.poppins(
-                fontSize: 16, fontWeight: FontWeight.w700, color: kPrimary600)),
+              Icon(Icons.description_outlined,
+                  color: dsColorIndigo600, size: context.si(20)),
+              const SizedBox(width: dsSpace3),
+              Text(
+                'Letter Details',
+                style: GoogleFonts.poppins(
+                  fontSize: context.sp(15),
+                  fontWeight: FontWeight.w700,
+                  color: dsColorIndigo600,
+                ),
+              ),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.close, size: 20),
+                icon: Icon(Icons.close_rounded,
+                    size: context.si(20)),
                 onPressed: () => Navigator.pop(context),
-                color: kTextSecondary,
+                color: textSecondary,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: kBorderLight),
-          const SizedBox(height: 16),
-          Text(letter.title,
-              style: GoogleFonts.inter(
-                  fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
-          const SizedBox(height: 14),
+          const SizedBox(height: dsSpace3),
+          Divider(height: 1, color: borderColor),
+          const SizedBox(height: dsSpace4),
+
+          Text(
+            letter.title,
+            style: GoogleFonts.inter(
+              fontSize: context.sp(14),
+              fontWeight: FontWeight.w700,
+              color: textPrimary,
+            ),
+          ),
+          const SizedBox(height: dsSpace4),
+
           if (letter.referenceNumber != null)
-            _row(Icons.tag, 'Ref. No.', letter.referenceNumber!),
+            _DetailRow(
+                icon: Icons.tag_rounded,
+                label: 'Ref. No.',
+                value: letter.referenceNumber!,
+                textSecondary: textSecondary,
+                textPrimary: textPrimary),
           if (letter.letterType != null)
-            _row(Icons.category_outlined, 'Type',
-                letter.letterType!.replaceAll('_', ' ')),
+            _DetailRow(
+                icon: Icons.category_outlined,
+                label: 'Type',
+                value: letter.letterType!.replaceAll('_', ' '),
+                textSecondary: textSecondary,
+                textPrimary: textPrimary),
           if (letter.status != null)
-            _row(Icons.info_outline, 'Status',
-                letter.status![0].toUpperCase() + letter.status!.substring(1)),
+            _DetailRow(
+                icon: Icons.info_outline_rounded,
+                label: 'Status',
+                value: letter.status![0].toUpperCase() +
+                    letter.status!.substring(1),
+                textSecondary: textSecondary,
+                textPrimary: textPrimary),
           if (letter.recipient != null)
-            _row(Icons.person_outline, 'Recipient', letter.recipient!),
+            _DetailRow(
+                icon: Icons.person_outline_rounded,
+                label: 'Recipient',
+                value: letter.recipient!,
+                textSecondary: textSecondary,
+                textPrimary: textPrimary),
           if (letter.subject != null)
-            _row(Icons.subject_outlined, 'Subject', letter.subject!),
-          _row(Icons.calendar_today_outlined, 'Created',
-              dateFormat.format(letter.letterDate ?? letter.createdAt)),
-          const SizedBox(height: 8),
-          const Divider(height: 1, color: kBorderLight),
-          const SizedBox(height: 12),
+            _DetailRow(
+                icon: Icons.subject_rounded,
+                label: 'Subject',
+                value: letter.subject!,
+                textSecondary: textSecondary,
+                textPrimary: textPrimary),
+          _DetailRow(
+              icon: Icons.calendar_today_outlined,
+              label: 'Created',
+              value: dateFormat
+                  .format(letter.letterDate ?? letter.createdAt),
+              textSecondary: textSecondary,
+              textPrimary: textPrimary),
+          const SizedBox(height: dsSpace3),
+          Divider(height: 1, color: borderColor),
+          const SizedBox(height: dsSpace3),
+
+          // Portal link banner
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.all(dsSpace3),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFFDE68A)),
+              color: isDark
+                  ? dsColorAmber600.withValues(alpha: 0.1)
+                  : dsColorAmber50,
+              borderRadius: BorderRadius.circular(dsRadiusMd),
+              border: Border.all(
+                color: isDark
+                    ? dsColorAmber600.withValues(alpha: 0.3)
+                    : dsColorAmber100,
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.open_in_browser_outlined,
-                    size: 16, color: kAccent500),
-                const SizedBox(width: 8),
+                Icon(Icons.open_in_browser_outlined,
+                    size: context.si(14), color: dsColorAmber600),
+                const SizedBox(width: dsSpace2),
                 Expanded(
                   child: Text(
                     'Full content and PDF download are available in the resident portal.',
                     style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF92400E),
-                        height: 1.4),
+                      fontSize: context.sp(11),
+                      color: isDark
+                          ? dsColorAmber300
+                          : const Color(0xFF92400E),
+                      height: 1.4,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -372,34 +475,41 @@ class _LetterDetailSheet extends StatelessWidget {
                     mode: LaunchMode.externalApplication,
                   ),
                   style: TextButton.styleFrom(
-                    foregroundColor: kPrimary600,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: dsColorIndigo600,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     textStyle: GoogleFonts.inter(
-                        fontSize: 12, fontWeight: FontWeight.w600),
+                        fontSize: context.sp(12),
+                        fontWeight: FontWeight.w600),
                   ),
                   child: const Text('Open'),
                 ),
               ],
             ),
           ),
+
           if (isExec) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: dsSpace3),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: kPrimary600,
-                      side: const BorderSide(color: kPrimary600),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      foregroundColor: dsColorIndigo600,
+                      side: const BorderSide(color: dsColorIndigo600),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusSm)),
                       textStyle: GoogleFonts.inter(
-                          fontSize: 12, fontWeight: FontWeight.w500),
+                          fontSize: context.sp(12),
+                          fontWeight: FontWeight.w500),
                     ),
-                    icon: const Icon(Icons.draw_outlined, size: 15),
+                    icon: Icon(Icons.draw_outlined,
+                        size: context.si(14)),
                     label: const Text('Sign-off'),
                     onPressed: () async {
                       final uri = Uri.parse(
@@ -411,19 +521,23 @@ class _LetterDetailSheet extends StatelessWidget {
                     },
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: dsSpace2),
                 Expanded(
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: kTextSecondary,
-                      side: const BorderSide(color: kBorderLight),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      foregroundColor: textSecondary,
+                      side: BorderSide(color: borderColor),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusSm)),
                       textStyle: GoogleFonts.inter(
-                          fontSize: 12, fontWeight: FontWeight.w500),
+                          fontSize: context.sp(12),
+                          fontWeight: FontWeight.w500),
                     ),
-                    icon: const Icon(Icons.link_outlined, size: 15),
+                    icon: Icon(Icons.link_outlined,
+                        size: context.si(14)),
                     label: const Text('Link Module'),
                     onPressed: () async {
                       final uri = Uri.parse(
@@ -438,6 +552,56 @@ class _LetterDetailSheet extends StatelessWidget {
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color textSecondary;
+  final Color textPrimary;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.textSecondary,
+    required this.textPrimary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: dsSpace3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: context.si(14), color: textSecondary),
+          const SizedBox(width: dsSpace3),
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(12),
+                color: textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(12),
+                fontWeight: FontWeight.w600,
+                color: textPrimary,
+              ),
+            ),
+          ),
         ],
       ),
     );

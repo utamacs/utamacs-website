@@ -228,7 +228,7 @@ class EventRepository {
           if (location != null && location.isNotEmpty) 'location': location,
           if (description != null && description.isNotEmpty)
             'description': description,
-          if (capacity != null) 'capacity': capacity,
+          'capacity': ?capacity,
           if (registrationDeadline != null)
             'registration_deadline':
                 registrationDeadline.toIso8601String(),

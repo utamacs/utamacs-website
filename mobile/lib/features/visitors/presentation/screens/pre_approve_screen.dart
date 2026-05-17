@@ -110,7 +110,7 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
               // Frequent visitor shortcuts
               frequentAsync.when(
                 loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
                 data: (names) {
                   if (names.isEmpty) return const SizedBox.shrink();
                   return Column(

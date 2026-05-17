@@ -781,7 +781,7 @@ class _QuorumDialogState extends ConsumerState<_QuorumDialog> {
               ),
               Switch(
                 value: _quorumMet,
-                activeColor: kSecondary500,
+                activeThumbColor: kSecondary500,
                 onChanged: (v) => setState(() => _quorumMet = v),
               ),
             ],

@@ -108,7 +108,7 @@ class _ReportSnagScreenState extends ConsumerState<ReportSnagScreen> {
             _FieldLabel('Scope'),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              value: _scope,
+              initialValue: _scope,
               decoration: const InputDecoration(),
               items: _scopes
                   .map((s) => DropdownMenuItem(
@@ -125,7 +125,7 @@ class _ReportSnagScreenState extends ConsumerState<ReportSnagScreen> {
             _FieldLabel('Category'),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(),
               items: _categories
                   .map((c) => DropdownMenuItem(
@@ -180,7 +180,7 @@ class _ReportSnagScreenState extends ConsumerState<ReportSnagScreen> {
             _FieldLabel('Severity'),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              value: _severity,
+              initialValue: _severity,
               decoration: const InputDecoration(),
               items: _severities
                   .map((s) => DropdownMenuItem(

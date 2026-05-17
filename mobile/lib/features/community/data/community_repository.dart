@@ -93,7 +93,7 @@ class CommunityRepository {
       'is_published': true,
       'is_pinned': false,
       'view_count': 0,
-      if (unitId != null) 'unit_id': unitId,
+      'unit_id': ?unitId,
     };
 
     final data = await _client

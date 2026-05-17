@@ -509,7 +509,7 @@ class _CommentsSectionState extends ConsumerState<_CommentsSection> {
                     fontWeight: FontWeight.w600),
               ),
               loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
             ),
           ],
         ),
@@ -869,10 +869,10 @@ class _CreateWoSheetState extends ConsumerState<_CreateWoSheet> {
           const SizedBox(height: 16),
           vendorsAsync.when(
             loading: () => const LinearProgressIndicator(),
-            error: (_, __) => Text('Could not load vendors',
+            error: (_, _) => Text('Could not load vendors',
                 style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary)),
             data: (vendors) => DropdownButtonFormField<Vendor>(
-              value: _selectedVendor,
+              initialValue: _selectedVendor,
               decoration: InputDecoration(
                 labelText: 'Vendor *',
                 border: OutlineInputBorder(

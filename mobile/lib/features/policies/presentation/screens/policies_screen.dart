@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/policy_repository.dart';
 
@@ -14,116 +16,154 @@ class PoliciesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final policiesAsync = ref.watch(activePoliciesProvider);
     final acksAsync = ref.watch(myAcknowledgementsProvider);
-    final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('Policies & Compliance'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(activePoliciesProvider);
-              ref.invalidate(myAcknowledgementsProvider);
-            },
-          ),
-        ],
-      ),
-      body: policiesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load policies',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () {
-              ref.invalidate(activePoliciesProvider);
-              ref.invalidate(myAcknowledgementsProvider);
-            },
-            child: const Text('Retry'),
-          ),
+    return DsScreenShell(
+      title: 'Policies & Compliance',
+      subtitle: 'Society rules & acknowledgements',
+      actions: [
+        DsActionButton(
+          icon: Icons.refresh_rounded,
+          onTap: () {
+            ref.invalidate(activePoliciesProvider);
+            ref.invalidate(myAcknowledgementsProvider);
+          },
         ),
-        data: (policies) {
-          if (policies.isEmpty) {
-            return const EmptyState(
-              icon: Icons.policy_outlined,
-              title: 'No active policies',
-              subtitle: 'Society policies will appear here once published.',
-            );
-          }
-
-          // Combine acks data (may still be loading — treat as empty set)
-          final acks = acksAsync.valueOrNull ?? [];
-          final ackedIds = {for (final a in acks) a.policyId};
-
-          final requiredCount =
-              policies.where((p) => p.acknowledgementRequired).length;
-          final ackedRequiredCount = policies
-              .where((p) => p.acknowledgementRequired && ackedIds.contains(p.id))
-              .length;
-
-          return RefreshIndicator(
-            onRefresh: () async {
+      ],
+      onRefresh: () async {
+        ref.invalidate(activePoliciesProvider);
+        ref.invalidate(myAcknowledgementsProvider);
+      },
+      slivers: [
+        policiesAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: 80),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load policies',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () {
               ref.invalidate(activePoliciesProvider);
               ref.invalidate(myAcknowledgementsProvider);
             },
-            child: ListView(
-              padding: const EdgeInsets.all(16),
+          ),
+          data: (policies) {
+            if (policies.isEmpty) {
+              return const DsEmptyPlaceholder(
+                icon: Icons.policy_outlined,
+                title: 'No active policies',
+                message:
+                    'Society policies will appear here once published.',
+              );
+            }
+
+            final acks = acksAsync.valueOrNull ?? [];
+            final ackedIds = {for (final a in acks) a.policyId};
+            final requiredCount =
+                policies.where((p) => p.acknowledgementRequired).length;
+            final ackedRequiredCount = policies
+                .where((p) =>
+                    p.acknowledgementRequired &&
+                    ackedIds.contains(p.id))
+                .length;
+
+            return Column(
               children: [
-                // Summary card
-                _AckSummaryCard(
-                  acknowledged: ackedRequiredCount,
-                  total: requiredCount,
+                // Acknowledgement summary card
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      dsSpace4, dsSpace3, dsSpace4, dsSpace4),
+                  child: DSFadeSlide(
+                    child: _AckSummaryCard(
+                      acknowledged: ackedRequiredCount,
+                      total: requiredCount,
+                      isDark: isDark,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 16),
 
                 // Policy list
-                ...policies.map((policy) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _PolicyCard(
-                        policy: policy,
-                        isAcked: ackedIds.contains(policy.id),
-                        isExec: isExec,
-                        onAcknowledge: () async {
-                          await ref
-                              .read(policyRepositoryProvider)
-                              .acknowledge(policy.id);
-                          ref.invalidate(myAcknowledgementsProvider);
-                        },
-                        onEdited: () => ref.invalidate(activePoliciesProvider),
-                      ),
-                    )),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: dsSpace4),
+                  itemCount: policies.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: dsSpace3),
+                  itemBuilder: (context, i) => DSFadeSlide(
+                    delay: Duration(
+                        milliseconds: (i + 1) * 40),
+                    child: _PolicyCard(
+                      policy: policies[i],
+                      isAcked: ackedIds.contains(policies[i].id),
+                      isExec: isExec,
+                      isDark: isDark,
+                      onAcknowledge: () async {
+                        await ref
+                            .read(policyRepositoryProvider)
+                            .acknowledge(policies[i].id);
+                        ref.invalidate(myAcknowledgementsProvider);
+                      },
+                      onEdited: () =>
+                          ref.invalidate(activePoliciesProvider),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: dsSpace4),
               ],
-            ),
-          );
-        },
-      ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Acknowledgement Summary Card
+// Acknowledgement summary card
 // ---------------------------------------------------------------------------
 
 class _AckSummaryCard extends StatelessWidget {
   final int acknowledged;
   final int total;
+  final bool isDark;
 
-  const _AckSummaryCard({required this.acknowledged, required this.total});
+  const _AckSummaryCard({
+    required this.acknowledged,
+    required this.total,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
     final progress = total == 0 ? 1.0 : acknowledged / total;
     final allDone = acknowledged >= total && total > 0;
+    final accentColor = allDone ? dsColorEmerald600 : dsColorAmber600;
 
-    return AppCard(
-      color: allDone ? const Color(0xFFECFDF5) : Colors.white,
+    return Container(
+      padding: const EdgeInsets.all(dsSpace4),
+      decoration: BoxDecoration(
+        color: isDark
+            ? (allDone
+                ? dsColorEmerald600.withValues(alpha: 0.1)
+                : dsColorAmber600.withValues(alpha: 0.1))
+            : (allDone ? dsColorEmerald50 : dsColorAmber50),
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        border: Border.all(
+          color: isDark
+              ? accentColor.withValues(alpha: 0.3)
+              : (allDone ? dsColorEmerald100 : dsColorAmber100),
+        ),
+        boxShadow: isDark ? [] : dsShadowSm,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -133,43 +173,48 @@ class _AckSummaryCard extends StatelessWidget {
                 allDone
                     ? Icons.verified_outlined
                     : Icons.pending_actions_outlined,
-                color: allDone ? kSecondary500 : kAccent500,
-                size: 22,
+                color: accentColor,
+                size: context.si(20),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: dsSpace3),
               Expanded(
                 child: Text(
                   allDone
                       ? 'All policies acknowledged'
                       : '$acknowledged of $total policies acknowledged',
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    fontSize: context.sp(14),
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: isDark
+                        ? dsDarkTextPrimary
+                        : dsTextPrimary,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: dsSpace3),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(dsRadiusXs),
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8,
-              backgroundColor: kBorderLight,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                allDone ? kSecondary500 : kAccent500,
-              ),
+              backgroundColor:
+                  isDark ? dsDarkBorderLight : dsBorderLight,
+              valueColor:
+                  AlwaysStoppedAnimation<Color>(accentColor),
             ),
           ),
           if (!allDone) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: dsSpace2),
             Text(
               'Please acknowledge all required policies to maintain portal access.',
               style: GoogleFonts.inter(
-                fontSize: 12,
-                color: kTextSecondary,
+                fontSize: context.sp(11),
+                color: isDark
+                    ? dsDarkTextSecondary
+                    : dsTextSecondary,
+                height: 1.4,
               ),
             ),
           ],
@@ -180,13 +225,14 @@ class _AckSummaryCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Policy Card
+// Policy card
 // ---------------------------------------------------------------------------
 
 class _PolicyCard extends StatefulWidget {
   final Policy policy;
   final bool isAcked;
   final bool isExec;
+  final bool isDark;
   final VoidCallback onAcknowledge;
   final VoidCallback onEdited;
 
@@ -194,6 +240,7 @@ class _PolicyCard extends StatefulWidget {
     required this.policy,
     required this.isAcked,
     required this.isExec,
+    required this.isDark,
     required this.onAcknowledge,
     required this.onEdited,
   });
@@ -217,233 +264,304 @@ class _PolicyCardState extends State<_PolicyCard> {
   @override
   Widget build(BuildContext context) {
     final policy = widget.policy;
+    final isDark = widget.isDark;
     final effectiveDateStr =
         DateFormat('dd MMM yyyy').format(policy.effectiveDate);
+    final needsAck =
+        policy.acknowledgementRequired && !widget.isAcked;
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top row: type badge + ack indicator + exec edit
-          Row(
-            children: [
-              _PolicyTypeBadge(policyType: policy.policyType),
-              const SizedBox(width: 8),
-              Text(
-                'v${policy.version}',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: kTextSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
-              if (widget.isAcked)
-                Row(
-                  children: [
-                    const Icon(Icons.check_circle,
-                        color: kSecondary500, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Acknowledged',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: kSecondary500,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              if (widget.isExec) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => _EditPolicySheet(
-                      policy: policy,
-                      onSaved: widget.onEdited,
-                    ),
-                  ),
-                  child: const Icon(Icons.edit_outlined,
-                      size: 18, color: kTextSecondary),
-                ),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          // Title
-          Text(
-            policy.title,
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: kTextPrimary,
-            ),
-          ),
-
-          // Description
-          if (policy.description != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              policy.description!,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: kTextSecondary,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-
-          const SizedBox(height: 10),
-
-          // Effective date
-          Row(
-            children: [
-              const Icon(Icons.calendar_today_outlined,
-                  size: 13, color: kTextSecondary),
-              const SizedBox(width: 4),
-              Text(
-                'Effective $effectiveDateStr',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: kTextSecondary,
-                ),
-              ),
-              if (policy.gatePortalAccess) ...[
-                const SizedBox(width: 8),
-                const Icon(Icons.lock_outline, size: 13, color: kRed600),
-              ],
-            ],
-          ),
-
-          // gate_portal_access warning banner when not yet acknowledged
-          if (policy.gatePortalAccess && !widget.isAcked) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEE2E2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFCA5A5)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.lock_outline, size: 14, color: kRed600),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Blocks portal access until acknowledged',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: kRed600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // Acknowledge button — only if required and not yet done
-          if (policy.acknowledgementRequired && !widget.isAcked) ...[
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _loading ? null : _handleAck,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: kAccent500,
-                  side: const BorderSide(color: kAccent500, width: 1.5),
-                  minimumSize: const Size(double.infinity, 42),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                icon: _loading
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: kAccent500,
-                        ),
-                      )
-                    : const Icon(Icons.draw_outlined, size: 16),
-                label: const Text('Acknowledge'),
-              ),
-            ),
-          ],
-          // Upload PDF button (exec only)
-          if (widget.isExec) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  final uri = Uri.parse(
-                      'https://portal.utamacs.org/portal/policies/${policy.id}?upload=pdf');
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri,
-                        mode: LaunchMode.externalApplication);
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: kPrimary600,
-                  side: const BorderSide(color: kPrimary600, width: 1),
-                  minimumSize: const Size(double.infinity, 38),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: GoogleFonts.inter(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                  ),
-                ),
-                icon: const Icon(Icons.upload_file_outlined, size: 16),
-                label: const Text('Upload / Replace PDF'),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Policy Type Badge
-// ---------------------------------------------------------------------------
-
-class _PolicyTypeBadge extends StatelessWidget {
-  final String policyType;
-  const _PolicyTypeBadge({required this.policyType});
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: kPrimary50,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: kPrimary100),
+        color: isDark ? dsDarkSurface : dsSurface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: isDark ? [] : dsShadowSm,
+        border: isDark ? Border.all(color: dsDarkBorderSubtle) : null,
       ),
-      child: Text(
-        policyType.replaceAll('_', ' ').toUpperCase(),
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: kPrimary600,
-          letterSpacing: 0.4,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 4,
+                color: widget.isAcked
+                    ? dsColorEmerald600
+                    : (needsAck ? dsColorAmber600 : dsColorIndigo600),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(dsSpace4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Type badge + version + ack indicator + edit
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? dsColorIndigo600.withValues(alpha: 0.18)
+                                  : dsColorIndigo50,
+                              borderRadius:
+                                  BorderRadius.circular(dsRadiusXs),
+                              border: Border.all(
+                                color: isDark
+                                    ? dsColorIndigo600.withValues(alpha: 0.35)
+                                    : dsColorIndigo100,
+                              ),
+                            ),
+                            child: Text(
+                              policy.policyType
+                                  .replaceAll('_', ' ')
+                                  .toUpperCase(),
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(9),
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? dsColorIndigo300
+                                    : dsColorIndigo600,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: dsSpace2),
+                          Text(
+                            'v${policy.version}',
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(11),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (widget.isAcked)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_circle_rounded,
+                                    color: dsColorEmerald600,
+                                    size: context.si(14)),
+                                const SizedBox(width: dsSpace1),
+                                Text(
+                                  'Acknowledged',
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(11),
+                                    color: dsColorEmerald600,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          if (widget.isExec) ...[
+                            const SizedBox(width: dsSpace2),
+                            GestureDetector(
+                              onTap: () => showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) => _EditPolicySheet(
+                                  policy: policy,
+                                  onSaved: widget.onEdited,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.edit_outlined,
+                                size: context.si(16),
+                                color: isDark
+                                    ? dsDarkTextSecondary
+                                    : dsTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: dsSpace3),
+
+                      // Title
+                      Text(
+                        policy.title,
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(14),
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? dsDarkTextPrimary
+                              : dsTextPrimary,
+                        ),
+                      ),
+
+                      if (policy.description != null) ...[
+                        const SizedBox(height: dsSpace1),
+                        Text(
+                          policy.description!,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(12),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: dsSpace3),
+
+                      // Effective date + gate indicator
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined,
+                              size: context.si(12),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary),
+                          const SizedBox(width: dsSpace1),
+                          Text(
+                            'Effective $effectiveDateStr',
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(11),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
+                            ),
+                          ),
+                          if (policy.gatePortalAccess) ...[
+                            const SizedBox(width: dsSpace2),
+                            Icon(Icons.lock_outline_rounded,
+                                size: context.si(12),
+                                color: dsColorRed600),
+                          ],
+                        ],
+                      ),
+
+                      // Gate warning when not yet acknowledged
+                      if (policy.gatePortalAccess &&
+                          !widget.isAcked) ...[
+                        const SizedBox(height: dsSpace3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: dsSpace3,
+                              vertical: dsSpace2),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? dsColorRed600.withValues(alpha: 0.12)
+                                : dsColorRed50,
+                            borderRadius:
+                                BorderRadius.circular(dsRadiusSm),
+                            border: Border.all(
+                              color: isDark
+                                  ? dsColorRed600.withValues(alpha: 0.3)
+                                  : dsColorRed100,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.lock_outline_rounded,
+                                  size: context.si(13),
+                                  color: dsColorRed600),
+                              const SizedBox(width: dsSpace2),
+                              Expanded(
+                                child: Text(
+                                  'Blocks portal access until acknowledged',
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(11),
+                                    fontWeight: FontWeight.w600,
+                                    color: dsColorRed600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      // Acknowledge button
+                      if (policy.acknowledgementRequired &&
+                          !widget.isAcked) ...[
+                        const SizedBox(height: dsSpace4),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _loading ? null : _handleAck,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: dsColorAmber600,
+                              side: const BorderSide(
+                                  color: dsColorAmber600, width: 1.5),
+                              minimumSize:
+                                  const Size(double.infinity, 42),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    dsRadiusMd),
+                              ),
+                              textStyle: GoogleFonts.inter(
+                                fontWeight: FontWeight.w600,
+                                fontSize: context.sp(13),
+                              ),
+                            ),
+                            icon: _loading
+                                ? SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: dsColorAmber600,
+                                    ),
+                                  )
+                                : Icon(Icons.draw_outlined,
+                                    size: context.si(16)),
+                            label: const Text('Acknowledge'),
+                          ),
+                        ),
+                      ],
+
+                      // Upload PDF (exec only)
+                      if (widget.isExec) ...[
+                        const SizedBox(height: dsSpace2),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final uri = Uri.parse(
+                                  'https://portal.utamacs.org/portal/policies/${policy.id}?upload=pdf');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri,
+                                    mode:
+                                        LaunchMode.externalApplication);
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: dsColorIndigo600,
+                              side: const BorderSide(
+                                  color: dsColorIndigo600),
+                              minimumSize:
+                                  const Size(double.infinity, 38),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    dsRadiusMd),
+                              ),
+                              textStyle: GoogleFonts.inter(
+                                fontWeight: FontWeight.w500,
+                                fontSize: context.sp(12),
+                              ),
+                            ),
+                            icon: Icon(
+                              Icons.upload_file_outlined,
+                              size: context.si(14),
+                            ),
+                            label:
+                                const Text('Upload / Replace PDF'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -451,7 +569,7 @@ class _PolicyTypeBadge extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Edit Policy Sheet (exec only)
+// Edit policy sheet (exec only)
 // ---------------------------------------------------------------------------
 
 class _EditPolicySheet extends ConsumerStatefulWidget {
@@ -460,7 +578,8 @@ class _EditPolicySheet extends ConsumerStatefulWidget {
   const _EditPolicySheet({required this.policy, required this.onSaved});
 
   @override
-  ConsumerState<_EditPolicySheet> createState() => _EditPolicySheetState();
+  ConsumerState<_EditPolicySheet> createState() =>
+      _EditPolicySheetState();
 }
 
 class _EditPolicySheetState extends ConsumerState<_EditPolicySheet> {
@@ -475,8 +594,8 @@ class _EditPolicySheetState extends ConsumerState<_EditPolicySheet> {
   void initState() {
     super.initState();
     _titleCtrl = TextEditingController(text: widget.policy.title);
-    _descCtrl =
-        TextEditingController(text: widget.policy.description ?? '');
+    _descCtrl = TextEditingController(
+        text: widget.policy.description ?? '');
     _versionCtrl =
         TextEditingController(text: '${widget.policy.version}');
     _effectiveDate = widget.policy.effectiveDate;
@@ -493,7 +612,8 @@ class _EditPolicySheetState extends ConsumerState<_EditPolicySheet> {
 
   Future<void> _save() async {
     if (_titleCtrl.text.trim().isEmpty) return;
-    final version = int.tryParse(_versionCtrl.text.trim()) ?? widget.policy.version;
+    final version = int.tryParse(_versionCtrl.text.trim()) ??
+        widget.policy.version;
     setState(() => _saving = true);
     try {
       await ref.read(policyRepositoryProvider).updatePolicy(
@@ -512,7 +632,7 @@ class _EditPolicySheetState extends ConsumerState<_EditPolicySheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Error: $e'),
-          backgroundColor: kRed600,
+          backgroundColor: dsColorRed600,
         ));
       }
     } finally {
@@ -522,103 +642,109 @@ class _EditPolicySheetState extends ConsumerState<_EditPolicySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary =
+        isDark ? dsDarkTextSecondary : dsTextSecondary;
+
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(dsRadiusXxl)),
         ),
         child: Column(
           children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: kBorderLight,
-                borderRadius: BorderRadius.circular(2),
+            const SizedBox(height: dsSpace2),
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              padding: const EdgeInsets.fromLTRB(
+                  dsSpace5, dsSpace4, dsSpace5, 0),
               child: Row(
                 children: [
                   Text(
                     'Edit Policy',
                     style: GoogleFonts.poppins(
-                      fontSize: 16,
+                      fontSize: context.sp(16),
                       fontWeight: FontWeight.w700,
-                      color: kTextPrimary,
+                      color: textPrimary,
                     ),
                   ),
                   const Spacer(),
                   TextButton(
                     onPressed: _saving ? null : _save,
                     child: _saving
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: kPrimary600),
+                                strokeWidth: 2,
+                                color: dsColorIndigo600),
                           )
-                        : Text('Save',
+                        : Text(
+                            'Save',
                             style: GoogleFonts.inter(
-                                color: kPrimary600,
-                                fontWeight: FontWeight.w600)),
+                              color: dsColorIndigo600,
+                              fontWeight: FontWeight.w600,
+                              fontSize: context.sp(14),
+                            ),
+                          ),
                   ),
                 ],
               ),
             ),
-            const Divider(),
+            Divider(height: 1, color: borderColor),
             Expanded(
               child: ListView(
                 controller: controller,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                padding: const EdgeInsets.fromLTRB(
+                    dsSpace5, dsSpace3, dsSpace5, dsSpace8),
                 children: [
-                  TextField(
+                  _EditField(
                     controller: _titleCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Title *',
-                      labelStyle: GoogleFonts.inter(
-                          fontSize: 13, color: kTextSecondary),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
+                    label: 'Title *',
+                    isDark: isDark,
+                    textCapitalization:
+                        TextCapitalization.sentences,
                   ),
-                  const SizedBox(height: 14),
-                  TextField(
+                  const SizedBox(height: dsSpace3),
+                  _EditField(
                     controller: _descCtrl,
+                    label: 'Description',
+                    isDark: isDark,
                     maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: 'Description',
-                      labelStyle: GoogleFonts.inter(
-                          fontSize: 13, color: kTextSecondary),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
+                    textCapitalization:
+                        TextCapitalization.sentences,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: dsSpace3),
                   Row(
                     children: [
                       Expanded(
-                        child: TextField(
+                        child: _EditField(
                           controller: _versionCtrl,
+                          label: 'Version',
+                          isDark: isDark,
                           keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'Version',
-                            labelStyle: GoogleFonts.inter(
-                                fontSize: 13, color: kTextSecondary),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: dsSpace3),
                       Expanded(
-                        child: InkWell(
+                        child: GestureDetector(
                           onTap: () async {
                             final picked = await showDatePicker(
                               context: context,
@@ -627,29 +753,51 @@ class _EditPolicySheetState extends ConsumerState<_EditPolicySheet> {
                               lastDate: DateTime(2030),
                             );
                             if (picked != null) {
-                              setState(() => _effectiveDate = picked);
+                              setState(
+                                  () => _effectiveDate = picked);
                             }
                           },
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'Effective Date',
-                              labelStyle: GoogleFonts.inter(
-                                  fontSize: 13, color: kTextSecondary),
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: dsSpace4,
+                                vertical: dsSpace3),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? dsDarkSurfaceMuted
+                                  : dsSurfaceMuted,
+                              borderRadius: BorderRadius.circular(
+                                  dsRadiusMd),
+                              border:
+                                  Border.all(color: borderColor),
                             ),
-                            child: Text(
-                              DateFormat('d MMM yyyy')
-                                  .format(_effectiveDate),
-                              style: GoogleFonts.inter(
-                                  fontSize: 13, color: kTextPrimary),
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Effective Date',
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(11),
+                                    color: textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  DateFormat('d MMM yyyy')
+                                      .format(_effectiveDate),
+                                  style: GoogleFonts.inter(
+                                    fontSize: context.sp(13),
+                                    color: textPrimary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: dsSpace3),
                   SwitchListTile(
                     value: _gatePortalAccess,
                     onChanged: (v) =>
@@ -657,20 +805,80 @@ class _EditPolicySheetState extends ConsumerState<_EditPolicySheet> {
                     title: Text(
                       'Block portal access until acknowledged',
                       style: GoogleFonts.inter(
-                          fontSize: 13, color: kTextPrimary),
+                        fontSize: context.sp(13),
+                        color: textPrimary,
+                      ),
                     ),
                     subtitle: Text(
-                      'Members who have not acknowledged this policy will be blocked from accessing the portal.',
+                      'Members who have not acknowledged this policy will be blocked.',
                       style: GoogleFonts.inter(
-                          fontSize: 11, color: kTextSecondary),
+                        fontSize: context.sp(11),
+                        color: textSecondary,
+                      ),
                     ),
-                    activeColor: kRed600,
+                    activeThumbColor: dsColorRed600,
                     contentPadding: EdgeInsets.zero,
                   ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final bool isDark;
+  final int maxLines;
+  final TextCapitalization textCapitalization;
+  final TextInputType? keyboardType;
+
+  const _EditField({
+    required this.controller,
+    required this.label,
+    required this.isDark,
+    this.maxLines = 1,
+    this.textCapitalization = TextCapitalization.none,
+    this.keyboardType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      textCapitalization: textCapitalization,
+      keyboardType: keyboardType,
+      style: GoogleFonts.inter(
+          fontSize: context.sp(14), color: textPrimary),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.inter(
+            fontSize: context.sp(12), color: textSecondary),
+        filled: true,
+        fillColor: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: dsSpace4, vertical: dsSpace3),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide:
+              const BorderSide(color: dsColorIndigo600, width: 2),
         ),
       ),
     );

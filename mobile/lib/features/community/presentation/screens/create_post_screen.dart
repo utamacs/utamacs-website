@@ -83,7 +83,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               const _FieldLabel(text: 'Category'),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   hintText: 'Select a category',
                 ),

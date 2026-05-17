@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/empty_state.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/gallery_repository.dart';
 import 'album_detail_screen.dart';
@@ -13,223 +16,273 @@ class GalleryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
     final albumsAsync = ref.watch(albumsProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
-    return Scaffold(
-      backgroundColor: kBgWarm,
-      appBar: AppBar(
-        title: const Text('Photo Gallery'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(albumsProvider),
-          ),
-        ],
-      ),
+    return DsScreenShell(
+      title: 'Photo Gallery',
+      subtitle: 'Society albums & event memories',
+      actions: [
+        DsActionButton(
+          icon: Icons.refresh_rounded,
+          onTap: () => ref.invalidate(albumsProvider),
+        ),
+      ],
+      onRefresh: () async => ref.invalidate(albumsProvider),
+      extraBottomPadding: isExec ? dsSpace16 : 0,
       floatingActionButton: isExec
-          ? FloatingActionButton.extended(
-              onPressed: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => _CreateAlbumModal(
-                  onCreated: () => ref.invalidate(albumsProvider),
+          ? Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(dsRadiusXl),
+                boxShadow: dsShadowBrand,
+              ),
+              child: FloatingActionButton.extended(
+                backgroundColor: dsColorIndigo600,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                focusElevation: 0,
+                hoverElevation: 0,
+                highlightElevation: 0,
+                icon: Icon(Icons.create_new_folder_outlined,
+                    size: context.si(20)),
+                label: Text(
+                  'New Album',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: context.sp(14),
+                  ),
+                ),
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => _CreateAlbumModal(
+                    onCreated: () => ref.invalidate(albumsProvider),
+                  ),
                 ),
               ),
-              icon: const Icon(Icons.create_new_folder_outlined),
-              label: Text('New Album',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-              backgroundColor: kPrimary600,
-              foregroundColor: Colors.white,
             )
           : null,
-      body: albumsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load albums',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(albumsProvider),
-            child: const Text('Retry'),
+      slivers: [
+        albumsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: 80),
+            child: Center(child: CircularProgressIndicator()),
           ),
-        ),
-        data: (albums) {
-          if (albums.isEmpty) {
-            return const EmptyState(
-              icon: Icons.photo_library_outlined,
-              title: 'No albums yet',
-              subtitle: 'Society event photos will appear here.',
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(albumsProvider),
-            child: GridView.builder(
-              padding: const EdgeInsets.all(12),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.85,
+          error: (e, _) => DsEmptyPlaceholder(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load albums',
+            message: e.toString(),
+            actionLabel: 'Retry',
+            onAction: () => ref.invalidate(albumsProvider),
+          ),
+          data: (albums) {
+            if (albums.isEmpty) {
+              return const DsEmptyPlaceholder(
+                icon: Icons.photo_library_outlined,
+                title: 'No albums yet',
+                message: 'Society event photos will appear here.',
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  dsSpace4, dsSpace3, dsSpace4, 0),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: dsSpace3,
+                  mainAxisSpacing: dsSpace3,
+                  childAspectRatio: 0.82,
+                ),
+                itemCount: albums.length,
+                itemBuilder: (context, i) => DSFadeSlide(
+                  delay: Duration(milliseconds: i * 40),
+                  child: _AlbumCard(album: albums[i], isDark: isDark),
+                ),
               ),
-              itemCount: albums.length,
-              itemBuilder: (context, i) => _AlbumCard(album: albums[i]),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
 
+// ---------------------------------------------------------------------------
+// Album card
+// ---------------------------------------------------------------------------
+
 class _AlbumCard extends ConsumerWidget {
   final GalleryAlbum album;
-  const _AlbumCard({required this.album});
+  final bool isDark;
 
-  // Cycle through a palette of warm accent colours for album thumbnails
-  static const List<Color> _palette = [
-    Color(0xFFDBEAFE),
-    Color(0xFFD1FAE5),
-    Color(0xFFFEF3C7),
-    Color(0xFFEDE9FE),
-    Color(0xFFFCE7F3),
-    Color(0xFFFFEDD5),
+  const _AlbumCard({required this.album, required this.isDark});
+
+  // Accent palette — cycles by album ID hash
+  static const List<(Color bg, Color icon)> _palette = [
+    (dsColorIndigo100, dsColorIndigo600),
+    (dsColorEmerald100, dsColorEmerald700),
+    (dsColorAmber100, dsColorAmber700),
+    (dsColorViolet100, dsColorViolet600),
+    (dsColorTerra100, dsColorTerra600),
+    (dsColorTeal100, dsColorTeal700),
   ];
 
-  static const List<Color> _iconColors = [
-    kPrimary600,
-    kSecondary500,
-    kAccent500,
-    Color(0xFF7C3AED),
-    Color(0xFFDB2777),
-    Color(0xFFEA580C),
+  static const List<(Color bg, Color icon)> _darkPalette = [
+    (Color(0xFF1E2E5A), dsColorIndigo300),
+    (Color(0xFF0C3829), dsColorEmerald400),
+    (Color(0xFF3D2E0C), dsColorAmber300),
+    (Color(0xFF2D1A50), dsColorViolet500),
+    (Color(0xFF3D1A0C), dsColorTerra400),
+    (Color(0xFF0C3030), dsColorTeal500),
   ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final idx = album.id.hashCode.abs() % _palette.length;
-    final bgColor = _palette[idx];
-    final iconColor = _iconColors[idx];
+    final (placeholderBg, iconColor) =
+        isDark ? _darkPalette[idx] : _palette[idx];
+
     final coverUrlAsync = album.coverKey != null
         ? ref.watch(albumCoverUrlProvider(album.coverKey!))
         : null;
 
-    return GestureDetector(
+    return DSScalePress(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => AlbumDetailScreen(album: album),
+        DSSlideRoute(
+          page: AlbumDetailScreen(album: album),
         ),
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorderLight),
+          color: isDark ? dsDarkSurface : dsSurface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowMd,
+          border: isDark ? Border.all(color: dsDarkBorderSubtle) : null,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Album cover thumbnail
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(15)),
-              child: SizedBox(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cover / placeholder
+              SizedBox(
                 height: 110,
                 width: double.infinity,
-                child: coverUrlAsync != null &&
-                        coverUrlAsync.valueOrNull != null
+                child: coverUrlAsync?.valueOrNull != null
                     ? Image.network(
-                        coverUrlAsync.valueOrNull!,
+                        coverUrlAsync!.valueOrNull!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: bgColor,
-                          child: Center(
-                            child: Icon(
-                              Icons.photo_library_outlined,
-                              size: 48,
-                              color: iconColor,
-                            ),
-                          ),
+                        errorBuilder: (_, _, _) =>
+                            _PlaceholderCover(
+                          bg: placeholderBg,
+                          iconColor: iconColor,
                         ),
                       )
-                    : Container(
-                        color: bgColor,
-                        child: Center(
-                          child: Icon(
-                            Icons.photo_library_outlined,
-                            size: 48,
+                    : _PlaceholderCover(
+                        bg: placeholderBg,
+                        iconColor: iconColor,
+                      ),
+              ),
+
+              // Info
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(dsSpace3),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title
+                      Text(
+                        album.title,
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(13),
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? dsDarkTextPrimary
+                              : dsTextPrimary,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      // Photo count badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isDark ? placeholderBg : placeholderBg,
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusFull),
+                        ),
+                        child: Text(
+                          '${album.photoCount} photo${album.photoCount == 1 ? '' : 's'}',
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(10),
+                            fontWeight: FontWeight.w600,
                             color: iconColor,
                           ),
                         ),
                       ),
-              ),
-            ),
-
-            // Info section
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      album.title,
-                      style:
-                          Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        // Photo count badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: bgColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${album.photoCount} photo${album.photoCount == 1 ? '' : 's'}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: iconColor,
+                      if (album.eventDate != null) ...[
+                        const SizedBox(height: dsSpace1),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.event_outlined,
+                              size: context.si(12),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
                             ),
-                          ),
+                            const SizedBox(width: dsSpace1),
+                            Text(
+                              DateFormat('d MMM y')
+                                  .format(album.eventDate!),
+                              style: GoogleFonts.inter(
+                                fontSize: context.sp(11),
+                                color: isDark
+                                    ? dsDarkTextSecondary
+                                    : dsTextSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                    if (album.eventDate != null) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.event,
-                              size: 12, color: kTextSecondary),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat('d MMM y').format(album.eventDate!),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: kTextSecondary),
-                          ),
-                        ],
-                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaceholderCover extends StatelessWidget {
+  final Color bg;
+  final Color iconColor;
+
+  const _PlaceholderCover({required this.bg, required this.iconColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: bg,
+      child: Center(
+        child: Icon(
+          Icons.photo_library_outlined,
+          size: context.si(40),
+          color: iconColor,
         ),
       ),
     );
@@ -245,10 +298,12 @@ class _CreateAlbumModal extends ConsumerStatefulWidget {
   const _CreateAlbumModal({required this.onCreated});
 
   @override
-  ConsumerState<_CreateAlbumModal> createState() => _CreateAlbumModalState();
+  ConsumerState<_CreateAlbumModal> createState() =>
+      _CreateAlbumModalState();
 }
 
-class _CreateAlbumModalState extends ConsumerState<_CreateAlbumModal> {
+class _CreateAlbumModalState
+    extends ConsumerState<_CreateAlbumModal> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
@@ -291,7 +346,7 @@ class _CreateAlbumModalState extends ConsumerState<_CreateAlbumModal> {
           SnackBar(
             content: Text('Album created',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-            backgroundColor: kSecondary500,
+            backgroundColor: dsColorEmerald600,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -301,7 +356,7 @@ class _CreateAlbumModalState extends ConsumerState<_CreateAlbumModal> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed: $e', style: GoogleFonts.inter()),
-            backgroundColor: kRed600,
+            backgroundColor: dsColorRed600,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -313,117 +368,230 @@ class _CreateAlbumModalState extends ConsumerState<_CreateAlbumModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final textPrimary =
+        isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary =
+        isDark ? dsDarkTextSecondary : dsTextSecondary;
+    final borderColor =
+        isDark ? dsDarkBorderLight : dsBorderLight;
+
     return Padding(
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(dsRadiusXxl)),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding: const EdgeInsets.fromLTRB(
+            dsSpace5, dsSpace4, dsSpace5, dsSpace8),
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Drag handle
               Center(
                 child: Container(
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                      color: kBorderLight,
-                      borderRadius: BorderRadius.circular(2)),
+                    color: borderColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: dsSpace4),
               Text(
                 'Create Album',
                 style: GoogleFonts.poppins(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: kPrimary600),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleCtrl,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: 'Album Title *',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                  fontSize: context.sp(17),
+                  fontWeight: FontWeight.w700,
+                  color: dsColorIndigo600,
                 ),
+              ),
+              const SizedBox(height: dsSpace4),
+
+              // Title
+              _ModalField(
+                controller: _titleCtrl,
+                label: 'Album Title *',
+                isDark: isDark,
+                textCapitalization: TextCapitalization.sentences,
                 validator: (v) => (v == null || v.trim().isEmpty)
                     ? 'Title is required'
                     : null,
               ),
-              const SizedBox(height: 12),
-              TextFormField(
+              const SizedBox(height: dsSpace3),
+
+              // Description
+              _ModalField(
                 controller: _descCtrl,
+                label: 'Description (optional)',
+                isDark: isDark,
                 maxLines: 2,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: 'Description (optional)',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
-                ),
               ),
-              const SizedBox(height: 12),
-              InkWell(
+              const SizedBox(height: dsSpace3),
+
+              // Event date picker
+              GestureDetector(
                 onTap: _pickDate,
-                borderRadius: BorderRadius.circular(10),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: 'Event Date (optional)',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    suffixIcon: _eventDate != null
-                        ? IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () =>
-                                setState(() => _eventDate = null),
-                          )
-                        : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: dsSpace4, vertical: dsSpace3),
+                  decoration: BoxDecoration(
+                    color:
+                        isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+                    borderRadius: BorderRadius.circular(dsRadiusMd),
+                    border: Border.all(color: borderColor),
                   ),
-                  child: Text(
-                    _eventDate != null
-                        ? DateFormat('d MMM yyyy').format(_eventDate!)
-                        : 'Tap to select',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: _eventDate != null
-                          ? kTextPrimary
-                          : kTextSecondary,
-                    ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.event_outlined,
+                        size: context.si(18),
+                        color: textSecondary,
+                      ),
+                      const SizedBox(width: dsSpace2),
+                      Expanded(
+                        child: Text(
+                          _eventDate != null
+                              ? DateFormat('d MMM yyyy')
+                                  .format(_eventDate!)
+                              : 'Event Date (optional)',
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(14),
+                            color: _eventDate != null
+                                ? textPrimary
+                                : textSecondary,
+                          ),
+                        ),
+                      ),
+                      if (_eventDate != null)
+                        GestureDetector(
+                          onTap: () =>
+                              setState(() => _eventDate = null),
+                          child: Icon(Icons.close_rounded,
+                              size: context.si(16),
+                              color: textSecondary),
+                        ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
+              const SizedBox(height: dsSpace5),
+
+              // Submit button
+              Container(
                 width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(dsRadiusButton),
+                  boxShadow: dsShadowBrand,
+                ),
                 child: ElevatedButton(
                   onPressed: _saving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: dsColorIndigo600,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        vertical: dsSpace4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(dsRadiusButton),
+                    ),
+                  ),
                   child: _saving
                       ? const SizedBox(
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
-                      : const Text('Create Album'),
+                      : Text(
+                          'Create Album',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            fontSize: context.sp(15),
+                          ),
+                        ),
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ModalField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final bool isDark;
+  final int maxLines;
+  final TextCapitalization textCapitalization;
+  final String? Function(String?)? validator;
+
+  const _ModalField({
+    required this.controller,
+    required this.label,
+    required this.isDark,
+    this.maxLines = 1,
+    this.textCapitalization = TextCapitalization.none,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
+    final textSecondary = isDark ? dsDarkTextSecondary : dsTextSecondary;
+
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      textCapitalization: textCapitalization,
+      style: GoogleFonts.inter(
+        fontSize: context.sp(14),
+        color: textPrimary,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.inter(
+          fontSize: context.sp(13),
+          color: textSecondary,
+        ),
+        filled: true,
+        fillColor: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: dsSpace4, vertical: dsSpace3),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide:
+              const BorderSide(color: dsColorIndigo600, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd),
+          borderSide: const BorderSide(color: dsColorRed600),
+        ),
+      ),
+      validator: validator,
     );
   }
 }

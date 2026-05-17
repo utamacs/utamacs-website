@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/design/ds_components.dart';
+
+// Upgraded EmptyState — delegates to DSEmptyState.
+// All existing call sites (icon, title, subtitle, action) continue to work.
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
@@ -17,32 +20,11 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 64, color: kPrimary100),
-            const SizedBox(height: 16),
-            Text(title,
-                style: Theme.of(context).textTheme.headlineMedium,
-                textAlign: TextAlign.center),
-            if (subtitle != null) ...[
-              const SizedBox(height: 8),
-              Text(subtitle!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: kTextSecondary,
-                      ),
-                  textAlign: TextAlign.center),
-            ],
-            if (action != null) ...[
-              const SizedBox(height: 24),
-              action!,
-            ],
-          ],
-        ),
-      ),
+    return DSEmptyState(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      action: action,
     );
   }
 }

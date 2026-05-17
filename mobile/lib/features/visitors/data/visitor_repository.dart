@@ -272,7 +272,7 @@ class VisitorRepository {
       'entry_time': DateTime.now().toIso8601String(),
       'host_unit_id': passData['host_unit_id'],
       'gate': gate,
-      if (uid != null) 'admitted_by': uid,
+      'admitted_by': ?uid,
       'pre_approval_id': passId,
     });
     await _client
@@ -299,7 +299,7 @@ class VisitorRepository {
       'entry_time': DateTime.now().toIso8601String(),
       if (vehicleNumber != null && vehicleNumber.isNotEmpty)
         'vehicle_number': vehicleNumber,
-      if (uid != null) 'admitted_by': uid,
+      'admitted_by': ?uid,
     });
   }
 

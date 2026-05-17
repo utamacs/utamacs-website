@@ -4,138 +4,205 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/empty_state.dart';
-import '../../../../shared/widgets/status_badge.dart';
+import '../../../../core/design/ds_animations.dart';
+import '../../../../core/design/ds_screen_shell.dart';
+import '../../../../core/design/ds_tokens.dart';
+import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/visitor_repository.dart';
 import 'pre_approve_screen.dart';
 import 'visitor_pass_screen.dart';
 
-// ---------------------------------------------------------------------------
-// Root screen — switches between resident and guard views
-// ---------------------------------------------------------------------------
+// ─── Root ─────────────────────────────────────────────────────────────────────
 
 class VisitorsScreen extends ConsumerWidget {
   const VisitorsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isGuard =
-        ref.watch(authNotifierProvider).profile?.isGuard ?? false;
+    final isGuard = ref.watch(authNotifierProvider).profile?.isGuard ?? false;
     return isGuard
         ? const _GuardVisitorsScreen()
         : const _ResidentVisitorsScreen();
   }
 }
 
-// ---------------------------------------------------------------------------
-// Resident view — 3 tabs: Passes · Logs · Deliveries
-// ---------------------------------------------------------------------------
+// ─── Resident View ────────────────────────────────────────────────────────────
 
 class _ResidentVisitorsScreen extends ConsumerWidget {
   const _ResidentVisitorsScreen();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark  = ref.watch(isDarkModeProvider);
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final bgColor = isDark ? dsDarkBackground : dsBackground;
+
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: kBgWarm,
-        appBar: AppBar(
-          title: const Text('Visitor Management'),
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          bottom: TabBar(
-            labelColor: kPrimary600,
-            unselectedLabelColor: kTextSecondary,
-            indicatorColor: kPrimary600,
-            indicatorWeight: 3,
-            labelStyle:
-                GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
-            unselectedLabelStyle:
-                GoogleFonts.inter(fontWeight: FontWeight.w400, fontSize: 13),
-            tabs: const [
-              Tab(text: 'Passes'),
-              Tab(text: 'Logs'),
-              Tab(text: 'Deliveries'),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                ref.invalidate(myPreApprovalsProvider);
-                ref.invalidate(frequentVisitorsProvider);
-              },
-            ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PreApproveScreen()),
-            );
+        backgroundColor: bgColor,
+        extendBody: true,
+        floatingActionButton: _PreApproveFab(
+          onCreated: () {
             ref.invalidate(myPreApprovalsProvider);
             ref.invalidate(frequentVisitorsProvider);
           },
-          icon: const Icon(Icons.person_add),
-          label:
-              Text('Pre-approve', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-          backgroundColor: kPrimary600,
-          foregroundColor: Colors.white,
         ),
-        body: TabBarView(
-          children: [
-            _PassesTab(),
-            _LogsTab(),
-            _DeliveriesTab(),
+        body: NestedScrollView(
+          headerSliverBuilder: (ctx, _) => [
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: surface,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: isDark ? 0.5 : 1,
+              shadowColor: isDark ? dsDarkBorderLight : dsBorderLight,
+              automaticallyImplyLeading: false,
+              titleSpacing: 0,
+              title: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: dsSpace4),
+                child: Text(
+                  'Visitor Management',
+                  style: GoogleFonts.poppins(
+                    fontSize: context.sp(17),
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                  ),
+                ),
+              ),
+              actions: [
+                DsActionButton(
+                  icon: Icons.refresh_rounded,
+                  onTap: () {
+                    ref.invalidate(myPreApprovalsProvider);
+                    ref.invalidate(frequentVisitorsProvider);
+                  },
+                ),
+                const SizedBox(width: dsSpace2),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Column(
+                  children: [
+                    Divider(
+                        height: 1,
+                        color: isDark ? dsDarkBorderLight : dsBorderSubtle),
+                    TabBar(
+                      labelColor: dsColorIndigo600,
+                      unselectedLabelColor:
+                          isDark ? dsDarkTextSecondary : dsTextSecondary,
+                      indicatorColor: dsColorIndigo600,
+                      indicatorWeight: 2,
+                      labelStyle: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700,
+                          fontSize: context.sp(13)),
+                      unselectedLabelStyle: GoogleFonts.inter(
+                          fontWeight: FontWeight.w500,
+                          fontSize: context.sp(13)),
+                      tabs: const [
+                        Tab(text: 'Passes'),
+                        Tab(text: 'Logs'),
+                        Tab(text: 'Deliveries'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
+          body: TabBarView(
+            children: [
+              _PassesTab(isDark: isDark),
+              _LogsTab(isDark: isDark),
+              _DeliveriesTab(isDark: isDark),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Passes tab (resident)
-// ---------------------------------------------------------------------------
+class _PreApproveFab extends StatelessWidget {
+  final VoidCallback onCreated;
+  const _PreApproveFab({required this.onCreated});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(dsRadiusXl),
+        boxShadow: dsShadowBrand,
+      ),
+      child: FloatingActionButton.extended(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PreApproveScreen()),
+          );
+          onCreated();
+        },
+        backgroundColor: dsColorIndigo600,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        icon: Icon(Icons.person_add_rounded, size: context.si(18)),
+        label: Text(
+          'Pre-approve',
+          style: GoogleFonts.inter(
+              fontSize: context.sp(14), fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Passes Tab ───────────────────────────────────────────────────────────────
 
 class _PassesTab extends ConsumerWidget {
+  final bool isDark;
+  const _PassesTab({required this.isDark});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final approvalsAsync = ref.watch(myPreApprovalsProvider);
+    final bottomPad      = 80 + MediaQuery.paddingOf(context).bottom;
 
     return approvalsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load passes',
-        subtitle: e.toString(),
-        action: ElevatedButton(
-          onPressed: () => ref.invalidate(myPreApprovalsProvider),
-          child: const Text('Retry'),
-        ),
+        message: e.toString(),
+        actionLabel: 'Retry',
+        onAction: () => ref.invalidate(myPreApprovalsProvider),
       ),
       data: (approvals) {
         if (approvals.isEmpty) {
-          return const EmptyState(
+          return const DsEmptyPlaceholder(
             icon: Icons.badge_outlined,
             title: 'No visitor passes',
-            subtitle:
+            message:
                 'Pre-approve a visitor to generate a QR pass they can show at the gate.',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(myPreApprovalsProvider),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          color: dsColorIndigo600,
+          backgroundColor: isDark ? dsDarkSurface : dsSurface,
+          child: ListView.builder(
+            padding: EdgeInsets.fromLTRB(
+                dsSpace4, dsSpace4, dsSpace4, bottomPad.toDouble()),
             itemCount: approvals.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, i) =>
-                _PreApprovalCard(approval: approvals[i]),
+            itemBuilder: (ctx, i) => Padding(
+              padding: const EdgeInsets.only(bottom: dsSpace3),
+              child: DSFadeSlide(
+                delay: Duration(milliseconds: i * 35),
+                child: _PreApprovalCard(
+                    approval: approvals[i], isDark: isDark),
+              ),
+            ),
           ),
         );
       },
@@ -143,11 +210,12 @@ class _PassesTab extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Logs tab (resident + guard)
-// ---------------------------------------------------------------------------
+// ─── Logs Tab ─────────────────────────────────────────────────────────────────
 
 class _LogsTab extends ConsumerStatefulWidget {
+  final bool isDark;
+  const _LogsTab({required this.isDark});
+
   @override
   ConsumerState<_LogsTab> createState() => _LogsTabState();
 }
@@ -156,65 +224,51 @@ class _LogsTabState extends ConsumerState<_LogsTab> {
   String? _typeFilter;
   String? _gateFilter;
 
-  static const _types = [
-    'guest', 'delivery', 'contractor', 'vendor', 'domestic_help',
-  ];
-  static const _gates = ['main', 'secondary', 'pedestrian'];
+  static const _types  = ['guest', 'delivery', 'contractor', 'vendor', 'domestic_help'];
+  static const _gates  = ['main', 'secondary', 'pedestrian'];
 
   @override
   Widget build(BuildContext context) {
-    final repo = ref.read(visitorRepositoryProvider);
+    final isDark = widget.isDark;
+    final repo   = ref.read(visitorRepositoryProvider);
+    final bottomPad = 80 + MediaQuery.paddingOf(context).bottom;
 
     return FutureBuilder<List<VisitorLog>>(
-      future: repo.fetchAllLogs(
-        visitorType: _typeFilter,
-        gate: _gateFilter,
-      ),
+      future: repo.fetchAllLogs(visitorType: _typeFilter, gate: _gateFilter),
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snap.hasError) {
-          return EmptyState(
-            icon: Icons.error_outline,
-            title: 'Could not load logs',
-            subtitle: snap.error.toString(),
-          );
-        }
-
-        final logs = snap.data ?? [];
+        final surface = isDark ? dsDarkSurface : dsSurface;
 
         return Column(
           children: [
-            // Filter row
+            // Filter bar
             Container(
-              color: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: surface,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: dsSpace3, vertical: dsSpace2),
               child: Row(
                 children: [
                   Expanded(
-                    child: _FilterChips(
+                    child: _FilterDropdown(
                       label: 'Type',
                       options: _types,
                       selected: _typeFilter,
+                      isDark: isDark,
                       onSelect: (v) => setState(() => _typeFilter = v),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: dsSpace2),
                   Expanded(
-                    child: _FilterChips(
+                    child: _FilterDropdown(
                       label: 'Gate',
                       options: _gates,
                       selected: _gateFilter,
+                      isDark: isDark,
                       onSelect: (v) => setState(() => _gateFilter = v),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.download_outlined,
-                        size: 20, color: kPrimary600),
-                    tooltip: 'Export CSV',
-                    onPressed: () async {
+                  DsActionButton(
+                    icon: Icons.download_outlined,
+                    onTap: () async {
                       final uri = Uri.parse(
                           'https://portal.utamacs.org/portal/visitors?tab=logs&export=csv');
                       if (await canLaunchUrl(uri)) {
@@ -226,21 +280,30 @@ class _LogsTabState extends ConsumerState<_LogsTab> {
                 ],
               ),
             ),
-            if (logs.isEmpty)
+            Divider(
+                height: 1,
+                color: isDark ? dsDarkBorderSubtle : dsBorderSubtle),
+            if (snap.connectionState == ConnectionState.waiting)
               const Expanded(
-                child: EmptyState(
-                  icon: Icons.people_outline,
+                  child: Center(child: CircularProgressIndicator()))
+            else if ((snap.data ?? []).isEmpty)
+              Expanded(
+                child: DsEmptyPlaceholder(
+                  icon: Icons.people_outline_rounded,
                   title: 'No visitor logs',
-                  subtitle: 'Visitor entries will appear here.',
+                  message: 'Visitor entries will appear here.',
                 ),
               )
             else
               Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: logs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) => _LogCard(log: logs[i]),
+                child: ListView.builder(
+                  padding: EdgeInsets.fromLTRB(
+                      dsSpace4, dsSpace3, dsSpace4, bottomPad.toDouble()),
+                  itemCount: snap.data!.length,
+                  itemBuilder: (ctx, i) => Padding(
+                    padding: const EdgeInsets.only(bottom: dsSpace2),
+                    child: _LogCard(log: snap.data![i], isDark: isDark),
+                  ),
                 ),
               ),
           ],
@@ -250,13 +313,16 @@ class _LogsTabState extends ConsumerState<_LogsTab> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Deliveries tab (resident)
-// ---------------------------------------------------------------------------
+// ─── Deliveries Tab ───────────────────────────────────────────────────────────
 
 class _DeliveriesTab extends ConsumerWidget {
+  final bool isDark;
+  const _DeliveriesTab({required this.isDark});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final bottomPad = 80 + MediaQuery.paddingOf(context).bottom;
+
     return FutureBuilder<List<VisitorLog>>(
       future: ref
           .read(visitorRepositoryProvider)
@@ -264,10 +330,11 @@ class _DeliveriesTab extends ConsumerWidget {
       builder: (context, snap) {
         final deliveries = snap.data ?? [];
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(
+              dsSpace4, dsSpace4, dsSpace4, bottomPad.toDouble()),
           children: [
-            // Log delivery portal CTA
-            GestureDetector(
+            // Log delivery CTA
+            DSScalePress(
               onTap: () async {
                 final uri = Uri.parse(
                     'https://portal.utamacs.org/portal/visitors?tab=deliveries&action=log');
@@ -276,46 +343,60 @@ class _DeliveriesTab extends ConsumerWidget {
                 }
               },
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(dsSpace4),
                 decoration: BoxDecoration(
-                  color: kPrimary50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kPrimary100),
+                  color: isDark
+                      ? dsColorIndigo600.withValues(alpha: 0.12)
+                      : dsColorIndigo50,
+                  borderRadius: BorderRadius.circular(dsRadiusCard),
+                  border: Border.all(
+                    color: isDark
+                        ? dsColorIndigo600.withValues(alpha: 0.3)
+                        : dsColorIndigo100,
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.local_shipping_outlined,
-                        color: kPrimary600, size: 22),
-                    const SizedBox(width: 12),
+                    Icon(
+                      Icons.local_shipping_outlined,
+                      color: isDark ? dsColorIndigo400 : dsColorIndigo600,
+                      size: context.si(22),
+                    ),
+                    const SizedBox(width: dsSpace3),
                     Expanded(
                       child: Text(
                         'Log a new delivery — tap to open portal',
                         style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: kPrimary600,
-                          fontWeight: FontWeight.w500,
+                          fontSize: context.sp(13),
+                          color: isDark ? dsColorIndigo400 : dsColorIndigo600,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    const Icon(Icons.open_in_new,
-                        color: kPrimary600, size: 14),
+                    Icon(Icons.open_in_new_rounded,
+                        color: isDark ? dsColorIndigo400 : dsColorIndigo600,
+                        size: context.si(14)),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: dsSpace4),
             if (snap.connectionState == ConnectionState.waiting)
               const Center(child: CircularProgressIndicator())
             else if (deliveries.isEmpty)
-              const EmptyState(
+              DsEmptyPlaceholder(
                 icon: Icons.local_shipping_outlined,
                 title: 'No deliveries recorded',
-                subtitle: 'Delivery logs will appear here.',
+                message: 'Delivery logs will appear here.',
               )
             else
-              ...deliveries.map((d) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _LogCard(log: d),
+              ...deliveries.asMap().entries.map((entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: dsSpace2),
+                    child: DSFadeSlide(
+                      delay: Duration(milliseconds: entry.key * 30),
+                      child: _LogCard(
+                          log: entry.value, isDark: isDark),
+                    ),
                   )),
           ],
         );
@@ -324,97 +405,126 @@ class _DeliveriesTab extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Guard view — 4 tabs: Active · Expected Today · OTP/QR · Walk-in
-// ---------------------------------------------------------------------------
+// ─── Guard View ───────────────────────────────────────────────────────────────
 
 class _GuardVisitorsScreen extends ConsumerWidget {
   const _GuardVisitorsScreen();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(isDarkModeProvider);
+    final bgColor = isDark ? dsDarkBackground : dsBackground;
+
     return DefaultTabController(
       length: 4,
       child: Scaffold(
-        backgroundColor: kBgWarm,
-        appBar: AppBar(
-          title: const Text('Guard — Visitors'),
-          backgroundColor: kPrimary600,
-          foregroundColor: Colors.white,
-          surfaceTintColor: kPrimary600,
-          bottom: TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            indicatorColor: Colors.white,
-            indicatorWeight: 3,
-            labelStyle:
-                GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12),
-            unselectedLabelStyle:
-                GoogleFonts.inter(fontWeight: FontWeight.w400, fontSize: 12),
-            tabs: const [
-              Tab(text: 'Active'),
-              Tab(text: 'Expected'),
-              Tab(text: 'OTP / QR'),
-              Tab(text: 'Walk-in'),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                ref.invalidate(activeVisitorsProvider);
-                ref.invalidate(expectedTodayProvider);
-              },
+        backgroundColor: bgColor,
+        extendBody: true,
+        body: NestedScrollView(
+          headerSliverBuilder: (ctx, _) => [
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: dsColorIndigo700,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              automaticallyImplyLeading: false,
+              titleSpacing: 0,
+              title: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: dsSpace4),
+                child: Text(
+                  'Guard — Visitors',
+                  style: GoogleFonts.poppins(
+                    fontSize: context.sp(17),
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              actions: [
+                DsActionButton(
+                  icon: Icons.refresh_rounded,
+                  color: Colors.white,
+                  onTap: () {
+                    ref.invalidate(activeVisitorsProvider);
+                    ref.invalidate(expectedTodayProvider);
+                  },
+                ),
+                const SizedBox(width: dsSpace2),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: TabBar(
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
+                  indicatorColor: Colors.white,
+                  indicatorWeight: 2,
+                  labelStyle: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700, fontSize: context.sp(12)),
+                  unselectedLabelStyle: GoogleFonts.inter(
+                      fontWeight: FontWeight.w400, fontSize: context.sp(12)),
+                  tabs: const [
+                    Tab(text: 'Active'),
+                    Tab(text: 'Expected'),
+                    Tab(text: 'OTP / QR'),
+                    Tab(text: 'Walk-in'),
+                  ],
+                ),
+              ),
             ),
           ],
-        ),
-        body: const TabBarView(
-          children: [
-            _GuardActiveTab(),
-            _GuardExpectedTab(),
-            _GuardOtpTab(),
-            _GuardWalkInTab(),
-          ],
+          body: TabBarView(
+            children: [
+              _GuardActiveTab(isDark: isDark),
+              _GuardExpectedTab(isDark: isDark),
+              _GuardOtpTab(isDark: isDark),
+              _GuardWalkInTab(isDark: isDark),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Guard: Active visitors tab
-// ---------------------------------------------------------------------------
+// ─── Guard Active Tab ─────────────────────────────────────────────────────────
 
 class _GuardActiveTab extends ConsumerWidget {
-  const _GuardActiveTab();
+  final bool isDark;
+  const _GuardActiveTab({required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final logsAsync = ref.watch(activeVisitorsProvider);
+    final bottomPad = 80 + MediaQuery.paddingOf(context).bottom;
 
     return logsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load active visitors',
-        subtitle: e.toString(),
+        message: e.toString(),
       ),
       data: (logs) {
         if (logs.isEmpty) {
-          return const EmptyState(
-            icon: Icons.people_outline,
+          return const DsEmptyPlaceholder(
+            icon: Icons.people_outline_rounded,
             title: 'No active visitors',
-            subtitle: 'Currently no visitors inside the premises.',
+            message: 'Currently no visitors inside the premises.',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(activeVisitorsProvider),
-          child: ListView.separated(
-            padding: const EdgeInsets.all(12),
+          color: dsColorIndigo600,
+          backgroundColor: isDark ? dsDarkSurface : dsSurface,
+          child: ListView.builder(
+            padding: EdgeInsets.fromLTRB(
+                dsSpace4, dsSpace3, dsSpace4, bottomPad.toDouble()),
             itemCount: logs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) =>
-                _ActiveVisitorCard(log: logs[i], ref: ref),
+            itemBuilder: (ctx, i) => Padding(
+              padding: const EdgeInsets.only(bottom: dsSpace2),
+              child: _ActiveVisitorCard(log: logs[i], isDark: isDark, ref: ref),
+            ),
           ),
         );
       },
@@ -424,25 +534,42 @@ class _GuardActiveTab extends ConsumerWidget {
 
 class _ActiveVisitorCard extends StatelessWidget {
   final VisitorLog log;
+  final bool isDark;
   final WidgetRef ref;
-  const _ActiveVisitorCard({required this.log, required this.ref});
+  const _ActiveVisitorCard(
+      {required this.log, required this.isDark, required this.ref});
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    return Container(
+      padding: const EdgeInsets.all(dsSpace3),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: isDark ? [] : dsShadowSm,
+        border: isDark
+            ? Border.all(color: dsDarkBorderSubtle, width: 1)
+            : null,
+      ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: context.si(42),
+            height: context.si(42),
             decoration: BoxDecoration(
-              color: kSecondary500.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: isDark
+                  ? dsColorEmerald600.withValues(alpha: 0.15)
+                  : dsColorEmerald50,
+              borderRadius: BorderRadius.circular(dsRadiusMd),
             ),
-            child: const Icon(Icons.person_outline,
-                color: kSecondary500, size: 22),
+            child: Icon(
+              Icons.person_outline_rounded,
+              color: isDark ? dsColorEmerald400 : dsColorEmerald600,
+              size: context.si(20),
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: dsSpace3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -450,32 +577,45 @@ class _ActiveVisitorCard extends StatelessWidget {
                 Text(
                   log.visitorName,
                   style: GoogleFonts.inter(
-                      fontSize: 14, fontWeight: FontWeight.w600),
+                    fontSize: context.sp(14),
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                  ),
                 ),
                 Text(
-                  'In since ${timeago.format(log.entryTime)}',
+                  'Inside · ${timeago.format(log.entryTime)}',
                   style: GoogleFonts.inter(
-                      fontSize: 12, color: kTextSecondary),
+                    fontSize: context.sp(12),
+                    color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+                  ),
                 ),
                 if (log.gate != null)
                   Text(
                     'Gate: ${log.gate}',
                     style: GoogleFonts.inter(
-                        fontSize: 11, color: kTextSecondary),
+                      fontSize: context.sp(11),
+                      color: isDark ? dsDarkTextTertiary : dsTextTertiary,
+                    ),
                   ),
               ],
             ),
           ),
-          TextButton(
-            onPressed: () async {
+          GestureDetector(
+            onTap: () async {
               try {
                 await ref.read(visitorRepositoryProvider).logExit(log.id);
                 ref.invalidate(activeVisitorsProvider);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Exit logged'),
-                      backgroundColor: kSecondary500,
+                    SnackBar(
+                      content: Text('Exit logged',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w500)),
+                      backgroundColor: dsColorEmerald600,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(dsRadiusMd)),
                     ),
                   );
                 }
@@ -484,14 +624,36 @@ class _ActiveVisitorCard extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error: $e'),
-                      backgroundColor: kRed600,
+                      backgroundColor: dsColorRed600,
+                      behavior: SnackBarBehavior.floating,
                     ),
                   );
                 }
               }
             },
-            style: TextButton.styleFrom(foregroundColor: kRed600),
-            child: const Text('Log Exit'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: dsSpace3, vertical: dsSpace2),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? dsColorRed700.withValues(alpha: 0.12)
+                    : dsColorRed50,
+                borderRadius: BorderRadius.circular(dsRadiusMd),
+                border: Border.all(
+                  color: isDark
+                      ? dsColorRed700.withValues(alpha: 0.3)
+                      : dsColorRed100,
+                ),
+              ),
+              child: Text(
+                'Log Exit',
+                style: GoogleFonts.inter(
+                  fontSize: context.sp(12),
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? dsColorRed500 : dsColorRed600,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -499,40 +661,45 @@ class _ActiveVisitorCard extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Guard: Expected Today tab
-// ---------------------------------------------------------------------------
+// ─── Guard Expected Tab ───────────────────────────────────────────────────────
 
 class _GuardExpectedTab extends ConsumerWidget {
-  const _GuardExpectedTab();
+  final bool isDark;
+  const _GuardExpectedTab({required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final passesAsync = ref.watch(expectedTodayProvider);
+    final bottomPad   = 80 + MediaQuery.paddingOf(context).bottom;
 
     return passesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
+      error: (e, _) => DsEmptyPlaceholder(
+        icon: Icons.error_outline_rounded,
         title: 'Could not load expected visitors',
-        subtitle: e.toString(),
+        message: e.toString(),
       ),
       data: (passes) {
         if (passes.isEmpty) {
-          return const EmptyState(
-            icon: Icons.event_available_outlined,
+          return const DsEmptyPlaceholder(
+            icon: Icons.event_available_rounded,
             title: 'No visitors expected today',
-            subtitle: 'Pre-approved passes for today will appear here.',
+            message: 'Pre-approved passes for today will appear here.',
           );
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(expectedTodayProvider),
-          child: ListView.separated(
-            padding: const EdgeInsets.all(12),
+          color: dsColorIndigo600,
+          backgroundColor: isDark ? dsDarkSurface : dsSurface,
+          child: ListView.builder(
+            padding: EdgeInsets.fromLTRB(
+                dsSpace4, dsSpace3, dsSpace4, bottomPad.toDouble()),
             itemCount: passes.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) =>
-                _ExpectedPassCard(pass: passes[i], ref: ref),
+            itemBuilder: (ctx, i) => Padding(
+              padding: const EdgeInsets.only(bottom: dsSpace3),
+              child: _ExpectedPassCard(
+                  pass: passes[i], isDark: isDark, ref: ref),
+            ),
           ),
         );
       },
@@ -542,12 +709,24 @@ class _GuardExpectedTab extends ConsumerWidget {
 
 class _ExpectedPassCard extends StatelessWidget {
   final VisitorPreApproval pass;
+  final bool isDark;
   final WidgetRef ref;
-  const _ExpectedPassCard({required this.pass, required this.ref});
+  const _ExpectedPassCard(
+      {required this.pass, required this.isDark, required this.ref});
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    return Container(
+      padding: const EdgeInsets.all(dsSpace4),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: isDark ? [] : dsShadowSm,
+        border: isDark
+            ? Border.all(color: dsDarkBorderSubtle, width: 1)
+            : null,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -557,54 +736,116 @@ class _ExpectedPassCard extends StatelessWidget {
                 child: Text(
                   pass.visitorName,
                   style: GoogleFonts.inter(
-                      fontSize: 14, fontWeight: FontWeight.w600),
+                    fontSize: context.sp(14),
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                  ),
                 ),
               ),
-              StatusBadge.forStatus(pass.status),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: dsSpace2, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (pass.isActive ? dsColorEmerald600 : dsTextSecondary)
+                      .withValues(alpha: isDark ? 0.15 : 0.10),
+                  borderRadius: BorderRadius.circular(dsRadiusFull),
+                ),
+                child: Text(
+                  pass.isActive ? 'ACTIVE' : pass.status.toUpperCase(),
+                  style: GoogleFonts.inter(
+                    fontSize: context.sp(9),
+                    fontWeight: FontWeight.w800,
+                    color: pass.isActive
+                        ? (isDark ? dsColorEmerald400 : dsColorEmerald600)
+                        : (isDark ? dsDarkTextSecondary : dsTextSecondary),
+                  ),
+                ),
+              ),
             ],
           ),
           if (pass.purpose != null) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               pass.purpose!,
               style: GoogleFonts.inter(
-                  fontSize: 12, color: kTextSecondary),
+                fontSize: context.sp(12),
+                color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+              ),
             ),
           ],
           if (pass.otpCode != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.lock_outlined,
-                    size: 13, color: kTextSecondary),
-                const SizedBox(width: 4),
-                Text(
-                  'OTP: ${pass.otpCode}',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: kPrimary600,
-                    letterSpacing: 2,
-                  ),
+            const SizedBox(height: dsSpace2),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: dsSpace3, vertical: dsSpace2),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? dsColorIndigo600.withValues(alpha: 0.12)
+                    : dsColorIndigo50,
+                borderRadius: BorderRadius.circular(dsRadiusMd),
+                border: Border.all(
+                  color: isDark
+                      ? dsColorIndigo600.withValues(alpha: 0.25)
+                      : dsColorIndigo100,
                 ),
-              ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_outlined,
+                      size: context.si(13),
+                      color: isDark ? dsColorIndigo400 : dsColorIndigo600),
+                  const SizedBox(width: dsSpace2),
+                  Text(
+                    'OTP: ${pass.otpCode}',
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(14),
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? dsColorIndigo400 : dsColorIndigo600,
+                      letterSpacing: 3,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: pass.isActive
-                  ? () => _admit(context, pass)
-                  : null,
-              icon: const Icon(Icons.how_to_reg_outlined, size: 16),
-              label: const Text('Admit'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kSecondary500,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                textStyle: GoogleFonts.inter(
-                    fontSize: 13, fontWeight: FontWeight.w600),
+          const SizedBox(height: dsSpace3),
+          GestureDetector(
+            onTap: pass.isActive
+                ? () => _admit(context, pass)
+                : null,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: pass.isActive
+                    ? dsColorEmerald600
+                    : (isDark ? dsDarkSurfaceMuted : dsColorSlate100),
+                borderRadius: BorderRadius.circular(dsRadiusMd),
+                boxShadow: pass.isActive ? dsShadowSuccess : [],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.how_to_reg_rounded,
+                    size: context.si(15),
+                    color: pass.isActive
+                        ? Colors.white
+                        : (isDark ? dsDarkTextSecondary : dsTextSecondary),
+                  ),
+                  const SizedBox(width: dsSpace2),
+                  Text(
+                    'Admit',
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(13),
+                      fontWeight: FontWeight.w700,
+                      color: pass.isActive
+                          ? Colors.white
+                          : (isDark ? dsDarkTextSecondary : dsTextSecondary),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -614,13 +855,11 @@ class _ExpectedPassCard extends StatelessWidget {
   }
 
   Future<void> _admit(BuildContext context, VisitorPreApproval pass) async {
-    String gate = 'main';
-    final confirmed = await showDialog<String>(
+    final gate = await showDialog<String>(
       context: context,
       builder: (_) => _GatePickerDialog(passName: pass.visitorName),
     );
-    if (confirmed == null) return;
-    gate = confirmed;
+    if (gate == null) return;
     try {
       await ref.read(visitorRepositoryProvider).admitByPassId(pass.id, gate);
       ref.invalidate(activeVisitorsProvider);
@@ -628,8 +867,12 @@ class _ExpectedPassCard extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${pass.visitorName} admitted via $gate gate'),
-            backgroundColor: kSecondary500,
+            content: Text('${pass.visitorName} admitted via $gate gate',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: dsColorEmerald600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(dsRadiusMd)),
           ),
         );
       }
@@ -637,19 +880,21 @@ class _ExpectedPassCard extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Error: $e'), backgroundColor: kRed600),
+            content: Text('Error: $e'),
+            backgroundColor: dsColorRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
   }
 }
 
-// ---------------------------------------------------------------------------
-// Guard: OTP / QR verification tab
-// ---------------------------------------------------------------------------
+// ─── Guard OTP/QR Tab ─────────────────────────────────────────────────────────
 
 class _GuardOtpTab extends ConsumerStatefulWidget {
-  const _GuardOtpTab();
+  final bool isDark;
+  const _GuardOtpTab({required this.isDark});
 
   @override
   ConsumerState<_GuardOtpTab> createState() => _GuardOtpTabState();
@@ -660,7 +905,6 @@ class _GuardOtpTabState extends ConsumerState<_GuardOtpTab> {
   VisitorPreApproval? _found;
   String? _error;
   bool _loading = false;
-  bool _scanning = false;
 
   @override
   void dispose() {
@@ -669,11 +913,7 @@ class _GuardOtpTabState extends ConsumerState<_GuardOtpTab> {
   }
 
   Future<void> _verify(String code) async {
-    setState(() {
-      _loading = true;
-      _error = null;
-      _found = null;
-    });
+    setState(() { _loading = true; _error = null; _found = null; });
     try {
       final pass = await ref.read(visitorRepositoryProvider).verifyOtp(code);
       setState(() => _found = pass);
@@ -696,15 +936,14 @@ class _GuardOtpTabState extends ConsumerState<_GuardOtpTab> {
       await ref.read(visitorRepositoryProvider).admitByPassId(_found!.id, gate);
       ref.invalidate(activeVisitorsProvider);
       ref.invalidate(expectedTodayProvider);
-      setState(() {
-        _found = null;
-        _otpCtrl.clear();
-      });
+      setState(() { _found = null; _otpCtrl.clear(); });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Visitor admitted'),
-            backgroundColor: kSecondary500,
+          SnackBar(
+            content: Text('Visitor admitted',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: dsColorEmerald600,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -712,7 +951,10 @@ class _GuardOtpTabState extends ConsumerState<_GuardOtpTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Error: $e'), backgroundColor: kRed600),
+            content: Text('Error: $e'),
+            backgroundColor: dsColorRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -720,107 +962,224 @@ class _GuardOtpTabState extends ConsumerState<_GuardOtpTab> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final fillColor   = isDark ? dsDarkSurfaceMuted : dsBackground;
+    final bottomPad   = 80 + MediaQuery.paddingOf(context).bottom;
+
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(
+          dsSpace4, dsSpace4, dsSpace4, bottomPad.toDouble()),
       children: [
-        // OTP input
-        Text(
-          'Enter OTP',
-          style: GoogleFonts.poppins(
-              fontSize: 15, fontWeight: FontWeight.w600, color: kPrimary600),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _otpCtrl,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          style: GoogleFonts.inter(
-              fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 6),
-          textAlign: TextAlign.center,
-          decoration: const InputDecoration(
-            hintText: '000000',
-            counterText: '',
+        // OTP section
+        Container(
+          padding: const EdgeInsets.all(dsSpace4),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(dsRadiusCard),
+            boxShadow: isDark ? [] : dsShadowSm,
+            border: isDark
+                ? Border.all(color: dsDarkBorderSubtle, width: 1)
+                : null,
           ),
-          onSubmitted: _verify,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Verify OTP',
+                style: GoogleFonts.poppins(
+                  fontSize: context.sp(15),
+                  fontWeight: FontWeight.w700,
+                  color: dsColorIndigo600,
+                ),
+              ),
+              const SizedBox(height: dsSpace3),
+              TextField(
+                controller: _otpCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                style: GoogleFonts.inter(
+                  fontSize: context.sp(24),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 8,
+                  color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                ),
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  hintText: '000000',
+                  counterText: '',
+                  filled: true,
+                  fillColor: fillColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(dsRadiusInput),
+                    borderSide: BorderSide(color: borderColor),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(dsRadiusInput),
+                    borderSide: BorderSide(color: borderColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(dsRadiusInput),
+                    borderSide: const BorderSide(
+                        color: dsColorIndigo600, width: 2),
+                  ),
+                ),
+                onSubmitted: _verify,
+              ),
+              const SizedBox(height: dsSpace3),
+              GestureDetector(
+                onTap: _loading ? null : () => _verify(_otpCtrl.text.trim()),
+                child: AnimatedContainer(
+                  duration: dsDurationFast,
+                  width: double.infinity,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: _loading
+                        ? dsColorIndigo300
+                        : dsColorIndigo600,
+                    borderRadius: BorderRadius.circular(dsRadiusButton),
+                    boxShadow: _loading ? [] : dsShadowBrand,
+                  ),
+                  child: Center(
+                    child: _loading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(
+                            'Verify OTP',
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(14),
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: _loading
-              ? null
-              : () => _verify(_otpCtrl.text.trim()),
-          child: _loading
-              ? const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : const Text('Verify OTP'),
-        ),
-        const SizedBox(height: 16),
-        const Divider(),
-        const SizedBox(height: 12),
-        // QR scan
-        OutlinedButton.icon(
-          onPressed: () async {
+
+        const SizedBox(height: dsSpace4),
+
+        // QR scan button
+        GestureDetector(
+          onTap: () async {
             final result = await Navigator.push<String>(
               context,
               MaterialPageRoute(builder: (_) => const _QrScanScreen()),
             );
             if (result != null) {
-              // QR payload: {"pass_id":"...","token":"..."}
               try {
                 final passId = _extractPassId(result);
                 if (passId != null) await _verifyByPassId(passId);
               } catch (_) {
-                setState(
-                    () => _error = 'Could not parse QR code.');
+                setState(() => _error = 'Could not parse QR code.');
               }
             }
           },
-          icon: const Icon(Icons.qr_code_scanner_outlined),
-          label: const Text('Scan QR Code'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: kPrimary600,
-            side: const BorderSide(color: kPrimary600),
-            padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 13),
+            decoration: BoxDecoration(
+              color: isDark ? dsDarkSurface : dsSurface,
+              borderRadius: BorderRadius.circular(dsRadiusCard),
+              boxShadow: isDark ? [] : dsShadowSm,
+              border: Border.all(
+                color: isDark ? dsDarkBorderLight : dsBorderLight,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.qr_code_scanner_rounded,
+                  size: context.si(20),
+                  color: isDark ? dsColorIndigo400 : dsColorIndigo600,
+                ),
+                const SizedBox(width: dsSpace2),
+                Text(
+                  'Scan QR Code',
+                  style: GoogleFonts.inter(
+                    fontSize: context.sp(14),
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? dsColorIndigo400 : dsColorIndigo600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+
         if (_error != null) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: dsSpace3),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(dsSpace3),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF5F5),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kRed600.withValues(alpha: 0.3)),
+              color: isDark
+                  ? dsColorRed700.withValues(alpha: 0.12)
+                  : dsColorRed50,
+              borderRadius: BorderRadius.circular(dsRadiusMd),
+              border: Border.all(
+                color: isDark
+                    ? dsColorRed700.withValues(alpha: 0.3)
+                    : dsColorRed100,
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline, color: kRed600, size: 18),
-                const SizedBox(width: 8),
+                Icon(Icons.error_outline_rounded,
+                    color: isDark ? dsColorRed500 : dsColorRed600,
+                    size: context.si(16)),
+                const SizedBox(width: dsSpace2),
                 Expanded(
-                  child: Text(_error!,
-                      style: GoogleFonts.inter(
-                          fontSize: 13, color: kRed600)),
+                  child: Text(
+                    _error!,
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(13),
+                      color: isDark ? dsColorRed500 : dsColorRed600,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
         ],
+
         if (_found != null) ...[
-          const SizedBox(height: 16),
-          _PassVerifiedCard(pass: _found!),
-          const SizedBox(height: 10),
-          ElevatedButton.icon(
-            onPressed: _admit,
-            icon: const Icon(Icons.how_to_reg_outlined, size: 18),
-            label: const Text('Admit Visitor'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kSecondary500,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              textStyle: GoogleFonts.inter(
-                  fontSize: 14, fontWeight: FontWeight.w600),
+          const SizedBox(height: dsSpace4),
+          _PassVerifiedCard(pass: _found!, isDark: isDark),
+          const SizedBox(height: dsSpace3),
+          GestureDetector(
+            onTap: _admit,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              decoration: BoxDecoration(
+                color: dsColorEmerald600,
+                borderRadius: BorderRadius.circular(dsRadiusCard),
+                boxShadow: dsShadowSuccess,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.how_to_reg_rounded,
+                      size: context.si(18), color: Colors.white),
+                  const SizedBox(width: dsSpace2),
+                  Text(
+                    'Admit Visitor',
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(14),
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -829,22 +1188,17 @@ class _GuardOtpTabState extends ConsumerState<_GuardOtpTab> {
   }
 
   String? _extractPassId(String raw) {
-    final passIdMatch = RegExp(r'"pass_id"\s*:\s*"([^"]+)"').firstMatch(raw);
-    return passIdMatch?.group(1);
+    final m = RegExp(r'"pass_id"\s*:\s*"([^"]+)"').firstMatch(raw);
+    return m?.group(1);
   }
 
   Future<void> _verifyByPassId(String passId) async {
-    setState(() {
-      _loading = true;
-      _error = null;
-      _found = null;
-    });
+    setState(() { _loading = true; _error = null; _found = null; });
     try {
-      final repo = ref.read(visitorRepositoryProvider);
-      final data = await repo.admitByPassId(passId, 'main');
-      // admitByPassId doesn't return pass — re-fetch
+      final repo   = ref.read(visitorRepositoryProvider);
+      await repo.admitByPassId(passId, 'main');
       final passes = await repo.fetchExpectedToday();
-      final match = passes.where((p) => p.id == passId).firstOrNull;
+      final match  = passes.where((p) => p.id == passId).firstOrNull;
       setState(() => _found = match);
       if (match == null) setState(() => _error = 'Pass not found.');
     } catch (e) {
@@ -855,30 +1209,26 @@ class _GuardOtpTabState extends ConsumerState<_GuardOtpTab> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Guard: Walk-in entry form
-// ---------------------------------------------------------------------------
+// ─── Guard Walk-in Tab ────────────────────────────────────────────────────────
 
 class _GuardWalkInTab extends ConsumerStatefulWidget {
-  const _GuardWalkInTab();
+  final bool isDark;
+  const _GuardWalkInTab({required this.isDark});
 
   @override
   ConsumerState<_GuardWalkInTab> createState() => _GuardWalkInTabState();
 }
 
 class _GuardWalkInTabState extends ConsumerState<_GuardWalkInTab> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
+  final _formKey    = GlobalKey<FormState>();
+  final _nameCtrl   = TextEditingController();
   final _vehicleCtrl = TextEditingController();
   String _visitorType = 'guest';
-  String _gate = 'main';
+  String _gate        = 'main';
   String? _selectedUnitId;
-  String? _selectedUnitDisplay;
   bool _loading = false;
 
-  static const _visitorTypes = [
-    'guest', 'delivery', 'contractor', 'vendor', 'domestic_help',
-  ];
+  static const _visitorTypes = ['guest', 'delivery', 'contractor', 'vendor', 'domestic_help'];
   static const _gates = ['main', 'secondary', 'pedestrian'];
 
   @override
@@ -892,9 +1242,10 @@ class _GuardWalkInTabState extends ConsumerState<_GuardWalkInTab> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedUnitId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Please select a host unit'),
-          backgroundColor: kRed600,
+          backgroundColor: dsColorRed600,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -914,14 +1265,15 @@ class _GuardWalkInTabState extends ConsumerState<_GuardWalkInTab> {
       if (mounted) {
         _nameCtrl.clear();
         _vehicleCtrl.clear();
-        setState(() {
-          _selectedUnitId = null;
-          _selectedUnitDisplay = null;
-        });
+        setState(() { _selectedUnitId = null; });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Walk-in logged'),
-            backgroundColor: kSecondary500,
+          SnackBar(
+            content: Text('Walk-in logged',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: dsColorEmerald600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(dsRadiusMd)),
           ),
         );
       }
@@ -929,7 +1281,10 @@ class _GuardWalkInTabState extends ConsumerState<_GuardWalkInTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Error: $e'), backgroundColor: kRed600),
+            content: Text('Error: $e'),
+            backgroundColor: dsColorRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -939,55 +1294,90 @@ class _GuardWalkInTabState extends ConsumerState<_GuardWalkInTab> {
 
   @override
   Widget build(BuildContext context) {
-    final unitsAsync = ref.watch(unitsProvider);
+    final isDark = widget.isDark;
+    final unitsAsync  = ref.watch(unitsProvider);
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
+    final fillColor   = isDark ? dsDarkSurfaceMuted : dsBackground;
+    final bottomPad   = 80 + MediaQuery.paddingOf(context).bottom;
+
+    InputDecoration dec(String label, {String? hint}) => InputDecoration(
+          labelText: label,
+          hintText: hint,
+          filled: true,
+          fillColor: fillColor,
+          labelStyle: GoogleFonts.inter(
+            fontSize: context.sp(13),
+            color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(dsRadiusInput),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(dsRadiusInput),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(dsRadiusInput),
+            borderSide: const BorderSide(color: dsColorIndigo600, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: dsSpace4, vertical: dsSpace3),
+        );
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(
+          dsSpace4, dsSpace4, dsSpace4, bottomPad.toDouble()),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _WalkInLabel('Visitor Name'),
-            const SizedBox(height: 6),
             TextFormField(
               controller: _nameCtrl,
               textCapitalization: TextCapitalization.words,
-              decoration:
-                  const InputDecoration(hintText: 'Full name of visitor'),
+              style: GoogleFonts.inter(
+                fontSize: context.sp(14),
+                color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+              ),
+              decoration: dec('Visitor Name *', hint: 'Full name of visitor'),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
-            _WalkInLabel('Visitor Type'),
-            const SizedBox(height: 6),
+            const SizedBox(height: dsSpace3),
             DropdownButtonFormField<String>(
-              value: _visitorType,
-              decoration: const InputDecoration(),
+              initialValue: _visitorType,
+              dropdownColor: isDark ? dsDarkSurfaceElevated : dsSurface,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(14),
+                color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+              ),
+              decoration: dec('Visitor Type'),
               items: _visitorTypes
                   .map((t) => DropdownMenuItem(
                         value: t,
                         child: Text(_typeLabel(t)),
                       ))
                   .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _visitorType = v);
-              },
+              onChanged: (v) { if (v != null) setState(() => _visitorType = v); },
             ),
-            const SizedBox(height: 14),
-            _WalkInLabel('Host Unit'),
-            const SizedBox(height: 6),
+            const SizedBox(height: dsSpace3),
             unitsAsync.when(
-              loading: () =>
-                  const LinearProgressIndicator(),
-              error: (_, __) => const Text(
+              loading: () => const LinearProgressIndicator(
+                  color: dsColorIndigo600),
+              error: (_, _) => Text(
                 'Could not load units',
-                style: TextStyle(color: kRed600, fontSize: 12),
+                style: TextStyle(
+                    color: dsColorRed600, fontSize: context.sp(12)),
               ),
               data: (units) => DropdownButtonFormField<String>(
-                value: _selectedUnitId,
-                decoration:
-                    const InputDecoration(hintText: 'Select flat/unit'),
+                initialValue: _selectedUnitId,
+                dropdownColor: isDark ? dsDarkSurfaceElevated : dsSurface,
+                style: GoogleFonts.inter(
+                  fontSize: context.sp(14),
+                  color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                ),
+                decoration: dec('Host Unit', hint: 'Select flat/unit'),
                 items: units
                     .map((u) => DropdownMenuItem(
                           value: u.id,
@@ -995,53 +1385,67 @@ class _GuardWalkInTabState extends ConsumerState<_GuardWalkInTab> {
                         ))
                     .toList(),
                 onChanged: (v) {
-                  if (v != null) {
-                    final u =
-                        units.firstWhere((x) => x.id == v);
-                    setState(() {
-                      _selectedUnitId = v;
-                      _selectedUnitDisplay = u.display;
-                    });
-                  }
+                  if (v != null) setState(() => _selectedUnitId = v);
                 },
               ),
             ),
-            const SizedBox(height: 14),
-            _WalkInLabel('Entry Gate'),
-            const SizedBox(height: 6),
+            const SizedBox(height: dsSpace3),
             DropdownButtonFormField<String>(
-              value: _gate,
-              decoration: const InputDecoration(),
+              initialValue: _gate,
+              dropdownColor: isDark ? dsDarkSurfaceElevated : dsSurface,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(14),
+                color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+              ),
+              decoration: dec('Entry Gate'),
               items: _gates
                   .map((g) => DropdownMenuItem(
                         value: g,
                         child: Text(_gateLabel(g)),
                       ))
                   .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _gate = v);
-              },
+              onChanged: (v) { if (v != null) setState(() => _gate = v); },
             ),
-            const SizedBox(height: 14),
-            _WalkInLabel('Vehicle Number (optional)'),
-            const SizedBox(height: 6),
+            const SizedBox(height: dsSpace3),
             TextFormField(
               controller: _vehicleCtrl,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(hintText: 'TS 01 AB 1234'),
+              style: GoogleFonts.inter(
+                fontSize: context.sp(14),
+                color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+              ),
+              decoration: dec('Vehicle Number (optional)',
+                  hint: 'TS 01 AB 1234'),
             ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _submit,
-                child: _loading
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Text('Log Walk-in Entry'),
+            const SizedBox(height: dsSpace6),
+            GestureDetector(
+              onTap: _loading ? null : _submit,
+              child: AnimatedContainer(
+                duration: dsDurationFast,
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: _loading ? dsColorIndigo300 : dsColorIndigo600,
+                  borderRadius: BorderRadius.circular(dsRadiusButton),
+                  boxShadow: _loading ? [] : dsShadowBrand,
+                ),
+                child: Center(
+                  child: _loading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(
+                          'Log Walk-in Entry',
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(15),
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
               ),
             ),
           ],
@@ -1050,35 +1454,37 @@ class _GuardWalkInTabState extends ConsumerState<_GuardWalkInTab> {
     );
   }
 
-  String _typeLabel(String t) => switch (t) {
-        'guest' => 'Guest',
-        'delivery' => 'Delivery',
-        'contractor' => 'Contractor',
-        'vendor' => 'Vendor',
+  static String _typeLabel(String t) => switch (t) {
+        'guest'         => 'Guest',
+        'delivery'      => 'Delivery',
+        'contractor'    => 'Contractor',
+        'vendor'        => 'Vendor',
         'domestic_help' => 'Domestic Help',
-        _ => t,
+        _               => t,
       };
 
-  String _gateLabel(String g) => switch (g) {
-        'main' => 'Main Gate',
-        'secondary' => 'Secondary Gate',
-        'pedestrian' => 'Pedestrian Gate',
-        _ => g,
+  static String _gateLabel(String g) => switch (g) {
+        'main'        => 'Main Gate',
+        'secondary'   => 'Secondary Gate',
+        'pedestrian'  => 'Pedestrian Gate',
+        _             => g,
       };
 }
 
-// ---------------------------------------------------------------------------
-// Shared widgets
-// ---------------------------------------------------------------------------
+// ─── Shared Cards ─────────────────────────────────────────────────────────────
 
 class _PreApprovalCard extends StatelessWidget {
   final VisitorPreApproval approval;
-  const _PreApprovalCard({required this.approval});
+  final bool isDark;
+  const _PreApprovalCard({required this.approval, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      onTap: approval.isActive
+    final surface = isDark ? dsDarkSurface : dsSurface;
+    final isActive = approval.isActive;
+
+    return DSScalePress(
+      onTap: isActive
           ? () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -1086,85 +1492,141 @@ class _PreApprovalCard extends StatelessWidget {
                 ),
               )
           : null,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: approval.isActive ? kPrimary50 : kSectionAlt,
-                  borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(dsSpace4),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          boxShadow: isDark ? [] : dsShadowSm,
+          border: isDark
+              ? Border.all(color: dsDarkBorderSubtle, width: 1)
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: context.si(42),
+                  height: context.si(42),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? dsColorIndigo50
+                        : (isDark
+                            ? dsDarkSurfaceMuted
+                            : dsColorSlate100),
+                    borderRadius: BorderRadius.circular(dsRadiusMd),
+                  ),
+                  child: Icon(
+                    Icons.person_outline_rounded,
+                    color: isActive
+                        ? dsColorIndigo600
+                        : (isDark ? dsDarkTextTertiary : dsTextTertiary),
+                    size: context.si(20),
+                  ),
                 ),
-                child: Icon(
-                  Icons.person_outline,
-                  color:
-                      approval.isActive ? kPrimary600 : kTextSecondary,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(approval.visitorName,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    if (approval.purpose != null)
+                const SizedBox(width: dsSpace3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        approval.purpose!,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: kTextSecondary),
+                        approval.visitorName,
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(14),
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                        ),
                       ),
-                  ],
+                      if (approval.purpose != null)
+                        Text(
+                          approval.purpose!,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(12),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              StatusBadge.forStatus(
-                  approval.isActive ? 'active' : approval.status),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              if (approval.vehicleNumber != null) ...[
-                const Icon(Icons.directions_car_outlined,
-                    size: 14, color: kTextSecondary),
-                const SizedBox(width: 4),
-                Text(approval.vehicleNumber!,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: kTextSecondary)),
-                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: dsSpace2, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (isActive ? dsColorEmerald600 : dsTextSecondary)
+                        .withValues(alpha: isDark ? 0.15 : 0.10),
+                    borderRadius: BorderRadius.circular(dsRadiusFull),
+                  ),
+                  child: Text(
+                    isActive ? 'ACTIVE' : approval.status.toUpperCase(),
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(9),
+                      fontWeight: FontWeight.w800,
+                      color: isActive
+                          ? (isDark
+                              ? dsColorEmerald400
+                              : dsColorEmerald600)
+                          : (isDark
+                              ? dsDarkTextSecondary
+                              : dsTextSecondary),
+                    ),
+                  ),
+                ),
               ],
-              const Icon(Icons.schedule, size: 14, color: kTextSecondary),
-              const SizedBox(width: 4),
-              Text(
-                timeago.format(approval.expectedDate),
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: kTextSecondary),
-              ),
-              if (approval.isActive) ...[
-                const Spacer(),
-                const Icon(Icons.qr_code_2, size: 16, color: kPrimary600),
+            ),
+            const SizedBox(height: dsSpace3),
+            Divider(
+                height: 1,
+                color: isDark ? dsDarkBorderSubtle : dsBorderSubtle),
+            const SizedBox(height: dsSpace2),
+            Row(
+              children: [
+                if (approval.vehicleNumber != null) ...[
+                  Icon(Icons.directions_car_outlined,
+                      size: context.si(13),
+                      color: isDark ? dsDarkTextTertiary : dsTextTertiary),
+                  const SizedBox(width: 4),
+                  Text(
+                    approval.vehicleNumber!,
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(11),
+                      color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: dsSpace3),
+                ],
+                Icon(Icons.schedule_rounded,
+                    size: context.si(13),
+                    color: isDark ? dsDarkTextTertiary : dsTextTertiary),
                 const SizedBox(width: 4),
-                const Text('Show pass',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: kPrimary600)),
+                Text(
+                  timeago.format(approval.expectedDate),
+                  style: GoogleFonts.inter(
+                    fontSize: context.sp(11),
+                    color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+                  ),
+                ),
+                if (isActive) ...[
+                  const Spacer(),
+                  Icon(Icons.qr_code_2_rounded,
+                      size: context.si(14), color: dsColorIndigo600),
+                  const SizedBox(width: 3),
+                  Text(
+                    'Show pass',
+                    style: GoogleFonts.inter(
+                      fontSize: context.sp(11),
+                      fontWeight: FontWeight.w700,
+                      color: dsColorIndigo600,
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1172,30 +1634,50 @@ class _PreApprovalCard extends StatelessWidget {
 
 class _LogCard extends StatelessWidget {
   final VisitorLog log;
-  const _LogCard({required this.log});
+  final bool isDark;
+  const _LogCard({required this.log, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     final isInside = log.isInside;
-    return AppCard(
+    final surface  = isDark ? dsDarkSurface : dsSurface;
+    final iconColor = isInside
+        ? (isDark ? dsColorEmerald400 : dsColorEmerald600)
+        : (isDark ? dsDarkTextTertiary : dsTextTertiary);
+    final iconBg = isInside
+        ? (isDark
+            ? dsColorEmerald600.withValues(alpha: 0.15)
+            : dsColorEmerald50)
+        : (isDark ? dsDarkSurfaceMuted : dsColorSlate100);
+
+    return Container(
+      padding: const EdgeInsets.all(dsSpace3),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        boxShadow: isDark ? [] : dsShadowXs,
+        border: isDark
+            ? Border.all(color: dsDarkBorderSubtle, width: 1)
+            : null,
+      ),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: context.si(38),
+            height: context.si(38),
             decoration: BoxDecoration(
-              color: isInside
-                  ? kSecondary500.withValues(alpha: 0.1)
-                  : kSectionAlt,
-              borderRadius: BorderRadius.circular(8),
+              color: iconBg,
+              borderRadius: BorderRadius.circular(dsRadiusSm),
             ),
             child: Icon(
-              isInside ? Icons.person_outline : Icons.person_off_outlined,
-              color: isInside ? kSecondary500 : kTextSecondary,
-              size: 20,
+              isInside
+                  ? Icons.person_outline_rounded
+                  : Icons.person_off_outlined,
+              color: iconColor,
+              size: context.si(18),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: dsSpace3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1203,20 +1685,27 @@ class _LogCard extends StatelessWidget {
                 Text(
                   log.visitorName,
                   style: GoogleFonts.inter(
-                      fontSize: 13, fontWeight: FontWeight.w600),
+                    fontSize: context.sp(13),
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                  ),
                 ),
                 Text(
                   isInside
                       ? 'Inside · ${timeago.format(log.entryTime)}'
                       : 'Exited · ${timeago.format(log.entryTime)}',
                   style: GoogleFonts.inter(
-                      fontSize: 11, color: kTextSecondary),
+                    fontSize: context.sp(11),
+                    color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+                  ),
                 ),
                 if (log.gate != null)
                   Text(
                     'Gate: ${log.gate}',
                     style: GoogleFonts.inter(
-                        fontSize: 11, color: kTextSecondary),
+                      fontSize: context.sp(10),
+                      color: isDark ? dsDarkTextTertiary : dsTextTertiary,
+                    ),
                   ),
               ],
             ),
@@ -1224,17 +1713,20 @@ class _LogCard extends StatelessWidget {
           if (isInside)
             Container(
               padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 4),
+                  horizontal: dsSpace2, vertical: 3),
               decoration: BoxDecoration(
-                color: kSecondary500.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
+                color: isDark
+                    ? dsColorEmerald600.withValues(alpha: 0.15)
+                    : dsColorEmerald50,
+                borderRadius: BorderRadius.circular(dsRadiusFull),
               ),
               child: Text(
                 'Inside',
                 style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: kSecondary500,
+                  fontSize: context.sp(9),
+                  fontWeight: FontWeight.w800,
+                  color:
+                      isDark ? dsColorEmerald400 : dsColorEmerald600,
                 ),
               ),
             ),
@@ -1246,64 +1738,94 @@ class _LogCard extends StatelessWidget {
 
 class _PassVerifiedCard extends StatelessWidget {
   final VisitorPreApproval pass;
-  const _PassVerifiedCard({required this.pass});
+  final bool isDark;
+  const _PassVerifiedCard({required this.pass, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
+    final surface = isDark ? dsDarkSurface : dsSurface;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(dsSpace4),
       decoration: BoxDecoration(
-        color: kSecondary500.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kSecondary500.withValues(alpha: 0.3)),
+        color: surface,
+        borderRadius: BorderRadius.circular(dsRadiusCard),
+        border: Border.all(
+          color: isDark
+              ? dsColorEmerald600.withValues(alpha: 0.3)
+              : dsColorEmerald100,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.check_circle,
-                  color: kSecondary500, size: 18),
-              const SizedBox(width: 6),
+              Icon(Icons.check_circle_rounded,
+                  color: isDark ? dsColorEmerald400 : dsColorEmerald600,
+                  size: context.si(17)),
+              const SizedBox(width: dsSpace2),
               Text(
                 'Pass verified',
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: context.sp(13),
                   fontWeight: FontWeight.w700,
-                  color: kSecondary500,
+                  color: isDark ? dsColorEmerald400 : dsColorEmerald600,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          _Row('Visitor', pass.visitorName),
-          if (pass.purpose != null) _Row('Purpose', pass.purpose!),
+          const SizedBox(height: dsSpace3),
+          _VerifiedRow(label: 'Visitor', value: pass.visitorName, isDark: isDark),
+          if (pass.purpose != null)
+            _VerifiedRow(label: 'Purpose', value: pass.purpose!, isDark: isDark),
           if (pass.vehicleNumber != null)
-            _Row('Vehicle', pass.vehicleNumber!),
+            _VerifiedRow(label: 'Vehicle', value: pass.vehicleNumber!, isDark: isDark),
         ],
       ),
     );
   }
-
-  Widget _Row(String label, String value) => Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 60,
-              child: Text(label,
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: kTextSecondary)),
-            ),
-            Expanded(
-              child: Text(value,
-                  style: GoogleFonts.inter(
-                      fontSize: 12, fontWeight: FontWeight.w600)),
-            ),
-          ],
-        ),
-      );
 }
+
+class _VerifiedRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isDark;
+  const _VerifiedRow(
+      {required this.label, required this.value, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 64,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(12),
+                color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: context.sp(12),
+                fontWeight: FontWeight.w600,
+                color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Gate Picker Dialog ───────────────────────────────────────────────────────
 
 class _GatePickerDialog extends StatefulWidget {
   final String passName;
@@ -1319,69 +1841,99 @@ class _GatePickerDialogState extends State<_GatePickerDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Admit ${widget.passName}'),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(dsRadiusCardLg)),
+      title: Text(
+        'Admit ${widget.passName}',
+        style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Select gate:'),
-          const SizedBox(height: 8),
-          ...['main', 'secondary', 'pedestrian'].map((g) => RadioListTile<String>(
-                title: Text(g[0].toUpperCase() + g.substring(1)),
-                value: g,
-                groupValue: _gate,
-                onChanged: (v) => setState(() => _gate = v!),
-                dense: true,
-              )),
+          Text('Select gate:',
+              style: GoogleFonts.inter(color: dsTextSecondary)),
+          const SizedBox(height: dsSpace2),
+          ...['main', 'secondary', 'pedestrian'].map(
+            (g) => RadioListTile<String>(
+              title: Text(g[0].toUpperCase() + g.substring(1),
+                  style: GoogleFonts.inter()),
+              value: g,
+              // ignore: deprecated_member_use
+              groupValue: _gate,
+              activeColor: dsColorIndigo600,
+              // ignore: deprecated_member_use
+              onChanged: (v) => setState(() => _gate = v!),
+              dense: true,
+            ),
+          ),
         ],
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('Cancel',
+              style: GoogleFonts.inter(color: dsTextSecondary)),
         ),
-        ElevatedButton(
+        TextButton(
           onPressed: () => Navigator.pop(context, _gate),
-          child: const Text('Admit'),
+          child: Text('Admit',
+              style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700, color: dsColorIndigo600)),
         ),
       ],
     );
   }
 }
 
-class _FilterChips extends StatelessWidget {
+// ─── Filter Dropdown ──────────────────────────────────────────────────────────
+
+class _FilterDropdown extends ConsumerWidget {
   final String label;
   final List<String> options;
   final String? selected;
+  final bool isDark;
   final void Function(String?) onSelect;
-  const _FilterChips({
+
+  const _FilterDropdown({
     required this.label,
     required this.options,
     required this.selected,
+    required this.isDark,
     required this.onSelect,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isActive    = selected != null;
+    final borderColor = isActive ? dsColorIndigo600 : (isDark ? dsDarkBorderLight : dsBorderLight);
+    final bgColor     = isActive
+        ? (isDark ? dsColorIndigo600.withValues(alpha: 0.12) : dsColorIndigo50)
+        : (isDark ? dsDarkSurfaceMuted : dsBackground);
+
     return PopupMenuButton<String?>(
       initialValue: selected,
       onSelected: onSelect,
+      color: isDark ? dsDarkSurfaceElevated : dsSurface,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(dsRadiusMd)),
       itemBuilder: (_) => [
-        PopupMenuItem(value: null, child: Text('All $label')),
+        PopupMenuItem(
+          value: null,
+          child: Text('All $label', style: GoogleFonts.inter()),
+        ),
         ...options.map((o) => PopupMenuItem(
               value: o,
-              child: Text(o),
+              child: Text(o, style: GoogleFonts.inter()),
             )),
       ],
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(
+            horizontal: dsSpace3, vertical: 7),
         decoration: BoxDecoration(
-          color: selected != null ? kPrimary50 : kSectionAlt,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected != null ? kPrimary100 : kBorderLight,
-          ),
+          color: bgColor,
+          borderRadius: BorderRadius.circular(dsRadiusSm),
+          border: Border.all(color: borderColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1390,17 +1942,20 @@ class _FilterChips extends StatelessWidget {
               child: Text(
                 selected ?? label,
                 style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: selected != null ? kPrimary600 : kTextSecondary,
-                  fontWeight: selected != null
+                  fontSize: context.sp(12),
+                  color: isActive
+                      ? dsColorIndigo600
+                      : (isDark ? dsDarkTextSecondary : dsTextSecondary),
+                  fontWeight: isActive
                       ? FontWeight.w600
-                      : FontWeight.w400,
+                      : FontWeight.w500,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Icon(Icons.arrow_drop_down,
-                size: 16, color: kTextSecondary),
+            Icon(Icons.arrow_drop_down_rounded,
+                size: context.si(16),
+                color: isDark ? dsDarkTextSecondary : dsTextSecondary),
           ],
         ),
       ),
@@ -1408,24 +1963,7 @@ class _FilterChips extends StatelessWidget {
   }
 }
 
-class _WalkInLabel extends StatelessWidget {
-  final String text;
-  const _WalkInLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: kTextSecondary,
-        ),
-      );
-}
-
-// ---------------------------------------------------------------------------
-// QR scan screen
-// ---------------------------------------------------------------------------
+// ─── QR Scan Screen ───────────────────────────────────────────────────────────
 
 class _QrScanScreen extends StatefulWidget {
   const _QrScanScreen();
@@ -1449,12 +1987,13 @@ class _QrScanScreenState extends State<_QrScanScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Scan Visitor QR'),
+        title: Text('Scan Visitor QR',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.flash_on),
+            icon: const Icon(Icons.flash_on_rounded),
             onPressed: () => _controller.toggleTorch(),
           ),
         ],
@@ -1472,26 +2011,24 @@ class _QrScanScreenState extends State<_QrScanScreen> {
               }
             },
           ),
-          // Scan overlay
           Center(
             child: Container(
               width: 220,
               height: 220,
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.white, width: 2),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(dsRadiusXl),
               ),
             ),
           ),
           Positioned(
-            bottom: 40,
+            bottom: 48,
             left: 0,
             right: 0,
             child: Text(
               'Position the QR code within the frame',
               textAlign: TextAlign.center,
-              style:
-                  const TextStyle(color: Colors.white70, fontSize: 14),
+              style: GoogleFonts.inter(color: Colors.white70, fontSize: 14),
             ),
           ),
         ],

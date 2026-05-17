@@ -477,7 +477,7 @@ class _AttachmentsSection extends ConsumerWidget {
 
     return attachmentsAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (attachments) {
         if (attachments.isEmpty) return const SizedBox.shrink();
         return Column(
@@ -497,7 +497,7 @@ class _AttachmentsSection extends ConsumerWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: attachments.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
                 itemBuilder: (context, i) =>
                     _AttachmentTile(attachment: attachments[i], ref: ref),
               ),
@@ -911,7 +911,7 @@ class _StatusUpdateModalState extends ConsumerState<_StatusUpdateModal> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _newStatus,
+              initialValue: _newStatus,
               decoration: InputDecoration(
                 labelText: 'New Status',
                 border: OutlineInputBorder(

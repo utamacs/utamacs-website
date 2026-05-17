@@ -191,7 +191,7 @@ class VendorRepository {
           'title': title,
           if (description != null && description.trim().isNotEmpty)
             'description': description.trim(),
-          if (quotedAmount != null) 'quoted_amount': quotedAmount,
+          'quoted_amount': ?quotedAmount,
           if (deadline != null) 'deadline': deadline.toIso8601String(),
           if (notes != null && notes.trim().isNotEmpty)
             'notes': notes.trim(),
