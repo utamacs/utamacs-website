@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../../shared/models/profile.dart';
 import '../data/auth_repository.dart';
 
@@ -37,11 +38,17 @@ class AuthNotifier extends _$AuthNotifier {
     final repo = ref.read(authRepositoryProvider);
     repo.authStateChanges.listen((event) async {
       if (event.session != null) {
-        final profile = await repo.fetchProfile();
-        state = AuthState(
-          status: AuthStatus.authenticated,
-          profile: profile,
-        );
+        try {
+          final profile = await repo.fetchProfile();
+          state = AuthState(
+            status: AuthStatus.authenticated,
+            profile: profile,
+          );
+        } catch (_) {
+          // Profile fetch failed after auth event — sign out to recover clean state
+          await repo.signOut();
+          state = const AuthState(status: AuthStatus.unauthenticated);
+        }
       } else {
         state = const AuthState(status: AuthStatus.unauthenticated);
       }
@@ -55,6 +62,9 @@ class AuthNotifier extends _$AuthNotifier {
           status: AuthStatus.authenticated,
           profile: profile,
         );
+      }).catchError((_) {
+        // Token may have expired silently — clear state
+        state = const AuthState(status: AuthStatus.unauthenticated);
       });
     } else {
       state = const AuthState(status: AuthStatus.unauthenticated);
@@ -63,12 +73,28 @@ class AuthNotifier extends _$AuthNotifier {
 
   Future<void> sendEmailOtp(String email) async {
     final repo = ref.read(authRepositoryProvider);
-    await repo.sendEmailOtp(email);
+    try {
+      await repo.sendEmailOtp(email);
+    } on AuthException catch (e) {
+      // Supabase returns 429 when OTP rate limit is exceeded
+      if (e.statusCode == '429') {
+        throw Exception(
+            'Too many requests — please wait a moment before requesting another code.');
+      }
+      rethrow;
+    }
   }
 
   Future<void> verifyEmailOtp(String email, String token) async {
     final repo = ref.read(authRepositoryProvider);
-    await repo.verifyEmailOtp(email, token);
+    try {
+      await repo.verifyEmailOtp(email, token);
+    } on AuthException catch (e) {
+      if (e.statusCode == '429') {
+        throw Exception('Too many verification attempts — please wait and try again.');
+      }
+      rethrow;
+    }
   }
 
   Future<void> signOut() async {

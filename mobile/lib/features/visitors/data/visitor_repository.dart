@@ -328,3 +328,12 @@ final frequentVisitorsProvider =
     FutureProvider.autoDispose<List<String>>((ref) {
   return ref.read(visitorRepositoryProvider).fetchFrequentVisitors();
 });
+
+final deliveryLogsProvider =
+    FutureProvider.autoDispose<List<VisitorLog>>((ref) {
+  final profile = ref.watch(authNotifierProvider).profile;
+  return ref.read(visitorRepositoryProvider).fetchAllLogs(
+        visitorType: 'delivery',
+        profile: profile,
+      );
+});
