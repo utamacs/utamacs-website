@@ -4,18 +4,41 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/staff_repository.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
-class StaffScreen extends ConsumerWidget {
+class StaffScreen extends ConsumerStatefulWidget {
   const StaffScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final staffAsync = ref.watch(activeStaffProvider);
+  ConsumerState<StaffScreen> createState() => _StaffScreenState();
+}
+
+class _StaffScreenState extends ConsumerState<StaffScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -26,43 +49,582 @@ class StaffScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(activeStaffProvider),
+            onPressed: () {
+              ref.invalidate(activeStaffProvider);
+              ref.invalidate(staffTasksProvider);
+            },
+          ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: kPrimary600,
+          unselectedLabelColor: kTextSecondary,
+          indicatorColor: kPrimary600,
+          labelStyle:
+              GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+          tabs: const [
+            Tab(text: 'Directory'),
+            Tab(text: 'Tasks'),
+          ],
+        ),
+      ),
+      floatingActionButton: isExec && _tabController.index == 1
+          ? FloatingActionButton.extended(
+              onPressed: () => _showCreateTaskSheet(context),
+              backgroundColor: kPrimary600,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: Text(
+                'Assign Task',
+                style: GoogleFonts.inter(
+                    color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            )
+          : null,
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          _DirectoryTab(),
+          _TasksTab(),
+        ],
+      ),
+    );
+  }
+
+  void _showCreateTaskSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CreateTaskSheet(
+        onCreated: () => ref.invalidate(staffTasksProvider),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Directory tab (previously the entire screen body)
+// ---------------------------------------------------------------------------
+
+class _DirectoryTab extends ConsumerWidget {
+  const _DirectoryTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final staffAsync = ref.watch(activeStaffProvider);
+
+    return staffAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load staff',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(activeStaffProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (staff) => RefreshIndicator(
+        onRefresh: () async => ref.invalidate(activeStaffProvider),
+        child: CustomScrollView(
+          slivers: [
+            const SliverToBoxAdapter(child: _InfoBanner()),
+            if (staff.isEmpty)
+              const SliverFillRemaining(
+                child: EmptyState(
+                  icon: Icons.badge_outlined,
+                  title: 'No active staff found',
+                  subtitle:
+                      'Active society staff members will appear here once registered.',
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                sliver: _GroupedStaffList(staff: staff),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tasks tab
+// ---------------------------------------------------------------------------
+
+class _TasksTab extends ConsumerWidget {
+  const _TasksTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tasksAsync = ref.watch(staffTasksProvider);
+    final staffAsync = ref.watch(activeStaffProvider);
+
+    return tasksAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load tasks',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(staffTasksProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (tasks) {
+        if (tasks.isEmpty) {
+          return const EmptyState(
+            icon: Icons.task_outlined,
+            title: 'No open tasks',
+            subtitle: 'Assigned tasks for society staff will appear here.',
+          );
+        }
+
+        final Map<String, String> staffNames = {};
+        staffAsync.whenData((staff) {
+          for (final s in staff) {
+            staffNames[s.id] = s.name;
+          }
+        });
+
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(staffTasksProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: tasks.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, i) => _TaskCard(
+              task: tasks[i],
+              assignedToName: staffNames[tasks[i].assignedTo],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TaskCard extends StatelessWidget {
+  final StaffTask task;
+  final String? assignedToName;
+  const _TaskCard({required this.task, this.assignedToName});
+
+  static Color _priorityColor(String p) => switch (p) {
+        'urgent' => kRed600,
+        'high' => kAccent500,
+        'normal' => kPrimary600,
+        _ => kTextSecondary,
+      };
+
+  static Color _priorityBg(String p) => switch (p) {
+        'urgent' => const Color(0xFFFEE2E2),
+        'high' => const Color(0xFFFEF3C7),
+        'normal' => kPrimary50,
+        _ => kSectionAlt,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final isPastDue = task.isOverdue;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: isPastDue
+                ? const Color(0xFFFECACA)
+                : kBorderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  task.title,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _priorityBg(task.priority),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  task.priority.toUpperCase(),
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: _priorityColor(task.priority),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (task.description != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              task.description!,
+              style: GoogleFonts.inter(
+                  fontSize: 12, color: kTextSecondary),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.person_outline,
+                  size: 13, color: kTextSecondary),
+              const SizedBox(width: 4),
+              Text(
+                assignedToName ?? 'Staff member',
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: kTextSecondary),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.calendar_today_outlined,
+                size: 13,
+                color: isPastDue ? kRed600 : kTextSecondary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Due ${DateFormat('d MMM y').format(task.dueDate)}',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: isPastDue ? kRed600 : kTextSecondary,
+                  fontWeight:
+                      isPastDue ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      body: staffAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => EmptyState(
-          icon: Icons.error_outline,
-          title: 'Could not load staff',
-          subtitle: e.toString(),
-          action: ElevatedButton(
-            onPressed: () => ref.invalidate(activeStaffProvider),
-            child: const Text('Retry'),
-          ),
-        ),
-        data: (staff) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(activeStaffProvider),
-          child: CustomScrollView(
-            slivers: [
-              // Info banner
-              const SliverToBoxAdapter(child: _InfoBanner()),
-              if (staff.isEmpty)
-                const SliverFillRemaining(
-                  child: EmptyState(
-                    icon: Icons.badge_outlined,
-                    title: 'No active staff found',
-                    subtitle:
-                        'Active society staff members will appear here once registered.',
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  sliver: _GroupedStaffList(staff: staff),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Create task sheet
+// ---------------------------------------------------------------------------
+
+class _CreateTaskSheet extends ConsumerStatefulWidget {
+  final VoidCallback onCreated;
+  const _CreateTaskSheet({required this.onCreated});
+
+  @override
+  ConsumerState<_CreateTaskSheet> createState() =>
+      _CreateTaskSheetState();
+}
+
+class _CreateTaskSheetState extends ConsumerState<_CreateTaskSheet> {
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  String? _selectedStaffId;
+  DateTime _dueDate = DateTime.now().add(const Duration(days: 1));
+  String _priority = 'normal';
+  bool _saving = false;
+
+  final _priorities = ['low', 'normal', 'high', 'urgent'];
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _dueDate = picked);
+  }
+
+  Future<void> _save() async {
+    if (_titleCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title is required')),
+      );
+      return;
+    }
+    if (_selectedStaffId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a staff member')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ref.read(staffRepositoryProvider).createTask(
+            assignedTo: _selectedStaffId!,
+            title: _titleCtrl.text.trim(),
+            description: _descCtrl.text.trim().isEmpty
+                ? null
+                : _descCtrl.text.trim(),
+            dueDate: _dueDate,
+            priority: _priority,
+          );
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onCreated();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Task assigned')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final staffAsync = ref.watch(activeStaffProvider);
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: kBorderLight,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-            ],
-          ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Assign Task',
+                style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary)),
+            const SizedBox(height: 16),
+            // Staff member
+            Text('Assign to *',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            staffAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) =>
+                  const Text('Failed to load staff'),
+              data: (staff) => DropdownButtonFormField<String>(
+                value: _selectedStaffId,
+                hint: Text('Select staff member',
+                    style: GoogleFonts.inter(
+                        fontSize: 14, color: kTextSecondary)),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: kBgWarm,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: kBorderLight)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                ),
+                items: staff
+                    .map((s) => DropdownMenuItem(
+                          value: s.id,
+                          child: Text(s.name,
+                              style: GoogleFonts.inter(fontSize: 14)),
+                        ))
+                    .toList(),
+                onChanged: (val) =>
+                    setState(() => _selectedStaffId = val),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Title
+            Text('Task title *',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _titleCtrl,
+              decoration: InputDecoration(
+                hintText: 'e.g. Clean lobby floor',
+                filled: true,
+                fillColor: kBgWarm,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kBorderLight)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+              ),
+              style: GoogleFonts.inter(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            // Description
+            Text('Description',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _descCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Task details…',
+                filled: true,
+                fillColor: kBgWarm,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kBorderLight)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+              ),
+              style: GoogleFonts.inter(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            // Due date + priority
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Due date *',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kTextSecondary)),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: _pickDate,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 11),
+                          decoration: BoxDecoration(
+                            color: kBgWarm,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: kBorderLight),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today_outlined,
+                                  size: 14, color: kTextSecondary),
+                              const SizedBox(width: 6),
+                              Text(
+                                DateFormat('d MMM y').format(_dueDate),
+                                style: GoogleFonts.inter(
+                                    fontSize: 13, color: kTextPrimary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Priority',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kTextSecondary)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: _priority,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: kBgWarm,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: kBorderLight)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                        items: _priorities
+                            .map((p) => DropdownMenuItem(
+                                  value: p,
+                                  child: Text(
+                                      p[0].toUpperCase() + p.substring(1),
+                                      style:
+                                          GoogleFonts.inter(fontSize: 14)),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _priority = val);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                style: FilledButton.styleFrom(
+                    backgroundColor: kPrimary600,
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : Text('Assign Task',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
+              ),
+            ),
+          ],
         ),
       ),
     );

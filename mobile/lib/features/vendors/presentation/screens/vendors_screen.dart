@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/vendor_repository.dart';
 
 class VendorsScreen extends ConsumerStatefulWidget {
@@ -24,6 +25,7 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
   }
 
   @override
@@ -34,6 +36,9 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+
     return Scaffold(
       backgroundColor: kBgWarm,
       appBar: AppBar(
@@ -62,12 +67,36 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen>
           ],
         ),
       ),
+      floatingActionButton: isExec &&
+              _tabController.index == 1
+          ? FloatingActionButton.extended(
+              onPressed: () => _showCreateWorkOrderSheet(context),
+              backgroundColor: kPrimary600,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: Text(
+                'New Work Order',
+                style: GoogleFonts.inter(
+                    color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            )
+          : null,
       body: TabBarView(
         controller: _tabController,
-        children: const [
-          _VendorsTab(),
-          _WorkOrdersTab(),
+        children: [
+          _VendorsTab(isExec: isExec),
+          _WorkOrdersTab(isExec: isExec),
         ],
+      ),
+    );
+  }
+
+  void _showCreateWorkOrderSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CreateWorkOrderSheet(
+        onCreated: () => ref.invalidate(workOrdersProvider),
       ),
     );
   }
@@ -78,7 +107,8 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen>
 // ---------------------------------------------------------------------------
 
 class _VendorsTab extends ConsumerWidget {
-  const _VendorsTab();
+  final bool isExec;
+  const _VendorsTab({required this.isExec});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -104,7 +134,6 @@ class _VendorsTab extends ConsumerWidget {
           );
         }
 
-        // Group by category
         final Map<String, List<Vendor>> grouped = {};
         for (final v in vendors) {
           grouped.putIfAbsent(v.category, () => []).add(v);
@@ -112,28 +141,30 @@ class _VendorsTab extends ConsumerWidget {
 
         final categories = grouped.keys.toList()..sort();
 
+        final items = <_ListItem>[];
+        for (final cat in categories) {
+          items.add(_ListItem.header(cat));
+          for (final v in grouped[cat]!) {
+            items.add(_ListItem.vendor(v));
+          }
+        }
+
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(vendorsProvider),
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: categories.fold<int>(
-                0, (sum, cat) => sum + 1 + (grouped[cat]?.length ?? 0)),
+            itemCount: items.length,
             itemBuilder: (context, index) {
-              // Flatten to a list of (type, item)
-              final items = <_ListItem>[];
-              for (final cat in categories) {
-                items.add(_ListItem.header(cat));
-                for (final v in grouped[cat]!) {
-                  items.add(_ListItem.vendor(v));
-                }
-              }
               final item = items[index];
               if (item.isHeader) {
                 return _CategoryHeader(category: item.header!);
               }
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _VendorCard(vendor: item.vendor!),
+                child: _VendorCard(
+                  vendor: item.vendor!,
+                  isExec: isExec,
+                ),
               );
             },
           ),
@@ -176,15 +207,21 @@ class _CategoryHeader extends StatelessWidget {
 
 class _VendorCard extends StatelessWidget {
   final Vendor vendor;
-  const _VendorCard({required this.vendor});
+  final bool isExec;
+  const _VendorCard({required this.vendor, required this.isExec});
 
-  IconData _iconForCategory(String category) {
+  static IconData _iconForCategory(String category) {
     return switch (category.toLowerCase()) {
-      'construction' => Icons.construction,
-      'cleaning' => Icons.cleaning_services,
+      'construction' || 'civil' => Icons.construction,
+      'cleaning' || 'housekeeping' => Icons.cleaning_services,
       'security' => Icons.security,
       'plumbing' => Icons.plumbing,
       'electrical' => Icons.electric_bolt,
+      'lift' => Icons.elevator_outlined,
+      'pest_control' => Icons.pest_control,
+      'landscaping' => Icons.grass,
+      'it' => Icons.computer_outlined,
+      'cctv' => Icons.videocam_outlined,
       _ => Icons.handyman,
     };
   }
@@ -192,6 +229,7 @@ class _VendorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
+      onTap: () => _showDetail(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -270,8 +308,18 @@ class _VendorCard extends StatelessWidget {
               ],
             ),
           ),
+          const Icon(Icons.chevron_right, color: kTextSecondary, size: 18),
         ],
       ),
+    );
+  }
+
+  void _showDetail(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _VendorDetailSheet(vendor: vendor, isExec: isExec),
     );
   }
 }
@@ -281,7 +329,8 @@ class _VendorCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _WorkOrdersTab extends ConsumerWidget {
-  const _WorkOrdersTab();
+  final bool isExec;
+  const _WorkOrdersTab({required this.isExec});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -308,7 +357,6 @@ class _WorkOrdersTab extends ConsumerWidget {
           );
         }
 
-        // Build a vendor lookup map if available
         final Map<String, String> vendorNames = {};
         vendorsAsync.whenData((vendors) {
           for (final v in vendors) {
@@ -325,6 +373,8 @@ class _WorkOrdersTab extends ConsumerWidget {
             itemBuilder: (context, i) => _WorkOrderCard(
               workOrder: workOrders[i],
               vendorName: vendorNames[workOrders[i].vendorId],
+              isExec: isExec,
+              onStatusChanged: () => ref.invalidate(workOrdersProvider),
             ),
           ),
         );
@@ -333,20 +383,67 @@ class _WorkOrdersTab extends ConsumerWidget {
   }
 }
 
-class _WorkOrderCard extends StatelessWidget {
+class _WorkOrderCard extends ConsumerStatefulWidget {
   final WorkOrder workOrder;
   final String? vendorName;
+  final bool isExec;
+  final VoidCallback onStatusChanged;
 
-  const _WorkOrderCard({required this.workOrder, this.vendorName});
+  const _WorkOrderCard({
+    required this.workOrder,
+    this.vendorName,
+    required this.isExec,
+    required this.onStatusChanged,
+  });
 
-  String _formatAmount(double amount) {
+  @override
+  ConsumerState<_WorkOrderCard> createState() => _WorkOrderCardState();
+}
+
+class _WorkOrderCardState extends ConsumerState<_WorkOrderCard> {
+  bool _updating = false;
+
+  static String _formatAmount(double amount) {
     final formatter = NumberFormat('#,##,###', 'en_IN');
     return '₹${formatter.format(amount)}';
   }
 
+  List<(String label, String newStatus)> get _transitions {
+    return switch (widget.workOrder.status) {
+      'issued' => [('Mark In Progress', 'in_progress')],
+      'in_progress' => [
+          ('Mark Completed', 'completed'),
+          ('Raise Dispute', 'disputed'),
+        ],
+      'completed' => [('Close', 'closed')],
+      'disputed' => [('Close', 'closed')],
+      _ => [],
+    };
+  }
+
+  Future<void> _updateStatus(String newStatus) async {
+    setState(() => _updating = true);
+    try {
+      await ref
+          .read(vendorRepositoryProvider)
+          .updateWorkOrderStatus(widget.workOrder.id, newStatus);
+      widget.onStatusChanged();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update status: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _updating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final displayAmount = workOrder.finalAmount ?? workOrder.quotedAmount;
+    final displayAmount =
+        widget.workOrder.finalAmount ?? widget.workOrder.quotedAmount;
+    final transitions = widget.isExec ? _transitions : <(String, String)>[];
 
     return AppCard(
       child: Column(
@@ -357,7 +454,7 @@ class _WorkOrderCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  workOrder.title,
+                  widget.workOrder.title,
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -368,17 +465,18 @@ class _WorkOrderCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              StatusBadge.forStatus(workOrder.status),
+              StatusBadge.forStatus(widget.workOrder.status),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.store_outlined, size: 13, color: kTextSecondary),
+              const Icon(Icons.store_outlined,
+                  size: 13, color: kTextSecondary),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  vendorName ?? workOrder.vendorId,
+                  widget.vendorName ?? widget.workOrder.vendorId,
                   style: GoogleFonts.inter(
                       fontSize: 12, color: kTextSecondary),
                   overflow: TextOverflow.ellipsis,
@@ -386,7 +484,7 @@ class _WorkOrderCard extends StatelessWidget {
               ),
             ],
           ),
-          if (displayAmount != null || workOrder.deadline != null) ...[
+          if (displayAmount != null || widget.workOrder.deadline != null) ...[
             const SizedBox(height: 8),
             const Divider(height: 1, color: kBorderLight),
             const SizedBox(height: 8),
@@ -405,28 +503,542 @@ class _WorkOrderCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (displayAmount != null && workOrder.deadline != null)
+                if (displayAmount != null && widget.workOrder.deadline != null)
                   const SizedBox(width: 16),
-                if (workOrder.deadline != null) ...[
+                if (widget.workOrder.deadline != null) ...[
                   const Icon(Icons.calendar_today_outlined,
                       size: 13, color: kTextSecondary),
                   const SizedBox(width: 4),
                   Text(
-                    'Due ${DateFormat('d MMM y').format(workOrder.deadline!)}',
+                    'Due ${DateFormat('d MMM y').format(widget.workOrder.deadline!)}',
                     style: GoogleFonts.inter(
                         fontSize: 12, color: kTextSecondary),
                   ),
                 ],
                 const Spacer(),
                 Text(
-                  timeago.format(workOrder.createdAt),
+                  timeago.format(widget.workOrder.createdAt),
                   style: GoogleFonts.inter(
                       fontSize: 11, color: kTextSecondary),
                 ),
               ],
             ),
           ],
+          if (transitions.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: kBorderLight),
+            const SizedBox(height: 8),
+            if (_updating)
+              const Center(
+                  child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2)))
+            else
+              Wrap(
+                spacing: 8,
+                children: transitions.map((t) {
+                  final isDestructive = t.$2 == 'disputed';
+                  return OutlinedButton(
+                    onPressed: () => _updateStatus(t.$2),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor:
+                          isDestructive ? kRed600 : kPrimary600,
+                      side: BorderSide(
+                          color: isDestructive ? kRed600 : kPrimary600),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      textStyle: GoogleFonts.inter(
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    child: Text(t.$1),
+                  );
+                }).toList(),
+              ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Vendor detail bottom sheet
+// ---------------------------------------------------------------------------
+
+class _VendorDetailSheet extends StatelessWidget {
+  final Vendor vendor;
+  final bool isExec;
+  const _VendorDetailSheet({required this.vendor, required this.isExec});
+
+  Widget _row(BuildContext context, IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 15, color: kTextSecondary),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 72,
+            child: Text(label,
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: kTextSecondary)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: kTextPrimary,
+                    fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: kBorderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: kPrimary50,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                      _VendorCard._iconForCategory(vendor.category),
+                      color: kPrimary600,
+                      size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        vendor.name,
+                        style: GoogleFonts.poppins(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary,
+                        ),
+                      ),
+                      Text(
+                        vendor.category.replaceAll('_', ' '),
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: kTextSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            if (vendor.contactPerson != null)
+              _row(context, Icons.person_outline, 'Contact',
+                  vendor.contactPerson!),
+            if (vendor.phone != null)
+              _row(context, Icons.phone_outlined, 'Phone', vendor.phone!),
+            if (vendor.email != null)
+              _row(context, Icons.email_outlined, 'Email', vendor.email!),
+            if (isExec) ...[
+              if (vendor.gstin != null)
+                _row(context, Icons.receipt_long_outlined, 'GSTIN',
+                    vendor.gstin!),
+              if (vendor.pan != null)
+                _row(context, Icons.credit_card_outlined, 'PAN', vendor.pan!),
+              if (vendor.bankIfsc != null)
+                _row(context, Icons.account_balance_outlined, 'Bank IFSC',
+                    vendor.bankIfsc!),
+            ],
+            if (vendor.contractEnd != null)
+              _row(
+                  context,
+                  Icons.event_outlined,
+                  'Contract',
+                  'Expires ${DateFormat('d MMM yyyy').format(vendor.contractEnd!)}'),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Create work order sheet
+// ---------------------------------------------------------------------------
+
+class _CreateWorkOrderSheet extends ConsumerStatefulWidget {
+  final VoidCallback onCreated;
+  const _CreateWorkOrderSheet({required this.onCreated});
+
+  @override
+  ConsumerState<_CreateWorkOrderSheet> createState() =>
+      _CreateWorkOrderSheetState();
+}
+
+class _CreateWorkOrderSheetState extends ConsumerState<_CreateWorkOrderSheet> {
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  String? _selectedVendorId;
+  DateTime? _deadline;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    _amountCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDeadline() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 7)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _deadline = picked);
+  }
+
+  Future<void> _save() async {
+    if (_titleCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title is required')),
+      );
+      return;
+    }
+    if (_selectedVendorId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a vendor')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final amount = double.tryParse(_amountCtrl.text.trim());
+      await ref.read(vendorRepositoryProvider).createWorkOrder(
+            vendorId: _selectedVendorId!,
+            title: _titleCtrl.text.trim(),
+            description: _descCtrl.text.trim().isEmpty
+                ? null
+                : _descCtrl.text.trim(),
+            quotedAmount: amount,
+            deadline: _deadline,
+            notes: _notesCtrl.text.trim().isEmpty
+                ? null
+                : _notesCtrl.text.trim(),
+          );
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onCreated();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Work order created')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vendorsAsync = ref.watch(vendorsProvider);
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: kBorderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('New Work Order',
+                style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary)),
+            const SizedBox(height: 16),
+            // Vendor dropdown
+            Text('Vendor *',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            vendorsAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) =>
+                  const Text('Failed to load vendors'),
+              data: (vendors) => DropdownButtonFormField<String>(
+                value: _selectedVendorId,
+                hint: Text('Select vendor',
+                    style: GoogleFonts.inter(
+                        fontSize: 14, color: kTextSecondary)),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: kBgWarm,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: kBorderLight)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                ),
+                items: vendors
+                    .map((v) => DropdownMenuItem(
+                          value: v.id,
+                          child: Text(v.name,
+                              style: GoogleFonts.inter(fontSize: 14)),
+                        ))
+                    .toList(),
+                onChanged: (val) =>
+                    setState(() => _selectedVendorId = val),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Title
+            Text('Title *',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _titleCtrl,
+              decoration: InputDecoration(
+                hintText: 'e.g. Lift maintenance Q2',
+                filled: true,
+                fillColor: kBgWarm,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kBorderLight)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+              ),
+              style: GoogleFonts.inter(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            // Description
+            Text('Description',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _descCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Scope of work…',
+                filled: true,
+                fillColor: kBgWarm,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kBorderLight)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+              ),
+              style: GoogleFonts.inter(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            // Quoted amount + deadline
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Quoted Amount (₹)',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kTextSecondary)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _amountCtrl,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(
+                                decimal: true),
+                        decoration: InputDecoration(
+                          hintText: '0.00',
+                          filled: true,
+                          fillColor: kBgWarm,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: kBorderLight)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                        style: GoogleFonts.inter(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Deadline',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kTextSecondary)),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: _pickDeadline,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 11),
+                          decoration: BoxDecoration(
+                            color: kBgWarm,
+                            borderRadius: BorderRadius.circular(10),
+                            border:
+                                Border.all(color: kBorderLight),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today_outlined,
+                                  size: 14, color: kTextSecondary),
+                              const SizedBox(width: 6),
+                              Text(
+                                _deadline != null
+                                    ? DateFormat('d MMM y')
+                                        .format(_deadline!)
+                                    : 'Pick date',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: _deadline != null
+                                      ? kTextPrimary
+                                      : kTextSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Notes
+            Text('Notes',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _notesCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Additional notes…',
+                filled: true,
+                fillColor: kBgWarm,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kBorderLight)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+              ),
+              style: GoogleFonts.inter(fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                style: FilledButton.styleFrom(
+                    backgroundColor: kPrimary600,
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : Text('Create Work Order',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

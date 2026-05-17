@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../data/document_repository.dart';
+import '../../../auth/domain/auth_notifier.dart';
 
 class DocumentsScreen extends ConsumerStatefulWidget {
   const DocumentsScreen({super.key});
@@ -173,9 +174,17 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   }
 
   void _showDocumentDialog(BuildContext context, SocietyDocument doc) {
+    final isExec = ref.read(authNotifierProvider).profile?.isExec ?? false;
     showDialog(
       context: context,
-      builder: (_) => _DocumentDetailDialog(doc: doc),
+      builder: (_) => _DocumentDetailDialog(
+        doc: doc,
+        isExec: isExec,
+        onArchived: () {
+          Navigator.pop(context);
+          ref.invalidate(documentsProvider);
+        },
+      ),
     );
   }
 }
@@ -400,12 +409,63 @@ class _DocumentTile extends StatelessWidget {
 // Document detail dialog
 // ---------------------------------------------------------------------------
 
-class _DocumentDetailDialog extends StatelessWidget {
+class _DocumentDetailDialog extends ConsumerStatefulWidget {
   final SocietyDocument doc;
-  const _DocumentDetailDialog({required this.doc});
+  final bool isExec;
+  final VoidCallback onArchived;
+
+  const _DocumentDetailDialog({
+    required this.doc,
+    required this.isExec,
+    required this.onArchived,
+  });
+
+  @override
+  ConsumerState<_DocumentDetailDialog> createState() =>
+      _DocumentDetailDialogState();
+}
+
+class _DocumentDetailDialogState extends ConsumerState<_DocumentDetailDialog> {
+  bool _archiving = false;
+
+  Future<void> _archive() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Archive document?'),
+        content: Text(
+            'Archive "${widget.doc.title}"? It will no longer appear in the list.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: kRed600),
+              child: const Text('Archive')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() => _archiving = true);
+    try {
+      await ref
+          .read(documentRepositoryProvider)
+          .archiveDocument(widget.doc.id);
+      widget.onArchived();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _archiving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to archive: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final doc = widget.doc;
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
@@ -444,24 +504,15 @@ class _DocumentDetailDialog extends StatelessWidget {
             const Divider(height: 1),
             const SizedBox(height: 12),
           ],
-          _DetailRow(
-            label: 'Category',
-            value: doc.category,
-          ),
-          _DetailRow(
-            label: 'Version',
-            value: 'v${doc.version}',
-          ),
+          _DetailRow(label: 'Category', value: doc.category),
+          _DetailRow(label: 'Version', value: 'v${doc.version}'),
           if (doc.fileSizeBytes != null)
             _DetailRow(
               label: 'File size',
               value: _DocumentTile._formatSize(doc.fileSizeBytes!),
             ),
           if (doc.fileName != null)
-            _DetailRow(
-              label: 'File',
-              value: doc.fileName!,
-            ),
+            _DetailRow(label: 'File', value: doc.fileName!),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
@@ -489,6 +540,19 @@ class _DocumentDetailDialog extends StatelessWidget {
         ],
       ),
       actions: [
+        if (widget.isExec)
+          TextButton.icon(
+            onPressed: _archiving ? null : _archive,
+            icon: _archiving
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.archive_outlined, size: 16),
+            label: const Text('Archive'),
+            style: TextButton.styleFrom(foregroundColor: kRed600),
+          ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Close'),

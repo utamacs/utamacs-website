@@ -16,7 +16,7 @@
 | 05 Events | 9 | 7 | 2 |
 | 06 Polls | 9 | 8 | 1 |
 | 07 Community Board | 11 | 10 | 1 |
-| 08 Documents | 11 | 5 | 6 |
+| 08 Documents | 11 | 6 | 5 |
 | 09 Gallery | 5 | 2 | 3 |
 | 10 Facilities | 6 | 6 | 0 |
 | 11 Parking | 12 | 7 | 5 |
@@ -29,15 +29,15 @@
 | 18 HOTO | 8 | 2 | 6 |
 | 19 Analytics | 8 | 2 | 6 |
 | 20 Security Patrol | 6 | 5 | 1 |
-| 21 Staff Management | 9 | 2 | 7 |
+| 21 Staff Management | 9 | 3 | 6 |
 | 22 Policies | 4 | 3 | 1 |
 | 23 Register / Membership | 6 | 5 | 1 |
 | 24 AGM | 5 | 5 | 0 |
 | 25 Tenant KYC | 5 | 5 | 0 |
 | 26 Letters | 5 | 0 | 5 |
-| 27 Vendors & Work Orders | 9 | 0 | 9 |
+| 27 Vendors & Work Orders | 9 | 3 | 6 |
 | 28 Profile & Auth | 6 | 4 | 2 |
-| **TOTAL** | **234** | **138** | **96** |
+| **TOTAL** | **234** | **143** | **91** |
 
 ---
 
@@ -163,7 +163,7 @@
 - [x] 🟡 Access control badge (`requires_role` member/executive, `is_public` indicator)
 - [x] 🟢 MIME type icons (PDF=red, Word=blue, Excel=green, CSV, Image)
 - [x] 🟢 File size and upload date displayed on card
-- [ ] 🟢 Archive document (exec)
+- [x] 🟢 Archive document (exec)
 - [ ] 🟢 Download audit log entry (exec downloads logged in `audit_logs`)
 
 ---
@@ -329,7 +329,7 @@
 
 - [x] 🔴 Staff directory screen — department-grouped list with role, status, contact, designation
 - [x] 🔴 KYC onboarding — photo upload, ID type/number, annual renewal tracking
-- [ ] 🟠 Task creation and assignment — title, description, assigned_to, department, deadline, priority (HIGH/MEDIUM/LOW)
+- [x] 🟠 Task creation and assignment — title, description, assigned_to, department, deadline, priority (HIGH/MEDIUM/LOW)
 - [ ] 🟠 Attendance marking and log view
 - [ ] 🟠 Shift scheduling — view and create shifts per department
 - [ ] 🟡 Hiring / exit proposals workflow (committee approval)
@@ -391,11 +391,11 @@
 
 ## 27 · VENDORS & WORK ORDERS
 
-- [ ] 🔴 Create work order form — vendor (select), linked complaint/snag (optional), description, quoted_amount, schedule_date, TDS applicable checkbox
+- [x] 🔴 Create work order form — vendor (select), linked complaint/snag (optional), description, quoted_amount, schedule_date, TDS applicable checkbox
 - [ ] 🔴 Invoice upload on work order + mark complete flow
 - [ ] 🔴 Procurement module — create requirement, vendor candidates, committee vote, select winner
-- [ ] 🟠 Vendor contact details, GST#, PAN#, bank account in detail view
-- [ ] 🟠 WO status workflow buttons — Mark In Progress → Inspect → Complete → Close / Dispute
+- [x] 🟠 Vendor contact details, GST#, PAN#, bank account in detail view
+- [x] 🟠 WO status workflow buttons — Mark In Progress → Inspect → Complete → Close / Dispute
 - [ ] 🟡 Licence expiry warnings for agency vendors (PSARA / PF / ESIC)
 - [ ] 🟡 TDS management — flag >₹30k WOs, link TDS certificate to Finance module
 - [ ] 🟡 Complaint / snag auto-link on WO creation and auto-resolve on WO close
