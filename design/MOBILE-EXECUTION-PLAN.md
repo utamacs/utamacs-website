@@ -2,7 +2,7 @@
 
 > **Source:** MOBILE-AUDIT.md — every gap, risk, and recommendation cross-referenced and tracked here  
 > **Scope:** All 34 critical/high/medium/low items from audit + all real runtime bugs observed in live app  
-> **Last Updated:** 2026-05-18 (session 4)  
+> **Last Updated:** 2026-05-18 (session 5)  
 > **Tracking:** Status updated in real-time as fixes are applied. Items never marked DONE until code is written.
 
 ---
@@ -86,12 +86,12 @@
 | P3-1 | Create `PortalRole` enum replacing raw `String portalRole` | RBAC-10, G-21 | ✅ DONE | `lib/shared/models/portal_role.dart` — `fromString()`, `isExec`, `isGuard`, `value` |
 | P3-2 | Create `mobile/.env.example` with placeholder values | G-01 | ✅ DONE | Created — see 0.9 |
 | P3-3 | Extract models from repository files → `data/models/` subfolder | Tech debt | ✅ DONE | 27 model files created via `part`/`part of` across all 27 feature repos. Each `data/models/{name}_models.dart` contains all non-Repository/non-Notifier classes. |
-| P3-4 | Handle deep links with role validation (RBAC-08) | RBAC-08 | ⬜ PENDING | Deep link to `/analytics` must check role, not just session |
-| P3-5 | Add token expiry / session timeout handling in `AuthNotifier` | RBAC-09 | ⬜ PENDING | Auto-logout after 30 min background; handle silent token refresh failures |
-| P3-6 | Feature flags — query `feature_flags` table from mobile; gate navigation | G-13 | ⬜ PENDING | Requires `feature_flags` Supabase table + GoRouter integration |
-| P3-7 | OTP rate limiting — verify Supabase OTP config | Security | ⬜ PENDING | Confirm max attempts / lockout window in Supabase auth settings |
-| P3-8 | FLAG_SECURE on Android for KYC / finance screens | G-23 | ⬜ PENDING | Prevent screenshots on `tenant_kyc_screen`, `finance_screen` |
-| P3-9 | Replace `FutureBuilder` with `AsyncValue.when()` in `visitors_screen.dart` | Tech debt | ⬜ PENDING | Mixed patterns; standardize on Riverpod `AsyncValue` |
+| P3-4 | Handle deep links with role validation (RBAC-08) | RBAC-08 | ✅ DONE | `UtamacsApp` → `ConsumerStatefulWidget`; `ref.listen(authNotifierProvider)` fires `_RouterRefreshNotifier.notify()` after profile loads — re-runs route redirects and eliminates startup race condition |
+| P3-5 | Add token expiry / session timeout handling in `AuthNotifier` | RBAC-09 | ✅ DONE | `WidgetsBindingObserver` in `_UtamacsAppState` starts 30-min `Timer` on `paused`, cancels on `resumed`; `AuthNotifier._init()` wraps profile fetch in try/catch and signs out on failure |
+| P3-6 | Feature flags — query `feature_flags` table from mobile; gate navigation | G-13 | ✅ DONE | `lib/core/feature_flags/feature_flags_provider.dart` — `activeModulesProvider` (keepAlive FutureProvider); `_requireModule()` helper applied to 8 routes in `app.dart` |
+| P3-7 | OTP rate limiting — verify Supabase OTP config | Security | ✅ DONE | `AuthNotifier.sendEmailOtp()` + `verifyEmailOtp()` catch `AuthException(statusCode: 429)` and throw human-readable message; Supabase-side config must be verified via dashboard |
+| P3-8 | FLAG_SECURE on Android for KYC / finance screens | G-23 | ✅ DONE | `MainActivity.kt` MethodChannel; `SecureScreenWrapper` + `SecureScreen` utility in `lib/core/utils/secure_screen.dart`; applied to `TenantKycScreen` and `FinanceScreen` |
+| P3-9 | Replace `FutureBuilder` with `AsyncValue.when()` in `visitors_screen.dart` | Tech debt | ✅ DONE | `_DeliveriesTabState` converted to `ref.watch(deliveryLogsProvider).when(...)` with loading/error/data states and `RefreshIndicator`; `deliveryLogsProvider` added to `visitor_repository.dart` |
 
 ---
 

@@ -9,6 +9,7 @@ import 'core/design/ds_icons.dart';
 import 'core/design/ds_tokens.dart';
 import 'core/design/ds_theme.dart';
 import 'core/design/ds_typography_scale.dart';
+import 'core/feature_flags/feature_flags_provider.dart';
 import 'core/preferences/app_preferences.dart';
 import 'features/auth/domain/auth_notifier.dart';
 import 'features/agm/data/agm_repository.dart' show AgmSession;
@@ -64,22 +65,14 @@ import 'features/visitors/presentation/screens/visitor_pass_screen.dart';
 import 'features/visitors/presentation/screens/visitors_screen.dart';
 import 'features/water_tankers/presentation/screens/water_tankers_screen.dart';
 
-// ─── Auth change notifier ─────────────────────────────────────────────────────
+// ─── Router refresh notifier ──────────────────────────────────────────────────
 
-class _AuthNotifier extends ChangeNotifier {
-  late final StreamSubscription<AuthState> _sub;
-  _AuthNotifier() {
-    _sub = Supabase.instance.client.auth.onAuthStateChange
-        .listen((_) => notifyListeners());
-  }
-  @override
-  void dispose() {
-    _sub.cancel();
-    super.dispose();
-  }
+// Notified on Supabase auth-state changes AND on profile-load completion so
+// GoRouter re-evaluates per-route role redirects after the profile is fetched
+// at startup (fixes the deep-link role check race condition — P3-4).
+class _RouterRefreshNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
 }
-
-final _authNotifier = _AuthNotifier();
 
 // ─── Route guard helpers ──────────────────────────────────────────────────────
 
@@ -107,12 +100,22 @@ String? _requireAdmin(BuildContext ctx, GoRouterState state) {
   return null;
 }
 
+// Returns '/' if the module is explicitly disabled in feature_flags.
+// When the flags haven't loaded yet (null), allows through — optimistic default.
+String? _requireModule(BuildContext ctx, String moduleKey) {
+  final flags = ProviderScope.containerOf(ctx, listen: false)
+      .read(activeModulesProvider)
+      .valueOrNull;
+  if (flags != null && !flags.contains(moduleKey)) return '/';
+  return null;
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
-GoRouter _buildRouter() {
+GoRouter _buildRouter(Listenable refreshListenable) {
   return GoRouter(
     initialLocation: '/',
-    refreshListenable: _authNotifier,
+    refreshListenable: refreshListenable,
     redirect: (context, state) {
       final session = Supabase.instance.client.auth.currentSession;
       final isLoggedIn = session != null;
@@ -140,6 +143,7 @@ GoRouter _buildRouter() {
           ),
           GoRoute(
             path: '/visitors',
+            redirect: (ctx, state) => _requireModule(ctx, 'visitor_mgmt'),
             builder: (ctx, _) => const VisitorsScreen(),
             routes: [
               GoRoute(path: 'pre-approve', builder: (ctx, _) => const PreApproveScreen()),
@@ -220,7 +224,8 @@ GoRouter _buildRouter() {
           GoRoute(path: '/water-tankers',       builder: (ctx, _) => const WaterTankersScreen()),
           GoRoute(
             path: '/vendors',
-            redirect: _requireExec,
+            redirect: (ctx, state) =>
+                _requireExec(ctx, state) ?? _requireModule(ctx, 'vendors'),
             builder: (ctx, _) => const VendorsScreen(),
           ),
           GoRoute(path: '/feedback',            builder: (ctx, _) => const FeedbackScreen()),
@@ -237,7 +242,8 @@ GoRouter _buildRouter() {
           ),
           GoRoute(
             path: '/security-patrol',
-            redirect: _requireGuard,
+            redirect: (ctx, state) =>
+                _requireGuard(ctx, state) ?? _requireModule(ctx, 'security_patrol'),
             builder: (ctx, _) => const SecurityPatrolScreen(),
           ),
           // Governance
@@ -245,35 +251,41 @@ GoRouter _buildRouter() {
           GoRoute(path: '/register',            builder: (ctx, _) => const RegisterScreen()),
           GoRoute(
             path: '/agm',
-            redirect: _requireExec,
+            redirect: (ctx, state) =>
+                _requireExec(ctx, state) ?? _requireModule(ctx, 'agm'),
             builder: (ctx, _) => const AgmScreen(),
             routes: [
               GoRoute(
                 path: 'detail',
-                redirect: _requireExec,
+                redirect: (ctx, state) =>
+                    _requireExec(ctx, state) ?? _requireModule(ctx, 'agm'),
                 builder: (ctx, s) => AgmDetailScreen(session: s.extra! as AgmSession),
               ),
             ],
           ),
           GoRoute(
             path: '/tenant-kyc',
-            redirect: _requireExec,
+            redirect: (ctx, state) =>
+                _requireExec(ctx, state) ?? _requireModule(ctx, 'tenant_kyc'),
             builder: (ctx, _) => const TenantKycScreen(),
           ),
           // Management — exec/admin only
           GoRoute(
             path: '/hoto',
-            redirect: _requireExec,
+            redirect: (ctx, state) =>
+                _requireExec(ctx, state) ?? _requireModule(ctx, 'hoto'),
             builder: (ctx, _) => const HotoScreen(),
           ),
           GoRoute(
             path: '/letters',
-            redirect: _requireExec,
+            redirect: (ctx, state) =>
+                _requireExec(ctx, state) ?? _requireModule(ctx, 'letters'),
             builder: (ctx, _) => const LettersScreen(),
           ),
           GoRoute(
             path: '/analytics',
-            redirect: _requireExec,
+            redirect: (ctx, state) =>
+                _requireExec(ctx, state) ?? _requireModule(ctx, 'analytics'),
             builder: (ctx, _) => const AnalyticsScreen(),
           ),
           GoRoute(
@@ -288,21 +300,69 @@ GoRouter _buildRouter() {
   );
 }
 
-final _router = _buildRouter();
-
 // ─── App Root ─────────────────────────────────────────────────────────────────
 
-class UtamacsApp extends ConsumerWidget {
+class UtamacsApp extends ConsumerStatefulWidget {
   const UtamacsApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UtamacsApp> createState() => _UtamacsAppState();
+}
+
+class _UtamacsAppState extends ConsumerState<UtamacsApp>
+    with WidgetsBindingObserver {
+  late final GoRouter _router;
+  final _routerRefresh = _RouterRefreshNotifier();
+  Timer? _backgroundTimer;
+
+  // Auto-logout after 30 minutes in the background (P3-5)
+  static const _sessionTimeoutDuration = Duration(minutes: 30);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _router = _buildRouter(_routerRefresh);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _backgroundTimer?.cancel();
+    _routerRefresh.dispose();
+    _router.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState lifecycleState) {
+    switch (lifecycleState) {
+      case AppLifecycleState.paused:
+        // Start countdown when app moves to background
+        _backgroundTimer ??= Timer(_sessionTimeoutDuration, () {
+          if (mounted) ref.read(authNotifierProvider.notifier).signOut();
+        });
+      case AppLifecycleState.resumed:
+        // User returned — cancel the timer
+        _backgroundTimer?.cancel();
+        _backgroundTimer = null;
+      default:
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Re-run GoRouter redirects on every auth state change — including when
+    // profile finishes loading after startup, which fixes the deep-link role
+    // check race condition (RBAC-08 / P3-4).
+    ref.listen(authNotifierProvider, (_, __) => _routerRefresh.notify());
+
     final prefsAsync = ref.watch(appPreferencesProvider);
     final themeMode  = ref.watch(themeModeProvider);
     final scale      = ref.watch(textScaleProvider);
     final isDark     = ref.watch(isDarkModeProvider);
 
-    // Set system UI overlay to match theme
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness:
@@ -324,7 +384,6 @@ class UtamacsApp extends ConsumerWidget {
         themeMode:  themeMode,
         routerConfig: _router,
         debugShowCheckedModeBanner: false,
-        // Apply text scale globally — all Text widgets in the app scale automatically
         builder: (context, child) {
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(

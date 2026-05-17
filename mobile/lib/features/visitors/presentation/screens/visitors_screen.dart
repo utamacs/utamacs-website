@@ -412,73 +412,95 @@ class _DeliveriesTabState extends ConsumerState<_DeliveriesTab>
   @override
   bool get wantKeepAlive => true;
 
+  Widget _logDeliveryCTA(bool isDark, BuildContext context) {
+    return DSScalePress(
+      onTap: () async {
+        final uri = Uri.parse(
+            'https://portal.utamacs.org/portal/visitors?tab=deliveries');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(dsSpace4),
+        decoration: BoxDecoration(
+          color: isDark
+              ? dsColorIndigo600.withValues(alpha: 0.12)
+              : dsColorIndigo50,
+          borderRadius: BorderRadius.circular(dsRadiusCard),
+          border: Border.all(
+            color: isDark
+                ? dsColorIndigo600.withValues(alpha: 0.3)
+                : dsColorIndigo100,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.local_shipping_outlined,
+              color: isDark ? dsColorIndigo400 : dsColorIndigo600,
+              size: context.si(22),
+            ),
+            const SizedBox(width: dsSpace3),
+            Expanded(
+              child: Text(
+                'Log a new delivery — tap to open portal',
+                style: GoogleFonts.inter(
+                  fontSize: context.sp(13),
+                  color: isDark ? dsColorIndigo400 : dsColorIndigo600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Icon(Icons.open_in_new_rounded,
+                color: isDark ? dsColorIndigo400 : dsColorIndigo600,
+                size: context.si(14)),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final isDark = widget.isDark;
+    final deliveriesAsync = ref.watch(deliveryLogsProvider);
     final bottomPad = 80 + MediaQuery.paddingOf(context).bottom;
+    final listPad = EdgeInsets.fromLTRB(
+        dsSpace4, dsSpace4, dsSpace4, bottomPad.toDouble());
 
-    return FutureBuilder<List<VisitorLog>>(
-      future: ref
-          .read(visitorRepositoryProvider)
-          .fetchAllLogs(visitorType: 'delivery'),
-      builder: (context, snap) {
-        final deliveries = snap.data ?? [];
-        return ListView(
-          padding: EdgeInsets.fromLTRB(
-              dsSpace4, dsSpace4, dsSpace4, bottomPad.toDouble()),
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(deliveryLogsProvider),
+      child: deliveriesAsync.when(
+        loading: () => ListView(
+          padding: listPad,
           children: [
-            // Log delivery CTA
-            DSScalePress(
-              onTap: () async {
-                final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/visitors?tab=deliveries');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.all(dsSpace4),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? dsColorIndigo600.withValues(alpha: 0.12)
-                      : dsColorIndigo50,
-                  borderRadius: BorderRadius.circular(dsRadiusCard),
-                  border: Border.all(
-                    color: isDark
-                        ? dsColorIndigo600.withValues(alpha: 0.3)
-                        : dsColorIndigo100,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.local_shipping_outlined,
-                      color: isDark ? dsColorIndigo400 : dsColorIndigo600,
-                      size: context.si(22),
-                    ),
-                    const SizedBox(width: dsSpace3),
-                    Expanded(
-                      child: Text(
-                        'Log a new delivery — tap to open portal',
-                        style: GoogleFonts.inter(
-                          fontSize: context.sp(13),
-                          color: isDark ? dsColorIndigo400 : dsColorIndigo600,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Icon(Icons.open_in_new_rounded,
-                        color: isDark ? dsColorIndigo400 : dsColorIndigo600,
-                        size: context.si(14)),
-                  ],
-                ),
-              ),
-            ),
+            _logDeliveryCTA(isDark, context),
             const SizedBox(height: dsSpace4),
-            if (snap.connectionState == ConnectionState.waiting)
-              const Center(child: CircularProgressIndicator())
-            else if (deliveries.isEmpty)
+            const Center(child: CircularProgressIndicator()),
+          ],
+        ),
+        error: (e, _) => ListView(
+          padding: listPad,
+          children: [
+            _logDeliveryCTA(isDark, context),
+            const SizedBox(height: dsSpace4),
+            DsEmptyPlaceholder(
+              icon: Icons.error_outline_rounded,
+              title: 'Could not load deliveries',
+              message: e.toString(),
+              actionLabel: 'Retry',
+              onAction: () => ref.invalidate(deliveryLogsProvider),
+            ),
+          ],
+        ),
+        data: (deliveries) => ListView(
+          padding: listPad,
+          children: [
+            _logDeliveryCTA(isDark, context),
+            const SizedBox(height: dsSpace4),
+            if (deliveries.isEmpty)
               DsEmptyPlaceholder(
                 icon: Icons.local_shipping_outlined,
                 title: 'No deliveries recorded',
@@ -489,13 +511,12 @@ class _DeliveriesTabState extends ConsumerState<_DeliveriesTab>
                     padding: const EdgeInsets.only(bottom: dsSpace2),
                     child: DSFadeSlide(
                       delay: Duration(milliseconds: entry.key * 30),
-                      child: _LogCard(
-                          log: entry.value, isDark: isDark),
+                      child: _LogCard(log: entry.value, isDark: isDark),
                     ),
                   )),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }

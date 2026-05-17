@@ -7,6 +7,7 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/secure_screen.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/tenant_kyc_repository.dart';
 
@@ -34,7 +35,8 @@ class TenantKycScreen extends ConsumerWidget {
       ],
     );
 
-    return DefaultTabController(
+    return SecureScreenWrapper(
+      child: DefaultTabController(
       length: 2,
       child: Scaffold(
         backgroundColor: isDark ? dsDarkBackground : dsBackground,
@@ -85,7 +87,8 @@ class TenantKycScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
+    ),   // DefaultTabController
+    );   // SecureScreenWrapper
   }
 }
 
