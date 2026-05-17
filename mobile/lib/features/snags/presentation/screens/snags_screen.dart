@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/snag_repository.dart';
 import 'report_snag_screen.dart';
 import 'snag_detail_screen.dart';
@@ -35,6 +37,9 @@ class _SnagsScreenState extends ConsumerState<SnagsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+
     return Scaffold(
       backgroundColor: kBgWarm,
       appBar: AppBar(
@@ -42,6 +47,19 @@ class _SnagsScreenState extends ConsumerState<SnagsScreen>
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (isExec)
+            IconButton(
+              icon: const Icon(Icons.download_outlined),
+              tooltip: 'Export CSV',
+              onPressed: () async {
+                final uri = Uri.parse(
+                    'https://portal.utamacs.org/portal/snags?export=csv');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri,
+                      mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
