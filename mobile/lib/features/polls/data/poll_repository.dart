@@ -212,6 +212,7 @@ class PollRepository {
     String resultVisibility = 'after_vote',
     int? maxChoices,
     List<String> options = const [],
+    String? agmSessionId,
   }) async {
     // Insert poll
     final pollData = await _client
@@ -229,6 +230,7 @@ class PollRepository {
           if (pollType == 'multiple_choice' && maxChoices != null)
             'max_choices': maxChoices,
           'is_published': true,
+          if (agmSessionId != null) 'agm_session_id': agmSessionId,
         })
         .select()
         .single();

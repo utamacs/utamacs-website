@@ -15,6 +15,9 @@ class CommunityScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final postsAsync = ref.watch(communityPostsProvider);
+    final currentLimit = ref.watch(communityLimitProvider);
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -23,9 +26,28 @@ class CommunityScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (isExec)
+            IconButton(
+              tooltip: 'Moderation Queue',
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => _ModerationSheet(
+                  onChanged: () {
+                    ref.invalidate(communityPostsProvider);
+                    ref.invalidate(moderationQueueProvider);
+                  },
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(communityPostsProvider),
+            onPressed: () {
+              ref.read(communityLimitProvider.notifier).state = 30;
+              ref.invalidate(communityPostsProvider);
+            },
           ),
         ],
       ),
@@ -61,13 +83,40 @@ class CommunityScreen extends ConsumerWidget {
               subtitle: 'Be the first to share something with the community.',
             );
           }
+          final hasMore = posts.length >= currentLimit;
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(communityPostsProvider),
-            child: ListView.separated(
+            onRefresh: () async {
+              ref.read(communityLimitProvider.notifier).state = 30;
+              ref.invalidate(communityPostsProvider);
+            },
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-              itemCount: posts.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) => _PostCard(post: posts[i]),
+              children: [
+                ...posts.map((post) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _PostCard(post: post),
+                    )),
+                if (hasMore)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Center(
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.expand_more, size: 18),
+                        label: Text(
+                          'Load more',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        onPressed: () {
+                          ref.read(communityLimitProvider.notifier).state =
+                              currentLimit + 10;
+                        },
+                      ),
+                    ),
+                  ),
+              ],
             ),
           );
         },
@@ -756,6 +805,239 @@ class _ReportPostModalState extends ConsumerState<_ReportPostModal> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Moderation sheet (exec only)
+// ---------------------------------------------------------------------------
+
+class _ModerationSheet extends ConsumerWidget {
+  final VoidCallback onChanged;
+  const _ModerationSheet({required this.onChanged});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final queueAsync = ref.watch(moderationQueueProvider);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 4),
+              child: Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: kBorderLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+              child: Row(
+                children: [
+                  Text(
+                    'Moderation Queue',
+                    style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: kRed600,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                    color: kTextSecondary,
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Posts with 3 or more reports',
+                style: GoogleFonts.inter(
+                    fontSize: 13, color: kTextSecondary),
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: queueAsync.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(
+                  child: Text(e.toString(),
+                      style: GoogleFonts.inter(color: kRed600)),
+                ),
+                data: (items) {
+                  if (items.isEmpty) {
+                    return const EmptyState(
+                      icon: Icons.check_circle_outline,
+                      title: 'No flagged posts',
+                      subtitle:
+                          'Posts with 3+ reports will appear here.',
+                    );
+                  }
+                  return ListView.separated(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: 10),
+                    itemBuilder: (context, i) =>
+                        _ModerationCard(item: items[i], onChanged: () {
+                      ref.invalidate(moderationQueueProvider);
+                      onChanged();
+                    }),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ModerationCard extends ConsumerWidget {
+  final ReportedPost item;
+  final VoidCallback onChanged;
+  const _ModerationCard({required this.item, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${item.reportCount} report${item.reportCount != 1 ? 's' : ''}',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: kRed600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item.post.title,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (item.post.body != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              item.post.body!,
+              style:
+                  GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kTextSecondary,
+                    side: const BorderSide(color: kBorderLight),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                  onPressed: () async {
+                    try {
+                      await ref
+                          .read(communityRepositoryProvider)
+                          .clearPostReports(item.post.id);
+                      onChanged();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Failed: $e',
+                              style: GoogleFonts.inter()),
+                          backgroundColor: kRed600,
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                      }
+                    }
+                  },
+                  child: Text('Clear Reports',
+                      style: GoogleFonts.inter(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kRed600,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                  onPressed: () async {
+                    try {
+                      await ref
+                          .read(communityRepositoryProvider)
+                          .hidePost(item.post.id);
+                      onChanged();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Failed: $e',
+                              style: GoogleFonts.inter()),
+                          backgroundColor: kRed600,
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                      }
+                    }
+                  },
+                  child: Text('Remove Post',
+                      style: GoogleFonts.inter(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

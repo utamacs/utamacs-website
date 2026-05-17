@@ -161,6 +161,44 @@ class CommunityRepository {
     });
   }
 
+  Future<List<ReportedPost>> fetchModerationQueue() async {
+    final reportsData = await _client
+        .from('post_reports')
+        .select('post_id')
+        .order('post_id');
+
+    final Map<String, int> counts = {};
+    for (final r in (reportsData as List)) {
+      final pid = r['post_id'] as String;
+      counts[pid] = (counts[pid] ?? 0) + 1;
+    }
+    final flaggedIds =
+        counts.entries.where((e) => e.value >= 3).map((e) => e.key).toList();
+    if (flaggedIds.isEmpty) return [];
+
+    final posts = await _client
+        .from('community_posts')
+        .select()
+        .inFilter('id', flaggedIds);
+    final result = (posts as List).map((p) {
+      final post = CommunityPost.fromJson(p);
+      return ReportedPost(post: post, reportCount: counts[post.id] ?? 0);
+    }).toList();
+    result.sort((a, b) => b.reportCount.compareTo(a.reportCount));
+    return result;
+  }
+
+  Future<void> clearPostReports(String postId) async {
+    await _client.from('post_reports').delete().eq('post_id', postId);
+  }
+
+  Future<void> hidePost(String postId) async {
+    await _client
+        .from('community_posts')
+        .update({'is_published': false})
+        .eq('id', postId);
+  }
+
   /// Toggles a reaction: inserts if not present, deletes if already present.
   Future<void> toggleReaction(String postId, String reactionType) async {
     final uid = _client.auth.currentUser?.id;
@@ -195,6 +233,16 @@ class CommunityRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Support models
+// ---------------------------------------------------------------------------
+
+class ReportedPost {
+  final CommunityPost post;
+  final int reportCount;
+  const ReportedPost({required this.post, required this.reportCount});
+}
+
+// ---------------------------------------------------------------------------
 // Providers
 // ---------------------------------------------------------------------------
 
@@ -202,7 +250,15 @@ final communityRepositoryProvider = Provider<CommunityRepository>(
   (ref) => CommunityRepository(),
 );
 
+final communityLimitProvider = StateProvider<int>((ref) => 30);
+
 final communityPostsProvider =
     FutureProvider.autoDispose<List<CommunityPost>>((ref) {
-  return ref.read(communityRepositoryProvider).fetchPosts();
+  final limit = ref.watch(communityLimitProvider);
+  return ref.read(communityRepositoryProvider).fetchPosts(limit: limit);
+});
+
+final moderationQueueProvider =
+    FutureProvider.autoDispose<List<ReportedPost>>((ref) {
+  return ref.read(communityRepositoryProvider).fetchModerationQueue();
 });
