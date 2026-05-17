@@ -9,14 +9,14 @@
 
 | Module | Total | Done | Remaining |
 |--------|-------|------|-----------|
-| 01 Notices | 9 | 3 | 6 |
+| 01 Notices | 9 | 4 | 5 |
 | 02 Visitors | 14 | 0 | 14 |
 | 03 Complaints | 13 | 7 | 6 |
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 6 | 3 |
 | 06 Polls | 9 | 7 | 2 |
 | 07 Community Board | 11 | 6 | 5 |
-| 08 Documents | 11 | 2 | 9 |
+| 08 Documents | 11 | 5 | 6 |
 | 09 Gallery | 5 | 2 | 3 |
 | 10 Facilities | 6 | 1 | 5 |
 | 11 Parking | 12 | 6 | 6 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 3 | 3 |
-| **TOTAL** | **234** | **87** | **147** |
+| **TOTAL** | **234** | **91** | **143** |
 
 ---
 
@@ -45,7 +45,7 @@
 
 - [x] 🔴 Acknowledge notice — button + modal, writes `notice_acknowledgements` with timestamp
 - [x] 🔴 Acknowledgement tracking panel (exec) — total / acknowledged / pending count per notice
-- [ ] 🟠 Scheduled notices tab — list scheduled notices with countdown + "Publish now" button
+- [x] 🟠 Scheduled notices tab — list scheduled notices with countdown + "Publish now" button
 - [x] 🟠 Create notice form — title, category, audience (all/owners/tenants), target blocks/wings, body HTML, is_pinned, requires_acknowledgement, scheduled_at, draft mode
 - [ ] 🟠 Attachment viewer — tap to open/download PDF or image via signed URL
 - [ ] 🟠 Target audience & wing/block field on create form
@@ -160,9 +160,9 @@
 - [ ] 🟡 Version history drawer — all versions with download links + change notes
 - [ ] 🟡 Upload new version + change notes (auto-increments version number)
 - [x] 🟡 10-category filter tabs (Bylaws, Minutes, Financial, Legal, Circulars, Governance, HOTO, Maintenance, Forms, Other)
-- [ ] 🟡 Access control badge (`requires_role` member/executive, `is_public` indicator)
-- [ ] 🟢 MIME type icons (PDF=red, Word=blue, Excel=green, CSV, Image)
-- [ ] 🟢 File size and upload date displayed on card
+- [x] 🟡 Access control badge (`requires_role` member/executive, `is_public` indicator)
+- [x] 🟢 MIME type icons (PDF=red, Word=blue, Excel=green, CSV, Image)
+- [x] 🟢 File size and upload date displayed on card
 - [ ] 🟢 Archive document (exec)
 - [ ] 🟢 Download audit log entry (exec downloads logged in `audit_logs`)
 
