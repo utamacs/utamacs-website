@@ -76,4 +76,23 @@ class AuthNotifier extends _$AuthNotifier {
     await repo.signOut();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
+
+  Future<void> updateProfile({
+    String? fullName,
+    String? bio,
+    String? whatsappNumber,
+    String? preferredLanguage,
+    Map<String, dynamic>? emergencyContact,
+  }) async {
+    final updatedProfile = await ref.read(authRepositoryProvider).updateProfile(
+          fullName: fullName,
+          bio: bio,
+          whatsappNumber: whatsappNumber,
+          preferredLanguage: preferredLanguage,
+          emergencyContact: emergencyContact,
+        );
+    if (updatedProfile != null) {
+      state = state.copyWith(profile: updatedProfile);
+    }
+  }
 }

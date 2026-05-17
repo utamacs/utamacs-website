@@ -11,8 +11,11 @@ class Notice {
   final String? category;
   final String? attachmentKey;
   final bool isPinned;
+  final bool requiresAcknowledgement;
   final DateTime publishedAt;
   final DateTime? expiresAt;
+  final DateTime? scheduledAt;
+  final String status;
 
   const Notice({
     required this.id,
@@ -21,8 +24,11 @@ class Notice {
     this.category,
     this.attachmentKey,
     this.isPinned = false,
+    this.requiresAcknowledgement = false,
     required this.publishedAt,
     this.expiresAt,
+    this.scheduledAt,
+    this.status = 'published',
   });
 
   factory Notice.fromJson(Map<String, dynamic> j) => Notice(
@@ -30,12 +36,20 @@ class Notice {
         title: j['title'] as String,
         body: j['body'] as String?,
         category: j['category'] as String?,
-        attachmentKey: j['attachment_key'] as String?,
+        attachmentKey: j['attachment_storage_key'] as String?,
         isPinned: j['is_pinned'] as bool? ?? false,
-        publishedAt: DateTime.parse(j['published_at'] as String),
+        requiresAcknowledgement:
+            j['requires_acknowledgement'] as bool? ?? false,
+        publishedAt: j['published_at'] != null
+            ? DateTime.parse(j['published_at'] as String)
+            : DateTime.now(),
         expiresAt: j['expires_at'] != null
             ? DateTime.parse(j['expires_at'] as String)
             : null,
+        scheduledAt: j['scheduled_at'] != null
+            ? DateTime.parse(j['scheduled_at'] as String)
+            : null,
+        status: j['status'] as String? ?? 'published',
       );
 }
 
@@ -57,8 +71,48 @@ class NoticeRepository {
         .limit(limit);
     return (data as List).map((e) => Notice.fromJson(e)).toList();
   }
+
+  Future<Notice> createNotice({
+    required String title,
+    required String category,
+    required String targetAudience,
+    String? body,
+    bool isPinned = false,
+    bool requiresAcknowledgement = false,
+    String status = 'published',
+    DateTime? scheduledAt,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final data = await _client.from('notices').insert({
+      'society_id': env.societyId,
+      'title': title.trim(),
+      'category': category,
+      'target_audience': targetAudience,
+      if (body != null && body.trim().isNotEmpty) 'body': body.trim(),
+      'is_pinned': isPinned,
+      'requires_acknowledgement': requiresAcknowledgement,
+      'status': scheduledAt != null ? 'scheduled' : status,
+      if (scheduledAt != null) 'scheduled_at': scheduledAt.toIso8601String(),
+      'created_by': uid,
+    }).select().single();
+    return Notice.fromJson(data);
+  }
+
+  Future<int> fetchAcknowledgementCount(String noticeId) async {
+    final data = await _client
+        .from('notice_acknowledgements')
+        .select('user_id')
+        .eq('notice_id', noticeId);
+    return (data as List).length;
+  }
 }
 
 @riverpod
 Future<List<Notice>> notices(NoticesRef ref) =>
     ref.watch(noticeRepositoryProvider).fetchNotices();
+
+final noticeAcknowledgementCountProvider =
+    FutureProvider.autoDispose.family<int, String>((ref, noticeId) {
+  return ref.read(noticeRepositoryProvider).fetchAcknowledgementCount(noticeId);
+});
