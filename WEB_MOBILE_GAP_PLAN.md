@@ -13,19 +13,19 @@
 | 02 Visitors | 14 | 0 | 14 |
 | 03 Complaints | 13 | 7 | 6 |
 | 04 Finance | 12 | 0 | 12 |
-| 05 Events | 9 | 5 | 4 |
-| 06 Polls | 9 | 5 | 4 |
-| 07 Community Board | 11 | 5 | 6 |
+| 05 Events | 9 | 6 | 3 |
+| 06 Polls | 9 | 7 | 2 |
+| 07 Community Board | 11 | 6 | 5 |
 | 08 Documents | 11 | 2 | 9 |
-| 09 Gallery | 5 | 1 | 4 |
+| 09 Gallery | 5 | 2 | 3 |
 | 10 Facilities | 6 | 1 | 5 |
-| 11 Parking | 12 | 3 | 9 |
+| 11 Parking | 12 | 6 | 6 |
 | 12 Maids | 9 | 4 | 5 |
 | 13 Members | 8 | 3 | 5 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 7 | 1 |
-| 16 Water Tankers | 11 | 5 | 6 |
-| 17 Snags | 11 | 4 | 7 |
+| 16 Water Tankers | 11 | 8 | 3 |
+| 17 Snags | 11 | 5 | 6 |
 | 18 HOTO | 8 | 2 | 6 |
 | 19 Analytics | 8 | 1 | 7 |
 | 20 Security Patrol | 6 | 1 | 5 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 3 | 3 |
-| **TOTAL** | **234** | **74** | **160** |
+| **TOTAL** | **234** | **87** | **147** |
 
 ---
 
@@ -50,7 +50,7 @@
 - [ ] 🟠 Attachment viewer — tap to open/download PDF or image via signed URL
 - [ ] 🟠 Target audience & wing/block field on create form
 - [ ] 🟡 Video URL field + embedded player in notice detail
-- [ ] 🟢 Full category colour-coding (Urgent=red, Financial=amber, Governance=blue, Maintenance=orange, Events=purple, General=grey)
+- [x] 🟢 Full category colour-coding (Urgent=red, Financial=amber, Governance=blue, Maintenance=orange, Events=purple, General=grey)
 
 ---
 
@@ -113,7 +113,7 @@
 - [x] 🔴 Capacity management — spots-left counter, capacity progress bar, auto-waitlist when full
 - [ ] 🟠 Waitlist auto-promotion when a spot opens + push notification to next in queue
 - [ ] 🟠 Banner image — display in list and detail; upload (exec)
-- [ ] 🟠 Attendee list — name, unit, guest count, check-in status (exec-only)
+- [x] 🟠 Attendee list — name, unit, guest count, check-in status (exec-only)
 - [x] 🟠 Create event form — title, category (8 types), capacity, start/end datetime, location, description, registration_deadline, ticket_price
 - [ ] 🟡 Guest count selection (1–5 attendees) in RSVP modal
 - [x] 🟡 Registration deadline enforcement (disable RSVP after deadline)
@@ -130,8 +130,8 @@
 - [x] 🟡 Multi-choice limit enforcement (`max_choices` 2–20, disable submit if over limit)
 - [x] 🟡 Close poll early button (exec) with confirmation dialog
 - [ ] 🟡 PDF export of results (exec) — signed PDF with society letterhead
-- [ ] 🟡 Anonymous voting — display layer hides voter identity
-- [ ] 🟡 Result visibility modes fully enforced: `after_vote` / `after_close` / `executive_only`
+- [x] 🟡 Anonymous voting — display layer hides voter identity
+- [x] 🟡 Result visibility modes fully enforced: `after_vote` / `after_close` / `executive_only`
 - [ ] 🟢 AGM session linkage on poll create
 
 ---
@@ -143,7 +143,7 @@
 - [ ] 🟠 Image uploads in create post — up to 5 images, JPEG/PNG/WebP/HEIC, signed URL via GitHub Docs
 - [x] 🟡 Edit post modal (owner-only) — title + body
 - [x] 🟡 Delete / soft-delete post (owner or exec)
-- [ ] 🟡 Pin / unpin post (exec) with pinned visual indicator
+- [x] 🟡 Pin / unpin post (exec) with pinned visual indicator
 - [ ] 🟡 Report post modal — reason (spam / offensive / misinformation / harassment / other) + optional details (max 300 chars)
 - [ ] 🟡 Moderation queue — 3 reports hides post; exec can clear or remove
 - [x] 🟡 Category filter chips (General / Help / Lost & Found / Recommendation / Alert)
@@ -173,7 +173,7 @@
 - [x] 🟠 Create album modal (exec) — title, description, event_date
 - [ ] 🟠 Upload photos to album — multi-file picker (exec), progress indicator
 - [ ] 🟡 Album cover image displayed in grid (currently placeholder colour only)
-- [ ] 🟡 Album description and event_date shown in detail view
+- [x] 🟡 Album description and event_date shown in detail view
 - [ ] 🟢 Photo captions in lightbox view
 
 ---
@@ -197,9 +197,9 @@
 - [ ] 🟠 Slot type / vehicle type filter dropdowns
 - [ ] 🟠 Insurance document upload + expiry date tracking
 - [ ] 🟠 RC document upload at allocation
-- [ ] 🟡 Vehicle details — make, model, colour on allocation card
-- [ ] 🟡 Monthly charge (`₹X/month`) displayed on allocation card
-- [ ] 🟡 Allocation expiry date (`expires_at`) displayed
+- [x] 🟡 Vehicle details — make, model, colour on allocation card
+- [x] 🟡 Monthly charge (`₹X/month`) displayed on allocation card
+- [x] 🟡 Allocation expiry date (`expires_at`) displayed
 - [ ] 🟢 Allocation history (past allocations list)
 - [ ] 🟢 Allocate / release slot (exec)
 - [ ] 🟢 Add new slot (exec)
@@ -262,13 +262,13 @@
 - [x] 🔴 Cost alert banner — threshold warnings from `/api/v1/water-tankers/cost-alert`
 - [ ] 🟠 12-month trend chart — bar chart with KL delivered + cost per month
 - [ ] 🟠 Month picker filter (input type=month to select viewing period)
-- [ ] 🟡 Payment mode badge (Cash / UPI / Bank Transfer / Credit)
+- [x] 🟡 Payment mode badge (Cash / UPI / Bank Transfer / Credit)
 - [x] 🟡 Invoice number displayed on delivery card
 - [x] 🟡 Notes field displayed on delivery card
 - [x] 🟡 Cost-per-KL displayed
-- [ ] 🟢 Year-to-date KL stat card
+- [x] 🟢 Year-to-date KL stat card
 - [ ] 🟢 CSV export (exec)
-- [ ] 🟢 Total monthly spend stat card
+- [x] 🟢 Total monthly spend stat card
 
 ---
 
@@ -279,7 +279,7 @@
 - [x] 🔴 Reopen workflow — VERIFIED_CLOSED → REOPENED with mandatory reason text
 - [ ] 🟠 Photo management — upload (multi-file), lightbox view, delete, before/after comparison
 - [ ] 🟠 Document uploads — PDF/DOC/CSV up to 50 MB with description
-- [ ] 🟠 Comments thread — view + add comments on snag
+- [x] 🟠 Comments thread — view + add comments on snag
 - [ ] 🟡 Create vendor work order from snag (linked WO with deadline + quoted amount)
 - [ ] 🟡 Assignee field — assign to committee member (exec/secretary/president)
 - [ ] 🟡 HOTO item linkage — view linked HOTO item; HOTO blocked until snag verified

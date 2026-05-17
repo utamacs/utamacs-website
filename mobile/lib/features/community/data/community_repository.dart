@@ -138,6 +138,13 @@ class CommunityRepository {
         .eq('id', postId);
   }
 
+  Future<void> pinPost(String postId, {required bool pin}) async {
+    await _client
+        .from('community_posts')
+        .update({'is_pinned': pin})
+        .eq('id', postId);
+  }
+
   /// Toggles a reaction: inserts if not present, deletes if already present.
   Future<void> toggleReaction(String postId, String reactionType) async {
     final uid = _client.auth.currentUser?.id;

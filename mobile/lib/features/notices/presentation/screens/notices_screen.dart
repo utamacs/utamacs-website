@@ -93,6 +93,15 @@ class _NoticeCard extends StatelessWidget {
   final Notice notice;
   const _NoticeCard({required this.notice});
 
+  static Color _categoryColor(String? cat) => switch (cat?.toLowerCase()) {
+        'urgent' => kRed600,
+        'financial' => Color(0xFFD97706),
+        'governance' => kPrimary600,
+        'maintenance' => Color(0xFFEA580C),
+        'events' => Color(0xFF7C3AED),
+        _ => kTextSecondary,
+      };
+
   @override
   Widget build(BuildContext context) {
     return AppCard(
@@ -130,10 +139,10 @@ class _NoticeCard extends StatelessWidget {
                     if (notice.category != null) ...[
                       Text(
                         notice.category!.toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: kPrimary600,
+                          color: _categoryColor(notice.category),
                           letterSpacing: 0.8,
                         ),
                       ),

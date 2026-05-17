@@ -144,6 +144,25 @@ class _PostCard extends ConsumerWidget {
     );
   }
 
+  Future<void> _togglePin(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(communityRepositoryProvider)
+          .pinPost(post.id, pin: !post.isPinned);
+      ref.invalidate(communityPostsProvider);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e', style: GoogleFonts.inter()),
+            backgroundColor: kRed600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final myId = ref.watch(authNotifierProvider).profile?.id;
@@ -152,6 +171,7 @@ class _PostCard extends ConsumerWidget {
     final isOwner = myId == post.authorId;
     final canEdit = isOwner;
     final canDelete = isOwner || isExec;
+    final canPin = isExec;
 
     return AppCard(
       child: Column(
@@ -173,7 +193,7 @@ class _PostCard extends ConsumerWidget {
                     .bodySmall
                     ?.copyWith(color: kTextSecondary),
               ),
-              if (canEdit || canDelete) ...[
+              if (canEdit || canDelete || canPin) ...[
                 const SizedBox(width: 4),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert,
@@ -181,8 +201,29 @@ class _PostCard extends ConsumerWidget {
                   onSelected: (v) {
                     if (v == 'edit') _showEditModal(context, ref);
                     if (v == 'delete') _confirmDelete(context, ref);
+                    if (v == 'pin') _togglePin(context, ref);
                   },
                   itemBuilder: (_) => [
+                    if (canPin)
+                      PopupMenuItem(
+                        value: 'pin',
+                        child: Row(
+                          children: [
+                            Icon(
+                              post.isPinned
+                                  ? Icons.push_pin_outlined
+                                  : Icons.push_pin,
+                              size: 16,
+                              color: kAccent500,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              post.isPinned ? 'Unpin Post' : 'Pin Post',
+                              style: GoogleFonts.inter(fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
                     if (canEdit)
                       PopupMenuItem(
                         value: 'edit',
