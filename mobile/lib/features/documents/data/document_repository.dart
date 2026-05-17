@@ -18,6 +18,7 @@ class SocietyDocument {
   final int version;
   final bool isPublic;
   final String requiresRole;
+  final bool isArchived;
   final DateTime createdAt;
 
   const SocietyDocument({
@@ -32,6 +33,7 @@ class SocietyDocument {
     required this.version,
     required this.isPublic,
     required this.requiresRole,
+    required this.isArchived,
     required this.createdAt,
   });
 
@@ -47,6 +49,7 @@ class SocietyDocument {
         version: j['version'] as int? ?? 1,
         isPublic: j['is_public'] as bool? ?? false,
         requiresRole: j['requires_role'] as String? ?? 'member',
+        isArchived: j['is_archived'] as bool? ?? false,
         createdAt: DateTime.parse(j['created_at'] as String),
       );
 
@@ -65,11 +68,20 @@ class DocumentRepository {
         .from('documents')
         .select()
         .eq('society_id', env.societyId)
+        .eq('is_archived', false)
         .or('is_public.eq.true,requires_role.eq.member')
         .order('category', ascending: true)
         .order('title', ascending: true)
         .limit(100);
     return (data as List).map((e) => SocietyDocument.fromJson(e)).toList();
+  }
+
+  Future<void> archiveDocument(String documentId) async {
+    await _client
+        .from('documents')
+        .update({'is_archived': true})
+        .eq('id', documentId)
+        .eq('society_id', env.societyId);
   }
 }
 

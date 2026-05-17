@@ -55,6 +55,51 @@ class StaffMember {
 }
 
 // ---------------------------------------------------------------------------
+// Staff task model
+// ---------------------------------------------------------------------------
+
+class StaffTask {
+  final String id;
+  final String assignedTo;
+  final String title;
+  final String? description;
+  final DateTime dueDate;
+  final String status;
+  final String priority;
+  final DateTime? completedAt;
+  final DateTime createdAt;
+
+  const StaffTask({
+    required this.id,
+    required this.assignedTo,
+    required this.title,
+    this.description,
+    required this.dueDate,
+    required this.status,
+    required this.priority,
+    this.completedAt,
+    required this.createdAt,
+  });
+
+  bool get isOverdue =>
+      status != 'completed' && dueDate.isBefore(DateTime.now());
+
+  factory StaffTask.fromJson(Map<String, dynamic> j) => StaffTask(
+        id: j['id'] as String,
+        assignedTo: j['assigned_to'] as String,
+        title: j['title'] as String,
+        description: j['description'] as String?,
+        dueDate: DateTime.parse(j['due_date'] as String),
+        status: j['status'] as String,
+        priority: j['priority'] as String,
+        completedAt: j['completed_at'] != null
+            ? DateTime.parse(j['completed_at'] as String)
+            : null,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
+}
+
+// ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
 
@@ -73,6 +118,43 @@ class StaffRepository {
 
     return (data as List).map((e) => StaffMember.fromJson(e)).toList();
   }
+
+  Future<List<StaffTask>> fetchTasks({int limit = 50}) async {
+    final data = await _client
+        .from('staff_task_assignments')
+        .select()
+        .eq('society_id', env.societyId)
+        .inFilter('status', ['pending', 'in_progress', 'overdue'])
+        .order('due_date', ascending: true)
+        .order('priority', ascending: false)
+        .limit(limit);
+    return (data as List).map((e) => StaffTask.fromJson(e)).toList();
+  }
+
+  Future<StaffTask> createTask({
+    required String assignedTo,
+    required String title,
+    String? description,
+    required DateTime dueDate,
+    required String priority,
+  }) async {
+    final uid = _client.auth.currentUser!.id;
+    final data = await _client
+        .from('staff_task_assignments')
+        .insert({
+          'society_id': env.societyId,
+          'assigned_to': assignedTo,
+          'assigned_by': uid,
+          'title': title,
+          if (description != null && description.trim().isNotEmpty)
+            'description': description.trim(),
+          'due_date': dueDate.toIso8601String().substring(0, 10),
+          'priority': priority,
+        })
+        .select()
+        .single();
+    return StaffTask.fromJson(data);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -86,4 +168,9 @@ final staffRepositoryProvider = Provider<StaffRepository>(
 final activeStaffProvider =
     FutureProvider.autoDispose<List<StaffMember>>((ref) {
   return ref.read(staffRepositoryProvider).fetchActiveStaff();
+});
+
+final staffTasksProvider =
+    FutureProvider.autoDispose<List<StaffTask>>((ref) {
+  return ref.read(staffRepositoryProvider).fetchTasks();
 });

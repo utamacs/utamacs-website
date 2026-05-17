@@ -13,6 +13,10 @@ class Vendor {
   final String? contactPerson;
   final String? phone;
   final String? email;
+  final String? gstin;
+  final String? pan;
+  final String? bankIfsc;
+  final DateTime? contractEnd;
   final bool isActive;
   final DateTime createdAt;
 
@@ -23,6 +27,10 @@ class Vendor {
     this.contactPerson,
     this.phone,
     this.email,
+    this.gstin,
+    this.pan,
+    this.bankIfsc,
+    this.contractEnd,
     required this.isActive,
     required this.createdAt,
   });
@@ -34,6 +42,12 @@ class Vendor {
         contactPerson: j['contact_person'] as String?,
         phone: j['phone'] as String?,
         email: j['email'] as String?,
+        gstin: j['gstin'] as String?,
+        pan: j['pan'] as String?,
+        bankIfsc: j['bank_ifsc'] as String?,
+        contractEnd: j['contract_end'] != null
+            ? DateTime.tryParse(j['contract_end'] as String)
+            : null,
         isActive: j['is_active'] as bool? ?? true,
         createdAt: DateTime.parse(j['created_at'] as String),
       );
@@ -114,6 +128,47 @@ class VendorRepository {
         .order('created_at', ascending: false)
         .limit(limit);
     return (data as List).map((e) => WorkOrder.fromJson(e)).toList();
+  }
+
+  Future<WorkOrder> updateWorkOrderStatus(
+      String workOrderId, String newStatus) async {
+    final data = await _client
+        .from('work_orders')
+        .update({'status': newStatus})
+        .eq('id', workOrderId)
+        .eq('society_id', env.societyId)
+        .select()
+        .single();
+    return WorkOrder.fromJson(data);
+  }
+
+  Future<WorkOrder> createWorkOrder({
+    required String vendorId,
+    required String title,
+    String? description,
+    double? quotedAmount,
+    DateTime? deadline,
+    String? notes,
+  }) async {
+    final data = await _client
+        .from('work_orders')
+        .insert({
+          'society_id': env.societyId,
+          'vendor_id': vendorId,
+          'title': title,
+          if (description != null && description.trim().isNotEmpty)
+            'description': description.trim(),
+          if (quotedAmount != null) 'quoted_amount': quotedAmount,
+          if (deadline != null) 'deadline': deadline.toIso8601String(),
+          if (notes != null && notes.trim().isNotEmpty)
+            'notes': notes.trim(),
+          'status': 'issued',
+          'issued_at': DateTime.now().toIso8601String(),
+          'created_by': _client.auth.currentUser!.id,
+        })
+        .select()
+        .single();
+    return WorkOrder.fromJson(data);
   }
 }
 
