@@ -28,16 +28,16 @@
 | 17 Snags | 11 | 5 | 6 |
 | 18 HOTO | 8 | 2 | 6 |
 | 19 Analytics | 8 | 1 | 7 |
-| 20 Security Patrol | 6 | 2 | 4 |
+| 20 Security Patrol | 6 | 3 | 3 |
 | 21 Staff Management | 9 | 2 | 7 |
 | 22 Policies | 4 | 2 | 2 |
 | 23 Register / Membership | 6 | 2 | 4 |
-| 24 AGM | 5 | 1 | 4 |
-| 25 Tenant KYC | 5 | 1 | 4 |
+| 24 AGM | 5 | 3 | 2 |
+| 25 Tenant KYC | 5 | 4 | 1 |
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 3 | 3 |
-| **TOTAL** | **234** | **113** | **121** |
+| **TOTAL** | **234** | **119** | **115** |
 
 ---
 
@@ -318,7 +318,7 @@
 
 - [x] 🔴 Log patrol form — patrol_date, shift, guard_name, remarks, incident flag, incident_type, severity, location, description
 - [x] 🟠 Incident management — view open incidents list (exec)
-- [ ] 🟠 Guard attendance dashboard — days worked / absent / late over 7 / 30 / 60 / 90-day windows
+- [x] 🟠 Guard attendance dashboard — days worked / absent / late over 7 / 30 / 60 / 90-day windows
 - [ ] 🟡 Shift schedule — view and create shifts (exec)
 - [ ] 🟡 CSV export of patrol logs (exec)
 - [ ] 🟢 Open incident count badge on tab
@@ -363,8 +363,8 @@
 
 - [x] 🔴 AGM detail screen — resolutions list with votes_for / votes_against / votes_abstain / passed_at
 - [ ] 🟡 AGM document view and download (type badge, status, public indicator, file download)
-- [ ] 🟡 Create AGM session modal — year, type (annual/extraordinary), meeting_date, venue, notes
-- [ ] 🟡 Quorum tracking — update attendees_count, progress bar vs quorum_threshold
+- [x] 🟡 Create AGM session modal — year, type (annual/extraordinary), meeting_date, venue, notes
+- [x] 🟡 Quorum tracking — update attendees_count, progress bar vs quorum_threshold
 - [ ] 🟡 Document workflow display — draft → submitted → secondary-approved → approved/rejected with `is_public` flag
 
 ---
@@ -372,9 +372,9 @@
 ## 25 · TENANT KYC
 
 - [x] 🔴 Add tenant KYC form (exec/owner) — unit, full_name, tenancy_start/end, aadhaar_last4, monthly_rent, PAN, notes
-- [ ] 🟠 Police verification form — police_station, verification_date, reference#, "Mark Police Verified" button
-- [ ] 🟡 Owner consent toggle + date stamp
-- [ ] 🟡 Status transition buttons — Pending → Submitted → Police Verified → Completed
+- [x] 🟠 Police verification form — police_station, verification_date, reference#, "Mark Police Verified" button
+- [x] 🟡 Owner consent toggle + date stamp
+- [x] 🟡 Status transition buttons — Pending → Submitted → Police Verified → Completed
 - [ ] 🟡 As-Tenant tab — full implementation (tenant views own KYC record)
 
 ---

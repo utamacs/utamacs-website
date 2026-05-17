@@ -128,6 +128,36 @@ class AgmRepository {
         .order('resolution_no', ascending: true);
     return (data as List).map((e) => AgmResolution.fromJson(e)).toList();
   }
+
+  Future<AgmSession> createSession({
+    required int agmYear,
+    required String agmType,
+    required DateTime meetingDate,
+    String? venue,
+    String? notes,
+  }) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final data = await _client.from('agm_sessions').insert({
+      'society_id': env.societyId,
+      'agm_year': agmYear,
+      'agm_type': agmType,
+      'meeting_date': meetingDate.toIso8601String().substring(0, 10),
+      if (venue != null && venue.trim().isNotEmpty) 'venue': venue.trim(),
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      'status': 'scheduled',
+      'created_by': uid,
+    }).select().single();
+    return AgmSession.fromJson(data);
+  }
+
+  Future<void> updateAttendees(
+      String sessionId, int attendeesCount, bool quorumMet) async {
+    await _client.from('agm_sessions').update({
+      'attendees_count': attendeesCount,
+      'quorum_met': quorumMet,
+    }).eq('id', sessionId).eq('society_id', env.societyId);
+  }
 }
 
 // ---------------------------------------------------------------------------

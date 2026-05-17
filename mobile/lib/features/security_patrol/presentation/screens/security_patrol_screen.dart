@@ -18,7 +18,7 @@ class SecurityPatrolScreen extends ConsumerWidget {
 
     if (isExec) {
       return DefaultTabController(
-        length: 2,
+        length: 3,
         child: Scaffold(
           backgroundColor: kBgWarm,
           appBar: AppBar(
@@ -31,6 +31,7 @@ class SecurityPatrolScreen extends ConsumerWidget {
                 onPressed: () {
                   ref.invalidate(patrolLogsProvider);
                   ref.invalidate(incidentLogsProvider);
+                  ref.invalidate(guardSummariesProvider);
                 },
               ),
             ],
@@ -46,6 +47,7 @@ class SecurityPatrolScreen extends ConsumerWidget {
               tabs: const [
                 Tab(text: 'Patrol Logs'),
                 Tab(text: 'Incidents'),
+                Tab(text: 'Guards'),
               ],
             ),
           ),
@@ -53,6 +55,7 @@ class SecurityPatrolScreen extends ConsumerWidget {
             children: [
               _PatrolLogsTab(),
               _IncidentsTab(),
+              _GuardsTab(),
             ],
           ),
         ),
@@ -490,6 +493,168 @@ class _StatBox extends StatelessWidget {
           style: GoogleFonts.inter(fontSize: 12, color: labelColor),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Guards Tab (exec only)
+// ---------------------------------------------------------------------------
+
+class _GuardsTab extends ConsumerWidget {
+  const _GuardsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summariesAsync = ref.watch(guardSummariesProvider);
+
+    return summariesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load guard data',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(guardSummariesProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (summaries) {
+        if (summaries.isEmpty) {
+          return const EmptyState(
+            icon: Icons.security,
+            title: 'No guard records yet',
+            subtitle:
+                'Guard attendance summaries will appear once patrol logs are submitted.',
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(guardSummariesProvider),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text(
+                'Guard Attendance',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Based on all logged patrol shifts',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: kTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...summaries.map((s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _GuardSummaryCard(summary: s),
+                  )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GuardSummaryCard extends StatelessWidget {
+  final GuardAttendanceSummary summary;
+  const _GuardSummaryCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasIncidents = summary.incidentCount > 0;
+    final lastDate = summary.lastPatrolDate != null
+        ? DateFormat('d MMM yyyy').format(summary.lastPatrolDate!)
+        : '—';
+
+    return AppCard(
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: kPrimary100,
+            child: Text(
+              summary.guardName.isNotEmpty
+                  ? summary.guardName[0].toUpperCase()
+                  : '?',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: kPrimary600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  summary.guardName,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Last patrol: $lastDate',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: kTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${summary.totalShifts}',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary600,
+                ),
+              ),
+              Text(
+                'shifts',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: kTextSecondary,
+                ),
+              ),
+              if (hasIncidents) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${summary.incidentCount} incident${summary.incidentCount != 1 ? 's' : ''}',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: kRed600,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

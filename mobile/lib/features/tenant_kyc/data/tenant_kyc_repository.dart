@@ -96,6 +96,22 @@ class TenantKycRepository {
     if (data == null) return null;
     return TenantKyc.fromJson(data);
   }
+
+  Future<void> toggleOwnerConsent(String id, {required bool value}) async {
+    await _client
+        .from('tenant_kyc')
+        .update({'owner_consent': value})
+        .eq('id', id)
+        .eq('society_id', env.societyId);
+  }
+
+  Future<void> updateStatus(String id, {required String status}) async {
+    await _client
+        .from('tenant_kyc')
+        .update({'status': status})
+        .eq('id', id)
+        .eq('society_id', env.societyId);
+  }
 }
 
 // ---------------------------------------------------------------------------
