@@ -290,20 +290,40 @@ class _PolicyCardState extends State<_PolicyCard> {
                 ),
               ),
               if (policy.gatePortalAccess) ...[
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 const Icon(Icons.lock_outline, size: 13, color: kRed600),
-                const SizedBox(width: 4),
-                Text(
-                  'Portal access required',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: kRed600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
               ],
             ],
           ),
+
+          // gate_portal_access warning banner when not yet acknowledged
+          if (policy.gatePortalAccess && !widget.isAcked) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline, size: 14, color: kRed600),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Blocks portal access until acknowledged',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kRed600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           // Acknowledge button — only if required and not yet done
           if (policy.acknowledgementRequired && !widget.isAcked) ...[

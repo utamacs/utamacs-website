@@ -18,9 +18,9 @@
 | 07 Community Board | 11 | 7 | 4 |
 | 08 Documents | 11 | 5 | 6 |
 | 09 Gallery | 5 | 2 | 3 |
-| 10 Facilities | 6 | 3 | 3 |
+| 10 Facilities | 6 | 5 | 1 |
 | 11 Parking | 12 | 6 | 6 |
-| 12 Maids | 9 | 6 | 3 |
+| 12 Maids | 9 | 8 | 1 |
 | 13 Members | 8 | 3 | 5 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
@@ -30,14 +30,14 @@
 | 19 Analytics | 8 | 1 | 7 |
 | 20 Security Patrol | 6 | 2 | 4 |
 | 21 Staff Management | 9 | 2 | 7 |
-| 22 Policies | 4 | 1 | 3 |
-| 23 Register / Membership | 6 | 1 | 5 |
+| 22 Policies | 4 | 2 | 2 |
+| 23 Register / Membership | 6 | 2 | 4 |
 | 24 AGM | 5 | 1 | 4 |
 | 25 Tenant KYC | 5 | 1 | 4 |
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 3 | 3 |
-| **TOTAL** | **234** | **107** | **127** |
+| **TOTAL** | **234** | **113** | **121** |
 
 ---
 
@@ -183,9 +183,9 @@
 - [x] 🟠 Cancel booking — for pending / confirmed / waitlisted bookings, with optional reason input
 - [x] 🟡 Booking fee and deposit amount displayed before and on booking confirmation
 - [x] 🟡 Client-side advance booking validation (enforce `advance_booking_days` minimum)
-- [ ] 🟢 Advance booking window indicator ("Up to X days in advance")
+- [x] 🟢 Advance booking window indicator ("Up to X days in advance")
 - [ ] 🟢 No-show suspension warning (3 no-shows = account flagged)
-- [ ] 🟢 Deposit refund / credit details on cancellation
+- [x] 🟢 Deposit refund / credit details on cancellation
 
 ---
 
@@ -212,10 +212,10 @@
 - [x] 🔴 Monthly summary tab — days_present / total_working_days, attendance %, progress bar per helper
 - [x] 🔴 Register helper form (exec) — full_name, phone, work_type (8 options), agency, id_type (6 options), id_number, police_verified + verification_date
 - [x] 🟠 Find & Approve tab — browse all registered helpers, approve for own unit
-- [ ] 🟠 Attendance tab with date picker and attendance table
+- [x] 🟠 Attendance tab with date picker and attendance table
 - [x] 🟡 KYC expiry / renewal warnings (`kyc_expires_at`)
 - [x] 🟢 Agency name displayed on helper card
-- [ ] 🟢 Toggle helper active / inactive (exec)
+- [x] 🟢 Toggle helper active / inactive (exec)
 - [ ] 🟢 Photo display for registered helpers
 
 ---
@@ -344,7 +344,7 @@
 - [x] 🟠 Policy detail / full-content view — render HTML body, embed PDF iframe, YouTube/video player
 - [ ] 🟡 PDF upload / replace (exec) — max 20 MB via GitHub Docs
 - [ ] 🟡 Policy edit form (title, description, effective_date, version, gate_portal_access toggle)
-- [ ] 🟡 `gate_portal_access` indicator clearly surfaced on policy card ("Blocks portal access until acknowledged")
+- [x] 🟡 `gate_portal_access` indicator clearly surfaced on policy card ("Blocks portal access until acknowledged")
 
 ---
 
@@ -352,7 +352,7 @@
 
 - [x] 🔴 Public self-registration form — Step 1 (name / email / phone / occupancy_type), Step 2 (flat / move-in date / ID type+number / vehicle), Step 3 (DPDPA consent review + submit)
 - [ ] 🟡 Sale deed upload — PDF/JPG/PNG, max 10 MB (for membership application)
-- [ ] 🟡 Member type alignment — add: original_owner / purchaser / successor / heir / joint_owner_nominee (currently only resident_owner / investor_owner)
+- [x] 🟡 Member type alignment — add: original_owner / purchaser / successor / heir / joint_owner_nominee (currently only resident_owner / investor_owner)
 - [ ] 🟡 Membership status timeline — Application Submitted → Fee Confirmed → Approved → Share Cert Issued
 - [ ] 🟡 Joint owners names field
 - [ ] 🟢 Fee payment notice (₹1,000 admission + ₹1,000 share capital with direct-pay instructions)

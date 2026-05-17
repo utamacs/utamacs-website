@@ -19,7 +19,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  String _memberType = 'resident_owner';
+  String _memberType = 'original_owner';
   bool _submitting = false;
 
   @override
@@ -532,8 +532,24 @@ class _ApplicationForm extends StatelessWidget {
                   decoration: const InputDecoration(),
                   items: const [
                     DropdownMenuItem(
-                      value: 'resident_owner',
-                      child: Text('Resident Owner'),
+                      value: 'original_owner',
+                      child: Text('Original Owner'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'purchaser',
+                      child: Text('Purchaser (Resale)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'successor',
+                      child: Text('Successor / Nominee'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'heir',
+                      child: Text('Heir (Inheritance)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'joint_owner_nominee',
+                      child: Text('Joint Owner / Nominee'),
                     ),
                     DropdownMenuItem(
                       value: 'investor_owner',
