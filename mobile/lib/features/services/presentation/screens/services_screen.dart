@@ -125,7 +125,7 @@ class _ServiceTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             width: double.infinity,

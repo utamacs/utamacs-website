@@ -10,9 +10,37 @@ import '../../data/water_tanker_repository.dart';
 class WaterTankersScreen extends ConsumerWidget {
   const WaterTankersScreen({super.key});
 
+  Future<void> _pickMonth(BuildContext context, WidgetRef ref) async {
+    final now = DateTime.now();
+    final current = ref.read(selectedMonthProvider);
+    final initial = current ?? DateTime(now.year, now.month);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year - 3, 1),
+      lastDate: now,
+      helpText: 'Select Month',
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme:
+              Theme.of(context).colorScheme.copyWith(primary: kPrimary600),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    ref.read(selectedMonthProvider.notifier).state =
+        DateTime(picked.year, picked.month);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final deliveriesAsync = ref.watch(waterDeliveriesProvider);
+    final selectedMonth = ref.watch(selectedMonthProvider);
+    final monthLabel = selectedMonth != null
+        ? DateFormat('MMM yyyy').format(selectedMonth)
+        : null;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -21,6 +49,34 @@ class WaterTankersScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (selectedMonth != null)
+            TextButton(
+              onPressed: () =>
+                  ref.read(selectedMonthProvider.notifier).state = null,
+              child: Text('Clear',
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: kRed600, fontWeight: FontWeight.w500)),
+            ),
+          IconButton(
+            icon: Stack(
+              children: [
+                const Icon(Icons.calendar_month_outlined),
+                if (selectedMonth != null)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                          color: kPrimary600, shape: BoxShape.circle),
+                    ),
+                  ),
+              ],
+            ),
+            tooltip: 'Filter by month',
+            onPressed: () => _pickMonth(context, ref),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(waterDeliveriesProvider),
@@ -40,11 +96,14 @@ class WaterTankersScreen extends ConsumerWidget {
         ),
         data: (deliveries) {
           if (deliveries.isEmpty) {
-            return const EmptyState(
+            return EmptyState(
               icon: Icons.water_drop_outlined,
-              title: 'No water deliveries recorded',
-              subtitle:
-                  'Water tanker delivery records will appear here once added.',
+              title: monthLabel != null
+                  ? 'No deliveries in $monthLabel'
+                  : 'No water deliveries recorded',
+              subtitle: monthLabel != null
+                  ? 'No water tanker deliveries were logged for $monthLabel.'
+                  : 'Water tanker delivery records will appear here once added.',
             );
           }
           return RefreshIndicator(
@@ -56,7 +115,8 @@ class WaterTankersScreen extends ConsumerWidget {
                 if (i == 0) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 14),
-                    child: _SummaryCard(deliveries: deliveries),
+                    child: _SummaryCard(
+                        deliveries: deliveries, monthLabel: monthLabel),
                   );
                 }
                 return Padding(
@@ -78,26 +138,18 @@ class WaterTankersScreen extends ConsumerWidget {
 
 class _SummaryCard extends StatelessWidget {
   final List<WaterDelivery> deliveries;
-  const _SummaryCard({required this.deliveries});
+  final String? monthLabel;
+  const _SummaryCard({required this.deliveries, this.monthLabel});
 
   @override
   Widget build(BuildContext context) {
     final latest = deliveries.first;
-    final now = DateTime.now();
     final currencyFmt = NumberFormat('#,##0', 'en_IN');
 
-    final monthDeliveries = deliveries.where((d) =>
-        d.deliveryDate.year == now.year &&
-        d.deliveryDate.month == now.month);
-    final monthKl =
-        monthDeliveries.fold<double>(0, (s, d) => s + (d.totalKl ?? 0));
-    final monthCost =
-        monthDeliveries.fold<double>(0, (s, d) => s + (d.totalCost ?? 0));
-
-    final ytdDeliveries = deliveries
-        .where((d) => d.deliveryDate.year == now.year);
-    final ytdKl =
-        ytdDeliveries.fold<double>(0, (s, d) => s + (d.totalKl ?? 0));
+    final totalKl =
+        deliveries.fold<double>(0, (s, d) => s + (d.totalKl ?? 0));
+    final totalCost =
+        deliveries.fold<double>(0, (s, d) => s + (d.totalCost ?? 0));
 
     return AppCard(
       color: kPrimary600,
@@ -109,7 +161,9 @@ class _SummaryCard extends StatelessWidget {
               const Icon(Icons.water_drop, color: Colors.white, size: 20),
               const SizedBox(width: 8),
               Text(
-                'Water Summary',
+                monthLabel != null
+                    ? 'Summary — $monthLabel'
+                    : 'Water Summary',
                 style: GoogleFonts.poppins(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -123,16 +177,17 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _SummaryItem(
-                  label: 'Last Delivery',
+                  label: 'Latest Delivery',
                   value: latest.formattedDate,
                 ),
               ),
-              Container(width: 1, height: 40, color: Colors.white.withAlpha(77)),
+              Container(
+                  width: 1, height: 40, color: Colors.white.withAlpha(77)),
               Expanded(
                 child: _SummaryItem(
-                  label: 'This Month KL',
-                  value: monthKl > 0
-                      ? '${monthKl.toStringAsFixed(0)} KL'
+                  label: monthLabel != null ? 'Total KL' : 'Shown KL',
+                  value: totalKl > 0
+                      ? '${totalKl.toStringAsFixed(0)} KL'
                       : '—',
                 ),
               ),
@@ -145,19 +200,18 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _SummaryItem(
-                  label: 'Month Spend',
-                  value: monthCost > 0
-                      ? '₹${currencyFmt.format(monthCost)}'
+                  label: monthLabel != null ? 'Month Spend' : 'Shown Spend',
+                  value: totalCost > 0
+                      ? '₹${currencyFmt.format(totalCost)}'
                       : '—',
                 ),
               ),
-              Container(width: 1, height: 40, color: Colors.white.withAlpha(77)),
+              Container(
+                  width: 1, height: 40, color: Colors.white.withAlpha(77)),
               Expanded(
                 child: _SummaryItem(
-                  label: 'YTD KL',
-                  value: ytdKl > 0
-                      ? '${ytdKl.toStringAsFixed(0)} KL'
-                      : '—',
+                  label: 'Deliveries',
+                  value: '${deliveries.length}',
                 ),
               ),
             ],

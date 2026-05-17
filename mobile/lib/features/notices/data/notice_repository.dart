@@ -10,6 +10,7 @@ class Notice {
   final String? body;
   final String? category;
   final String? attachmentKey;
+  final String? videoUrl;
   final bool isPinned;
   final bool requiresAcknowledgement;
   final DateTime publishedAt;
@@ -23,6 +24,7 @@ class Notice {
     this.body,
     this.category,
     this.attachmentKey,
+    this.videoUrl,
     this.isPinned = false,
     this.requiresAcknowledgement = false,
     required this.publishedAt,
@@ -37,6 +39,7 @@ class Notice {
         body: j['body'] as String?,
         category: j['category'] as String?,
         attachmentKey: j['attachment_storage_key'] as String?,
+        videoUrl: j['video_url'] as String?,
         isPinned: j['is_pinned'] as bool? ?? false,
         requiresAcknowledgement:
             j['requires_acknowledgement'] as bool? ?? false,

@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/feedback_repository.dart';
 
 const _categories = [
@@ -94,6 +95,51 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
   @override
   Widget build(BuildContext context) {
     final feedbackAsync = ref.watch(myFeedbackProvider);
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
+
+    if (isExec) {
+      return DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          backgroundColor: kBgWarm,
+          appBar: AppBar(
+            title: const Text('Feedback'),
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  ref.invalidate(myFeedbackProvider);
+                  ref.invalidate(allFeedbackProvider);
+                },
+              ),
+            ],
+            bottom: TabBar(
+              labelStyle: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600, fontSize: 14),
+              unselectedLabelStyle: GoogleFonts.inter(
+                  fontWeight: FontWeight.w400, fontSize: 14),
+              labelColor: kPrimary600,
+              unselectedLabelColor: kTextSecondary,
+              indicatorColor: kPrimary600,
+              indicatorWeight: 2.5,
+              tabs: const [
+                Tab(text: 'My Feedback'),
+                Tab(text: 'All Feedback'),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              _buildContent(context, feedbackAsync),
+              const _AllFeedbackTab(),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -108,7 +154,12 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: _buildContent(context, feedbackAsync),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, AsyncValue<List<FeedbackItem>> feedbackAsync) {
+    return SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,7 +398,51 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
             const SizedBox(height: 32),
           ],
         ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// All Feedback Tab (exec only)
+// ---------------------------------------------------------------------------
+
+class _AllFeedbackTab extends ConsumerWidget {
+  const _AllFeedbackTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final allAsync = ref.watch(allFeedbackProvider);
+
+    return allAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load feedback',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(allFeedbackProvider),
+          child: const Text('Retry'),
+        ),
       ),
+      data: (items) {
+        if (items.isEmpty) {
+          return const EmptyState(
+            icon: Icons.feedback_outlined,
+            title: 'No feedback yet',
+            subtitle: 'No feedback submissions have been made.',
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(allFeedbackProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, i) =>
+                _FeedbackItemCard(item: items[i], showUnit: true),
+          ),
+        );
+      },
     );
   }
 }
@@ -358,7 +453,8 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
 
 class _FeedbackItemCard extends StatelessWidget {
   final FeedbackItem item;
-  const _FeedbackItemCard({required this.item});
+  final bool showUnit;
+  const _FeedbackItemCard({required this.item, this.showUnit = false});
 
   @override
   Widget build(BuildContext context) {
@@ -408,6 +504,20 @@ class _FeedbackItemCard extends StatelessWidget {
               ),
             ],
           ),
+          if (showUnit && !item.isAnonymous && item.unitId != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.home_outlined, size: 13, color: kTextSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  'Unit ${item.unitId}',
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: kTextSecondary),
+                ),
+              ],
+            ),
+          ],
           if (item.response != null) ...[
             const SizedBox(height: 10),
             Container(

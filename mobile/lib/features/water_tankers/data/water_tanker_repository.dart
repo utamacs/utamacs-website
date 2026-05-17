@@ -71,11 +71,26 @@ class WaterDelivery {
 class WaterTankerRepository {
   final _client = Supabase.instance.client;
 
-  Future<List<WaterDelivery>> fetchDeliveries({int limit = 30}) async {
-    final data = await _client
+  Future<List<WaterDelivery>> fetchDeliveries({
+    int limit = 30,
+    DateTime? month,
+  }) async {
+    var query = _client
         .from('water_tankers')
         .select()
-        .eq('society_id', env.societyId)
+        .eq('society_id', env.societyId);
+
+    if (month != null) {
+      final firstDay =
+          DateFormat('yyyy-MM-dd').format(DateTime(month.year, month.month, 1));
+      final lastDay = DateFormat('yyyy-MM-dd').format(
+          DateTime(month.year, month.month + 1, 0));
+      query = query
+          .gte('delivery_date', firstDay)
+          .lte('delivery_date', lastDay);
+    }
+
+    final data = await query
         .order('delivery_date', ascending: false)
         .limit(limit);
     return (data as List)
@@ -92,6 +107,12 @@ final waterTankerRepositoryProvider = Provider<WaterTankerRepository>(
   (ref) => WaterTankerRepository(),
 );
 
+final selectedMonthProvider = StateProvider<DateTime?>((ref) => null);
+
 final waterDeliveriesProvider =
-    FutureProvider.autoDispose<List<WaterDelivery>>((ref) =>
-        ref.read(waterTankerRepositoryProvider).fetchDeliveries());
+    FutureProvider.autoDispose<List<WaterDelivery>>((ref) {
+  final month = ref.watch(selectedMonthProvider);
+  return ref
+      .read(waterTankerRepositoryProvider)
+      .fetchDeliveries(month: month);
+});
