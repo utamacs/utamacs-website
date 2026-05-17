@@ -180,6 +180,21 @@ class _FacilityCard extends ConsumerWidget {
                       ),
                     ),
                   ],
+                  if (facility.advanceBookingDays != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.event_available_outlined,
+                            size: 12, color: kTextSecondary),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Up to ${facility.advanceBookingDays}d ahead',
+                          style: GoogleFonts.inter(
+                              fontSize: 10, color: kTextSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
                   const Spacer(),
                   SizedBox(
                     width: double.infinity,
@@ -280,7 +295,10 @@ class _MyBookingsTab extends ConsumerWidget {
               booking: bookings[i],
               facilityName: facilityMap[bookings[i].facilityId] ??
                   bookings[i].facilityId.substring(0, 8),
-              onCancel: () => _confirmCancel(context, ref, bookings[i].id),
+              onCancel: () => _confirmCancel(
+                context, ref, bookings[i].id,
+                depositPaid: bookings[i].depositPaid,
+              ),
             ),
           ),
         );
@@ -291,8 +309,9 @@ class _MyBookingsTab extends ConsumerWidget {
   Future<void> _confirmCancel(
     BuildContext context,
     WidgetRef ref,
-    String bookingId,
-  ) async {
+    String bookingId, {
+    double? depositPaid,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -305,9 +324,40 @@ class _MyBookingsTab extends ConsumerWidget {
             fontSize: 17,
           ),
         ),
-        content: Text(
-          'Are you sure you want to cancel this booking? This cannot be undone.',
-          style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to cancel this booking?',
+              style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
+            ),
+            if (depositPaid != null && depositPaid > 0) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 14, color: kAccent500),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Deposit of ₹${depositPaid.toStringAsFixed(0)} will be refunded per society policy.',
+                        style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF92400E)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(

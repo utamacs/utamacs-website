@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/supabase.dart' as env;
+import 'package:intl/intl.dart';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -52,6 +53,40 @@ class Maid {
         kycExpiresAt: j['kyc_expires_at'] != null
             ? DateTime.parse(j['kyc_expires_at'] as String)
             : null,
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Attendance Model
+// ---------------------------------------------------------------------------
+
+class MaidAttendance {
+  final String id;
+  final String maidId;
+  final DateTime attendanceDate;
+  final String? entryTime;
+  final String? exitTime;
+  final String? notes;
+  final DateTime createdAt;
+
+  const MaidAttendance({
+    required this.id,
+    required this.maidId,
+    required this.attendanceDate,
+    this.entryTime,
+    this.exitTime,
+    this.notes,
+    required this.createdAt,
+  });
+
+  factory MaidAttendance.fromJson(Map<String, dynamic> j) => MaidAttendance(
+        id: j['id'] as String,
+        maidId: j['maid_id'] as String,
+        attendanceDate: DateTime.parse(j['attendance_date'] as String),
+        entryTime: j['entry_time'] as String?,
+        exitTime: j['exit_time'] as String?,
+        notes: j['notes'] as String?,
+        createdAt: DateTime.parse(j['created_at'] as String),
       );
 }
 
@@ -165,6 +200,34 @@ class MaidRepository {
         .eq('maid_id', maidId)
         .eq('unit_id', myUnitId);
   }
+
+  Future<void> toggleMaidActive(String maidId, {required bool isActive}) async {
+    await _client
+        .from('maids')
+        .update({'is_active': isActive})
+        .eq('id', maidId)
+        .eq('society_id', env.societyId);
+  }
+
+  Future<List<MaidAttendance>> fetchAttendance({
+    required String maidId,
+    required DateTime month,
+  }) async {
+    final firstDay = DateFormat('yyyy-MM-dd').format(
+        DateTime(month.year, month.month, 1));
+    final lastDay = DateFormat('yyyy-MM-dd').format(
+        DateTime(month.year, month.month + 1, 0));
+    final data = await _client
+        .from('maid_attendance')
+        .select()
+        .eq('maid_id', maidId)
+        .gte('attendance_date', firstDay)
+        .lte('attendance_date', lastDay)
+        .order('attendance_date', ascending: false);
+    return (data as List)
+        .map((e) => MaidAttendance.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -184,3 +247,19 @@ final allMaidsProvider = FutureProvider.autoDispose<List<Maid>>((ref) =>
 final approvedMaidIdsProvider =
     FutureProvider.autoDispose<List<String>>((ref) =>
         ref.read(maidRepositoryProvider).fetchApprovedMaidIds());
+
+// Month filter for attendance tab
+final attendanceMonthProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month);
+});
+
+// Selected maid for attendance detail
+final selectedMaidForAttendanceProvider = StateProvider<Maid?>((ref) => null);
+
+final maidAttendanceProvider = FutureProvider.autoDispose
+    .family<List<MaidAttendance>, ({String maidId, DateTime month})>((ref, args) {
+  return ref
+      .read(maidRepositoryProvider)
+      .fetchAttendance(maidId: args.maidId, month: args.month);
+});

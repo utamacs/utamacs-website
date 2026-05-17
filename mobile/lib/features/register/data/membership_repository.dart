@@ -47,7 +47,7 @@ class Membership {
         unitId: j['unit_id'] as String,
         profileId: j['profile_id'] as String?,
         memberName: j['member_name'] as String,
-        memberType: j['member_type'] as String? ?? 'resident_owner',
+        memberType: j['member_type'] as String? ?? 'original_owner',
         status: j['status'] as String? ?? 'pending',
         admissionFeeAmount:
             (j['admission_fee_amount'] as num?)?.toDouble() ?? 1000.0,
