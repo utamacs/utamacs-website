@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/water_tanker_repository.dart';
 
 class WaterTankersScreen extends ConsumerWidget {
@@ -36,6 +38,8 @@ class WaterTankersScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final deliveriesAsync = ref.watch(waterDeliveriesProvider);
     final trendAsync = ref.watch(waterMonthlyTrendProvider);
     final selectedMonth = ref.watch(selectedMonthProvider);
@@ -50,6 +54,19 @@ class WaterTankersScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (isExec)
+            IconButton(
+              icon: const Icon(Icons.download_outlined),
+              tooltip: 'Export CSV',
+              onPressed: () async {
+                final uri = Uri.parse(
+                    'https://portal.utamacs.org/portal/water-tankers?export=csv');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri,
+                      mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
           if (selectedMonth != null)
             TextButton(
               onPressed: () =>

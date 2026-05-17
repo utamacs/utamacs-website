@@ -19,25 +19,25 @@
 | 08 Documents | 11 | 7 | 4 |
 | 09 Gallery | 5 | 3 | 2 |
 | 10 Facilities | 6 | 6 | 0 |
-| 11 Parking | 12 | 7 | 5 |
+| 11 Parking | 12 | 10 | 2 |
 | 12 Maids | 9 | 9 | 0 |
 | 13 Members | 8 | 5 | 3 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
-| 16 Water Tankers | 11 | 9 | 2 |
+| 16 Water Tankers | 11 | 10 | 1 |
 | 17 Snags | 11 | 8 | 3 |
 | 18 HOTO | 8 | 4 | 4 |
 | 19 Analytics | 8 | 3 | 5 |
-| 20 Security Patrol | 6 | 5 | 1 |
+| 20 Security Patrol | 6 | 6 | 0 |
 | 21 Staff Management | 9 | 6 | 3 |
 | 22 Policies | 4 | 3 | 1 |
 | 23 Register / Membership | 6 | 5 | 1 |
 | 24 AGM | 5 | 5 | 0 |
 | 25 Tenant KYC | 5 | 5 | 0 |
 | 26 Letters | 5 | 1 | 4 |
-| 27 Vendors & Work Orders | 9 | 6 | 3 |
+| 27 Vendors & Work Orders | 9 | 7 | 2 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **234** | **167** | **67** |
+| **TOTAL** | **234** | **173** | **61** |
 
 ---
 
@@ -194,15 +194,15 @@
 - [x] 🔴 Slot grid — colour-coded availability for all slots (slot_number, type, level, monthly_charge, occupied/free status)
 - [x] 🔴 Waitlist — join waitlist, view position in queue, withdraw
 - [x] 🔴 Transfer request — member requests slot transfer to another unit with reason
-- [ ] 🟠 Slot type / vehicle type filter dropdowns
+- [x] 🟠 Slot type / vehicle type filter dropdowns
 - [ ] 🟠 Insurance document upload + expiry date tracking
 - [ ] 🟠 RC document upload at allocation
 - [x] 🟡 Vehicle details — make, model, colour on allocation card
 - [x] 🟡 Monthly charge (`₹X/month`) displayed on allocation card
 - [x] 🟡 Allocation expiry date (`expires_at`) displayed
 - [x] 🟢 Allocation history (past allocations list)
-- [ ] 🟢 Allocate / release slot (exec)
-- [ ] 🟢 Add new slot (exec)
+- [x] 🟢 Allocate / release slot (exec)
+- [x] 🟢 Add new slot (exec)
 
 ---
 
@@ -267,7 +267,7 @@
 - [x] 🟡 Notes field displayed on delivery card
 - [x] 🟡 Cost-per-KL displayed
 - [x] 🟢 Year-to-date KL stat card
-- [ ] 🟢 CSV export (exec)
+- [x] 🟢 CSV export (exec)
 - [x] 🟢 Total monthly spend stat card
 
 ---
@@ -320,7 +320,7 @@
 - [x] 🟠 Incident management — view open incidents list (exec)
 - [x] 🟠 Guard attendance dashboard — days worked / absent / late over 7 / 30 / 60 / 90-day windows
 - [x] 🟡 Shift schedule — view and create shifts (exec)
-- [ ] 🟡 CSV export of patrol logs (exec)
+- [x] 🟡 CSV export of patrol logs (exec)
 - [x] 🟢 Open incident count badge on tab
 
 ---
@@ -396,7 +396,7 @@
 - [ ] 🔴 Procurement module — create requirement, vendor candidates, committee vote, select winner
 - [x] 🟠 Vendor contact details, GST#, PAN#, bank account in detail view
 - [x] 🟠 WO status workflow buttons — Mark In Progress → Inspect → Complete → Close / Dispute
-- [ ] 🟡 Licence expiry warnings for agency vendors (PSARA / PF / ESIC)
+- [x] 🟡 Licence expiry warnings for agency vendors (PSARA / PF / ESIC)
 - [x] 🟡 TDS management — flag >₹30k WOs, link TDS certificate to Finance module
 - [x] 🟡 Complaint / snag auto-link on WO creation and auto-resolve on WO close
 - [x] 🟡 Vendor rating after WO completion (1–5 stars + review)
