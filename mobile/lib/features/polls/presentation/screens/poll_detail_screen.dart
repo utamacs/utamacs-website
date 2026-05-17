@@ -4,6 +4,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/poll_repository.dart';
 
 class PollDetailScreen extends ConsumerStatefulWidget {
@@ -46,9 +47,10 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
     }
   }
 
-  bool _canSeeResults(PollWithDetails details) {
+  bool _canSeeResults(PollWithDetails details, {required bool isExec}) {
     final v = details.poll.resultVisibility;
     if (v == 'always') return true;
+    if (v == 'executive_only') return isExec;
     if (v == 'after_vote' && details.hasVoted) return true;
     if (v == 'after_close' && details.poll.isClosed) return true;
     return false;
@@ -57,6 +59,8 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final detailsAsync = ref.watch(pollDetailsProvider(widget.pollId));
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -79,7 +83,7 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
         ),
         data: (details) {
           final poll = details.poll;
-          final showResults = _canSeeResults(details);
+          final showResults = _canSeeResults(details, isExec: isExec);
           final canVote = poll.isActive && !details.hasVoted;
 
           return RefreshIndicator(

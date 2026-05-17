@@ -83,14 +83,21 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final latest = deliveries.first;
-
-    // Compute total KL delivered this calendar month
     final now = DateTime.now();
+    final currencyFmt = NumberFormat('#,##0', 'en_IN');
+
     final monthDeliveries = deliveries.where((d) =>
         d.deliveryDate.year == now.year &&
         d.deliveryDate.month == now.month);
-    final monthKl = monthDeliveries.fold<double>(
-        0, (sum, d) => sum + (d.totalKl ?? 0));
+    final monthKl =
+        monthDeliveries.fold<double>(0, (s, d) => s + (d.totalKl ?? 0));
+    final monthCost =
+        monthDeliveries.fold<double>(0, (s, d) => s + (d.totalCost ?? 0));
+
+    final ytdDeliveries = deliveries
+        .where((d) => d.deliveryDate.year == now.year);
+    final ytdKl =
+        ytdDeliveries.fold<double>(0, (s, d) => s + (d.totalKl ?? 0));
 
     return AppCard(
       color: kPrimary600,
@@ -120,16 +127,36 @@ class _SummaryCard extends StatelessWidget {
                   value: latest.formattedDate,
                 ),
               ),
-              Container(
-                width: 1,
-                height: 40,
-                color: Colors.white.withAlpha(77),
-              ),
+              Container(width: 1, height: 40, color: Colors.white.withAlpha(77)),
               Expanded(
                 child: _SummaryItem(
-                  label: 'This Month',
+                  label: 'This Month KL',
                   value: monthKl > 0
                       ? '${monthKl.toStringAsFixed(0)} KL'
+                      : '—',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(height: 1, color: Colors.white.withAlpha(51)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryItem(
+                  label: 'Month Spend',
+                  value: monthCost > 0
+                      ? '₹${currencyFmt.format(monthCost)}'
+                      : '—',
+                ),
+              ),
+              Container(width: 1, height: 40, color: Colors.white.withAlpha(77)),
+              Expanded(
+                child: _SummaryItem(
+                  label: 'YTD KL',
+                  value: ytdKl > 0
+                      ? '${ytdKl.toStringAsFixed(0)} KL'
                       : '—',
                 ),
               ),
