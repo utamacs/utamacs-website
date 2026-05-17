@@ -558,6 +558,182 @@ class _WorkOrderCardState extends ConsumerState<_WorkOrderCard> {
                 }).toList(),
               ),
           ],
+          // Vendor rating section — show on completed/closed WOs
+          if (['completed', 'closed'].contains(widget.workOrder.status)) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: kBorderLight),
+            const SizedBox(height: 8),
+            if (widget.workOrder.vendorRating != null)
+              Row(
+                children: [
+                  ...List.generate(5, (i) => Icon(
+                    i < widget.workOrder.vendorRating!
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    size: 16,
+                    color: kAccent500,
+                  )),
+                  const SizedBox(width: 8),
+                  Text(
+                    widget.workOrder.vendorReview ?? 'Rated ${widget.workOrder.vendorRating}/5',
+                    style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              )
+            else if (widget.isExec)
+              TextButton.icon(
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => _RateVendorSheet(
+                    workOrder: widget.workOrder,
+                    onRated: widget.onStatusChanged,
+                  ),
+                ),
+                icon: const Icon(Icons.star_outline_rounded, size: 15),
+                label: const Text('Rate Vendor'),
+                style: TextButton.styleFrom(
+                  foregroundColor: kAccent500,
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rate vendor bottom sheet
+// ---------------------------------------------------------------------------
+
+class _RateVendorSheet extends ConsumerStatefulWidget {
+  final WorkOrder workOrder;
+  final VoidCallback onRated;
+  const _RateVendorSheet({required this.workOrder, required this.onRated});
+
+  @override
+  ConsumerState<_RateVendorSheet> createState() => _RateVendorSheetState();
+}
+
+class _RateVendorSheetState extends ConsumerState<_RateVendorSheet> {
+  int _rating = 0;
+  final _reviewCtrl = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _reviewCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_rating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a star rating')),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await ref.read(vendorRepositoryProvider).submitVendorRating(
+            workOrderId: widget.workOrder.id,
+            rating: _rating,
+            review: _reviewCtrl.text.trim().isEmpty ? null : _reviewCtrl.text.trim(),
+          );
+      widget.onRated();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit rating: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        left: 24, right: 24, top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: kBorderLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text('Rate Vendor', style: GoogleFonts.poppins(
+            fontSize: 17, fontWeight: FontWeight.w700, color: kPrimary600)),
+          const SizedBox(height: 4),
+          Text(widget.workOrder.title, style: GoogleFonts.inter(
+            fontSize: 13, color: kTextSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(5, (i) => GestureDetector(
+              onTap: () => setState(() => _rating = i + 1),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Icon(
+                  i < _rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                  size: 40,
+                  color: kAccent500,
+                ),
+              ),
+            )),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _reviewCtrl,
+            maxLines: 3,
+            maxLength: 500,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              hintText: 'Write a review (optional)…',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+            style: GoogleFonts.inter(fontSize: 14),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submitting ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _submitting
+                  ? const SizedBox(width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Submit Rating'),
+            ),
+          ),
         ],
       ),
     );

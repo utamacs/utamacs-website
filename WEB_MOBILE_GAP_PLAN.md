@@ -26,18 +26,18 @@
 | 15 Feedback | 8 | 8 | 0 |
 | 16 Water Tankers | 11 | 8 | 3 |
 | 17 Snags | 11 | 7 | 4 |
-| 18 HOTO | 8 | 3 | 5 |
+| 18 HOTO | 8 | 4 | 4 |
 | 19 Analytics | 8 | 2 | 6 |
 | 20 Security Patrol | 6 | 5 | 1 |
-| 21 Staff Management | 9 | 3 | 6 |
+| 21 Staff Management | 9 | 4 | 5 |
 | 22 Policies | 4 | 3 | 1 |
 | 23 Register / Membership | 6 | 5 | 1 |
 | 24 AGM | 5 | 5 | 0 |
 | 25 Tenant KYC | 5 | 5 | 0 |
-| 26 Letters | 5 | 0 | 5 |
-| 27 Vendors & Work Orders | 9 | 3 | 6 |
-| 28 Profile & Auth | 6 | 4 | 2 |
-| **TOTAL** | **234** | **146** | **88** |
+| 26 Letters | 5 | 1 | 4 |
+| 27 Vendors & Work Orders | 9 | 4 | 5 |
+| 28 Profile & Auth | 6 | 6 | 0 |
+| **TOTAL** | **234** | **153** | **81** |
 
 ---
 
@@ -67,7 +67,7 @@
 - [ ] 🟠 Deliveries tab — log delivery form (courier, tracking#, flat), Mark Collected
 - [ ] 🟠 Visitor logs table with filters (type, gate, date range) and CSV export
 - [ ] 🟡 Frequent visitor shortcuts — pre-fill new pass from visit history
-- [ ] 🟢 Guard note displayed on pass screen
+- [x] 🟢 Guard note displayed on pass screen
 - [ ] 🟢 Vehicle number displayed on pass screen
 - [ ] 🟢 Recurring pass indicator on pass card
 
@@ -216,7 +216,7 @@
 - [x] 🟡 KYC expiry / renewal warnings (`kyc_expires_at`)
 - [x] 🟢 Agency name displayed on helper card
 - [x] 🟢 Toggle helper active / inactive (exec)
-- [ ] 🟢 Photo display for registered helpers
+- [x] 🟢 Photo display for registered helpers
 
 ---
 
@@ -282,7 +282,7 @@
 - [x] 🟠 Comments thread — view + add comments on snag
 - [ ] 🟡 Create vendor work order from snag (linked WO with deadline + quoted amount)
 - [x] 🟡 Assignee field — assign to committee member (exec/secretary/president)
-- [ ] 🟡 HOTO item linkage — view linked HOTO item; HOTO blocked until snag verified
+- [x] 🟡 HOTO item linkage — view linked HOTO item; HOTO blocked until snag verified
 - [ ] 🟡 CSV export with filters (status, severity, scope, category)
 - [x] 🟢 Builder reference fields (`builder_ref`, `builder_committed_date`)
 
@@ -291,7 +291,7 @@
 ## 18 · HOTO
 
 - [x] 🔴 HOTO item detail screen — full status workflow: NOT_STARTED → IN_PROGRESS → UNDER_REVIEW → PENDING_SECRETARY / PENDING_PRESIDENT → APPROVED / REJECTED → CLOSED
-- [ ] 🔴 Snag ↔ HOTO bidirectional linking (attach snag to HOTO item; block HOTO review if snag open)
+- [x] 🔴 Snag ↔ HOTO bidirectional linking (attach snag to HOTO item; block HOTO review if snag open)
 - [x] 🟠 Status transition buttons (advance / submit for review / approve / reject)
 - [ ] 🟠 Delegation management — assign authority to committee member
 - [ ] 🟠 Elections workflow screen
@@ -330,7 +330,7 @@
 - [x] 🔴 Staff directory screen — department-grouped list with role, status, contact, designation
 - [x] 🔴 KYC onboarding — photo upload, ID type/number, annual renewal tracking
 - [x] 🟠 Task creation and assignment — title, description, assigned_to, department, deadline, priority (HIGH/MEDIUM/LOW)
-- [ ] 🟠 Attendance marking and log view
+- [x] 🟠 Attendance marking and log view
 - [ ] 🟠 Shift scheduling — view and create shifts per department
 - [ ] 🟡 Hiring / exit proposals workflow (committee approval)
 - [ ] 🟡 Staff analytics — attendance %, compliance status, activity logs
@@ -384,7 +384,7 @@
 - [ ] 🔴 PDF generation and download (exec) — society letterhead, sequential reference#, secretary sign-off
 - [ ] 🟠 Template system — select template, fill variables (resident name / unit / date / amount), auto render, reference# auto-generation
 - [ ] 🟡 Secretary sign-off step before PDF issue
-- [ ] 🟡 Letter detail / full-content view on mobile
+- [x] 🟡 Letter detail / full-content view on mobile
 - [ ] 🟡 Cross-module linking — AGM notice → AGM session, demand notice → Finance due, RERA notice → Snag/HOTO item
 
 ---
@@ -399,7 +399,7 @@
 - [ ] 🟡 Licence expiry warnings for agency vendors (PSARA / PF / ESIC)
 - [ ] 🟡 TDS management — flag >₹30k WOs, link TDS certificate to Finance module
 - [ ] 🟡 Complaint / snag auto-link on WO creation and auto-resolve on WO close
-- [ ] 🟡 Vendor rating after WO completion (1–5 stars + review)
+- [x] 🟡 Vendor rating after WO completion (1–5 stars + review)
 
 ---
 
@@ -409,8 +409,8 @@
 - [ ] 🟠 Avatar upload — JPEG/PNG/WebP with upload progress; stored via GitHub Docs `avatar(profileId, ext)` path
 - [x] 🟡 Unit details view — building, floor, area_sqft, residency_type, move_in_date, num_occupants
 - [ ] 🟡 Password reset flow — forgot-password email → reset-password token screen
-- [ ] 🟢 NRI flag and occupant count display
-- [ ] 🟢 Consent version and date display (DPDPA)
+- [x] 🟢 NRI flag and occupant count display
+- [x] 🟢 Consent version and date display (DPDPA)
 
 ---
 

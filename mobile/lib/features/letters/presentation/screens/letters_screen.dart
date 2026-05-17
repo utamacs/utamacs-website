@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -117,9 +118,20 @@ class _LetterCard extends StatelessWidget {
   final GeneratedLetter letter;
   const _LetterCard({required this.letter});
 
+  void _openDetail(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _LetterDetailSheet(letter: letter),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return GestureDetector(
+      onTap: () => _openDetail(context),
+      child: AppCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -194,6 +206,148 @@ class _LetterCard extends StatelessWidget {
                     color: kTextSecondary,
                     fontWeight: FontWeight.w500,
                   ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Letter detail bottom sheet
+// ---------------------------------------------------------------------------
+
+class _LetterDetailSheet extends StatelessWidget {
+  final GeneratedLetter letter;
+  const _LetterDetailSheet({required this.letter});
+
+  Widget _row(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: kTextSecondary),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 90,
+            child: Text(label,
+                style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFormat = DateFormat('d MMM yyyy');
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 12,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: kBorderLight, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Icon(Icons.description_outlined, color: kPrimary600, size: 20),
+              const SizedBox(width: 10),
+              Text('Letter Details', style: GoogleFonts.poppins(
+                fontSize: 16, fontWeight: FontWeight.w700, color: kPrimary600)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () => Navigator.pop(context),
+                color: kTextSecondary,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: kBorderLight),
+          const SizedBox(height: 16),
+          Text(letter.title,
+              style: GoogleFonts.inter(
+                  fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
+          const SizedBox(height: 14),
+          if (letter.referenceNumber != null)
+            _row(Icons.tag, 'Ref. No.', letter.referenceNumber!),
+          if (letter.letterType != null)
+            _row(Icons.category_outlined, 'Type',
+                letter.letterType!.replaceAll('_', ' ')),
+          if (letter.status != null)
+            _row(Icons.info_outline, 'Status',
+                letter.status![0].toUpperCase() + letter.status!.substring(1)),
+          if (letter.recipient != null)
+            _row(Icons.person_outline, 'Recipient', letter.recipient!),
+          if (letter.subject != null)
+            _row(Icons.subject_outlined, 'Subject', letter.subject!),
+          _row(Icons.calendar_today_outlined, 'Created',
+              dateFormat.format(letter.letterDate ?? letter.createdAt)),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: kBorderLight),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.open_in_browser_outlined,
+                    size: 16, color: kAccent500),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Full content and PDF download are available in the resident portal.',
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: const Color(0xFF92400E), height: 1.4),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => launchUrl(
+                    Uri.parse('https://portal.utamacs.org/portal/letters'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: kPrimary600,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: GoogleFonts.inter(
+                        fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  child: const Text('Open'),
                 ),
               ],
             ),

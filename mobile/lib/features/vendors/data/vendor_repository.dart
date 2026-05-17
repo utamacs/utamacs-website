@@ -64,6 +64,8 @@ class WorkOrder {
   final double? quotedAmount;
   final double? finalAmount;
   final DateTime createdAt;
+  final int? vendorRating;
+  final String? vendorReview;
 
   const WorkOrder({
     required this.id,
@@ -76,6 +78,8 @@ class WorkOrder {
     this.quotedAmount,
     this.finalAmount,
     required this.createdAt,
+    this.vendorRating,
+    this.vendorReview,
   });
 
   factory WorkOrder.fromJson(Map<String, dynamic> j) => WorkOrder(
@@ -97,6 +101,8 @@ class WorkOrder {
             ? (j['final_amount'] as num).toDouble()
             : null,
         createdAt: DateTime.parse(j['created_at'] as String),
+        vendorRating: j['vendor_rating'] as int?,
+        vendorReview: j['vendor_review'] as String?,
       );
 }
 
@@ -135,6 +141,25 @@ class VendorRepository {
     final data = await _client
         .from('work_orders')
         .update({'status': newStatus})
+        .eq('id', workOrderId)
+        .eq('society_id', env.societyId)
+        .select()
+        .single();
+    return WorkOrder.fromJson(data);
+  }
+
+  Future<WorkOrder> submitVendorRating({
+    required String workOrderId,
+    required int rating,
+    String? review,
+  }) async {
+    final update = <String, dynamic>{'vendor_rating': rating};
+    if (review != null && review.trim().isNotEmpty) {
+      update['vendor_review'] = review.trim();
+    }
+    final data = await _client
+        .from('work_orders')
+        .update(update)
         .eq('id', workOrderId)
         .eq('society_id', env.societyId)
         .select()

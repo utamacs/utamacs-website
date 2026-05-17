@@ -112,6 +112,46 @@ class HotoRepository {
         .single();
     return HotoComment.fromJson(data);
   }
+
+  Future<List<LinkedSnagItem>> fetchLinkedSnags(String hotoItemId) async {
+    final data = await _client
+        .from('hoto_item_snag_links')
+        .select('snag_item_id, snag_items:snag_item_id(description, status, severity, category)')
+        .eq('hoto_item_id', hotoItemId)
+        .eq('society_id', env.societyId);
+    return (data as List).map((e) => LinkedSnagItem.fromJson(e)).toList();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Linked snag item model (for bidirectional HOTO ↔ Snag linking)
+// ---------------------------------------------------------------------------
+
+class LinkedSnagItem {
+  final String snagItemId;
+  final String description;
+  final String status;
+  final String severity;
+  final String category;
+
+  const LinkedSnagItem({
+    required this.snagItemId,
+    required this.description,
+    required this.status,
+    required this.severity,
+    required this.category,
+  });
+
+  factory LinkedSnagItem.fromJson(Map<String, dynamic> j) {
+    final snagMap = j['snag_items'] as Map<String, dynamic>?;
+    return LinkedSnagItem(
+      snagItemId: j['snag_item_id'] as String,
+      description: snagMap?['description'] as String? ?? 'Snag',
+      status: snagMap?['status'] as String? ?? 'unknown',
+      severity: snagMap?['severity'] as String? ?? 'low',
+      category: snagMap?['category'] as String? ?? 'other',
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -181,4 +221,10 @@ final hotoCommentsProvider =
     FutureProvider.autoDispose.family<List<HotoComment>, String>(
   (ref, itemId) =>
       ref.read(hotoRepositoryProvider).fetchComments(itemId),
+);
+
+final hotoLinkedSnagsProvider =
+    FutureProvider.autoDispose.family<List<LinkedSnagItem>, String>(
+  (ref, hotoItemId) =>
+      ref.read(hotoRepositoryProvider).fetchLinkedSnags(hotoItemId),
 );
