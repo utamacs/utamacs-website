@@ -228,6 +228,45 @@ class _AgmDetailScreenState extends ConsumerState<AgmDetailScreen> {
               );
             },
           ),
+
+          const SizedBox(height: 20),
+
+          // Documents section
+          Text(
+            'Documents',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: kPrimary600,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          ref.watch(agmDocumentsProvider(session.id)).when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => const SizedBox.shrink(),
+            data: (docs) {
+              if (docs.isEmpty) {
+                return const EmptyState(
+                  icon: Icons.folder_outlined,
+                  title: 'No documents uploaded',
+                  subtitle: 'Meeting documents will appear here once uploaded.',
+                );
+              }
+              return Column(
+                children: docs
+                    .map((d) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _DocumentCard(doc: d),
+                        ))
+                    .toList(),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -256,6 +295,141 @@ class _InfoRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Document card
+// ---------------------------------------------------------------------------
+
+class _DocumentCard extends StatelessWidget {
+  final AgmDocument doc;
+  const _DocumentCard({required this.doc});
+
+  Color _typeColor(String type) {
+    return switch (type) {
+      'minutes' => kPrimary600,
+      'financial_statement' => const Color(0xFF065F46),
+      'audit_report' => const Color(0xFF92400E),
+      'resolution' => kSecondary500,
+      'notice' => kAccent500,
+      _ => kTextSecondary,
+    };
+  }
+
+  Color _statusColor(String status) => switch (status) {
+        'approved' => kSecondary500,
+        'rejected' => kRed600,
+        'submitted' => kAccent500,
+        _ => kTextSecondary,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final typeColor = _typeColor(doc.documentType);
+    final statusColor = _statusColor(doc.status);
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: typeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  doc.typeLabel,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: typeColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (doc.isPublic)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: kSecondary500.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Public',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: kSecondary500,
+                    ),
+                  ),
+                ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  doc.status.replaceAll('_', ' ').toUpperCase(),
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            doc.title,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: kTextPrimary,
+            ),
+          ),
+          if (doc.description != null && doc.description!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              doc.description!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: kTextSecondary,
+              ),
+            ),
+          ],
+          if (doc.fileName != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.attach_file, size: 14, color: kTextSecondary),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    doc.fileName!,
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: kTextSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

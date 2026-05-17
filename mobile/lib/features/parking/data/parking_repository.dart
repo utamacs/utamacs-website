@@ -83,6 +83,21 @@ class ParkingRepository {
     if (data == null) return null;
     return ParkingAllocation.fromJson(data);
   }
+
+  Future<List<ParkingAllocation>> fetchMyAllocationHistory() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return [];
+    final data = await _client
+        .from('parking_allocations')
+        .select(
+            '*, parking_slots(slot_number, slot_type, vehicle_type, level, monthly_charge)')
+        .eq('user_id', uid)
+        .eq('society_id', env.societyId)
+        .inFilter('status', ['released', 'suspended'])
+        .order('created_at', ascending: false)
+        .limit(10);
+    return (data as List).map((e) => ParkingAllocation.fromJson(e)).toList();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -96,3 +111,7 @@ final parkingRepositoryProvider = Provider<ParkingRepository>(
 final myParkingProvider =
     FutureProvider.autoDispose<ParkingAllocation?>((ref) =>
         ref.read(parkingRepositoryProvider).fetchMyAllocation());
+
+final myParkingHistoryProvider =
+    FutureProvider.autoDispose<List<ParkingAllocation>>((ref) =>
+        ref.read(parkingRepositoryProvider).fetchMyAllocationHistory());

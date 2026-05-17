@@ -19,25 +19,25 @@
 | 08 Documents | 11 | 5 | 6 |
 | 09 Gallery | 5 | 2 | 3 |
 | 10 Facilities | 6 | 5 | 1 |
-| 11 Parking | 12 | 6 | 6 |
+| 11 Parking | 12 | 7 | 5 |
 | 12 Maids | 9 | 8 | 1 |
-| 13 Members | 8 | 3 | 5 |
+| 13 Members | 8 | 4 | 4 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
 | 16 Water Tankers | 11 | 8 | 3 |
 | 17 Snags | 11 | 5 | 6 |
 | 18 HOTO | 8 | 2 | 6 |
 | 19 Analytics | 8 | 1 | 7 |
-| 20 Security Patrol | 6 | 3 | 3 |
+| 20 Security Patrol | 6 | 4 | 2 |
 | 21 Staff Management | 9 | 2 | 7 |
 | 22 Policies | 4 | 2 | 2 |
 | 23 Register / Membership | 6 | 5 | 1 |
-| 24 AGM | 5 | 3 | 2 |
+| 24 AGM | 5 | 5 | 0 |
 | 25 Tenant KYC | 5 | 5 | 0 |
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 4 | 2 |
-| **TOTAL** | **234** | **127** | **107** |
+| **TOTAL** | **234** | **132** | **102** |
 
 ---
 
@@ -200,7 +200,7 @@
 - [x] 🟡 Vehicle details — make, model, colour on allocation card
 - [x] 🟡 Monthly charge (`₹X/month`) displayed on allocation card
 - [x] 🟡 Allocation expiry date (`expires_at`) displayed
-- [ ] 🟢 Allocation history (past allocations list)
+- [x] 🟢 Allocation history (past allocations list)
 - [ ] 🟢 Allocate / release slot (exec)
 - [ ] 🟢 Add new slot (exec)
 
@@ -227,7 +227,7 @@
 - [x] 🟠 Occupancy filter — owner_occupied / tenant_occupied / vacant / under_renovation
 - [x] 🟡 Role badge on member card (member / executive / secretary / president)
 - [x] 🟡 Move-in date ("Member since MMM YYYY") on profile
-- [ ] 🟡 Vehicle details section (reg_no, make, model) in own profile
+- [x] 🟡 Vehicle details section (reg_no, make, model) in own profile
 - [ ] 🟢 Tenancy expiry filter ("Expiring in 30 days")
 - [ ] 🟢 CSV export (exec)
 
@@ -321,7 +321,7 @@
 - [x] 🟠 Guard attendance dashboard — days worked / absent / late over 7 / 30 / 60 / 90-day windows
 - [ ] 🟡 Shift schedule — view and create shifts (exec)
 - [ ] 🟡 CSV export of patrol logs (exec)
-- [ ] 🟢 Open incident count badge on tab
+- [x] 🟢 Open incident count badge on tab
 
 ---
 
@@ -362,10 +362,10 @@
 ## 24 · AGM
 
 - [x] 🔴 AGM detail screen — resolutions list with votes_for / votes_against / votes_abstain / passed_at
-- [ ] 🟡 AGM document view and download (type badge, status, public indicator, file download)
+- [x] 🟡 AGM document view and download (type badge, status, public indicator, file download)
 - [x] 🟡 Create AGM session modal — year, type (annual/extraordinary), meeting_date, venue, notes
 - [x] 🟡 Quorum tracking — update attendees_count, progress bar vs quorum_threshold
-- [ ] 🟡 Document workflow display — draft → submitted → secondary-approved → approved/rejected with `is_public` flag
+- [x] 🟡 Document workflow display — draft → submitted → secondary-approved → approved/rejected with `is_public` flag
 
 ---
 
