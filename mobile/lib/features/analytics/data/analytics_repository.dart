@@ -31,6 +31,13 @@ class ComplaintBreakdown {
   int get total => countsByStatus.values.fold(0, (a, b) => a + b);
 }
 
+class VisitorTypeBreakdown {
+  final Map<String, int> countsByType;
+  const VisitorTypeBreakdown({required this.countsByType});
+
+  int get total => countsByType.values.fold(0, (a, b) => a + b);
+}
+
 // ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
@@ -121,6 +128,20 @@ class AnalyticsRepository {
     }
     return ComplaintBreakdown(countsByStatus: counts);
   }
+
+  Future<VisitorTypeBreakdown> fetchVisitorTypeBreakdown() async {
+    final data = await _client
+        .from('visitor_logs')
+        .select('visitor_type')
+        .eq('society_id', env.societyId);
+
+    final counts = <String, int>{};
+    for (final row in (data as List)) {
+      final t = (row['visitor_type'] as String?) ?? 'unknown';
+      counts[t] = (counts[t] ?? 0) + 1;
+    }
+    return VisitorTypeBreakdown(countsByType: counts);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -139,4 +160,9 @@ final societyStatsProvider =
 final complaintBreakdownProvider =
     FutureProvider.autoDispose<ComplaintBreakdown>((ref) {
   return ref.read(analyticsRepositoryProvider).fetchComplaintBreakdown();
+});
+
+final visitorTypeBreakdownProvider =
+    FutureProvider.autoDispose<VisitorTypeBreakdown>((ref) {
+  return ref.read(analyticsRepositoryProvider).fetchVisitorTypeBreakdown();
 });

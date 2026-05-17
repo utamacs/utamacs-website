@@ -9,8 +9,8 @@
 
 | Module | Total | Done | Remaining |
 |--------|-------|------|-----------|
-| 01 Notices | 9 | 6 | 3 |
-| 02 Visitors | 14 | 0 | 14 |
+| 01 Notices | 9 | 7 | 2 |
+| 02 Visitors | 14 | 3 | 11 |
 | 03 Complaints | 13 | 13 | 0 |
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 7 | 2 |
@@ -29,7 +29,7 @@
 | 18 HOTO | 8 | 4 | 4 |
 | 19 Analytics | 8 | 3 | 5 |
 | 20 Security Patrol | 6 | 5 | 1 |
-| 21 Staff Management | 9 | 4 | 5 |
+| 21 Staff Management | 9 | 5 | 4 |
 | 22 Policies | 4 | 3 | 1 |
 | 23 Register / Membership | 6 | 5 | 1 |
 | 24 AGM | 5 | 5 | 0 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 1 | 4 |
 | 27 Vendors & Work Orders | 9 | 4 | 5 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **234** | **156** | **78** |
+| **TOTAL** | **234** | **160** | **74** |
 
 ---
 
@@ -47,7 +47,7 @@
 - [x] 🔴 Acknowledgement tracking panel (exec) — total / acknowledged / pending count per notice
 - [x] 🟠 Scheduled notices tab — list scheduled notices with countdown + "Publish now" button
 - [x] 🟠 Create notice form — title, category, audience (all/owners/tenants), target blocks/wings, body HTML, is_pinned, requires_acknowledgement, scheduled_at, draft mode
-- [ ] 🟠 Attachment viewer — tap to open/download PDF or image via signed URL
+- [x] 🟠 Attachment viewer — tap to open/download PDF or image via signed URL
 - [x] 🟠 Target audience & wing/block field on create form
 - [x] 🟡 Video URL field + embedded player in notice detail
 - [x] 🟢 Full category colour-coding (Urgent=red, Financial=amber, Governance=blue, Maintenance=orange, Events=purple, General=grey)
@@ -68,8 +68,8 @@
 - [ ] 🟠 Visitor logs table with filters (type, gate, date range) and CSV export
 - [ ] 🟡 Frequent visitor shortcuts — pre-fill new pass from visit history
 - [x] 🟢 Guard note displayed on pass screen
-- [ ] 🟢 Vehicle number displayed on pass screen
-- [ ] 🟢 Recurring pass indicator on pass card
+- [x] 🟢 Vehicle number displayed on pass screen
+- [x] 🟢 Recurring pass indicator on pass card
 
 ---
 
@@ -331,7 +331,7 @@
 - [x] 🔴 KYC onboarding — photo upload, ID type/number, annual renewal tracking
 - [x] 🟠 Task creation and assignment — title, description, assigned_to, department, deadline, priority (HIGH/MEDIUM/LOW)
 - [x] 🟠 Attendance marking and log view
-- [ ] 🟠 Shift scheduling — view and create shifts per department
+- [x] 🟠 Shift scheduling — view and create shifts per department
 - [ ] 🟡 Hiring / exit proposals workflow (committee approval)
 - [ ] 🟡 Staff analytics — attendance %, compliance status, activity logs
 - [ ] 🟡 Agency management — PSARA / PF / ESIC expiry tracking

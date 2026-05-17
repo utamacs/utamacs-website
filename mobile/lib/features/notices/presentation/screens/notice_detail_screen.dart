@@ -157,32 +157,27 @@ class NoticeDetailScreen extends ConsumerWidget {
               ),
             ],
 
-            // Attachment info
+            // Attachment viewer
             if (notice.attachmentKey != null) ...[
               const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: kPrimary50,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kPrimary100),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kPrimary600,
+                  side: const BorderSide(color: kPrimary600),
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.attach_file,
-                        size: 16, color: kPrimary600),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Attachment available — open portal.utamacs.org to download',
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: kPrimary600,
-                            fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-                ),
+                icon: const Icon(Icons.attach_file, size: 20),
+                label: const Text('View Attachment'),
+                onPressed: () async {
+                  final uri = Uri.parse(
+                      'https://portal.utamacs.org/portal/notices/${notice.id}');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri,
+                        mode: LaunchMode.externalApplication);
+                  }
+                },
               ),
             ],
 
