@@ -7,9 +7,10 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../auth/domain/auth_notifier.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/event_repository.dart';
-import 'event_detail_screen.dart';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -317,11 +318,7 @@ class _EventCard extends StatelessWidget {
     final catColor = _categoryColor(event.category ?? 'other');
 
     return DSScalePress(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (_) => EventDetailScreen(event: event)),
-      ),
+      onTap: () => context.push('/events/detail', extra: event),
       child: Container(
         decoration: BoxDecoration(
           color: surface,
@@ -784,13 +781,11 @@ class _CreateEventModalState
                   children: [
                     TextFormField(
                       controller: _titleCtrl,
+                      maxLength: 255,
                       textCapitalization: TextCapitalization.sentences,
                       decoration:
                           _deco('Event Title *', icon: Icons.event_rounded),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty)
-                              ? 'Title is required'
-                              : null,
+                      validator: (v) => InputValidators.shortText(v, label: 'Event title', max: 255),
                     ),
                     const SizedBox(height: dsSpace4),
                     DropdownButtonFormField<String>(
@@ -878,8 +873,10 @@ class _CreateEventModalState
                     const SizedBox(height: dsSpace4),
                     TextFormField(
                       controller: _locationCtrl,
+                      maxLength: 255,
                       decoration: _deco('Location (optional)',
                           icon: Icons.place_rounded),
+                      validator: (v) => InputValidators.optionalText(v, max: 255),
                     ),
                     const SizedBox(height: dsSpace4),
                     TextFormField(
@@ -899,9 +896,11 @@ class _CreateEventModalState
                     TextFormField(
                       controller: _descCtrl,
                       maxLines: 3,
+                      maxLength: 2000,
                       textCapitalization: TextCapitalization.sentences,
                       decoration: _deco('Description (optional)',
                           icon: Icons.notes_rounded),
+                      validator: (v) => InputValidators.optionalText(v, max: 2000),
                     ),
                     const SizedBox(height: dsSpace4),
                     // Paid toggle

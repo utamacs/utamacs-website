@@ -7,6 +7,7 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/feedback_repository.dart';
 
@@ -241,10 +242,9 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                     controller: _subjectCtrl,
                     hint: 'Brief summary of your feedback',
                     isDark: isDark,
+                    maxLength: 255,
                     textCapitalization: TextCapitalization.sentences,
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Subject is required'
-                        : null,
+                    validator: (v) => InputValidators.shortText(v, label: 'Subject', max: 255),
                   ),
                   const SizedBox(height: dsSpace3),
 
@@ -256,10 +256,9 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                     hint: 'Describe your feedback in detail…',
                     isDark: isDark,
                     maxLines: 4,
+                    maxLength: 2000,
                     textCapitalization: TextCapitalization.sentences,
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Feedback details are required'
-                        : null,
+                    validator: (v) => InputValidators.longText(v, label: 'Feedback details'),
                   ),
                   const SizedBox(height: dsSpace3),
 
@@ -850,6 +849,7 @@ class _FormField extends StatelessWidget {
   final String hint;
   final bool isDark;
   final int maxLines;
+  final int? maxLength;
   final TextCapitalization textCapitalization;
   final String? Function(String?)? validator;
 
@@ -858,6 +858,7 @@ class _FormField extends StatelessWidget {
     required this.hint,
     required this.isDark,
     this.maxLines = 1,
+    this.maxLength,
     this.textCapitalization = TextCapitalization.none,
     this.validator,
   });
@@ -871,6 +872,7 @@ class _FormField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
       textCapitalization: textCapitalization,
       style: GoogleFonts.inter(
         fontSize: context.sp(14),

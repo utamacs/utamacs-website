@@ -7,9 +7,10 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/notice_repository.dart';
-import 'notice_detail_screen.dart';
 
 const List<String> _kNoticeCategories = [
   'General',
@@ -59,7 +60,7 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen>
       floatingActionButton: isExec
           ? _CreateFab(
               onCreated: () {
-                ref.invalidate(noticesProvider);
+                ref.invalidate(noticesPagedProvider);
                 ref.invalidate(scheduledNoticesProvider);
               },
             )
@@ -92,7 +93,7 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen>
               DsActionButton(
                 icon: Icons.refresh_rounded,
                 onTap: () {
-                  ref.invalidate(noticesProvider);
+                  ref.invalidate(noticesPagedProvider);
                   if (isExec) ref.invalidate(scheduledNoticesProvider);
                 },
               ),
@@ -211,7 +212,8 @@ class _PublishedNoticesTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = ref.watch(isDarkModeProvider);
-    final noticesAsync = ref.watch(noticesProvider);
+    final noticesAsync = ref.watch(noticesPagedProvider);
+    final notifier = ref.read(noticesPagedProvider.notifier);
     final bottomPad = 80 + MediaQuery.paddingOf(context).bottom;
 
     return noticesAsync.when(
@@ -222,7 +224,7 @@ class _PublishedNoticesTab extends ConsumerWidget {
           title: 'Could not load notices',
           message: e.toString(),
           actionLabel: 'Retry',
-          onAction: () => ref.invalidate(noticesProvider),
+          onAction: () => ref.invalidate(noticesPagedProvider),
         ),
       ),
       data: (notices) {
@@ -247,20 +249,37 @@ class _PublishedNoticesTab extends ConsumerWidget {
         }
 
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(noticesProvider),
+          onRefresh: () async => ref.invalidate(noticesPagedProvider),
           color: dsColorIndigo600,
           backgroundColor: isDark ? dsDarkSurface : dsSurface,
           child: ListView.builder(
             padding: EdgeInsets.fromLTRB(
                 dsSpace4, dsSpace4, dsSpace4, bottomPad.toDouble()),
-            itemCount: filtered.length,
-            itemBuilder: (ctx, i) => Padding(
-              padding: const EdgeInsets.only(bottom: dsSpace3),
-              child: DSFadeSlide(
-                delay: Duration(milliseconds: i * 35),
-                child: _NoticeCard(notice: filtered[i], isDark: isDark),
-              ),
-            ),
+            itemCount: filtered.length + 1,
+            itemBuilder: (ctx, i) {
+              if (i == filtered.length) {
+                if (notifier.hasMore) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: dsSpace4),
+                    child: Center(
+                      child: TextButton.icon(
+                        onPressed: () => notifier.loadMore(),
+                        icon: const Icon(Icons.expand_more_rounded),
+                        label: const Text('Load more'),
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox(height: dsSpace4);
+              }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: dsSpace3),
+                child: DSFadeSlide(
+                  delay: Duration(milliseconds: i * 35),
+                  child: _NoticeCard(notice: filtered[i], isDark: isDark),
+                ),
+              );
+            },
           ),
         );
       },
@@ -357,12 +376,7 @@ class _NoticeCard extends StatelessWidget {
         : catColor.withValues(alpha: isDark ? 0.18 : 0.10);
 
     return DSScalePress(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => NoticeDetailScreen(notice: notice),
-        ),
-      ),
+      onTap: () => context.push('/notices/detail', extra: notice),
       child: Container(
         decoration: BoxDecoration(
           color: surface,
@@ -608,7 +622,7 @@ class _ScheduledNoticeCard extends ConsumerWidget {
                     .read(noticeRepositoryProvider)
                     .publishNow(notice.id);
                 ref.invalidate(scheduledNoticesProvider);
-                ref.invalidate(noticesProvider);
+                ref.invalidate(noticesPagedProvider);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -829,11 +843,9 @@ class _CreateNoticeModalState
                     _field(context, isDark, fillColor, borderColor,
                         controller: _titleCtrl,
                         label: 'Title *',
+                        maxLength: 255,
                         capitalize: TextCapitalization.sentences,
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty)
-                                ? 'Title is required'
-                                : null),
+                        validator: (v) => InputValidators.shortText(v, label: 'Title', max: 255)),
                     const SizedBox(height: dsSpace3),
                     _dropdown<String>(
                       context, isDark, fillColor, borderColor,
@@ -867,7 +879,9 @@ class _CreateNoticeModalState
                         controller: _bodyCtrl,
                         label: 'Body (optional)',
                         maxLines: 5,
-                        capitalize: TextCapitalization.sentences),
+                        maxLength: 2000,
+                        capitalize: TextCapitalization.sentences,
+                        validator: (v) => InputValidators.optionalText(v, max: 2000)),
                     const SizedBox(height: dsSpace4),
                     _ToggleRow(
                       label: 'Pin this notice',
@@ -946,12 +960,14 @@ class _CreateNoticeModalState
     required TextEditingController controller,
     required String label,
     int maxLines = 1,
+    int? maxLength,
     TextCapitalization capitalize = TextCapitalization.none,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
       textCapitalization: capitalize,
       validator: validator,
       style: GoogleFonts.inter(

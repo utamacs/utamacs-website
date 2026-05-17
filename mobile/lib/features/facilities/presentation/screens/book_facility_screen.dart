@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../data/facility_repository.dart';
 
@@ -432,12 +433,14 @@ class _BookFacilityScreenState extends ConsumerState<BookFacilityScreen> {
             TextFormField(
               controller: _purposeController,
               maxLines: 3,
+              maxLength: 500,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
                 hintText:
                     'Describe the purpose of the booking, e.g. Birthday party',
                 alignLabelWithHint: true,
               ),
+              validator: (v) => InputValidators.optionalText(v, max: 500),
             ),
 
             const SizedBox(height: 32),

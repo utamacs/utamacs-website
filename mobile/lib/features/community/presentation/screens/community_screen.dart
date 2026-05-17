@@ -8,9 +8,10 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../auth/domain/auth_notifier.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/community_repository.dart';
-import 'create_post_screen.dart';
 
 // ─── Community Screen ─────────────────────────────────────────────────────────
 
@@ -162,11 +163,7 @@ class _PostFab extends ConsumerWidget {
       ),
       child: FloatingActionButton.extended(
         onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => const CreatePostScreen()),
-          );
+          await context.push('/community/new-post');
           ref.invalidate(communityPostsProvider);
         },
         backgroundColor: dsColorIndigo600,
@@ -1028,6 +1025,7 @@ class _EditPostModalState
               const SizedBox(height: 12),
               TextFormField(
                 controller: _titleCtrl,
+                maxLength: 255,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
                   labelText: 'Title *',
@@ -1037,15 +1035,13 @@ class _EditPostModalState
                   contentPadding: const EdgeInsets.symmetric(
                       horizontal: dsSpace4, vertical: 14),
                 ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty)
-                        ? 'Title is required'
-                        : null,
+                validator: (v) => InputValidators.shortText(v, label: 'Title', max: 255),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _bodyCtrl,
                 maxLines: 5,
+                maxLength: 2000,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
                   labelText: 'Body',
@@ -1055,6 +1051,7 @@ class _EditPostModalState
                   contentPadding: const EdgeInsets.symmetric(
                       horizontal: dsSpace4, vertical: 14),
                 ),
+                validator: (v) => InputValidators.optionalText(v, max: 2000),
               ),
               const SizedBox(height: 20),
               SizedBox(
@@ -1249,6 +1246,7 @@ class _ReportPostModalState
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: dsSpace4, vertical: 14),
               ),
+              validator: (v) => InputValidators.optionalText(v, max: 300),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -1372,9 +1370,19 @@ class _ModerationSheet extends ConsumerWidget {
                 loading: () => const Center(
                     child: CircularProgressIndicator()),
                 error: (e, _) => Center(
-                  child: Text(e.toString(),
-                      style: GoogleFonts.inter(
-                          color: dsColorRed600)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline, color: dsColorRed600),
+                      const SizedBox(height: 8),
+                      Text('Could not load flagged posts',
+                          style: GoogleFonts.inter(color: dsColorRed600)),
+                      TextButton(
+                        onPressed: () => ref.invalidate(moderationQueueProvider),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
                 data: (items) {
                   if (items.isEmpty) {

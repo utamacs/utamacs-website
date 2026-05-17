@@ -9,6 +9,7 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../../shared/models/profile.dart';
 import '../../../auth/domain/auth_notifier.dart';
 
@@ -1256,21 +1257,25 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
                   children: [
                     _buildField(context, isDark, controller: _nameCtrl,
                         label: 'Full name',
-                        capitalize: TextCapitalization.words),
+                        maxLength: 100,
+                        capitalize: TextCapitalization.words,
+                        validator: (v) => InputValidators.name(v, label: 'Full name')),
                     const SizedBox(height: dsSpace3),
                     _buildField(context, isDark,
                         controller: _bioCtrl,
                         label: 'Bio (optional)',
                         maxLines: 3,
                         maxLength: 500,
-                        capitalize: TextCapitalization.sentences),
+                        capitalize: TextCapitalization.sentences,
+                        validator: (v) => InputValidators.optionalText(v, max: 500)),
                     const SizedBox(height: dsSpace3),
                     _buildField(context, isDark,
                         controller: _whatsappCtrl,
                         label: 'WhatsApp number (optional)',
                         hint: '+919876543210',
                         keyboard: TextInputType.phone,
-                        maxLength: 15),
+                        maxLength: 15,
+                        validator: (v) => InputValidators.phone(v)),
                     const SizedBox(height: dsSpace3),
                     _buildDropdown<String>(
                       context,
@@ -1299,12 +1304,16 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
                     _buildField(context, isDark,
                         controller: _ecNameCtrl,
                         label: 'Contact name',
-                        capitalize: TextCapitalization.words),
+                        maxLength: 100,
+                        capitalize: TextCapitalization.words,
+                        validator: (v) => InputValidators.name(v, label: 'Contact name')),
                     const SizedBox(height: dsSpace3),
                     _buildField(context, isDark,
                         controller: _ecPhoneCtrl,
                         label: 'Contact phone',
-                        keyboard: TextInputType.phone),
+                        keyboard: TextInputType.phone,
+                        maxLength: 15,
+                        validator: (v) => InputValidators.phone(v)),
                     const SizedBox(height: dsSpace3),
                     _buildDropdown<String?>(
                       context,
@@ -1386,6 +1395,7 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
     int? maxLength,
     TextInputType keyboard = TextInputType.text,
     TextCapitalization capitalize = TextCapitalization.none,
+    String? Function(String?)? validator,
   }) {
     final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
     final fillColor = isDark ? dsDarkSurfaceMuted : dsBackground;
@@ -1395,6 +1405,7 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
       maxLines: maxLines,
       maxLength: maxLength,
       textCapitalization: capitalize,
+      validator: validator,
       style: GoogleFonts.inter(
         fontSize: context.sp(14),
         color: isDark ? dsDarkTextPrimary : dsTextPrimary,

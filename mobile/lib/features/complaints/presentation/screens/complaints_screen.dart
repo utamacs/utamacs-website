@@ -7,9 +7,8 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/complaint_repository.dart';
-import 'complaint_detail_screen.dart';
-import 'submit_complaint_screen.dart';
 
 // ─── Complaints Screen ────────────────────────────────────────────────────────
 
@@ -28,7 +27,8 @@ class _ComplaintsScreenState extends ConsumerState<ComplaintsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = ref.watch(isDarkModeProvider);
-    final complaintsAsync = ref.watch(myComplaintsProvider);
+    final complaintsAsync = ref.watch(myComplaintsPagedProvider);
+    final notifier = ref.read(myComplaintsPagedProvider.notifier);
 
     return DsScreenShell(
       title: 'Complaints',
@@ -37,7 +37,7 @@ class _ComplaintsScreenState extends ConsumerState<ComplaintsScreen> {
       actions: [
         DsActionButton(
           icon: Icons.refresh_rounded,
-          onTap: () => ref.invalidate(myComplaintsProvider),
+          onTap: () => ref.invalidate(myComplaintsPagedProvider),
         ),
       ],
       floatingActionButton: _NewComplaintFab(),
@@ -88,7 +88,7 @@ class _ComplaintsScreenState extends ConsumerState<ComplaintsScreen> {
             title: 'Could not load complaints',
             message: e.toString(),
             actionLabel: 'Retry',
-            onAction: () => ref.invalidate(myComplaintsProvider),
+            onAction: () => ref.invalidate(myComplaintsPagedProvider),
           ),
           data: (complaints) {
             final filtered = _statusFilter == null
@@ -110,25 +110,40 @@ class _ComplaintsScreenState extends ConsumerState<ComplaintsScreen> {
             }
 
             return Column(
-              children: filtered.asMap().entries.map((entry) {
-                final i = entry.key;
-                final complaint = entry.value;
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    dsSpace4,
-                    0,
-                    dsSpace4,
-                    i == filtered.length - 1 ? 0 : dsSpace3,
-                  ),
-                  child: DSFadeSlide(
-                    delay: Duration(milliseconds: i * 40),
-                    child: _ComplaintCard(
-                      complaint: complaint,
-                      isDark: isDark,
+              children: [
+                ...filtered.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final complaint = entry.value;
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      dsSpace4,
+                      0,
+                      dsSpace4,
+                      i == filtered.length - 1 ? 0 : dsSpace3,
                     ),
-                  ),
-                );
-              }).toList(),
+                    child: DSFadeSlide(
+                      delay: Duration(milliseconds: i * 40),
+                      child: _ComplaintCard(
+                        complaint: complaint,
+                        isDark: isDark,
+                      ),
+                    ),
+                  );
+                }),
+                if (notifier.hasMore)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: dsSpace4),
+                    child: Center(
+                      child: TextButton.icon(
+                        onPressed: () => notifier.loadMore(),
+                        icon: const Icon(Icons.expand_more_rounded),
+                        label: const Text('Load more'),
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(height: dsSpace4),
+              ],
             );
           },
         ),
@@ -182,10 +197,7 @@ class _NewComplaintFab extends StatelessWidget {
         boxShadow: dsShadowBrand,
       ),
       child: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SubmitComplaintScreen()),
-        ),
+        onPressed: () => context.push('/complaints/new'),
         backgroundColor: dsColorIndigo600,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -240,12 +252,7 @@ class _ComplaintCard extends StatelessWidget {
     final statusColor = _statusColor(complaint.status);
 
     return DSScalePress(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ComplaintDetailScreen(complaint: complaint),
-        ),
-      ),
+      onTap: () => context.push('/complaints/detail', extra: complaint),
       child: Container(
         decoration: BoxDecoration(
           color: surface,

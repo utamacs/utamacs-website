@@ -140,12 +140,23 @@ class FinanceScreen extends ConsumerWidget {
 
 // ─── Dues Tab ─────────────────────────────────────────────────────────────────
 
-class _DuesTab extends ConsumerWidget {
+class _DuesTab extends ConsumerStatefulWidget {
   final bool isDark;
   const _DuesTab({required this.isDark});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DuesTab> createState() => _DuesTabState();
+}
+
+class _DuesTabState extends ConsumerState<_DuesTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final isDark = widget.isDark;
     final duesAsync = ref.watch(myDuesProvider);
     final bottomPad = 80 + MediaQuery.paddingOf(context).bottom;
 
@@ -605,12 +616,23 @@ class _ActionButton extends StatelessWidget {
 
 // ─── History Tab ──────────────────────────────────────────────────────────────
 
-class _HistoryTab extends ConsumerWidget {
+class _HistoryTab extends ConsumerStatefulWidget {
   final bool isDark;
   const _HistoryTab({required this.isDark});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HistoryTab> createState() => _HistoryTabState();
+}
+
+class _HistoryTabState extends ConsumerState<_HistoryTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final isDark = widget.isDark;
     final paymentsAsync = ref.watch(myPaymentsProvider);
     final bottomPad     = 80 + MediaQuery.paddingOf(context).bottom;
 
@@ -640,12 +662,14 @@ class _HistoryTab extends ConsumerWidget {
             padding: EdgeInsets.fromLTRB(
                 dsSpace4, dsSpace4, dsSpace4, bottomPad.toDouble()),
             itemCount: payments.length,
-            itemBuilder: (ctx, i) => Padding(
-              padding: const EdgeInsets.only(bottom: dsSpace3),
-              child: DSFadeSlide(
-                delay: Duration(milliseconds: i * 35),
-                child: _PaymentCard(
-                    payment: payments[i], isDark: isDark),
+            itemBuilder: (ctx, i) => RepaintBoundary(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: dsSpace3),
+                child: DSFadeSlide(
+                  delay: Duration(milliseconds: i * 35),
+                  child: _PaymentCard(
+                      payment: payments[i], isDark: isDark),
+                ),
               ),
             ),
           ),

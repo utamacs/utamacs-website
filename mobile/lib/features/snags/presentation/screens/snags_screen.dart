@@ -9,9 +9,8 @@ import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
 import '../../../auth/domain/auth_notifier.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/snag_repository.dart';
-import 'report_snag_screen.dart';
-import 'snag_detail_screen.dart';
 
 class SnagsScreen extends ConsumerWidget {
   const SnagsScreen({super.key});
@@ -158,10 +157,7 @@ class _ReportFab extends ConsumerWidget {
           ),
         ),
         onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ReportSnagScreen()),
-          );
+          await context.push('/snags/new');
           ref.invalidate(mySnagItemsProvider);
           ref.invalidate(allSnagItemsProvider);
         },
@@ -210,9 +206,11 @@ class _MySnagTab extends ConsumerWidget {
             ),
             itemCount: snags.length,
             separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
-            itemBuilder: (context, i) => DSFadeSlide(
-              delay: Duration(milliseconds: i * 30),
-              child: _SnagCard(snag: snags[i]),
+            itemBuilder: (context, i) => RepaintBoundary(
+              child: DSFadeSlide(
+                delay: Duration(milliseconds: i * 30),
+                child: _SnagCard(snag: snags[i]),
+              ),
             ),
           ),
         );
@@ -261,9 +259,11 @@ class _AllSnagTab extends ConsumerWidget {
             ),
             itemCount: snags.length,
             separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
-            itemBuilder: (context, i) => DSFadeSlide(
-              delay: Duration(milliseconds: i * 30),
-              child: _SnagCard(snag: snags[i]),
+            itemBuilder: (context, i) => RepaintBoundary(
+              child: DSFadeSlide(
+                delay: Duration(milliseconds: i * 30),
+                child: _SnagCard(snag: snags[i]),
+              ),
             ),
           ),
         );
@@ -327,10 +327,7 @@ class _SnagCard extends ConsumerWidget {
     final (statusBg, statusText) = _statusColors(snag.status);
 
     return DSScalePress(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => SnagDetailScreen(snag: snag)),
-      ),
+      onTap: () => context.push('/snags/detail', extra: snag),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? dsDarkSurface : dsSurface,

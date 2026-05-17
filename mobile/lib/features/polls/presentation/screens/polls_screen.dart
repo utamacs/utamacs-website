@@ -8,10 +8,11 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../agm/data/agm_repository.dart';
 import '../../../auth/domain/auth_notifier.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/poll_repository.dart';
-import 'poll_detail_screen.dart';
 
 // ─── Polls Screen ─────────────────────────────────────────────────────────────
 
@@ -232,11 +233,7 @@ class _PollCard extends StatelessWidget {
     final statusColor = _statusColor(statusKey);
 
     return DSScalePress(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (_) => PollDetailScreen(pollId: poll.id)),
-      ),
+      onTap: () => context.push('/polls/${poll.id}'),
       child: Container(
         decoration: BoxDecoration(
           color: surface,
@@ -633,14 +630,12 @@ class _CreatePollModalState
                     // Question
                     TextFormField(
                       controller: _titleCtrl,
+                      maxLength: 255,
                       textCapitalization:
                           TextCapitalization.sentences,
                       decoration: _deco('Poll Question *',
                           icon: Icons.help_outline_rounded),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty)
-                              ? 'Question is required'
-                              : null,
+                      validator: (v) => InputValidators.shortText(v, label: 'Poll question', max: 255),
                     ),
                     const SizedBox(height: dsSpace4),
 
@@ -648,10 +643,12 @@ class _CreatePollModalState
                     TextFormField(
                       controller: _descCtrl,
                       maxLines: 3,
+                      maxLength: 2000,
                       textCapitalization:
                           TextCapitalization.sentences,
                       decoration: _deco('Description (optional)',
                           icon: Icons.notes_rounded),
+                      validator: (v) => InputValidators.optionalText(v, max: 2000),
                     ),
                     const SizedBox(height: dsSpace4),
 
@@ -700,6 +697,7 @@ class _CreatePollModalState
                               Expanded(
                                 child: TextFormField(
                                   controller: _optionCtrls[i],
+                                  maxLength: 255,
                                   decoration: InputDecoration(
                                     labelText: 'Option ${i + 1}',
                                     border: OutlineInputBorder(
@@ -713,6 +711,7 @@ class _CreatePollModalState
                                                     dsSpace4,
                                                 vertical: 14),
                                   ),
+                                  validator: (v) => InputValidators.optionalText(v, max: 255),
                                 ),
                               ),
                               if (_optionCtrls.length > 2) ...[

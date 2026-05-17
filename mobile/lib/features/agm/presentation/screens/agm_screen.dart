@@ -7,9 +7,10 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../auth/domain/auth_notifier.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/agm_repository.dart';
-import 'agm_detail_screen.dart';
 
 class AgmScreen extends ConsumerWidget {
   const AgmScreen({super.key});
@@ -229,10 +230,7 @@ class _SessionCard extends ConsumerWidget {
     final stripColor = isUpcoming ? dsColorAmber600 : dsColorEmerald600;
 
     return DSScalePress(
-      onTap: () => Navigator.push(
-        context,
-        DSSlideRoute(page: AgmDetailScreen(session: session)),
-      ),
+      onTap: () => context.push('/agm/detail', extra: session),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? dsDarkSurface : dsSurface,
@@ -717,8 +715,10 @@ class _CreateSessionModalState
                       controller: _venueCtrl,
                       hint: 'e.g. Community Hall',
                       isDark: isDark,
+                      maxLength: 255,
                       textCapitalization:
                           TextCapitalization.sentences,
+                      validator: (v) => InputValidators.optionalText(v, max: 255),
                     ),
                     const SizedBox(height: dsSpace3),
 
@@ -731,8 +731,10 @@ class _CreateSessionModalState
                       hint: 'Agenda or additional notes…',
                       isDark: isDark,
                       maxLines: 3,
+                      maxLength: 2000,
                       textCapitalization:
                           TextCapitalization.sentences,
+                      validator: (v) => InputValidators.optionalText(v, max: 2000),
                     ),
                     const SizedBox(height: dsSpace6),
 
@@ -805,14 +807,18 @@ class _ModalTextField extends StatelessWidget {
   final String hint;
   final bool isDark;
   final int maxLines;
+  final int? maxLength;
   final TextCapitalization textCapitalization;
+  final String? Function(String?)? validator;
 
   const _ModalTextField({
     required this.controller,
     required this.hint,
     required this.isDark,
     this.maxLines = 1,
+    this.maxLength,
     this.textCapitalization = TextCapitalization.none,
+    this.validator,
   });
 
   @override
@@ -824,6 +830,7 @@ class _ModalTextField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
       textCapitalization: textCapitalization,
       style: GoogleFonts.inter(
           fontSize: context.sp(14), color: textPrimary),
@@ -849,7 +856,7 @@ class _ModalTextField extends StatelessWidget {
               const BorderSide(color: dsColorIndigo600, width: 2),
         ),
       ),
-      validator: null,
+      validator: validator,
     );
   }
 }

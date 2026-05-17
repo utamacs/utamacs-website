@@ -107,10 +107,12 @@ class LettersScreen extends ConsumerWidget {
               itemCount: letters.length,
               separatorBuilder: (_, _) =>
                   const SizedBox(height: dsSpace2),
-              itemBuilder: (context, i) => DSFadeSlide(
-                delay: Duration(milliseconds: i * 30),
-                child: _LetterCard(
-                    letter: letters[i], isExec: isExec),
+              itemBuilder: (context, i) => RepaintBoundary(
+                child: DSFadeSlide(
+                  delay: Duration(milliseconds: i * 30),
+                  child: _LetterCard(
+                      letter: letters[i], isExec: isExec),
+                ),
               ),
             );
           },
@@ -513,7 +515,7 @@ class _LetterDetailSheet extends ConsumerWidget {
                     label: const Text('Sign-off'),
                     onPressed: () async {
                       final uri = Uri.parse(
-                          'https://portal.utamacs.org/portal/letters/${letter.id}?action=signoff');
+                          'https://portal.utamacs.org/portal/letters/${letter.id}');
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri,
                             mode: LaunchMode.externalApplication);
@@ -541,7 +543,7 @@ class _LetterDetailSheet extends ConsumerWidget {
                     label: const Text('Link Module'),
                     onPressed: () async {
                       final uri = Uri.parse(
-                          'https://portal.utamacs.org/portal/letters/${letter.id}?action=link');
+                          'https://portal.utamacs.org/portal/letters/${letter.id}');
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri,
                             mode: LaunchMode.externalApplication);

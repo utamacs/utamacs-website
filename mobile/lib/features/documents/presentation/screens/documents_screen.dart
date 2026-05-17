@@ -89,7 +89,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                 ),
                 onPressed: () async {
                   final uri = Uri.parse(
-                      'https://portal.utamacs.org/portal/documents?action=upload');
+                      'https://portal.utamacs.org/portal/documents');
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri,
                         mode: LaunchMode.externalApplication);
@@ -658,7 +658,7 @@ class _DocumentDetailDialogState
               borderColor: dsColorEmerald600,
               onPressed: () async {
                 final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/documents/${doc.id}?action=new-version');
+                    'https://portal.utamacs.org/portal/documents/${doc.id}');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri,
                       mode: LaunchMode.externalApplication);

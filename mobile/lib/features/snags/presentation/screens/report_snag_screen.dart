@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../data/snag_repository.dart';
 
 const _scopes = ['common_area', 'flat', 'external'];
@@ -143,11 +144,11 @@ class _ReportSnagScreenState extends ConsumerState<ReportSnagScreen> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _locationCtrl,
+              maxLength: 255,
               decoration: const InputDecoration(
                   hintText: 'e.g. Block A staircase, Lobby, Terrace'),
               textCapitalization: TextCapitalization.sentences,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Location is required' : null,
+              validator: (v) => InputValidators.shortText(v, label: 'Location', max: 255),
             ),
             const SizedBox(height: 16),
 
@@ -156,8 +157,10 @@ class _ReportSnagScreenState extends ConsumerState<ReportSnagScreen> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _flatCtrl,
+              maxLength: 20,
               decoration: const InputDecoration(hintText: 'e.g. A-101'),
               textCapitalization: TextCapitalization.characters,
+              validator: (v) => InputValidators.vehicleNumber(v),
             ),
             const SizedBox(height: 16),
 
@@ -166,13 +169,13 @@ class _ReportSnagScreenState extends ConsumerState<ReportSnagScreen> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _descriptionCtrl,
+              maxLines: 5,
+              maxLength: 2000,
               decoration: const InputDecoration(
                   hintText:
                       'Describe the defect clearly — what, where, extent of damage…'),
-              maxLines: 5,
               textCapitalization: TextCapitalization.sentences,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Description is required' : null,
+              validator: (v) => InputValidators.longText(v, label: 'Description'),
             ),
             const SizedBox(height: 16),
 

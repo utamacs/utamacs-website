@@ -590,11 +590,18 @@ class _HotoItemDetailSheetState
                       padding: EdgeInsets.all(16),
                       child: CircularProgressIndicator(),
                     )),
-                    error: (e, _) => Text(
-                        'Could not load comments: $e',
-                        style: GoogleFonts.inter(
-                            fontSize: context.sp(12),
-                            color: textSecondary)),
+                    error: (e, _) => Row(
+                      children: [
+                        Icon(Icons.error_outline, size: 14, color: dsColorRed600),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text('Could not load comments',
+                            style: GoogleFonts.inter(fontSize: context.sp(12), color: textSecondary))),
+                        TextButton(
+                          onPressed: () => ref.invalidate(hotoCommentsProvider(item.id)),
+                          child: Text('Retry', style: GoogleFonts.inter(fontSize: context.sp(12))),
+                        ),
+                      ],
+                    ),
                     data: (comments) {
                       if (comments.isEmpty) {
                         return Padding(
@@ -737,9 +744,18 @@ class _LinkedSnagsSection extends ConsumerWidget {
             padding: EdgeInsets.all(12),
             child: CircularProgressIndicator(strokeWidth: 2),
           )),
-          error: (e, _) => Text('Could not load snags: $e',
-              style: GoogleFonts.inter(
-                  fontSize: context.sp(12), color: textSecondary)),
+          error: (e, _) => Row(
+            children: [
+              Icon(Icons.error_outline, size: 14, color: dsColorRed600),
+              const SizedBox(width: 6),
+              Expanded(child: Text('Could not load snags',
+                  style: GoogleFonts.inter(fontSize: context.sp(12), color: textSecondary))),
+              TextButton(
+                onPressed: () => ref.invalidate(hotoLinkedSnagsProvider(hotoItemId)),
+                child: Text('Retry', style: GoogleFonts.inter(fontSize: context.sp(12))),
+              ),
+            ],
+          ),
           data: (snags) {
             if (snags.isEmpty) {
               return Padding(

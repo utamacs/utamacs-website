@@ -497,9 +497,17 @@ class _AttendeesSection extends ConsumerWidget {
         attendeesAsync.when(
           loading: () =>
               const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text(
-            'Could not load attendees: $e',
-            style: GoogleFonts.inter(color: kRed600, fontSize: 13),
+          error: (e, _) => Row(
+            children: [
+              const Icon(Icons.error_outline, size: 14, color: kRed600),
+              const SizedBox(width: 6),
+              const Expanded(child: Text('Could not load attendees',
+                  style: TextStyle(color: kRed600, fontSize: 13))),
+              TextButton(
+                onPressed: () => ref.invalidate(eventAttendeesProvider(eventId)),
+                child: const Text('Retry', style: TextStyle(fontSize: 12)),
+              ),
+            ],
           ),
           data: (attendees) => attendees.isEmpty
               ? Container(
