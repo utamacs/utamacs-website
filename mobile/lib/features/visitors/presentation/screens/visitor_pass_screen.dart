@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../data/visitor_repository.dart';
@@ -126,6 +127,23 @@ class VisitorPassScreen extends StatelessWidget {
                     .textTheme
                     .bodySmall
                     ?.copyWith(color: Colors.white70),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final uri = Uri.parse(
+                      'https://portal.utamacs.org/portal/visitors?tab=passes&id=${approval.id}&action=share');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri,
+                        mode: LaunchMode.externalApplication);
+                  }
+                },
+                icon: const Icon(Icons.share_outlined, size: 16),
+                label: const Text('Share Pass via Portal'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  side: const BorderSide(color: Colors.white38),
+                ),
               ),
               const SizedBox(height: 16),
             ],

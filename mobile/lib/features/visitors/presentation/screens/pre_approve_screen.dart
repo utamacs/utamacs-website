@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/visitor_repository.dart';
 
@@ -95,6 +96,8 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final frequentAsync = ref.watch(frequentVisitorsProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Pre-approve Visitor')),
       body: SingleChildScrollView(
@@ -104,6 +107,48 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Frequent visitor shortcuts
+              frequentAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (names) {
+                  if (names.isEmpty) return const SizedBox.shrink();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Recent visitors',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: kTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: names
+                            .map((name) => ActionChip(
+                                  label: Text(name,
+                                      style: GoogleFonts.inter(
+                                          fontSize: 12)),
+                                  avatar: const Icon(
+                                      Icons.person_outline, size: 14),
+                                  onPressed: () =>
+                                      _nameCtrl.text = name,
+                                  backgroundColor: kPrimary50,
+                                  side: const BorderSide(
+                                      color: kPrimary100),
+                                  labelPadding: EdgeInsets.zero,
+                                ))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                },
+              ),
               _SectionLabel('Visitor details'),
               const SizedBox(height: 12),
               TextFormField(
