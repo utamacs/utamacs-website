@@ -132,6 +132,40 @@ class PatrolRepository {
     result.sort((a, b) => b.totalShifts.compareTo(a.totalShifts));
     return result;
   }
+
+  Future<List<PatrolSchedule>> fetchSchedules() async {
+    final data = await _client
+        .from('patrol_schedules')
+        .select()
+        .eq('society_id', env.societyId)
+        .order('effective_from', ascending: false);
+    return (data as List).map((e) => PatrolSchedule.fromJson(e)).toList();
+  }
+
+  Future<PatrolSchedule> createSchedule({
+    required String guardName,
+    required String shift,
+    required List<int> daysOfWeek,
+    required DateTime effectiveFrom,
+    DateTime? effectiveTo,
+    String? notes,
+  }) async {
+    final data = await _client
+        .from('patrol_schedules')
+        .insert({
+          'society_id': env.societyId,
+          'guard_name': guardName,
+          'shift': shift,
+          'days_of_week': daysOfWeek,
+          'effective_from': effectiveFrom.toIso8601String().substring(0, 10),
+          if (effectiveTo != null)
+            'effective_to': effectiveTo.toIso8601String().substring(0, 10),
+          if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+        })
+        .select()
+        .single();
+    return PatrolSchedule.fromJson(data);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +187,56 @@ class GuardAttendanceSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Patrol schedule model
+// ---------------------------------------------------------------------------
+
+class PatrolSchedule {
+  final String id;
+  final String guardName;
+  final String shift;
+  final List<int> daysOfWeek;
+  final DateTime effectiveFrom;
+  final DateTime? effectiveTo;
+  final String? notes;
+  final DateTime createdAt;
+
+  const PatrolSchedule({
+    required this.id,
+    required this.guardName,
+    required this.shift,
+    required this.daysOfWeek,
+    required this.effectiveFrom,
+    this.effectiveTo,
+    this.notes,
+    required this.createdAt,
+  });
+
+  bool get isActive =>
+      effectiveTo == null || effectiveTo!.isAfter(DateTime.now());
+
+  String get daysLabel {
+    const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    final sorted = [...daysOfWeek]..sort();
+    return sorted.map((d) => names[d % 7]).join(', ');
+  }
+
+  factory PatrolSchedule.fromJson(Map<String, dynamic> j) => PatrolSchedule(
+        id: j['id'] as String,
+        guardName: j['guard_name'] as String,
+        shift: j['shift'] as String,
+        daysOfWeek: (j['days_of_week'] as List<dynamic>)
+            .map((e) => e as int)
+            .toList(),
+        effectiveFrom: DateTime.parse(j['effective_from'] as String),
+        effectiveTo: j['effective_to'] != null
+            ? DateTime.parse(j['effective_to'] as String)
+            : null,
+        notes: j['notes'] as String?,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
+}
+
+// ---------------------------------------------------------------------------
 // Providers
 // ---------------------------------------------------------------------------
 
@@ -171,3 +255,7 @@ final incidentLogsProvider =
 final guardSummariesProvider =
     FutureProvider.autoDispose<List<GuardAttendanceSummary>>((ref) =>
         ref.read(patrolRepositoryProvider).fetchGuardSummaries());
+
+final patrolSchedulesProvider =
+    FutureProvider.autoDispose<List<PatrolSchedule>>((ref) =>
+        ref.read(patrolRepositoryProvider).fetchSchedules());
