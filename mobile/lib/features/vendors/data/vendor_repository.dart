@@ -66,6 +66,8 @@ class WorkOrder {
   final DateTime createdAt;
   final int? vendorRating;
   final String? vendorReview;
+  final String? complaintId;
+  final String? snagId;
 
   const WorkOrder({
     required this.id,
@@ -80,7 +82,11 @@ class WorkOrder {
     required this.createdAt,
     this.vendorRating,
     this.vendorReview,
+    this.complaintId,
+    this.snagId,
   });
+
+  bool get tdsFlag => (quotedAmount ?? 0) >= 30000;
 
   factory WorkOrder.fromJson(Map<String, dynamic> j) => WorkOrder(
         id: j['id'] as String,
@@ -103,6 +109,8 @@ class WorkOrder {
         createdAt: DateTime.parse(j['created_at'] as String),
         vendorRating: j['vendor_rating'] as int?,
         vendorReview: j['vendor_review'] as String?,
+        complaintId: j['complaint_id'] as String?,
+        snagId: j['snag_id'] as String?,
       );
 }
 

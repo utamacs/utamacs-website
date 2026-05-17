@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../data/document_repository.dart';
@@ -518,27 +519,26 @@ class _DocumentDetailDialogState extends ConsumerState<_DocumentDetailDialog> {
           if (doc.fileName != null)
             _DetailRow(label: 'File', value: doc.fileName!),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: kPrimary50,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.open_in_browser,
-                    size: 16, color: kPrimary600),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'To download this document, visit the portal at portal.utamacs.org',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: kPrimary600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                  ),
-                ),
-              ],
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: kPrimary600,
+                side: const BorderSide(color: kPrimary600),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              icon: const Icon(Icons.open_in_browser, size: 18),
+              label: const Text('Open Document'),
+              onPressed: () async {
+                final uri = Uri.parse(
+                    'https://portal.utamacs.org/portal/documents/${doc.id}');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri,
+                      mode: LaunchMode.externalApplication);
+                }
+              },
             ),
           ),
         ],

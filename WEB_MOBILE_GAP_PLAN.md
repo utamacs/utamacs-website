@@ -16,7 +16,7 @@
 | 05 Events | 9 | 7 | 2 |
 | 06 Polls | 9 | 8 | 1 |
 | 07 Community Board | 11 | 10 | 1 |
-| 08 Documents | 11 | 6 | 5 |
+| 08 Documents | 11 | 7 | 4 |
 | 09 Gallery | 5 | 2 | 3 |
 | 10 Facilities | 6 | 6 | 0 |
 | 11 Parking | 12 | 7 | 5 |
@@ -29,15 +29,15 @@
 | 18 HOTO | 8 | 4 | 4 |
 | 19 Analytics | 8 | 3 | 5 |
 | 20 Security Patrol | 6 | 5 | 1 |
-| 21 Staff Management | 9 | 5 | 4 |
+| 21 Staff Management | 9 | 6 | 3 |
 | 22 Policies | 4 | 3 | 1 |
 | 23 Register / Membership | 6 | 5 | 1 |
 | 24 AGM | 5 | 5 | 0 |
 | 25 Tenant KYC | 5 | 5 | 0 |
 | 26 Letters | 5 | 1 | 4 |
-| 27 Vendors & Work Orders | 9 | 4 | 5 |
+| 27 Vendors & Work Orders | 9 | 6 | 3 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **234** | **160** | **74** |
+| **TOTAL** | **234** | **164** | **70** |
 
 ---
 
@@ -154,7 +154,7 @@
 
 ## 08 · DOCUMENTS
 
-- [ ] 🟠 View full document content — PDF in viewer, video player for video-type docs
+- [x] 🟠 View full document content — PDF in viewer, video player for video-type docs
 - [ ] 🟠 Upload document modal (exec) — file, title, category, description, access level, is_public flag
 - [x] 🟡 Search input with debounce (real-time filter against title/description)
 - [ ] 🟡 Version history drawer — all versions with download links + change notes
@@ -334,7 +334,7 @@
 - [x] 🟠 Shift scheduling — view and create shifts per department
 - [ ] 🟡 Hiring / exit proposals workflow (committee approval)
 - [ ] 🟡 Staff analytics — attendance %, compliance status, activity logs
-- [ ] 🟡 Agency management — PSARA / PF / ESIC expiry tracking
+- [x] 🟡 Agency management — PSARA / PF / ESIC expiry tracking
 - [ ] 🟢 Department configuration
 
 ---
@@ -397,8 +397,8 @@
 - [x] 🟠 Vendor contact details, GST#, PAN#, bank account in detail view
 - [x] 🟠 WO status workflow buttons — Mark In Progress → Inspect → Complete → Close / Dispute
 - [ ] 🟡 Licence expiry warnings for agency vendors (PSARA / PF / ESIC)
-- [ ] 🟡 TDS management — flag >₹30k WOs, link TDS certificate to Finance module
-- [ ] 🟡 Complaint / snag auto-link on WO creation and auto-resolve on WO close
+- [x] 🟡 TDS management — flag >₹30k WOs, link TDS certificate to Finance module
+- [x] 🟡 Complaint / snag auto-link on WO creation and auto-resolve on WO close
 - [x] 🟡 Vendor rating after WO completion (1–5 stars + review)
 
 ---

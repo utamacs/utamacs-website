@@ -484,6 +484,85 @@ class _WorkOrderCardState extends ConsumerState<_WorkOrderCard> {
               ),
             ],
           ),
+          // TDS flag + linked item badges
+          if (widget.workOrder.tdsFlag ||
+              widget.workOrder.complaintId != null ||
+              widget.workOrder.snagId != null) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (widget.workOrder.tdsFlag)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'TDS may apply',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: kAccent500,
+                      ),
+                    ),
+                  ),
+                if (widget.workOrder.complaintId != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.report_outlined,
+                            size: 11, color: kRed600),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Linked Complaint',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: kRed600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (widget.workOrder.snagId != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: kPrimary50,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.bug_report_outlined,
+                            size: 11, color: kPrimary600),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Linked Snag',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: kPrimary600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
           if (displayAmount != null || widget.workOrder.deadline != null) ...[
             const SizedBox(height: 8),
             const Divider(height: 1, color: kBorderLight),

@@ -25,7 +25,7 @@ class _StaffScreenState extends ConsumerState<StaffScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() => setState(() {}));
   }
 
@@ -53,6 +53,8 @@ class _StaffScreenState extends ConsumerState<StaffScreen>
               ref.invalidate(activeStaffProvider);
               ref.invalidate(staffTasksProvider);
               ref.invalidate(staffAttendanceProvider);
+              ref.invalidate(staffShiftsProvider);
+              ref.invalidate(staffAgenciesProvider);
             },
           ),
         ],
@@ -68,6 +70,7 @@ class _StaffScreenState extends ConsumerState<StaffScreen>
             Tab(text: 'Tasks'),
             Tab(text: 'Attendance'),
             Tab(text: 'Shifts'),
+            Tab(text: 'Agencies'),
           ],
         ),
       ),
@@ -101,6 +104,7 @@ class _StaffScreenState extends ConsumerState<StaffScreen>
           _TasksTab(),
           _AttendanceTab(),
           _ShiftsTab(),
+          _AgenciesTab(),
         ],
       ),
     );
@@ -1434,6 +1438,314 @@ class _CreateShiftSheetState extends ConsumerState<_CreateShiftSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Agencies tab
+// ---------------------------------------------------------------------------
+
+class _AgenciesTab extends ConsumerWidget {
+  const _AgenciesTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final agenciesAsync = ref.watch(staffAgenciesProvider);
+
+    return agenciesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load agencies',
+        subtitle: e.toString(),
+        action: ElevatedButton(
+          onPressed: () => ref.invalidate(staffAgenciesProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (agencies) {
+        if (agencies.isEmpty) {
+          return const EmptyState(
+            icon: Icons.business_outlined,
+            title: 'No agencies registered',
+            subtitle:
+                'Staff service agencies will appear here once added.',
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(staffAgenciesProvider),
+          child: ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: agencies.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, i) => _AgencyCard(agency: agencies[i]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AgencyCard extends StatelessWidget {
+  final StaffAgency agency;
+  const _AgencyCard({required this.agency});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final psaraExpired = agency.psaraExpiry != null &&
+        agency.psaraExpiry!.isBefore(now);
+    final contractExpired = agency.contractEnd != null &&
+        agency.contractEnd!.isBefore(now);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: agency.hasComplianceWarning
+              ? const Color(0xFFFDE68A)
+              : kBorderLight,
+          width: agency.hasComplianceWarning ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: kPrimary50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.business_outlined,
+                    size: 20, color: kPrimary600),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      agency.name,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: kTextPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      agency.type.replaceAll('_', ' ').toUpperCase(),
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: kTextSecondary,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: agency.isActive
+                      ? const Color(0xFFD1FAE5)
+                      : kSectionAlt,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  agency.isActive ? 'ACTIVE' : 'INACTIVE',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color:
+                        agency.isActive ? kSecondary500 : kTextSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (agency.contactName != null ||
+              agency.contactPhone != null) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: kBorderLight),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.person_outline,
+                    size: 13, color: kTextSecondary),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    [
+                      if (agency.contactName != null) agency.contactName!,
+                      if (agency.contactPhone != null)
+                        agency.contactPhone!,
+                    ].join(' · '),
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: kTextSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (agency.monthlyRate != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.currency_rupee,
+                    size: 13, color: kTextSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  '₹${NumberFormat('#,##,###').format(agency.monthlyRate)}/month',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: kTextPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          // Compliance warnings
+          if (agency.psaraNumber != null ||
+              agency.contractEnd != null) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: kBorderLight),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (agency.psaraNumber != null)
+                  _ComplianceBadge(
+                    label: 'PSARA',
+                    expiry: agency.psaraExpiry,
+                    isExpired: psaraExpired,
+                    isExpiringSoon: agency.psaraExpiringSoon && !psaraExpired,
+                  ),
+                if (agency.contractEnd != null)
+                  _ComplianceBadge(
+                    label: 'Contract',
+                    expiry: agency.contractEnd,
+                    isExpired: contractExpired,
+                    isExpiringSoon:
+                        agency.contractExpiringSoon && !contractExpired,
+                  ),
+                if (agency.pfNumber != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD1FAE5),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'PF: ${agency.pfNumber!}',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: kSecondary500,
+                      ),
+                    ),
+                  ),
+                if (agency.esicNumber != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: kPrimary50,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'ESIC: ${agency.esicNumber!}',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: kPrimary600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ComplianceBadge extends StatelessWidget {
+  final String label;
+  final DateTime? expiry;
+  final bool isExpired;
+  final bool isExpiringSoon;
+
+  const _ComplianceBadge({
+    required this.label,
+    this.expiry,
+    required this.isExpired,
+    required this.isExpiringSoon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg;
+    final Color fg;
+    final IconData icon;
+
+    if (isExpired) {
+      bg = const Color(0xFFFEE2E2);
+      fg = kRed600;
+      icon = Icons.error_outline;
+    } else if (isExpiringSoon) {
+      bg = const Color(0xFFFEF3C7);
+      fg = kAccent500;
+      icon = Icons.warning_amber_outlined;
+    } else {
+      bg = const Color(0xFFD1FAE5);
+      fg = kSecondary500;
+      icon = Icons.check_circle_outline;
+    }
+
+    final expiryStr = expiry != null
+        ? DateFormat('d MMM yyyy').format(expiry!)
+        : null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            expiryStr != null
+                ? '$label: $expiryStr'
+                : label,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }
