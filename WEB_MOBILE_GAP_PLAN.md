@@ -15,17 +15,17 @@
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 7 | 2 |
 | 06 Polls | 9 | 8 | 1 |
-| 07 Community Board | 11 | 9 | 2 |
+| 07 Community Board | 11 | 10 | 1 |
 | 08 Documents | 11 | 5 | 6 |
 | 09 Gallery | 5 | 2 | 3 |
-| 10 Facilities | 6 | 5 | 1 |
+| 10 Facilities | 6 | 6 | 0 |
 | 11 Parking | 12 | 7 | 5 |
 | 12 Maids | 9 | 8 | 1 |
 | 13 Members | 8 | 4 | 4 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
 | 16 Water Tankers | 11 | 8 | 3 |
-| 17 Snags | 11 | 5 | 6 |
+| 17 Snags | 11 | 7 | 4 |
 | 18 HOTO | 8 | 2 | 6 |
 | 19 Analytics | 8 | 1 | 7 |
 | 20 Security Patrol | 6 | 4 | 2 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 4 | 2 |
-| **TOTAL** | **234** | **132** | **102** |
+| **TOTAL** | **234** | **135** | **99** |
 
 ---
 
@@ -147,7 +147,7 @@
 - [x] 🟡 Report post modal — reason (spam / offensive / misinformation / harassment / other) + optional details (max 300 chars)
 - [x] 🟡 Moderation queue — 3 reports hides post; exec can clear or remove
 - [x] 🟡 Category filter chips (General / Help / Lost & Found / Recommendation / Alert)
-- [ ] 🟡 Marketplace sub-section (buy / sell / giveaway listings)
+- [x] 🟡 Marketplace sub-section (buy / sell / giveaway listings)
 - [x] 🟢 Pagination / load-more (offset-based, limit=10)
 
 ---
@@ -184,7 +184,7 @@
 - [x] 🟡 Booking fee and deposit amount displayed before and on booking confirmation
 - [x] 🟡 Client-side advance booking validation (enforce `advance_booking_days` minimum)
 - [x] 🟢 Advance booking window indicator ("Up to X days in advance")
-- [ ] 🟢 No-show suspension warning (3 no-shows = account flagged)
+- [x] 🟢 No-show suspension warning (3 no-shows = account flagged)
 - [x] 🟢 Deposit refund / credit details on cancellation
 
 ---
@@ -281,10 +281,10 @@
 - [ ] 🟠 Document uploads — PDF/DOC/CSV up to 50 MB with description
 - [x] 🟠 Comments thread — view + add comments on snag
 - [ ] 🟡 Create vendor work order from snag (linked WO with deadline + quoted amount)
-- [ ] 🟡 Assignee field — assign to committee member (exec/secretary/president)
+- [x] 🟡 Assignee field — assign to committee member (exec/secretary/president)
 - [ ] 🟡 HOTO item linkage — view linked HOTO item; HOTO blocked until snag verified
 - [ ] 🟡 CSV export with filters (status, severity, scope, category)
-- [ ] 🟢 Builder reference fields (`builder_ref`, `builder_committed_date`)
+- [x] 🟢 Builder reference fields (`builder_ref`, `builder_committed_date`)
 
 ---
 

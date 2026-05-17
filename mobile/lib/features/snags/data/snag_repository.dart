@@ -20,6 +20,9 @@ class SnagItem {
   final DateTime reportedDate;
   final DateTime? verifiedAt;
   final DateTime createdAt;
+  final String? builderRef;
+  final DateTime? builderCommittedDate;
+  final String? responsibleRole;
 
   const SnagItem({
     required this.id,
@@ -35,6 +38,9 @@ class SnagItem {
     required this.reportedDate,
     this.verifiedAt,
     required this.createdAt,
+    this.builderRef,
+    this.builderCommittedDate,
+    this.responsibleRole,
   });
 
   factory SnagItem.fromJson(Map<String, dynamic> j) => SnagItem(
@@ -53,6 +59,11 @@ class SnagItem {
             ? DateTime.parse(j['verified_at'] as String)
             : null,
         createdAt: DateTime.parse(j['created_at'] as String),
+        builderRef: j['builder_ref'] as String?,
+        builderCommittedDate: j['builder_committed_date'] != null
+            ? DateTime.parse(j['builder_committed_date'] as String)
+            : null,
+        responsibleRole: j['responsible_role'] as String?,
       );
 }
 

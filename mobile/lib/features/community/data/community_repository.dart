@@ -199,6 +199,19 @@ class CommunityRepository {
         .eq('id', postId);
   }
 
+  Future<List<MarketplaceListing>> fetchMarketplaceListings() async {
+    final data = await _client
+        .from('marketplace_listings')
+        .select()
+        .eq('society_id', env.societyId)
+        .eq('status', 'active')
+        .order('created_at', ascending: false)
+        .limit(30);
+    return (data as List)
+        .map((e) => MarketplaceListing.fromJson(e))
+        .toList();
+  }
+
   /// Toggles a reaction: inserts if not present, deletes if already present.
   Future<void> toggleReaction(String postId, String reactionType) async {
     final uid = _client.auth.currentUser?.id;
@@ -243,6 +256,64 @@ class ReportedPost {
 }
 
 // ---------------------------------------------------------------------------
+// Marketplace Listing model
+// ---------------------------------------------------------------------------
+
+class MarketplaceListing {
+  final String id;
+  final String sellerId;
+  final String? unitId;
+  final String category;
+  final String title;
+  final String? description;
+  final double? price;
+  final String status;
+  final String contactPreference;
+  final DateTime? expiresAt;
+  final DateTime createdAt;
+
+  const MarketplaceListing({
+    required this.id,
+    required this.sellerId,
+    this.unitId,
+    required this.category,
+    required this.title,
+    this.description,
+    this.price,
+    required this.status,
+    required this.contactPreference,
+    this.expiresAt,
+    required this.createdAt,
+  });
+
+  bool get isExpired =>
+      expiresAt != null && expiresAt!.isBefore(DateTime.now());
+
+  String get categoryLabel => switch (category) {
+        'Baby_Items' => 'Baby Items',
+        _ => category,
+      };
+
+  factory MarketplaceListing.fromJson(Map<String, dynamic> j) =>
+      MarketplaceListing(
+        id: j['id'] as String,
+        sellerId: j['seller_id'] as String,
+        unitId: j['unit_id'] as String?,
+        category: j['category'] as String? ?? 'Other',
+        title: j['title'] as String,
+        description: j['description'] as String?,
+        price: (j['price'] as num?)?.toDouble(),
+        status: j['status'] as String? ?? 'active',
+        contactPreference:
+            j['contact_preference'] as String? ?? 'in_app',
+        expiresAt: j['expires_at'] != null
+            ? DateTime.parse(j['expires_at'] as String)
+            : null,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
+}
+
+// ---------------------------------------------------------------------------
 // Providers
 // ---------------------------------------------------------------------------
 
@@ -261,4 +332,9 @@ final communityPostsProvider =
 final moderationQueueProvider =
     FutureProvider.autoDispose<List<ReportedPost>>((ref) {
   return ref.read(communityRepositoryProvider).fetchModerationQueue();
+});
+
+final marketplaceListingsProvider =
+    FutureProvider.autoDispose<List<MarketplaceListing>>((ref) {
+  return ref.read(communityRepositoryProvider).fetchMarketplaceListings();
 });

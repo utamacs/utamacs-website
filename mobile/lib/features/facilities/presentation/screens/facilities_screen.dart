@@ -277,6 +277,9 @@ class _MyBookingsTab extends ConsumerWidget {
           );
         }
 
+        final noShowCount =
+            bookings.where((b) => b.status == 'no_show').length;
+
         // Build a lookup map from facilities (best-effort — shows id prefix on error).
         final facilityMap = facilitiesAsync.valueOrNull != null
             ? {for (final f in facilitiesAsync.valueOrNull!) f.id: f.name}
@@ -289,17 +292,60 @@ class _MyBookingsTab extends ConsumerWidget {
           },
           child: ListView.separated(
             padding: const EdgeInsets.all(16),
-            itemCount: bookings.length,
+            itemCount: bookings.length + (noShowCount >= 3 ? 1 : 0),
             separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, i) => _BookingCard(
-              booking: bookings[i],
-              facilityName: facilityMap[bookings[i].facilityId] ??
-                  bookings[i].facilityId.substring(0, 8),
-              onCancel: () => _confirmCancel(
-                context, ref, bookings[i].id,
-                depositPaid: bookings[i].depositPaid,
-              ),
-            ),
+            itemBuilder: (context, i) {
+              if (noShowCount >= 3 && i == 0) {
+                return Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          size: 20, color: Color(0xFFD97706)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'No-Show Warning',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF92400E),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'You have $noShowCount no-show bookings. Accounts with 3 or more no-shows may have facility access suspended. Please contact management.',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF92400E)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              final idx = noShowCount >= 3 ? i - 1 : i;
+              return _BookingCard(
+                booking: bookings[idx],
+                facilityName: facilityMap[bookings[idx].facilityId] ??
+                    bookings[idx].facilityId.substring(0, 8),
+                onCancel: () => _confirmCancel(
+                  context, ref, bookings[idx].id,
+                  depositPaid: bookings[idx].depositPaid,
+                ),
+              );
+            },
           ),
         );
       },
