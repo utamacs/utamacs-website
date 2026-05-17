@@ -6,13 +6,23 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/letter_repository.dart';
 
 class LettersScreen extends ConsumerWidget {
   const LettersScreen({super.key});
 
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final lettersAsync = ref.watch(lettersProvider);
 
     return Scaffold(
@@ -22,12 +32,27 @@ class LettersScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (isExec)
+            IconButton(
+              icon: const Icon(Icons.description_outlined),
+              tooltip: 'Templates',
+              onPressed: () => _openPortal('letters?tab=templates'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(lettersProvider),
           ),
         ],
       ),
+      floatingActionButton: isExec
+          ? FloatingActionButton.extended(
+              onPressed: () => _openPortal('letters?action=generate'),
+              icon: const Icon(Icons.add),
+              label: const Text('Generate Letter'),
+              backgroundColor: kPrimary600,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: lettersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => EmptyState(
@@ -61,7 +86,7 @@ class LettersScreen extends ConsumerWidget {
                     itemCount: letters.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, i) =>
-                        _LetterCard(letter: letters[i]),
+                        _LetterCard(letter: letters[i], isExec: isExec),
                   ),
                 ),
             ],
@@ -116,14 +141,16 @@ class _InfoBanner extends StatelessWidget {
 
 class _LetterCard extends StatelessWidget {
   final GeneratedLetter letter;
-  const _LetterCard({required this.letter});
+  final bool isExec;
+  const _LetterCard({required this.letter, required this.isExec});
 
   void _openDetail(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _LetterDetailSheet(letter: letter),
+      builder: (_) =>
+          _LetterDetailSheet(letter: letter, isExec: isExec),
     );
   }
 
@@ -223,7 +250,9 @@ class _LetterCard extends StatelessWidget {
 
 class _LetterDetailSheet extends StatelessWidget {
   final GeneratedLetter letter;
-  const _LetterDetailSheet({required this.letter});
+  final bool isExec;
+  const _LetterDetailSheet(
+      {required this.letter, required this.isExec});
 
   Widget _row(IconData icon, String label, String value) {
     return Padding(
@@ -331,12 +360,15 @@ class _LetterDetailSheet extends StatelessWidget {
                   child: Text(
                     'Full content and PDF download are available in the resident portal.',
                     style: GoogleFonts.inter(
-                        fontSize: 12, color: const Color(0xFF92400E), height: 1.4),
+                        fontSize: 12,
+                        color: const Color(0xFF92400E),
+                        height: 1.4),
                   ),
                 ),
                 TextButton(
                   onPressed: () => launchUrl(
-                    Uri.parse('https://portal.utamacs.org/portal/letters'),
+                    Uri.parse(
+                        'https://portal.utamacs.org/portal/letters/${letter.id}'),
                     mode: LaunchMode.externalApplication,
                   ),
                   style: TextButton.styleFrom(
@@ -352,6 +384,60 @@ class _LetterDetailSheet extends StatelessWidget {
               ],
             ),
           ),
+          if (isExec) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kPrimary600,
+                      side: const BorderSide(color: kPrimary600),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      textStyle: GoogleFonts.inter(
+                          fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                    icon: const Icon(Icons.draw_outlined, size: 15),
+                    label: const Text('Sign-off'),
+                    onPressed: () async {
+                      final uri = Uri.parse(
+                          'https://portal.utamacs.org/portal/letters/${letter.id}?action=signoff');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kTextSecondary,
+                      side: const BorderSide(color: kBorderLight),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      textStyle: GoogleFonts.inter(
+                          fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                    icon: const Icon(Icons.link_outlined, size: 15),
+                    label: const Text('Link Module'),
+                    onPressed: () async {
+                      final uri = Uri.parse(
+                          'https://portal.utamacs.org/portal/letters/${letter.id}?action=link');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

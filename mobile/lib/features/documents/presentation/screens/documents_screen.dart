@@ -45,6 +45,8 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final docsAsync = ref.watch(documentsProvider);
 
     return Scaffold(
@@ -60,6 +62,22 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
           ),
         ],
       ),
+      floatingActionButton: isExec
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                final uri = Uri.parse(
+                    'https://portal.utamacs.org/portal/documents?action=upload');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri,
+                      mode: LaunchMode.externalApplication);
+                }
+              },
+              icon: const Icon(Icons.upload_file_outlined),
+              label: const Text('Upload'),
+              backgroundColor: kPrimary600,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: docsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => EmptyState(
@@ -541,6 +559,77 @@ class _DocumentDetailDialogState extends ConsumerState<_DocumentDetailDialog> {
               },
             ),
           ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: kTextSecondary,
+                side: const BorderSide(color: kBorderLight),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              icon: const Icon(Icons.history_outlined, size: 16),
+              label: const Text('Version History'),
+              onPressed: () async {
+                final uri = Uri.parse(
+                    'https://portal.utamacs.org/portal/documents/${doc.id}?tab=versions');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri,
+                      mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ),
+          if (widget.isExec) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kSecondary500,
+                  side: const BorderSide(color: kSecondary500),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                icon: const Icon(Icons.upload_file_outlined, size: 16),
+                label: const Text('Upload New Version'),
+                onPressed: () async {
+                  final uri = Uri.parse(
+                      'https://portal.utamacs.org/portal/documents/${doc.id}?action=new-version');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri,
+                        mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kTextSecondary,
+                  side: const BorderSide(color: kBorderLight),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                icon: const Icon(Icons.manage_search_outlined, size: 16),
+                label: const Text('Download Audit Log'),
+                onPressed: () async {
+                  final uri = Uri.parse(
+                      'https://portal.utamacs.org/portal/documents/${doc.id}?tab=audit');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri,
+                        mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
+            ),
+          ],
         ],
       ),
       actions: [

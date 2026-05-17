@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/hoto_repository.dart';
 
 // ---------------------------------------------------------------------------
@@ -15,8 +17,17 @@ import '../../data/hoto_repository.dart';
 class HotoScreen extends ConsumerWidget {
   const HotoScreen({super.key});
 
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final summaryAsync = ref.watch(hotoSummaryProvider);
 
     return Scaffold(
@@ -26,6 +37,18 @@ class HotoScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (isExec) ...[
+            IconButton(
+              icon: const Icon(Icons.group_add_outlined),
+              tooltip: 'Invite Participants',
+              onPressed: () => _openPortal('hoto?action=invite'),
+            ),
+            IconButton(
+              icon: const Icon(Icons.supervisor_account_outlined),
+              tooltip: 'Manage Delegation',
+              onPressed: () => _openPortal('hoto?action=delegate'),
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
