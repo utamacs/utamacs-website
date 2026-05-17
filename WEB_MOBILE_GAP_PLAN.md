@@ -14,8 +14,8 @@
 | 03 Complaints | 13 | 13 | 0 |
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 7 | 2 |
-| 06 Polls | 9 | 7 | 2 |
-| 07 Community Board | 11 | 7 | 4 |
+| 06 Polls | 9 | 8 | 1 |
+| 07 Community Board | 11 | 9 | 2 |
 | 08 Documents | 11 | 5 | 6 |
 | 09 Gallery | 5 | 2 | 3 |
 | 10 Facilities | 6 | 5 | 1 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 3 | 3 |
-| **TOTAL** | **234** | **119** | **115** |
+| **TOTAL** | **234** | **122** | **112** |
 
 ---
 
@@ -132,7 +132,7 @@
 - [ ] 🟡 PDF export of results (exec) — signed PDF with society letterhead
 - [x] 🟡 Anonymous voting — display layer hides voter identity
 - [x] 🟡 Result visibility modes fully enforced: `after_vote` / `after_close` / `executive_only`
-- [ ] 🟢 AGM session linkage on poll create
+- [x] 🟢 AGM session linkage on poll create
 
 ---
 
@@ -145,10 +145,10 @@
 - [x] 🟡 Delete / soft-delete post (owner or exec)
 - [x] 🟡 Pin / unpin post (exec) with pinned visual indicator
 - [x] 🟡 Report post modal — reason (spam / offensive / misinformation / harassment / other) + optional details (max 300 chars)
-- [ ] 🟡 Moderation queue — 3 reports hides post; exec can clear or remove
+- [x] 🟡 Moderation queue — 3 reports hides post; exec can clear or remove
 - [x] 🟡 Category filter chips (General / Help / Lost & Found / Recommendation / Alert)
 - [ ] 🟡 Marketplace sub-section (buy / sell / giveaway listings)
-- [ ] 🟢 Pagination / load-more (offset-based, limit=10)
+- [x] 🟢 Pagination / load-more (offset-based, limit=10)
 
 ---
 

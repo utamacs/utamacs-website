@@ -8,6 +8,7 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
 import '../../../auth/domain/auth_notifier.dart';
+import '../../../agm/data/agm_repository.dart';
 import '../../data/poll_repository.dart';
 import 'poll_detail_screen.dart';
 
@@ -234,6 +235,7 @@ class _CreatePollModalState extends ConsumerState<_CreatePollModal> {
   String _resultVisibility = 'after_vote';
   int _maxChoices = 2;
   DateTime? _endsAt;
+  String? _selectedAgmSessionId;
   bool _saving = false;
 
   // Options list (for single/multiple choice)
@@ -328,6 +330,7 @@ class _CreatePollModalState extends ConsumerState<_CreatePollModal> {
                     .where((t) => t.isNotEmpty)
                     .toList()
                 : [],
+            agmSessionId: _selectedAgmSessionId,
           );
       widget.onCreated();
       if (mounted) {
@@ -597,6 +600,14 @@ class _CreatePollModalState extends ConsumerState<_CreatePollModal> {
                       onChanged: (v) =>
                           setState(() => _oneVotePerUnit = v),
                     ),
+                    const SizedBox(height: 14),
+
+                    // AGM session linkage (optional)
+                    _AgmSessionDropdown(
+                      selectedSessionId: _selectedAgmSessionId,
+                      onChanged: (id) =>
+                          setState(() => _selectedAgmSessionId = id),
+                    ),
 
                     const SizedBox(height: 24),
                     ElevatedButton(
@@ -666,6 +677,59 @@ class _ToggleRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AGM session linkage dropdown (used in create poll form)
+// ---------------------------------------------------------------------------
+
+class _AgmSessionDropdown extends ConsumerWidget {
+  final String? selectedSessionId;
+  final ValueChanged<String?> onChanged;
+
+  const _AgmSessionDropdown({
+    required this.selectedSessionId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(agmSessionsProvider);
+
+    return sessionsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (sessions) {
+        if (sessions.isEmpty) return const SizedBox.shrink();
+        return DropdownButtonFormField<String>(
+          value: selectedSessionId,
+          decoration: InputDecoration(
+            labelText: 'Link to AGM Session (optional)',
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
+          items: [
+            const DropdownMenuItem<String>(
+              value: null,
+              child: Text('No AGM linkage'),
+            ),
+            ...sessions.map(
+              (s) => DropdownMenuItem<String>(
+                value: s.id,
+                child: Text(
+                  'AGM ${s.agmYear} — ${s.typeLabel.split(' ').first}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+          onChanged: onChanged,
+        );
+      },
     );
   }
 }
