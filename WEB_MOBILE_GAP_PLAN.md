@@ -21,23 +21,23 @@
 | 10 Facilities | 6 | 6 | 0 |
 | 11 Parking | 12 | 10 | 2 |
 | 12 Maids | 9 | 9 | 0 |
-| 13 Members | 8 | 5 | 3 |
+| 13 Members | 8 | 6 | 2 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
 | 16 Water Tankers | 11 | 10 | 1 |
-| 17 Snags | 11 | 8 | 3 |
+| 17 Snags | 11 | 9 | 2 |
 | 18 HOTO | 8 | 4 | 4 |
-| 19 Analytics | 8 | 3 | 5 |
+| 19 Analytics | 8 | 7 | 1 |
 | 20 Security Patrol | 6 | 6 | 0 |
 | 21 Staff Management | 9 | 6 | 3 |
-| 22 Policies | 4 | 3 | 1 |
+| 22 Policies | 4 | 4 | 0 |
 | 23 Register / Membership | 6 | 5 | 1 |
 | 24 AGM | 5 | 5 | 0 |
 | 25 Tenant KYC | 5 | 5 | 0 |
 | 26 Letters | 5 | 1 | 4 |
 | 27 Vendors & Work Orders | 9 | 7 | 2 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **234** | **173** | **61** |
+| **TOTAL** | **234** | **179** | **55** |
 
 ---
 
@@ -229,7 +229,7 @@
 - [x] 🟡 Move-in date ("Member since MMM YYYY") on profile
 - [x] 🟡 Vehicle details section (reg_no, make, model) in own profile
 - [x] 🟢 Tenancy expiry filter ("Expiring in 30 days")
-- [ ] 🟢 CSV export (exec)
+- [x] 🟢 CSV export (exec)
 
 ---
 
@@ -283,7 +283,7 @@
 - [x] 🟡 Create vendor work order from snag (linked WO with deadline + quoted amount)
 - [x] 🟡 Assignee field — assign to committee member (exec/secretary/president)
 - [x] 🟡 HOTO item linkage — view linked HOTO item; HOTO blocked until snag verified
-- [ ] 🟡 CSV export with filters (status, severity, scope, category)
+- [x] 🟡 CSV export with filters (status, severity, scope, category)
 - [x] 🟢 Builder reference fields (`builder_ref`, `builder_committed_date`)
 
 ---
@@ -305,11 +305,11 @@
 
 - [x] 🔴 Overview KPI cards — total members, units, dues collection %, complaints, visitors
 - [x] 🔴 Charts — bar (complaints by status, visitor types), line (14-day visitor trend, 6-month P&L, collection efficiency), pie (member composition, expense breakdown)
-- [ ] 🟠 Filtered data CSV export
-- [ ] 🟠 Executive PDF report (`/api/v1/reports/executive-pdf`)
+- [x] 🟠 Filtered data CSV export
+- [x] 🟠 Executive PDF report (`/api/v1/reports/executive-pdf`)
 - [ ] 🟡 Wing / block / billing-period filters
 - [x] 🟡 Real-time KPI refresh
-- [ ] 🟡 All 11 report types — Collection, Pending Dues, Complaint Resolution, Facility Utilisation, Visitor Log, Tenant Expiry, Member Directory, Trends, Expense Breakdown, Occupancy
+- [x] 🟡 All 11 report types — Collection, Pending Dues, Complaint Resolution, Facility Utilisation, Visitor Log, Tenant Expiry, Member Directory, Trends, Expense Breakdown, Occupancy
 - [ ] 🟢 Occupancy heatmap by unit status
 
 ---
@@ -342,7 +342,7 @@
 ## 22 · POLICIES
 
 - [x] 🟠 Policy detail / full-content view — render HTML body, embed PDF iframe, YouTube/video player
-- [ ] 🟡 PDF upload / replace (exec) — max 20 MB via GitHub Docs
+- [x] 🟡 PDF upload / replace (exec) — max 20 MB via GitHub Docs
 - [x] 🟡 Policy edit form (title, description, effective_date, version, gate_portal_access toggle)
 - [x] 🟡 `gate_portal_access` indicator clearly surfaced on policy card ("Blocks portal access until acknowledged")
 

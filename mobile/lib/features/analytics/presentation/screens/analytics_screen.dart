@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../auth/domain/auth_notifier.dart';
 import '../../data/analytics_repository.dart';
 
 // ---------------------------------------------------------------------------
@@ -12,8 +14,17 @@ import '../../data/analytics_repository.dart';
 class AnalyticsScreen extends ConsumerWidget {
   const AnalyticsScreen({super.key});
 
+  static Future<void> _openPortal(String path) async {
+    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final statsAsync = ref.watch(societyStatsProvider);
     final breakdownAsync = ref.watch(complaintBreakdownProvider);
     final visitorAsync = ref.watch(visitorTypeBreakdownProvider);
@@ -27,10 +38,22 @@ class AnalyticsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: kBgWarm,
       appBar: AppBar(
-        title: const Text('Society Overview'),
+        title: const Text('Analytics & Reports'),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         actions: [
+          if (isExec) ...[
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Executive PDF Report',
+              onPressed: () => _openPortal('analytics?export=pdf'),
+            ),
+            IconButton(
+              icon: const Icon(Icons.download_outlined),
+              tooltip: 'Export CSV',
+              onPressed: () => _openPortal('analytics?export=csv'),
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: refresh,
@@ -84,9 +107,173 @@ class AnalyticsScreen extends ConsumerWidget {
                       ? _VisitorTypeBreakdownCard(breakdown: vb)
                       : const SizedBox.shrink(),
                 ),
+                const SizedBox(height: 24),
+                // All report types (exec only)
+                if (isExec) const _ReportsGrid(),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reports grid — 11 report types linking to portal
+// ---------------------------------------------------------------------------
+
+class _ReportsGrid extends StatelessWidget {
+  const _ReportsGrid();
+
+  static const _reports = [
+    _ReportDef(
+        label: 'Collection Report',
+        icon: Icons.receipt_long_outlined,
+        path: 'analytics?report=collection',
+        color: kPrimary600),
+    _ReportDef(
+        label: 'Pending Dues',
+        icon: Icons.pending_actions_outlined,
+        path: 'analytics?report=pending-dues',
+        color: kRed600),
+    _ReportDef(
+        label: 'Complaint Resolution',
+        icon: Icons.support_agent_outlined,
+        path: 'analytics?report=complaint-resolution',
+        color: kAccent500),
+    _ReportDef(
+        label: 'Facility Utilisation',
+        icon: Icons.meeting_room_outlined,
+        path: 'analytics?report=facility-utilisation',
+        color: kSecondary500),
+    _ReportDef(
+        label: 'Visitor Log',
+        icon: Icons.badge_outlined,
+        path: 'analytics?report=visitor-log',
+        color: Color(0xFF7C3AED)),
+    _ReportDef(
+        label: 'Tenant Expiry',
+        icon: Icons.event_busy_outlined,
+        path: 'analytics?report=tenant-expiry',
+        color: Color(0xFFDB2777)),
+    _ReportDef(
+        label: 'Member Directory',
+        icon: Icons.people_outline,
+        path: 'analytics?report=member-directory',
+        color: kPrimary600),
+    _ReportDef(
+        label: 'Trends',
+        icon: Icons.trending_up_outlined,
+        path: 'analytics?report=trends',
+        color: kSecondary500),
+    _ReportDef(
+        label: 'Expense Breakdown',
+        icon: Icons.pie_chart_outline,
+        path: 'analytics?report=expense-breakdown',
+        color: kAccent500),
+    _ReportDef(
+        label: 'Occupancy',
+        icon: Icons.home_work_outlined,
+        path: 'analytics?report=occupancy',
+        color: Color(0xFF0891B2)),
+    _ReportDef(
+        label: 'Staff Analytics',
+        icon: Icons.groups_outlined,
+        path: 'analytics?report=staff',
+        color: Color(0xFF059669)),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Reports',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: kTextPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 2.2,
+          ),
+          itemCount: _reports.length,
+          itemBuilder: (context, i) => _ReportCard(report: _reports[i]),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReportDef {
+  final String label;
+  final IconData icon;
+  final String path;
+  final Color color;
+  const _ReportDef(
+      {required this.label,
+      required this.icon,
+      required this.path,
+      required this.color});
+}
+
+class _ReportCard extends StatelessWidget {
+  final _ReportDef report;
+  const _ReportCard({required this.report});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final uri = Uri.parse(
+            'https://portal.utamacs.org/portal/${report.path}');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kBorderLight),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: report.color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child:
+                  Icon(report.icon, size: 18, color: report.color),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                report.label,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kTextPrimary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );
