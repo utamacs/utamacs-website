@@ -17,6 +17,7 @@ class Maid {
   final DateTime registeredAt;
   final String? agency;
   final DateTime? kycExpiresAt;
+  final String? photoKey;
 
   const Maid({
     required this.id,
@@ -28,6 +29,7 @@ class Maid {
     required this.registeredAt,
     this.agency,
     this.kycExpiresAt,
+    this.photoKey,
   });
 
   bool get kycExpired =>
@@ -53,6 +55,7 @@ class Maid {
         kycExpiresAt: j['kyc_expires_at'] != null
             ? DateTime.parse(j['kyc_expires_at'] as String)
             : null,
+        photoKey: j['photo_key'] as String?,
       );
 }
 

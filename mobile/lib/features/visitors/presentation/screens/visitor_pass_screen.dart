@@ -95,6 +95,10 @@ class VisitorPassScreen extends StatelessWidget {
                           ? '${formatDate(approval.expectedDate)} – ${formatDate(approval.expiresAt!)}'
                           : formatDate(approval.expectedDate),
                     ),
+                    if (approval.notes != null &&
+                        approval.notes!.isNotEmpty)
+                      _DetailRow(
+                          label: 'Guard note', value: approval.notes!),
                     if (approval.otpCode != null)
                       _DetailRow(label: 'Guard OTP', value: approval.otpCode!),
                     if (approval.isRecurring)

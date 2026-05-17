@@ -13,6 +13,7 @@ class Member {
   final String? unitNumber;
   final String? block;
   final String portalRole;
+  final bool isNri;
 
   const Member({
     required this.id,
@@ -21,6 +22,7 @@ class Member {
     this.unitNumber,
     this.block,
     required this.portalRole,
+    this.isNri = false,
   });
 
   /// Returns "B-101" style display, or just unit number, or empty string.
@@ -48,6 +50,7 @@ class Member {
       unitNumber: unitMap?['unit_number'] as String?,
       block: unitMap?['block'] as String?,
       portalRole: j['portal_role'] as String? ?? 'member',
+      isNri: j['is_nri'] as bool? ?? false,
     );
   }
 }

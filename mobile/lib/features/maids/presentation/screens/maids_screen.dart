@@ -273,20 +273,42 @@ class _MaidCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar with initial
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: kPrimary100,
-            child: Text(
-              maid.fullName.isNotEmpty
-                  ? maid.fullName[0].toUpperCase()
-                  : '?',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: kPrimary600,
+          // Avatar with initial + photo-on-file badge
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: kPrimary100,
+                child: Text(
+                  maid.fullName.isNotEmpty
+                      ? maid.fullName[0].toUpperCase()
+                      : '?',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: kPrimary600,
+                  ),
+                ),
               ),
-            ),
+              if (maid.photoKey != null)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: const BoxDecoration(
+                      color: kSecondary500,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      size: 10,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 14),
           // Content

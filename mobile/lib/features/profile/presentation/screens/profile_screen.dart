@@ -16,6 +16,7 @@ class ProfileScreen extends ConsumerWidget {
     final profile = authState.profile;
     final unitDetails = ref.watch(_unitDetailsProvider).valueOrNull;
     final vehicleInfo = ref.watch(_vehicleProvider).valueOrNull;
+    final consentInfo = ref.watch(_consentProvider).valueOrNull;
 
     final initial = (profile?.fullName?.isNotEmpty == true)
         ? profile!.fullName![0].toUpperCase()
@@ -192,6 +193,66 @@ class ProfileScreen extends ConsumerWidget {
             if (vehicleInfo != null) ...[
               const SizedBox(height: 16),
               _VehicleInfoCard(info: vehicleInfo),
+            ],
+
+            // DPDPA consent card
+            if (consentInfo != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: kPrimary50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.privacy_tip_outlined,
+                                size: 18, color: kPrimary600),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Data Privacy',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: kTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    _InfoRow(
+                      icon: Icons.check_circle_outline,
+                      label: 'DPDPA Consent',
+                      value: 'v${consentInfo.policyVersion}',
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    _InfoRow(
+                      icon: Icons.calendar_today_outlined,
+                      label: 'Accepted on',
+                      value: DateFormat('d MMM yyyy').format(consentInfo.acceptedAt),
+                    ),
+                  ],
+                ),
+              ),
             ],
 
             // Emergency contact card (if set)
@@ -620,6 +681,7 @@ class _UnitDetails {
   final String? residencyType;
   final DateTime? moveInDate;
   final int? numOccupants;
+  final bool isNri;
 
   const _UnitDetails({
     this.areaSqft,
@@ -627,6 +689,7 @@ class _UnitDetails {
     this.residencyType,
     this.moveInDate,
     this.numOccupants,
+    this.isNri = false,
   });
 
   bool get hasAnyData =>
@@ -634,7 +697,8 @@ class _UnitDetails {
       floor != null ||
       residencyType != null ||
       moveInDate != null ||
-      numOccupants != null;
+      numOccupants != null ||
+      isNri;
 
   factory _UnitDetails.fromJson(Map<String, dynamic> j) {
     final unitsMap = j['units'] as Map<String, dynamic>?;
@@ -646,6 +710,7 @@ class _UnitDetails {
           ? DateTime.parse(j['move_in_date'] as String)
           : null,
       numOccupants: j['num_occupants'] as int?,
+      isNri: j['is_nri'] as bool? ?? false,
     );
   }
 }
@@ -656,7 +721,7 @@ final _unitDetailsProvider = FutureProvider.autoDispose<_UnitDetails?>(
     if (uid == null) return null;
     final data = await Supabase.instance.client
         .from('profiles')
-        .select('residency_type, move_in_date, num_occupants, units(floor, area_sqft)')
+        .select('residency_type, move_in_date, num_occupants, is_nri, units(floor, area_sqft)')
         .eq('id', uid)
         .maybeSingle();
     if (data == null) return null;
@@ -758,6 +823,14 @@ class _UnitDetailsCard extends StatelessWidget {
                   '${details.numOccupants} person${details.numOccupants != 1 ? 's' : ''}',
             ),
           ],
+          if (details.isNri) ...[
+            const Divider(height: 1, indent: 56),
+            _InfoRow(
+              icon: Icons.flight_outlined,
+              label: 'Residency',
+              value: 'NRI (Non-Resident Indian)',
+            ),
+          ],
         ],
       ),
     );
@@ -821,6 +894,38 @@ final _vehicleProvider = FutureProvider.autoDispose<_VehicleInfo?>(
     if (data == null) return null;
     final v = _VehicleInfo.fromJson(data);
     return v.hasAnyData ? v : null;
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Consent provider
+// ---------------------------------------------------------------------------
+
+class _ConsentInfo {
+  final String policyVersion;
+  final DateTime acceptedAt;
+
+  const _ConsentInfo({required this.policyVersion, required this.acceptedAt});
+
+  factory _ConsentInfo.fromJson(Map<String, dynamic> j) => _ConsentInfo(
+        policyVersion: j['policy_version'] as String? ?? '1.0',
+        acceptedAt: DateTime.parse(j['accepted_at'] as String),
+      );
+}
+
+final _consentProvider = FutureProvider.autoDispose<_ConsentInfo?>(
+  (ref) async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return null;
+    final data = await Supabase.instance.client
+        .from('privacy_consents')
+        .select('policy_version, accepted_at')
+        .eq('user_id', uid)
+        .order('accepted_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    if (data == null) return null;
+    return _ConsentInfo.fromJson(data);
   },
 );
 
