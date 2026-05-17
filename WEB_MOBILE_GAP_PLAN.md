@@ -9,9 +9,9 @@
 
 | Module | Total | Done | Remaining |
 |--------|-------|------|-----------|
-| 01 Notices | 9 | 7 | 2 |
+| 01 Notices | 8 | 8 | 0 |
 | 02 Visitors | 14 | 3 | 11 |
-| 03 Complaints | 13 | 13 | 0 |
+| 03 Complaints | 13 | 12 | 1 |
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 8 | 1 |
 | 06 Polls | 9 | 9 | 0 |
@@ -21,23 +21,23 @@
 | 10 Facilities | 6 | 6 | 0 |
 | 11 Parking | 12 | 10 | 2 |
 | 12 Maids | 9 | 9 | 0 |
-| 13 Members | 8 | 6 | 2 |
+| 13 Members | 8 | 8 | 0 |
 | 14 Notifications | 5 | 5 | 0 |
 | 15 Feedback | 8 | 8 | 0 |
-| 16 Water Tankers | 11 | 10 | 1 |
+| 16 Water Tankers | 11 | 11 | 0 |
 | 17 Snags | 11 | 9 | 2 |
 | 18 HOTO | 8 | 6 | 2 |
 | 19 Analytics | 8 | 7 | 1 |
 | 20 Security Patrol | 6 | 6 | 0 |
-| 21 Staff Management | 9 | 6 | 3 |
+| 21 Staff Management | 9 | 9 | 0 |
 | 22 Policies | 4 | 4 | 0 |
 | 23 Register / Membership | 6 | 6 | 0 |
 | 24 AGM | 5 | 5 | 0 |
 | 25 Tenant KYC | 5 | 5 | 0 |
 | 26 Letters | 5 | 5 | 0 |
-| 27 Vendors & Work Orders | 9 | 7 | 2 |
+| 27 Vendors & Work Orders | 9 | 9 | 0 |
 | 28 Profile & Auth | 6 | 6 | 0 |
-| **TOTAL** | **234** | **191** | **43** |
+| **TOTAL** | **233** | **198** | **35** |
 
 ---
 
@@ -80,7 +80,7 @@
 - [ ] 🔴 Photo / document attachment upload — 5 files, 5 MB each, JPEG/PNG/WebP/HEIC/PDF
 - [x] 🟠 Category alignment — expand mobile from 6 to 14 categories matching web (Plumbing, Electrical, Lift, Security, Housekeeping, etc.)
 - [x] 🟠 Comments thread — view thread, add comment, internal-note checkbox (exec-only comments hidden from member)
-- [ ] 🟠 Attachments viewer in detail screen (tap to open signed URL)
+- [x] 🟠 Attachments viewer in detail screen (tap to open signed URL)
 - [x] 🟠 Status update + assignee sidebar (exec) — status dropdown + note + assign-to dropdown
 - [x] 🟡 Star rating widget (1–5 stars) + feedback textarea on resolved complaints
 - [x] 🟡 SLA deadline display and breach indicator (red if past deadline)
@@ -223,7 +223,7 @@
 ## 13 · MEMBERS DIRECTORY
 
 - [x] 🔴 Edit own profile — bio, preferred_language, WhatsApp number, emergency contact (name / phone / relation)
-- [ ] 🔴 Avatar upload — JPEG/PNG/WebP with progress indicator; stored via GitHub Docs
+- [x] 🔴 Avatar upload — JPEG/PNG/WebP with progress indicator; stored via GitHub Docs
 - [x] 🟠 Occupancy filter — owner_occupied / tenant_occupied / vacant / under_renovation
 - [x] 🟡 Role badge on member card (member / executive / secretary / president)
 - [x] 🟡 Move-in date ("Member since MMM YYYY") on profile
@@ -307,7 +307,7 @@
 - [x] 🔴 Charts — bar (complaints by status, visitor types), line (14-day visitor trend, 6-month P&L, collection efficiency), pie (member composition, expense breakdown)
 - [x] 🟠 Filtered data CSV export
 - [x] 🟠 Executive PDF report (`/api/v1/reports/executive-pdf`)
-- [ ] 🟡 Wing / block / billing-period filters
+- [x] 🟡 Wing / block / billing-period filters
 - [x] 🟡 Real-time KPI refresh
 - [x] 🟡 All 11 report types — Collection, Pending Dues, Complaint Resolution, Facility Utilisation, Visitor Log, Tenant Expiry, Member Directory, Trends, Expense Breakdown, Occupancy
 - [ ] 🟢 Occupancy heatmap by unit status
@@ -332,10 +332,10 @@
 - [x] 🟠 Task creation and assignment — title, description, assigned_to, department, deadline, priority (HIGH/MEDIUM/LOW)
 - [x] 🟠 Attendance marking and log view
 - [x] 🟠 Shift scheduling — view and create shifts per department
-- [ ] 🟡 Hiring / exit proposals workflow (committee approval)
-- [ ] 🟡 Staff analytics — attendance %, compliance status, activity logs
+- [x] 🟡 Hiring / exit proposals workflow (committee approval)
+- [x] 🟡 Staff analytics — attendance %, compliance status, activity logs
 - [x] 🟡 Agency management — PSARA / PF / ESIC expiry tracking
-- [ ] 🟢 Department configuration
+- [x] 🟢 Department configuration
 
 ---
 
@@ -392,8 +392,8 @@
 ## 27 · VENDORS & WORK ORDERS
 
 - [x] 🔴 Create work order form — vendor (select), linked complaint/snag (optional), description, quoted_amount, schedule_date, TDS applicable checkbox
-- [ ] 🔴 Invoice upload on work order + mark complete flow
-- [ ] 🔴 Procurement module — create requirement, vendor candidates, committee vote, select winner
+- [x] 🔴 Invoice upload on work order + mark complete flow
+- [x] 🔴 Procurement module — create requirement, vendor candidates, committee vote, select winner
 - [x] 🟠 Vendor contact details, GST#, PAN#, bank account in detail view
 - [x] 🟠 WO status workflow buttons — Mark In Progress → Inspect → Complete → Close / Dispute
 - [x] 🟡 Licence expiry warnings for agency vendors (PSARA / PF / ESIC)
@@ -406,9 +406,9 @@
 ## 28 · PROFILE & AUTH
 
 - [x] 🟠 Edit own profile — bio, preferred_language (en/te/hi), WhatsApp number, emergency contact (name / phone / relation)
-- [ ] 🟠 Avatar upload — JPEG/PNG/WebP with upload progress; stored via GitHub Docs `avatar(profileId, ext)` path
+- [x] 🟠 Avatar upload — JPEG/PNG/WebP with upload progress; stored via GitHub Docs `avatar(profileId, ext)` path
 - [x] 🟡 Unit details view — building, floor, area_sqft, residency_type, move_in_date, num_occupants
-- [ ] 🟡 Password reset flow — forgot-password email → reset-password token screen
+- [x] 🟡 Password reset flow — forgot-password email → reset-password token screen
 - [x] 🟢 NRI flag and occupant count display
 - [x] 🟢 Consent version and date display (DPDPA)
 

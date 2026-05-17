@@ -11,8 +11,16 @@ import '../../data/analytics_repository.dart';
 // Screen
 // ---------------------------------------------------------------------------
 
-class AnalyticsScreen extends ConsumerWidget {
+class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
+
+  @override
+  ConsumerState<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
+  String? _selectedWing;
+  String? _selectedPeriod;
 
   static Future<void> _openPortal(String path) async {
     final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
@@ -21,19 +29,19 @@ class AnalyticsScreen extends ConsumerWidget {
     }
   }
 
+  void refresh() {
+    ref.invalidate(societyStatsProvider);
+    ref.invalidate(complaintBreakdownProvider);
+    ref.invalidate(visitorTypeBreakdownProvider);
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final statsAsync = ref.watch(societyStatsProvider);
     final breakdownAsync = ref.watch(complaintBreakdownProvider);
     final visitorAsync = ref.watch(visitorTypeBreakdownProvider);
-
-    void refresh() {
-      ref.invalidate(societyStatsProvider);
-      ref.invalidate(complaintBreakdownProvider);
-      ref.invalidate(visitorTypeBreakdownProvider);
-    }
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -79,6 +87,21 @@ class AnalyticsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Wing / block / period filter row
+                _FilterRow(
+                  selectedWing: _selectedWing,
+                  selectedPeriod: _selectedPeriod,
+                  onWingSelected: (w) {
+                    setState(() => _selectedWing = w);
+                    final query = w != null ? '?wing=$w' : '';
+                    _openPortal('analytics$query');
+                  },
+                  onPeriodSelected: (p) {
+                    setState(() => _selectedPeriod = p);
+                    if (p != null) _openPortal('analytics?period=$p');
+                  },
+                ),
+                const SizedBox(height: 16),
                 Text(
                   'At a glance',
                   style: GoogleFonts.poppins(
@@ -114,6 +137,102 @@ class AnalyticsScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Filter row — wing / block / billing period
+// ---------------------------------------------------------------------------
+
+class _FilterRow extends StatelessWidget {
+  final String? selectedWing;
+  final String? selectedPeriod;
+  final void Function(String?) onWingSelected;
+  final void Function(String?) onPeriodSelected;
+
+  const _FilterRow({
+    required this.selectedWing,
+    required this.selectedPeriod,
+    required this.onWingSelected,
+    required this.onPeriodSelected,
+  });
+
+  static const _wings = ['A', 'B', 'C', 'D'];
+  static const _periods = [
+    ('This Month', 'current'),
+    ('Last 3 Months', 'q'),
+    ('This Year', 'year'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          // Wing chips
+          ..._wings.map((w) {
+            final selected = selectedWing == w;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () =>
+                    onWingSelected(selected ? null : w),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: selected ? kPrimary600 : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: selected ? kPrimary600 : kBorderLight,
+                    ),
+                  ),
+                  child: Text(
+                    'Wing $w',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: selected ? Colors.white : kTextSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+          // Period chips
+          ..._periods.map((p) {
+            final selected = selectedPeriod == p.$2;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () =>
+                    onPeriodSelected(selected ? null : p.$2),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: selected ? kAccent500 : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: selected ? kAccent500 : kBorderLight,
+                    ),
+                  ),
+                  child: Text(
+                    p.$1,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: selected ? Colors.white : kTextSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
