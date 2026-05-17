@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/constants/supabase.dart' as env;
 
 // ---------------------------------------------------------------------------
 // Model
@@ -81,6 +82,72 @@ class MaidRepository {
         .map((e) => Maid.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  Future<List<Maid>> fetchAllMaids() async {
+    final data = await _client
+        .from('maids')
+        .select()
+        .eq('society_id', env.societyId)
+        .eq('is_active', true)
+        .order('full_name', ascending: true)
+        .limit(100);
+    return (data as List)
+        .map((e) => Maid.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<String>> fetchApprovedMaidIds() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return [];
+    final profileData = await _client
+        .from('profiles')
+        .select('unit_id')
+        .eq('id', uid)
+        .maybeSingle();
+    final myUnitId = profileData?['unit_id'] as String?;
+    if (myUnitId == null) return [];
+    final data = await _client
+        .from('maid_unit_approvals')
+        .select('maid_id')
+        .eq('unit_id', myUnitId)
+        .eq('is_active', true);
+    return (data as List).map((e) => e['maid_id'] as String).toList();
+  }
+
+  Future<void> approveMaidForUnit(String maidId) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final profileData = await _client
+        .from('profiles')
+        .select('unit_id')
+        .eq('id', uid)
+        .maybeSingle();
+    final myUnitId = profileData?['unit_id'] as String?;
+    if (myUnitId == null) throw Exception('No unit associated with profile');
+    await _client.from('maid_unit_approvals').upsert({
+      'maid_id': maidId,
+      'unit_id': myUnitId,
+      'approved_by': uid,
+      'is_active': true,
+    }, onConflict: 'maid_id,unit_id');
+  }
+
+  Future<void> removeApprovalForUnit(String maidId) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    final profileData = await _client
+        .from('profiles')
+        .select('unit_id')
+        .eq('id', uid)
+        .maybeSingle();
+    final myUnitId = profileData?['unit_id'] as String?;
+    if (myUnitId == null) return;
+    await _client
+        .from('maid_unit_approvals')
+        .update({'is_active': false})
+        .eq('maid_id', maidId)
+        .eq('unit_id', myUnitId);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -93,3 +160,10 @@ final maidRepositoryProvider = Provider<MaidRepository>(
 
 final myMaidsProvider = FutureProvider.autoDispose<List<Maid>>((ref) =>
     ref.read(maidRepositoryProvider).fetchMyMaids());
+
+final allMaidsProvider = FutureProvider.autoDispose<List<Maid>>((ref) =>
+    ref.read(maidRepositoryProvider).fetchAllMaids());
+
+final approvedMaidIdsProvider =
+    FutureProvider.autoDispose<List<String>>((ref) =>
+        ref.read(maidRepositoryProvider).fetchApprovedMaidIds());

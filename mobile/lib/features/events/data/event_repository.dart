@@ -152,6 +152,42 @@ class EventRepository {
         .eq('id', registrationId)
         .eq('user_id', uid);
   }
+
+  Future<Event> createEvent({
+    required String title,
+    required String category,
+    required DateTime startsAt,
+    DateTime? endsAt,
+    String? location,
+    String? description,
+    int? capacity,
+    DateTime? registrationDeadline,
+    bool isPaid = false,
+    double? ticketPrice,
+  }) async {
+    final data = await _client
+        .from('events')
+        .insert({
+          'society_id': env.societyId,
+          'title': title,
+          'category': category,
+          'starts_at': startsAt.toIso8601String(),
+          if (endsAt != null) 'ends_at': endsAt.toIso8601String(),
+          if (location != null && location.isNotEmpty) 'location': location,
+          if (description != null && description.isNotEmpty)
+            'description': description,
+          if (capacity != null) 'capacity': capacity,
+          if (registrationDeadline != null)
+            'registration_deadline':
+                registrationDeadline.toIso8601String(),
+          'is_paid': isPaid,
+          if (isPaid && ticketPrice != null) 'ticket_price': ticketPrice,
+          'is_published': true,
+        })
+        .select()
+        .single();
+    return Event.fromJson(data);
+  }
 }
 
 // ---------------------------------------------------------------------------
