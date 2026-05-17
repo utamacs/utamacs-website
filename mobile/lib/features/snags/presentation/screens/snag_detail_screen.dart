@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/status_badge.dart';
 import '../../../auth/domain/auth_notifier.dart';
+import '../../../vendors/data/vendor_repository.dart';
 import '../../data/snag_repository.dart';
 
 class SnagDetailScreen extends ConsumerWidget {
@@ -192,6 +193,34 @@ class SnagDetailScreen extends ConsumerWidget {
           if (isExec) ...[
             const SizedBox(height: 16),
             _LinkedHotoSection(snagId: snag.id),
+          ],
+
+          // ── Create Work Order action (exec, open/in-progress snags) ───
+          if (isExec &&
+              (snag.status == 'open' || snag.status == 'in_progress')) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => _CreateWoSheet(snag: snag),
+                ),
+                icon: const Icon(Icons.assignment_outlined, size: 18),
+                label: const Text('Create Work Order'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kPrimary600,
+                  side: const BorderSide(color: kPrimary600),
+                  minimumSize: const Size(double.infinity, 46),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  textStyle:
+                      GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
           ],
 
           // ── Comments thread (exec only) ────────────────────────────────
@@ -676,6 +705,175 @@ class _DetailRow extends StatelessWidget {
                 fontWeight: FontWeight.w500,
                 color: kTextPrimary,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Create Work Order from snag bottom sheet
+// ---------------------------------------------------------------------------
+
+class _CreateWoSheet extends ConsumerStatefulWidget {
+  final SnagItem snag;
+  const _CreateWoSheet({required this.snag});
+
+  @override
+  ConsumerState<_CreateWoSheet> createState() => _CreateWoSheetState();
+}
+
+class _CreateWoSheetState extends ConsumerState<_CreateWoSheet> {
+  final _titleCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  Vendor? _selectedVendor;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final desc = widget.snag.description;
+    _titleCtrl.text = 'Rectify: ${desc.length > 45 ? desc.substring(0, 45) : desc}';
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_titleCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a work order title')));
+      return;
+    }
+    if (_selectedVendor == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a vendor')));
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final amount = double.tryParse(_amountCtrl.text.trim());
+      await ref.read(vendorRepositoryProvider).createWorkOrder(
+            vendorId: _selectedVendor!.id,
+            title: _titleCtrl.text.trim(),
+            description: 'Linked Snag: ${widget.snag.id}',
+            quotedAmount: amount,
+          );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Work order created',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            backgroundColor: kSecondary500,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e'), backgroundColor: kRed600),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vendorsAsync = ref.watch(vendorsProvider);
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 12,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(width: 36, height: 4,
+                decoration: BoxDecoration(color: kBorderLight,
+                    borderRadius: BorderRadius.circular(2))),
+          ),
+          const SizedBox(height: 14),
+          Text('Create Work Order', style: GoogleFonts.poppins(
+              fontSize: 16, fontWeight: FontWeight.w700, color: kPrimary600)),
+          const SizedBox(height: 4),
+          Text('Linked to Snag ${widget.snag.id}',
+              style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary)),
+          const SizedBox(height: 16),
+          vendorsAsync.when(
+            loading: () => const LinearProgressIndicator(),
+            error: (_, __) => Text('Could not load vendors',
+                style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary)),
+            data: (vendors) => DropdownButtonFormField<Vendor>(
+              value: _selectedVendor,
+              decoration: InputDecoration(
+                labelText: 'Vendor *',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+              ),
+              items: vendors.map((v) => DropdownMenuItem(
+                value: v,
+                child: Text(v.name, style: GoogleFonts.inter(fontSize: 14)),
+              )).toList(),
+              onChanged: (v) => setState(() => _selectedVendor = v),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _titleCtrl,
+            decoration: InputDecoration(
+              labelText: 'Title *',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+            ),
+            style: GoogleFonts.inter(fontSize: 14),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _amountCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Quoted Amount ₹ (optional)',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+            ),
+            style: GoogleFonts.inter(fontSize: 14),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submitting ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _submitting
+                  ? const SizedBox(width: 20, height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('Create Work Order'),
             ),
           ),
         ],

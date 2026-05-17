@@ -15,6 +15,12 @@ class AnalyticsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(societyStatsProvider);
+    final breakdownAsync = ref.watch(complaintBreakdownProvider);
+
+    void refresh() {
+      ref.invalidate(societyStatsProvider);
+      ref.invalidate(complaintBreakdownProvider);
+    }
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -25,7 +31,7 @@ class AnalyticsScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(societyStatsProvider),
+            onPressed: refresh,
           ),
         ],
       ),
@@ -36,12 +42,12 @@ class AnalyticsScreen extends ConsumerWidget {
           title: 'Could not load overview',
           subtitle: e.toString(),
           action: ElevatedButton(
-            onPressed: () => ref.invalidate(societyStatsProvider),
+            onPressed: refresh,
             child: const Text('Retry'),
           ),
         ),
         data: (stats) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(societyStatsProvider),
+          onRefresh: () async => refresh(),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
@@ -58,6 +64,15 @@ class AnalyticsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 _StatsGrid(stats: stats),
+                const SizedBox(height: 24),
+                // Complaint status breakdown chart
+                breakdownAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (bd) => bd.total > 0
+                      ? _ComplaintBreakdownCard(breakdown: bd)
+                      : const SizedBox.shrink(),
+                ),
               ],
             ),
           ),
@@ -196,6 +211,109 @@ class _StatCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Complaint status breakdown chart
+// ---------------------------------------------------------------------------
+
+class _ComplaintBreakdownCard extends StatelessWidget {
+  final ComplaintBreakdown breakdown;
+  const _ComplaintBreakdownCard({required this.breakdown});
+
+  static const _statusOrder = [
+    'open', 'under_review', 'in_progress', 'resolved', 'closed', 'rejected',
+  ];
+
+  static const _statusColors = {
+    'open': kRed600,
+    'under_review': kAccent500,
+    'in_progress': kPrimary600,
+    'resolved': kSecondary500,
+    'closed': kTextSecondary,
+    'rejected': Color(0xFF9CA3AF),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final total = breakdown.total;
+    final sorted = _statusOrder
+        .where((s) => (breakdown.countsByStatus[s] ?? 0) > 0)
+        .toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.report_outlined, size: 18, color: kRed600),
+              ),
+              const SizedBox(width: 10),
+              Text('Complaints by Status',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
+              const Spacer(),
+              Text('$total total',
+                  style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...sorted.map((s) {
+            final count = breakdown.countsByStatus[s] ?? 0;
+            final pct = count / total;
+            final color = _statusColors[s] ?? kTextSecondary;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        s.replaceAll('_', ' ')[0].toUpperCase() +
+                            s.replaceAll('_', ' ').substring(1),
+                        style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '$count',
+                        style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: color),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      minHeight: 8,
+                      backgroundColor: kBorderLight,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
