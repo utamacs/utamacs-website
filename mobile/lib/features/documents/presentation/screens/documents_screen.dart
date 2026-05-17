@@ -1,14 +1,47 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../data/document_repository.dart';
 
-class DocumentsScreen extends ConsumerWidget {
+class DocumentsScreen extends ConsumerStatefulWidget {
   const DocumentsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DocumentsScreen> createState() => _DocumentsScreenState();
+}
+
+class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _query = value.trim().toLowerCase());
+    });
+  }
+
+  List<SocietyDocument> _filter(List<SocietyDocument> docs) {
+    if (_query.isEmpty) return docs;
+    return docs.where((d) {
+      return d.title.toLowerCase().contains(_query) ||
+          (d.description?.toLowerCase().contains(_query) ?? false) ||
+          d.category.toLowerCase().contains(_query);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final docsAsync = ref.watch(documentsProvider);
 
     return Scaffold(
@@ -35,52 +68,106 @@ class DocumentsScreen extends ConsumerWidget {
             child: const Text('Retry'),
           ),
         ),
-        data: (docs) {
-          if (docs.isEmpty) {
-            return const EmptyState(
-              icon: Icons.folder_open_outlined,
-              title: 'No documents yet',
-              subtitle: 'Society documents and circulars will appear here.',
-            );
-          }
+        data: (allDocs) {
+          final docs = _filter(allDocs);
 
-          // Group documents by category
-          final Map<String, List<SocietyDocument>> grouped = {};
-          for (final doc in docs) {
-            grouped.putIfAbsent(doc.category, () => []).add(doc);
-          }
-          final categories = grouped.keys.toList()..sort();
+          return Column(
+            children: [
+              // Search bar
+              Container(
+                color: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: _onSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Search documents…',
+                    prefixIcon: const Icon(Icons.search,
+                        size: 20, color: kTextSecondary),
+                    suffixIcon: _query.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear,
+                                size: 18, color: kTextSecondary),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() => _query = '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: kBgWarm,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    hintStyle: const TextStyle(
+                        color: kTextSecondary, fontSize: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 1),
 
-          // Build flat list: category headers interleaved with document rows
-          final List<_ListItem> items = [];
-          for (final cat in categories) {
-            items.add(_CategoryHeader(cat));
-            for (final doc in grouped[cat]!) {
-              items.add(_DocumentItem(doc));
-            }
-          }
-
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(documentsProvider),
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: items.length,
-              itemBuilder: (context, i) {
-                final item = items[i];
-                if (item is _CategoryHeader) {
-                  return _CategoryHeaderTile(label: item.label);
-                } else if (item is _DocumentItem) {
-                  return _DocumentTile(
-                    doc: item.doc,
-                    onTap: () => _showDocumentDialog(context, item.doc),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
+              // Results
+              Expanded(
+                child: docs.isEmpty
+                    ? EmptyState(
+                        icon: _query.isNotEmpty
+                            ? Icons.search_off
+                            : Icons.folder_open_outlined,
+                        title: _query.isNotEmpty
+                            ? 'No results for "$_query"'
+                            : 'No documents yet',
+                        subtitle: _query.isNotEmpty
+                            ? 'Try a different search term.'
+                            : 'Society documents and circulars will appear here.',
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () async =>
+                            ref.invalidate(documentsProvider),
+                        child: _buildList(context, docs),
+                      ),
+              ),
+            ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildList(BuildContext context, List<SocietyDocument> docs) {
+    // Group documents by category
+    final Map<String, List<SocietyDocument>> grouped = {};
+    for (final doc in docs) {
+      grouped.putIfAbsent(doc.category, () => []).add(doc);
+    }
+    final categories = grouped.keys.toList()..sort();
+
+    final List<_ListItem> items = [];
+    for (final cat in categories) {
+      items.add(_CategoryHeader(cat));
+      for (final doc in grouped[cat]!) {
+        items.add(_DocumentItem(doc));
+      }
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final item = items[i];
+        if (item is _CategoryHeader) {
+          return _CategoryHeaderTile(label: item.label);
+        } else if (item is _DocumentItem) {
+          return _DocumentTile(
+            doc: item.doc,
+            onTap: () => _showDocumentDialog(context, item.doc),
+          );
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
 

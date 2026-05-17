@@ -15,8 +15,8 @@
 | 04 Finance | 12 | 0 | 12 |
 | 05 Events | 9 | 5 | 4 |
 | 06 Polls | 9 | 5 | 4 |
-| 07 Community Board | 11 | 3 | 8 |
-| 08 Documents | 11 | 1 | 10 |
+| 07 Community Board | 11 | 5 | 6 |
+| 08 Documents | 11 | 2 | 9 |
 | 09 Gallery | 5 | 1 | 4 |
 | 10 Facilities | 6 | 1 | 5 |
 | 11 Parking | 12 | 3 | 9 |
@@ -37,7 +37,7 @@
 | 26 Letters | 5 | 0 | 5 |
 | 27 Vendors & Work Orders | 9 | 0 | 9 |
 | 28 Profile & Auth | 6 | 2 | 4 |
-| **TOTAL** | **234** | **67** | **167** |
+| **TOTAL** | **234** | **70** | **164** |
 
 ---
 
@@ -141,8 +141,8 @@
 - [x] 🔴 Like / Helpful reactions — `like_count`, `helpful_count`, animated toggle buttons
 - [x] 🔴 Comments — view thread per post, add comment form, delete own comment
 - [ ] 🟠 Image uploads in create post — up to 5 images, JPEG/PNG/WebP/HEIC, signed URL via GitHub Docs
-- [ ] 🟡 Edit post modal (owner-only) — title + body
-- [ ] 🟡 Delete / soft-delete post (owner or exec)
+- [x] 🟡 Edit post modal (owner-only) — title + body
+- [x] 🟡 Delete / soft-delete post (owner or exec)
 - [ ] 🟡 Pin / unpin post (exec) with pinned visual indicator
 - [ ] 🟡 Report post modal — reason (spam / offensive / misinformation / harassment / other) + optional details (max 300 chars)
 - [ ] 🟡 Moderation queue — 3 reports hides post; exec can clear or remove
@@ -156,7 +156,7 @@
 
 - [ ] 🟠 View full document content — PDF in viewer, video player for video-type docs
 - [ ] 🟠 Upload document modal (exec) — file, title, category, description, access level, is_public flag
-- [ ] 🟡 Search input with debounce (real-time filter against title/description)
+- [x] 🟡 Search input with debounce (real-time filter against title/description)
 - [ ] 🟡 Version history drawer — all versions with download links + change notes
 - [ ] 🟡 Upload new version + change notes (auto-increments version number)
 - [x] 🟡 10-category filter tabs (Bylaws, Minutes, Financial, Legal, Circulars, Governance, HOTO, Maintenance, Forms, Other)
