@@ -73,6 +73,34 @@ class StaffRepository {
 
     return (data as List).map((e) => StaffMember.fromJson(e)).toList();
   }
+
+  Future<StaffMember> registerStaff({
+    required String name,
+    required String role,
+    DateTime? joiningDate,
+    String? idType,
+    String? idNumber,
+  }) async {
+    final data = await _client
+        .from('staff_members')
+        .insert({
+          'society_id': env.societyId,
+          'name': name,
+          'role': role,
+          if (joiningDate != null)
+            'joining_date':
+                joiningDate.toIso8601String().split('T').first,
+          if (idType != null && idType.isNotEmpty) 'id_type': idType,
+          if (idNumber != null && idNumber.isNotEmpty)
+            'id_number': idNumber,
+          'is_active': true,
+          'kyc_status': 'pending',
+          'security_pass_issued': false,
+        })
+        .select()
+        .single();
+    return StaffMember.fromJson(data);
+  }
 }
 
 // ---------------------------------------------------------------------------

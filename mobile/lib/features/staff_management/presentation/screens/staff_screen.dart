@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../features/auth/domain/auth_notifier.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../data/staff_repository.dart';
 
@@ -16,6 +17,8 @@ class StaffScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final staffAsync = ref.watch(activeStaffProvider);
+    final isExec =
+        ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
     return Scaffold(
       backgroundColor: kBgWarm,
@@ -30,6 +33,28 @@ class StaffScreen extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButton: isExec
+          ? FloatingActionButton.extended(
+              backgroundColor: kPrimary600,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.person_add_outlined),
+              label: Text(
+                'Register Staff',
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+              onPressed: () async {
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => _RegisterStaffModal(
+                    onSaved: () => ref.invalidate(activeStaffProvider),
+                  ),
+                );
+              },
+            )
+          : null,
       body: staffAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => EmptyState(
@@ -457,6 +482,309 @@ class _PassBadge extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Register Staff Modal
+// ---------------------------------------------------------------------------
+
+const _kStaffRoles = [
+  'security_guard',
+  'housekeeping',
+  'gardening',
+  'maintenance',
+  'electrician',
+  'plumber',
+  'management',
+  'other',
+];
+
+const _kIdTypes = [
+  'aadhaar',
+  'pan',
+  'passport',
+  'voter_id',
+  'driving_licence',
+];
+
+class _RegisterStaffModal extends ConsumerStatefulWidget {
+  final VoidCallback onSaved;
+  const _RegisterStaffModal({required this.onSaved});
+
+  @override
+  ConsumerState<_RegisterStaffModal> createState() =>
+      _RegisterStaffModalState();
+}
+
+class _RegisterStaffModalState extends ConsumerState<_RegisterStaffModal> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
+  final _idNumberCtrl = TextEditingController();
+  String _role = 'security_guard';
+  String? _idType;
+  DateTime? _joiningDate;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _idNumberCtrl.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _inputDeco(String label, {String? hint}) => InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+        hintStyle: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: kBorderLight),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: kBorderLight),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: kPrimary600, width: 1.5),
+        ),
+      );
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(staffRepositoryProvider).registerStaff(
+            name: _nameCtrl.text.trim(),
+            role: _role,
+            joiningDate: _joiningDate,
+            idType: _idType,
+            idNumber: _idNumberCtrl.text.isNotEmpty
+                ? _idNumberCtrl.text.trim()
+                : null,
+          );
+      widget.onSaved();
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Staff member registered')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final df = DateFormat('dd MMM yyyy');
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollCtrl) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 4),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: kBorderLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Text(
+                      'Register Staff Member',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimary600,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      // Name
+                      TextFormField(
+                        controller: _nameCtrl,
+                        decoration: _inputDeco('Full Name *'),
+                        style: GoogleFonts.inter(fontSize: 14),
+                        textCapitalization: TextCapitalization.words,
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Role
+                      DropdownButtonFormField<String>(
+                        value: _role,
+                        decoration: _inputDeco('Role *'),
+                        style: GoogleFonts.inter(
+                            fontSize: 14, color: kTextPrimary),
+                        items: _kStaffRoles
+                            .map((r) => DropdownMenuItem(
+                                  value: r,
+                                  child: Text(
+                                    r.replaceAll('_', ' ').split(' ').map(
+                                      (w) {
+                                        if (w.isEmpty) return w;
+                                        return '${w[0].toUpperCase()}${w.substring(1)}';
+                                      },
+                                    ).join(' '),
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _role = v ?? 'security_guard'),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Joining date
+                      GestureDetector(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _joiningDate ?? DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            setState(() => _joiningDate = picked);
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: _inputDeco('Joining Date (optional)'),
+                          child: Text(
+                            _joiningDate != null
+                                ? df.format(_joiningDate!)
+                                : 'Select date',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: _joiningDate != null
+                                  ? kTextPrimary
+                                  : kTextSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // ID type
+                      DropdownButtonFormField<String>(
+                        value: _idType,
+                        decoration:
+                            _inputDeco('ID Document Type (optional)'),
+                        style: GoogleFonts.inter(
+                            fontSize: 14, color: kTextPrimary),
+                        items: [
+                          const DropdownMenuItem(
+                              value: null,
+                              child: Text('None')),
+                          ..._kIdTypes.map(
+                            (t) => DropdownMenuItem(
+                              value: t,
+                              child: Text(
+                                t.replaceAll('_', ' ').split(' ').map(
+                                  (w) {
+                                    if (w.isEmpty) return w;
+                                    return '${w[0].toUpperCase()}${w.substring(1)}';
+                                  },
+                                ).join(' '),
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _idType = v),
+                      ),
+
+                      if (_idType != null) ...[
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _idNumberCtrl,
+                          decoration: _inputDeco('ID Number'),
+                          style: GoogleFonts.inter(fontSize: 14),
+                          textCapitalization: TextCapitalization.characters,
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _saving ? null : _save,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimary600,
+                            foregroundColor: Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: _saving
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  'Register Staff Member',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
