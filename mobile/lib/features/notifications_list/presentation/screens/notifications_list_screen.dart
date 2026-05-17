@@ -73,15 +73,17 @@ class NotificationsListScreen extends ConsumerWidget {
                   const Divider(height: 1, indent: 72, color: kBorderLight),
               itemBuilder: (context, i) {
                 final n = notifications[i];
-                return _NotificationTile(
-                  notification: n,
-                  typeIcon: _iconForType(n.type),
-                  onTap: () async {
-                    if (!n.isRead) {
-                      await repo.markRead(n.id);
-                      ref.invalidate(notificationsProvider);
-                    }
-                  },
+                return RepaintBoundary(
+                  child: _NotificationTile(
+                    notification: n,
+                    typeIcon: _iconForType(n.type),
+                    onTap: () async {
+                      if (!n.isRead) {
+                        await repo.markRead(n.id);
+                        ref.invalidate(notificationsProvider);
+                      }
+                    },
+                  ),
                 );
               },
             ),

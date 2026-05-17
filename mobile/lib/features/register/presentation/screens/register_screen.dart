@@ -9,6 +9,7 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../data/membership_repository.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -317,7 +318,7 @@ class _MembershipStatusView extends StatelessWidget {
                       fontSize: context.sp(14))),
               onPressed: () async {
                 final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/register?action=upload-sale-deed');
+                    'https://portal.utamacs.org/portal/register');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri,
                       mode: LaunchMode.externalApplication);
@@ -587,19 +588,12 @@ class _ApplicationForm extends StatelessWidget {
                 TextFormField(
                   controller: nameController,
                   textCapitalization: TextCapitalization.words,
+                  maxLength: 100,
                   style: GoogleFonts.inter(
                       fontSize: context.sp(14), color: textPrimary),
                   decoration:
                       _fieldDecoration(context, 'Enter your full name'),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Please enter your name';
-                    }
-                    if (v.trim().length < 3) {
-                      return 'Name must be at least 3 characters';
-                    }
-                    return null;
-                  },
+                  validator: (v) => InputValidators.name(v, label: 'Full name'),
                 ),
 
                 const SizedBox(height: dsSpace4),
@@ -652,10 +646,12 @@ class _ApplicationForm extends StatelessWidget {
                 TextFormField(
                   controller: jointOwnersController,
                   textCapitalization: TextCapitalization.words,
+                  maxLength: 500,
                   style: GoogleFonts.inter(
                       fontSize: context.sp(14), color: textPrimary),
                   decoration: _fieldDecoration(
                       context, 'e.g. Priya Reddy, Arjun Reddy'),
+                  validator: (v) => InputValidators.optionalText(v, max: 500),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(top: dsSpace1),

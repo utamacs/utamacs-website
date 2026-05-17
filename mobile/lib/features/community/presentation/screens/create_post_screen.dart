@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../data/community_repository.dart';
 
 class CreatePostScreen extends ConsumerStatefulWidget {
@@ -108,19 +109,11 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               const SizedBox(height: 6),
               TextFormField(
                 controller: _titleController,
-                maxLength: 200,
+                maxLength: 255,
                 decoration: const InputDecoration(
                   hintText: 'Give your post a clear title',
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Title is required';
-                  }
-                  if (v.trim().length < 5) {
-                    return 'Title must be at least 5 characters';
-                  }
-                  return null;
-                },
+                validator: (v) => InputValidators.shortText(v, label: 'Title', max: 255),
               ),
               const SizedBox(height: 16),
 
@@ -136,6 +129,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   hintText: 'Share details, ask a question, or start a discussion…',
                   alignLabelWithHint: true,
                 ),
+                validator: (v) => InputValidators.optionalText(v, max: 2000),
               ),
               const SizedBox(height: 16),
 
@@ -143,7 +137,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               GestureDetector(
                 onTap: () async {
                   final uri = Uri.parse(
-                      'https://portal.utamacs.org/portal/community?action=create-post-with-images');
+                      'https://portal.utamacs.org/portal/community');
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }

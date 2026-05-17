@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
@@ -771,6 +772,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
+              validator: (v) => InputValidators.optionalText(v, max: 300),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -935,6 +937,7 @@ class _StatusUpdateModalState extends ConsumerState<_StatusUpdateModal> {
             TextFormField(
               controller: _noteCtrl,
               maxLines: 3,
+              maxLength: 2000,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 labelText: 'Note (optional)',
@@ -944,6 +947,7 @@ class _StatusUpdateModalState extends ConsumerState<_StatusUpdateModal> {
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 12),
               ),
+              validator: (v) => InputValidators.optionalText(v, max: 2000),
             ),
             const SizedBox(height: 20),
             SizedBox(

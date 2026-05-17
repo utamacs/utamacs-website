@@ -8,6 +8,7 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/parking_repository.dart';
 
@@ -1156,66 +1157,114 @@ class _AllocateSlotModalState extends ConsumerState<_AllocateSlotModal> {
                     color: dsColorIndigo600),
               ),
               const SizedBox(height: dsSpace4),
-              ...[
-                (_unitCtrl, 'Unit Number *', 'e.g. A-101', TextInputType.text,
-                    TextCapitalization.characters),
-                (_vehicleNumCtrl, 'Vehicle Registration (optional)',
-                    'e.g. TS09AB1234', TextInputType.text,
-                    TextCapitalization.characters),
-                (_vehicleMakeCtrl, 'Vehicle Make/Model (optional)',
-                    'e.g. Honda City', TextInputType.text,
-                    TextCapitalization.words),
-              ].map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: dsSpace3),
-                    child: TextFormField(
-                      controller: e.$1,
-                      textCapitalization: e.$5,
-                      keyboardType: e.$4,
-                      style: GoogleFonts.inter(
-                          fontSize: context.sp(14), color: textPrimary),
-                      decoration: InputDecoration(
-                        labelText: e.$2,
-                        labelStyle: GoogleFonts.inter(
-                            fontSize: context.sp(13),
-                            color: textSecondary),
-                        hintText: e.$3,
-                        hintStyle: GoogleFonts.inter(
-                            color: isDark
-                                ? dsDarkTextTertiary
-                                : dsTextTertiary),
-                        border: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(dsRadiusMd),
-                            borderSide: BorderSide(
-                                color: isDark
-                                    ? dsDarkBorderLight
-                                    : dsBorderLight)),
-                        enabledBorder: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(dsRadiusMd),
-                            borderSide: BorderSide(
-                                color: isDark
-                                    ? dsDarkBorderLight
-                                    : dsBorderLight)),
-                        focusedBorder: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(dsRadiusMd),
-                            borderSide: const BorderSide(
-                                color: dsColorIndigo600)),
-                        filled: true,
-                        fillColor: isDark
-                            ? dsDarkSurfaceMuted
-                            : dsSurfaceMuted,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: dsSpace4, vertical: dsSpace3),
-                      ),
-                      validator: e.$1 == _unitCtrl
-                          ? (v) => (v == null || v.trim().isEmpty)
-                              ? 'Unit number is required'
-                              : null
-                          : null,
-                    ),
-                  )),
+              Padding(
+                padding: const EdgeInsets.only(bottom: dsSpace3),
+                child: TextFormField(
+                  controller: _unitCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  maxLength: 20,
+                  keyboardType: TextInputType.text,
+                  style: GoogleFonts.inter(
+                      fontSize: context.sp(14), color: textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Unit Number *',
+                    labelStyle: GoogleFonts.inter(
+                        fontSize: context.sp(13), color: textSecondary),
+                    hintText: 'e.g. A-101',
+                    hintStyle: GoogleFonts.inter(
+                        color: isDark ? dsDarkTextTertiary : dsTextTertiary),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(dsRadiusMd),
+                        borderSide: BorderSide(
+                            color: isDark ? dsDarkBorderLight : dsBorderLight)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(dsRadiusMd),
+                        borderSide: BorderSide(
+                            color: isDark ? dsDarkBorderLight : dsBorderLight)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(dsRadiusMd),
+                        borderSide:
+                            const BorderSide(color: dsColorIndigo600)),
+                    filled: true,
+                    fillColor: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: dsSpace4, vertical: dsSpace3),
+                  ),
+                  validator: (v) => InputValidators.shortText(v, label: 'Unit number', max: 20),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: dsSpace3),
+                child: TextFormField(
+                  controller: _vehicleNumCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  maxLength: 20,
+                  keyboardType: TextInputType.text,
+                  style: GoogleFonts.inter(
+                      fontSize: context.sp(14), color: textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Vehicle Registration (optional)',
+                    labelStyle: GoogleFonts.inter(
+                        fontSize: context.sp(13), color: textSecondary),
+                    hintText: 'e.g. TS09AB1234',
+                    hintStyle: GoogleFonts.inter(
+                        color: isDark ? dsDarkTextTertiary : dsTextTertiary),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(dsRadiusMd),
+                        borderSide: BorderSide(
+                            color: isDark ? dsDarkBorderLight : dsBorderLight)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(dsRadiusMd),
+                        borderSide: BorderSide(
+                            color: isDark ? dsDarkBorderLight : dsBorderLight)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(dsRadiusMd),
+                        borderSide:
+                            const BorderSide(color: dsColorIndigo600)),
+                    filled: true,
+                    fillColor: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: dsSpace4, vertical: dsSpace3),
+                  ),
+                  validator: (v) => InputValidators.vehicleNumber(v),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: dsSpace3),
+                child: TextFormField(
+                  controller: _vehicleMakeCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  maxLength: 100,
+                  keyboardType: TextInputType.text,
+                  style: GoogleFonts.inter(
+                      fontSize: context.sp(14), color: textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Vehicle Make/Model (optional)',
+                    labelStyle: GoogleFonts.inter(
+                        fontSize: context.sp(13), color: textSecondary),
+                    hintText: 'e.g. Honda City',
+                    hintStyle: GoogleFonts.inter(
+                        color: isDark ? dsDarkTextTertiary : dsTextTertiary),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(dsRadiusMd),
+                        borderSide: BorderSide(
+                            color: isDark ? dsDarkBorderLight : dsBorderLight)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(dsRadiusMd),
+                        borderSide: BorderSide(
+                            color: isDark ? dsDarkBorderLight : dsBorderLight)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(dsRadiusMd),
+                        borderSide:
+                            const BorderSide(color: dsColorIndigo600)),
+                    filled: true,
+                    fillColor: isDark ? dsDarkSurfaceMuted : dsSurfaceMuted,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: dsSpace4, vertical: dsSpace3),
+                  ),
+                  validator: (v) => InputValidators.optionalText(v, max: 100),
+                ),
+              ),
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -1395,13 +1444,12 @@ class _CreateSlotModalState extends ConsumerState<_CreateSlotModal> {
               TextFormField(
                 controller: _slotNumCtrl,
                 textCapitalization: TextCapitalization.characters,
+                maxLength: 20,
                 style: GoogleFonts.inter(
                     fontSize: context.sp(14), color: textPrimary),
                 decoration:
                     _fieldDec(context, 'Slot Number *', hint: 'e.g. P-01'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Slot number is required'
-                    : null,
+                validator: (v) => InputValidators.shortText(v, label: 'Slot number', max: 20),
               ),
               const SizedBox(height: dsSpace3),
               DropdownButtonFormField<String>(

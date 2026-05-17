@@ -1,0 +1,148 @@
+part of '../complaint_repository.dart';
+
+class Complaint {
+  final String id;
+  final String ticketNumber;
+  final String title;
+  final String? description;
+  final String category;
+  final String priority;
+  final String status;
+  final String raisedBy;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? resolvedAt;
+  final DateTime? slaDeadline;
+  final int? satisfactionRating;
+  final String? satisfactionComment;
+  final int reopenCount;
+
+  const Complaint({
+    required this.id,
+    required this.ticketNumber,
+    required this.title,
+    this.description,
+    required this.category,
+    required this.priority,
+    required this.status,
+    required this.raisedBy,
+    required this.createdAt,
+    required this.updatedAt,
+    this.resolvedAt,
+    this.slaDeadline,
+    this.satisfactionRating,
+    this.satisfactionComment,
+    this.reopenCount = 0,
+  });
+
+  factory Complaint.fromJson(Map<String, dynamic> j) => Complaint(
+        id: j['id'] as String,
+        ticketNumber: j['ticket_number'] as String,
+        title: j['title'] as String,
+        description: j['description'] as String?,
+        category: j['category'] as String,
+        priority: j['priority'] as String,
+        status: j['status'] as String,
+        raisedBy: j['raised_by'] as String,
+        createdAt: DateTime.parse(j['created_at'] as String),
+        updatedAt: DateTime.parse(j['updated_at'] as String),
+        resolvedAt: j['resolved_at'] != null
+            ? DateTime.parse(j['resolved_at'] as String)
+            : null,
+        slaDeadline: j['sla_deadline'] != null
+            ? DateTime.parse(j['sla_deadline'] as String)
+            : null,
+        satisfactionRating: j['satisfaction_rating'] as int?,
+        satisfactionComment: j['satisfaction_comment'] as String?,
+        reopenCount: j['reopen_count'] as int? ?? 0,
+      );
+}
+
+class ComplaintHistory {
+  final String id;
+  final String complaintId;
+  final String oldStatus;
+  final String newStatus;
+  final String? note;
+  final DateTime changedAt;
+
+  const ComplaintHistory({
+    required this.id,
+    required this.complaintId,
+    required this.oldStatus,
+    required this.newStatus,
+    this.note,
+    required this.changedAt,
+  });
+
+  factory ComplaintHistory.fromJson(Map<String, dynamic> j) => ComplaintHistory(
+        id: j['id'] as String,
+        complaintId: j['complaint_id'] as String,
+        oldStatus: j['old_status'] as String,
+        newStatus: j['new_status'] as String,
+        note: j['note'] as String?,
+        changedAt: DateTime.parse(j['changed_at'] as String),
+      );
+}
+
+class ComplaintAttachment {
+  final String id;
+  final String complaintId;
+  final String storageKey;
+  final String? fileName;
+  final String? mimeType;
+  final int? fileSizeBytes;
+  final DateTime createdAt;
+
+  const ComplaintAttachment({
+    required this.id,
+    required this.complaintId,
+    required this.storageKey,
+    this.fileName,
+    this.mimeType,
+    this.fileSizeBytes,
+    required this.createdAt,
+  });
+
+  bool get isImage =>
+      mimeType != null &&
+      (mimeType!.startsWith('image/') ||
+          mimeType == 'image/jpeg' ||
+          mimeType == 'image/png' ||
+          mimeType == 'image/webp');
+
+  factory ComplaintAttachment.fromJson(Map<String, dynamic> j) =>
+      ComplaintAttachment(
+        id: j['id'] as String,
+        complaintId: j['complaint_id'] as String,
+        storageKey: j['storage_key'] as String,
+        fileName: j['file_name'] as String?,
+        mimeType: j['mime_type'] as String?,
+        fileSizeBytes: j['file_size_bytes'] as int?,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
+}
+
+class ComplaintComment {
+  final String id;
+  final String complaintId;
+  final String comment;
+  final bool isInternal;
+  final DateTime createdAt;
+
+  const ComplaintComment({
+    required this.id,
+    required this.complaintId,
+    required this.comment,
+    required this.isInternal,
+    required this.createdAt,
+  });
+
+  factory ComplaintComment.fromJson(Map<String, dynamic> j) => ComplaintComment(
+        id: j['id'] as String,
+        complaintId: j['complaint_id'] as String,
+        comment: j['comment'] as String,
+        isInternal: j['is_internal'] as bool? ?? false,
+        createdAt: DateTime.parse(j['created_at'] as String),
+      );
+}

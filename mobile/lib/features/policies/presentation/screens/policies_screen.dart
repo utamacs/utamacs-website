@@ -525,7 +525,7 @@ class _PolicyCardState extends State<_PolicyCard> {
                           child: OutlinedButton.icon(
                             onPressed: () async {
                               final uri = Uri.parse(
-                                  'https://portal.utamacs.org/portal/policies/${policy.id}?upload=pdf');
+                                  'https://portal.utamacs.org/portal/policies/${policy.id}');
                               if (await canLaunchUrl(uri)) {
                                 await launchUrl(uri,
                                     mode:

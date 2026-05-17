@@ -7,8 +7,8 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/facility_repository.dart';
-import 'book_facility_screen.dart';
 
 // ─── Facilities Screen ────────────────────────────────────────────────────────
 
@@ -222,13 +222,7 @@ class _FacilityCard extends ConsumerWidget {
 
     return DSScalePress(
       onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) =>
-                BookFacilityScreen(facility: facility),
-          ),
-        );
+        await context.push('/facilities/book', extra: facility);
         ref.invalidate(myFacilityBookingsProvider);
       },
       child: Container(
@@ -349,16 +343,8 @@ class _FacilityCard extends ConsumerWidget {
                           ),
                         ),
                         onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  BookFacilityScreen(
-                                      facility: facility),
-                            ),
-                          );
-                          ref.invalidate(
-                              myFacilityBookingsProvider);
+                          await context.push('/facilities/book', extra: facility);
+                          ref.invalidate(myFacilityBookingsProvider);
                         },
                         child: const Text('Book'),
                       ),

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,9 +8,10 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../auth/domain/auth_notifier.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/gallery_repository.dart';
-import 'album_detail_screen.dart';
 
 class GalleryScreen extends ConsumerWidget {
   const GalleryScreen({super.key});
@@ -153,12 +155,7 @@ class _AlbumCard extends ConsumerWidget {
         : null;
 
     return DSScalePress(
-      onTap: () => Navigator.push(
-        context,
-        DSSlideRoute(
-          page: AlbumDetailScreen(album: album),
-        ),
-      ),
+      onTap: () => context.push('/gallery/album', extra: album),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? dsDarkSurface : dsSurface,
@@ -176,11 +173,14 @@ class _AlbumCard extends ConsumerWidget {
                 height: 110,
                 width: double.infinity,
                 child: coverUrlAsync?.valueOrNull != null
-                    ? Image.network(
-                        coverUrlAsync!.valueOrNull!,
+                    ? CachedNetworkImage(
+                        imageUrl: coverUrlAsync!.valueOrNull!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            _PlaceholderCover(
+                        placeholder: (_, __) => _PlaceholderCover(
+                          bg: placeholderBg,
+                          iconColor: iconColor,
+                        ),
+                        errorWidget: (_, __, ___) => _PlaceholderCover(
                           bg: placeholderBg,
                           iconColor: iconColor,
                         ),
@@ -421,10 +421,9 @@ class _CreateAlbumModalState
                 controller: _titleCtrl,
                 label: 'Album Title *',
                 isDark: isDark,
+                maxLength: 255,
                 textCapitalization: TextCapitalization.sentences,
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Title is required'
-                    : null,
+                validator: (v) => InputValidators.shortText(v, label: 'Album title', max: 255),
               ),
               const SizedBox(height: dsSpace3),
 
@@ -434,7 +433,9 @@ class _CreateAlbumModalState
                 label: 'Description (optional)',
                 isDark: isDark,
                 maxLines: 2,
+                maxLength: 500,
                 textCapitalization: TextCapitalization.sentences,
+                validator: (v) => InputValidators.optionalText(v, max: 500),
               ),
               const SizedBox(height: dsSpace3),
 
@@ -537,6 +538,7 @@ class _ModalField extends StatelessWidget {
   final String label;
   final bool isDark;
   final int maxLines;
+  final int? maxLength;
   final TextCapitalization textCapitalization;
   final String? Function(String?)? validator;
 
@@ -545,6 +547,7 @@ class _ModalField extends StatelessWidget {
     required this.label,
     required this.isDark,
     this.maxLines = 1,
+    this.maxLength,
     this.textCapitalization = TextCapitalization.none,
     this.validator,
   });
@@ -558,6 +561,7 @@ class _ModalField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
       textCapitalization: textCapitalization,
       style: GoogleFonts.inter(
         fontSize: context.sp(14),

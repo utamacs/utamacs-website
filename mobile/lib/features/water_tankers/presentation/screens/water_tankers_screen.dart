@@ -171,10 +171,12 @@ class WaterTankersScreen extends ConsumerWidget {
                   itemCount: deliveries.length,
                   separatorBuilder: (_, _) =>
                       const SizedBox(height: dsSpace2),
-                  itemBuilder: (context, i) => DSFadeSlide(
-                    delay: Duration(milliseconds: i * 30),
-                    child: _DeliveryCard(
-                        delivery: deliveries[i], isDark: isDark),
+                  itemBuilder: (context, i) => RepaintBoundary(
+                    child: DSFadeSlide(
+                      delay: Duration(milliseconds: i * 30),
+                      child: _DeliveryCard(
+                          delivery: deliveries[i], isDark: isDark),
+                    ),
                   ),
                 ),
               ],

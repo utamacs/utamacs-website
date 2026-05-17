@@ -1584,8 +1584,18 @@ class _CreateWorkOrderSheetState
             vendorsAsync.when(
               loading: () =>
                   const LinearProgressIndicator(),
-              error: (_, _) =>
-                  const Text('Failed to load vendors'),
+              error: (_, _) => Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 14, color: dsColorRed600),
+                  const SizedBox(width: 6),
+                  const Expanded(child: Text('Failed to load vendors',
+                      style: TextStyle(fontSize: 13, color: dsColorRed600))),
+                  TextButton(
+                    onPressed: () => ref.invalidate(vendorsProvider),
+                    child: const Text('Retry', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
               data: (vendors) =>
                   DropdownButtonFormField<String>(
                 initialValue: _selectedVendorId,
@@ -1647,6 +1657,7 @@ class _CreateWorkOrderSheetState
             TextField(
               controller: _titleCtrl,
               textCapitalization: TextCapitalization.sentences,
+              maxLength: 255,
               style: GoogleFonts.inter(
                 fontSize: context.sp(14),
                 color: isDark
@@ -1662,6 +1673,7 @@ class _CreateWorkOrderSheetState
             TextField(
               controller: _descCtrl,
               maxLines: 3,
+              maxLength: 2000,
               textCapitalization: TextCapitalization.sentences,
               style: GoogleFonts.inter(
                 fontSize: context.sp(14),
@@ -1765,6 +1777,7 @@ class _CreateWorkOrderSheetState
             TextField(
               controller: _notesCtrl,
               maxLines: 2,
+              maxLength: 500,
               style: GoogleFonts.inter(
                 fontSize: context.sp(14),
                 color: isDark

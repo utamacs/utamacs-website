@@ -1,82 +1,10 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/supabase.dart' as env;
 
 part 'notice_repository.g.dart';
-
-class Notice {
-  final String id;
-  final String title;
-  final String? body;
-  final String? category;
-  final String? attachmentKey;
-  final String? videoUrl;
-  final bool isPinned;
-  final bool requiresAcknowledgement;
-  final DateTime publishedAt;
-  final DateTime? expiresAt;
-  final DateTime? scheduledAt;
-  final String status;
-  final String targetAudience;
-  final List<String> targetBlocks;
-
-  const Notice({
-    required this.id,
-    required this.title,
-    this.body,
-    this.category,
-    this.attachmentKey,
-    this.videoUrl,
-    this.isPinned = false,
-    this.requiresAcknowledgement = false,
-    required this.publishedAt,
-    this.expiresAt,
-    this.scheduledAt,
-    this.status = 'published',
-    this.targetAudience = 'all',
-    this.targetBlocks = const [],
-  });
-
-  String get targetAudienceLabel => switch (targetAudience) {
-        'owners' => 'Owners only',
-        'tenants' => 'Tenants only',
-        'block_specific' => 'Specific blocks',
-        _ => 'All residents',
-      };
-
-  factory Notice.fromJson(Map<String, dynamic> j) {
-    final rawBlocks = j['target_blocks'];
-    final List<String> blocks;
-    if (rawBlocks is List) {
-      blocks = rawBlocks.map((e) => e.toString()).toList();
-    } else {
-      blocks = [];
-    }
-    return Notice(
-      id: j['id'] as String,
-      title: j['title'] as String,
-      body: j['body'] as String?,
-      category: j['category'] as String?,
-      attachmentKey: j['attachment_storage_key'] as String?,
-      videoUrl: j['video_url'] as String?,
-      isPinned: j['is_pinned'] as bool? ?? false,
-      requiresAcknowledgement:
-          j['requires_acknowledgement'] as bool? ?? false,
-      publishedAt: j['published_at'] != null
-          ? DateTime.parse(j['published_at'] as String)
-          : DateTime.now(),
-      expiresAt: j['expires_at'] != null
-          ? DateTime.parse(j['expires_at'] as String)
-          : null,
-      scheduledAt: j['scheduled_at'] != null
-          ? DateTime.parse(j['scheduled_at'] as String)
-          : null,
-      status: j['status'] as String? ?? 'published',
-      targetAudience: j['target_audience'] as String? ?? 'all',
-      targetBlocks: blocks,
-    );
-  }
-}
+part 'models/notice_models.dart';
 
 @riverpod
 NoticeRepository noticeRepository(NoticeRepositoryRef ref) =>
@@ -85,12 +13,16 @@ NoticeRepository noticeRepository(NoticeRepositoryRef ref) =>
 class NoticeRepository {
   final _client = Supabase.instance.client;
 
-  Future<List<Notice>> fetchNotices({int limit = 30}) async {
-    final data = await _client
+  Future<List<Notice>> fetchNotices({int limit = 30, DateTime? before}) async {
+    var query = _client
         .from('notices')
         .select()
         .eq('society_id', env.societyId)
-        .eq('status', 'published')
+        .eq('status', 'published');
+    if (before != null) {
+      query = query.lt('published_at', before.toIso8601String());
+    }
+    final data = await query
         .order('is_pinned', ascending: false)
         .order('published_at', ascending: false)
         .limit(limit);
@@ -163,3 +95,46 @@ final noticeAcknowledgementCountProvider =
 final scheduledNoticesProvider =
     FutureProvider.autoDispose<List<Notice>>((ref) =>
         ref.read(noticeRepositoryProvider).fetchScheduledNotices());
+
+// ---------------------------------------------------------------------------
+// Paginated notices notifier (load-more)
+// ---------------------------------------------------------------------------
+
+class NoticesPageNotifier extends AutoDisposeAsyncNotifier<List<Notice>> {
+  static const _pageSize = 20;
+  final _items = <Notice>[];
+  DateTime? _cursor;
+  bool _hasMore = true;
+
+  @override
+  Future<List<Notice>> build() async {
+    _items.clear();
+    _cursor = null;
+    _hasMore = true;
+    return _fetchPage();
+  }
+
+  bool get hasMore => _hasMore;
+
+  Future<void> loadMore() async {
+    if (!_hasMore || state.isLoading) return;
+    await _fetchPage();
+  }
+
+  Future<List<Notice>> _fetchPage() async {
+    final repo = ref.read(noticeRepositoryProvider);
+    final next = await repo.fetchNotices(limit: _pageSize, before: _cursor);
+    _hasMore = next.length == _pageSize;
+    if (next.isNotEmpty) {
+      final nonPinned = next.where((n) => !n.isPinned);
+      if (nonPinned.isNotEmpty) _cursor = nonPinned.last.publishedAt;
+    }
+    _items.addAll(next);
+    return List.unmodifiable(_items);
+  }
+}
+
+final noticesPagedProvider =
+    AsyncNotifierProvider.autoDispose<NoticesPageNotifier, List<Notice>>(
+  NoticesPageNotifier.new,
+);

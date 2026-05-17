@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../domain/auth_notifier.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -98,10 +99,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
+                  maxLength: 255,
                   decoration: const InputDecoration(
                     hintText: 'you@example.com',
                     labelText: 'Email address',
+                    counterText: '',
                   ),
+                  validator: (v) => InputValidators.required(v, label: 'Email address'),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
@@ -127,12 +131,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextFormField(
                   controller: _otpCtrl,
                   keyboardType: TextInputType.number,
-                  maxLength: 8,
+                  maxLength: 6,
                   decoration: const InputDecoration(
                     hintText: 'Enter code',
                     labelText: 'Sign-in code',
                     counterText: '',
                   ),
+                  validator: (v) => InputValidators.otp(v),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(

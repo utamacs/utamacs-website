@@ -133,9 +133,11 @@ class _MyHelpersTab extends ConsumerWidget {
             ),
             itemCount: maids.length,
             separatorBuilder: (_, _) => const SizedBox(height: dsSpace2),
-            itemBuilder: (context, i) => DSFadeSlide(
-              delay: Duration(milliseconds: i * 40),
-              child: _MaidCard(maid: maids[i], isDark: isDark),
+            itemBuilder: (context, i) => RepaintBoundary(
+              child: DSFadeSlide(
+                delay: Duration(milliseconds: i * 40),
+                child: _MaidCard(maid: maids[i], isDark: isDark),
+              ),
             ),
           ),
         );
@@ -204,7 +206,8 @@ class _FindApproveTab extends ConsumerWidget {
             itemBuilder: (context, i) {
               final maid = allMaids[i];
               final isApproved = approvedIds.contains(maid.id);
-              return DSFadeSlide(
+              return RepaintBoundary(
+                child: DSFadeSlide(
                 delay: Duration(milliseconds: i * 40),
                 child: _FindApproveCard(
                   maid: maid,
@@ -301,7 +304,8 @@ class _FindApproveTab extends ConsumerWidget {
                         }
                       : null,
                 ),
-              );
+              ),
+            );
             },
           ),
         );

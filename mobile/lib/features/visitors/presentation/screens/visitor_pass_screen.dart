@@ -132,7 +132,7 @@ class VisitorPassScreen extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () async {
                   final uri = Uri.parse(
-                      'https://portal.utamacs.org/portal/visitors?tab=passes&id=${approval.id}&action=share');
+                      'https://portal.utamacs.org/portal/visitors?tab=passes&id=${approval.id}');
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri,
                         mode: LaunchMode.externalApplication);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../data/visitor_repository.dart';
 
 class PreApproveScreen extends ConsumerStatefulWidget {
@@ -158,8 +159,8 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
                   prefixIcon: Icon(Icons.person_outline),
                 ),
                 textCapitalization: TextCapitalization.words,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+                maxLength: 100,
+                validator: (v) => InputValidators.name(v, label: 'Visitor name'),
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -169,6 +170,8 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
                 keyboardType: TextInputType.phone,
+                maxLength: 15,
+                validator: InputValidators.phone,
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -178,6 +181,8 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
                   prefixIcon: Icon(Icons.directions_car_outlined),
                 ),
                 textCapitalization: TextCapitalization.characters,
+                maxLength: 20,
+                validator: InputValidators.vehicleNumber,
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -186,17 +191,21 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
                   labelText: 'Purpose of visit (optional)',
                   prefixIcon: Icon(Icons.info_outline),
                 ),
+                maxLength: 255,
+                validator: (v) => InputValidators.optionalText(v, max: 255),
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _notesCtrl,
                 maxLines: 2,
+                maxLength: 500,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
                   labelText: 'Notes for guard (optional)',
                   hintText: 'e.g. Allow access to Flat 201',
                   prefixIcon: Icon(Icons.note_outlined),
                 ),
+                validator: (v) => InputValidators.optionalText(v, max: 500),
               ),
               const SizedBox(height: 28),
               _SectionLabel('Validity'),

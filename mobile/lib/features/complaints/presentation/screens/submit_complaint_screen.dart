@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/complaint_repository.dart';
 
@@ -145,18 +146,11 @@ class _SubmitComplaintScreenState
             TextFormField(
               controller: _titleController,
               textCapitalization: TextCapitalization.sentences,
+              maxLength: 255,
               decoration: const InputDecoration(
                 hintText: 'Brief description of the issue',
               ),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) {
-                  return 'Title is required';
-                }
-                if (v.trim().length < 5) {
-                  return 'Title must be at least 5 characters';
-                }
-                return null;
-              },
+              validator: (v) => InputValidators.shortText(v, label: 'Title', max: 255),
             ),
             const SizedBox(height: 20),
             _SectionLabel('Category'),
@@ -218,19 +212,21 @@ class _SubmitComplaintScreenState
             TextFormField(
               controller: _descriptionController,
               maxLines: 4,
+              maxLength: 2000,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
                 hintText:
                     'Provide additional details, block/floor number, etc.',
                 alignLabelWithHint: true,
               ),
+              validator: (v) => InputValidators.optionalText(v, max: 2000),
             ),
             const SizedBox(height: 20),
             // Attachment upload — opens portal
             GestureDetector(
               onTap: () async {
                 final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/complaints?action=create-with-attachments');
+                    'https://portal.utamacs.org/portal/complaints/new');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }

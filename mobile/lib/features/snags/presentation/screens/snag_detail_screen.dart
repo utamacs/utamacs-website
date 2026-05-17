@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../../shared/widgets/status_badge.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../../vendors/data/vendor_repository.dart';
@@ -313,9 +314,17 @@ class _LinkedHotoSection extends ConsumerWidget {
         linkedAsync.when(
           loading: () =>
               const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text(
-            'Could not load linked items',
-            style: GoogleFonts.inter(color: kRed600, fontSize: 13),
+          error: (e, _) => Row(
+            children: [
+              const Icon(Icons.error_outline, size: 14, color: kRed600),
+              const SizedBox(width: 6),
+              const Expanded(child: Text('Could not load linked items',
+                  style: TextStyle(color: kRed600, fontSize: 13))),
+              TextButton(
+                onPressed: () => ref.invalidate(snagLinkedHotoItemsProvider(snagId)),
+                child: const Text('Retry', style: TextStyle(fontSize: 12)),
+              ),
+            ],
           ),
           data: (items) => items.isEmpty
               ? Container(
@@ -517,9 +526,17 @@ class _CommentsSectionState extends ConsumerState<_CommentsSection> {
         commentsAsync.when(
           loading: () =>
               const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text(
-            'Could not load comments: $e',
-            style: GoogleFonts.inter(color: kRed600, fontSize: 13),
+          error: (e, _) => Row(
+            children: [
+              const Icon(Icons.error_outline, size: 14, color: kRed600),
+              const SizedBox(width: 6),
+              const Expanded(child: Text('Could not load comments',
+                  style: TextStyle(color: kRed600, fontSize: 13))),
+              TextButton(
+                onPressed: () => ref.invalidate(snagCommentsProvider(widget.snagId)),
+                child: const Text('Retry', style: TextStyle(fontSize: 12)),
+              ),
+            ],
           ),
           data: (comments) => comments.isEmpty
               ? Container(
@@ -557,12 +574,14 @@ class _CommentsSectionState extends ConsumerState<_CommentsSection> {
                   controller: _commentCtrl,
                   minLines: 1,
                   maxLines: 4,
+                  maxLength: 2000,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: InputDecoration(
                     hintText: 'Add a comment…',
                     hintStyle: GoogleFonts.inter(
                         fontSize: 13, color: kTextSecondary),
                     border: InputBorder.none,
+                    counterText: '',
                   ),
                   style: GoogleFonts.inter(fontSize: 13),
                 ),
@@ -869,8 +888,18 @@ class _CreateWoSheetState extends ConsumerState<_CreateWoSheet> {
           const SizedBox(height: 16),
           vendorsAsync.when(
             loading: () => const LinearProgressIndicator(),
-            error: (_, _) => Text('Could not load vendors',
-                style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary)),
+            error: (_, _) => Row(
+              children: [
+                const Icon(Icons.error_outline, size: 14, color: kRed600),
+                const SizedBox(width: 6),
+                const Expanded(child: Text('Could not load vendors',
+                    style: TextStyle(fontSize: 12, color: kTextSecondary))),
+                TextButton(
+                  onPressed: () => ref.invalidate(vendorsProvider),
+                  child: const Text('Retry', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
             data: (vendors) => DropdownButtonFormField<Vendor>(
               initialValue: _selectedVendor,
               decoration: InputDecoration(
@@ -890,6 +919,7 @@ class _CreateWoSheetState extends ConsumerState<_CreateWoSheet> {
           const SizedBox(height: 12),
           TextFormField(
             controller: _titleCtrl,
+            maxLength: 255,
             decoration: InputDecoration(
               labelText: 'Title *',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -897,6 +927,7 @@ class _CreateWoSheetState extends ConsumerState<_CreateWoSheet> {
                   horizontal: 14, vertical: 12),
             ),
             style: GoogleFonts.inter(fontSize: 14),
+            validator: (v) => InputValidators.shortText(v, label: 'Title', max: 255),
           ),
           const SizedBox(height: 12),
           TextFormField(

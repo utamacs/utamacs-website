@@ -9,7 +9,7 @@ import '../../../../core/design/ds_tokens.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../../notices/data/notice_repository.dart';
 import '../../../visitors/data/visitor_repository.dart';
-import '../../../visitors/presentation/screens/visitor_pass_screen.dart';
+import '../../../visitors/data/visitor_repository.dart' show VisitorPreApproval;
 
 // ─── Dashboard Screen ─────────────────────────────────────────────────────────
 
@@ -573,10 +573,7 @@ class _PassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DSScalePress(
-      onTap: () => Navigator.push(
-        context,
-        DSSlideRoute(page: VisitorPassScreen(approval: approval)),
-      ),
+      onTap: () => context.push('/visitors/pass', extra: approval),
       child: Container(
         padding: const EdgeInsets.all(dsSpace4),
         decoration: BoxDecoration(

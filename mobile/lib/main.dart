@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'core/constants/supabase.dart' as env;
@@ -14,6 +15,12 @@ void main() async {
     url: env.supabaseUrl,
     anonKey: env.supabaseAnonKey,
   );
+
+  // Pre-load Inter and Poppins before first frame to avoid visible font swap.
+  await GoogleFonts.pendingFonts([
+    GoogleFonts.inter(),
+    GoogleFonts.poppins(),
+  ]);
 
   runApp(const ProviderScope(child: UtamacsApp()));
 }

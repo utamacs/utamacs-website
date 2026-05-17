@@ -270,12 +270,19 @@ class _AcknowledgementStatsCard extends ConsumerWidget {
               child: CircularProgressIndicator(
                   strokeWidth: 2, color: kPrimary600),
             ),
-            error: (e, _) => Text(
-              'Could not load acknowledgements',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: kRed600),
+            error: (e, _) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 14, color: kRed600),
+                const SizedBox(width: 4),
+                Text('Could not load',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: kRed600)),
+                TextButton(
+                  onPressed: () => ref.invalidate(noticeAcknowledgementCountProvider(noticeId)),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
+                  child: const Text('Retry', style: TextStyle(fontSize: 11)),
+                ),
+              ],
             ),
             data: (count) => Row(
               children: [
