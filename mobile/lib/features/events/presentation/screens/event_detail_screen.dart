@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../auth/domain/auth_notifier.dart';
@@ -828,7 +829,7 @@ class _BannerButton extends StatelessWidget {
       label: const Text('View Event Banner'),
       onPressed: () async {
         final uri = Uri.parse(
-            'https://portal.utamacs.org/portal/events/$eventId');
+            '$portalUrl/portal/events/$eventId');
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         }

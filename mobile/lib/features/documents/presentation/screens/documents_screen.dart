@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/design/ds_animations.dart';
 import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
@@ -89,7 +90,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                 ),
                 onPressed: () async {
                   final uri = Uri.parse(
-                      'https://portal.utamacs.org/portal/documents');
+                      '$portalUrl/portal/documents');
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri,
                         mode: LaunchMode.externalApplication);
@@ -627,7 +628,7 @@ class _DocumentDetailDialogState
             borderColor: dsColorIndigo600,
             onPressed: () async {
               final uri = Uri.parse(
-                  'https://portal.utamacs.org/portal/documents/${doc.id}');
+                  '$portalUrl/portal/documents/${doc.id}');
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri,
                     mode: LaunchMode.externalApplication);
@@ -642,7 +643,7 @@ class _DocumentDetailDialogState
             borderColor: dsBorderLight,
             onPressed: () async {
               final uri = Uri.parse(
-                  'https://portal.utamacs.org/portal/documents/${doc.id}?tab=versions');
+                  '$portalUrl/portal/documents/${doc.id}?tab=versions');
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri,
                     mode: LaunchMode.externalApplication);
@@ -658,7 +659,7 @@ class _DocumentDetailDialogState
               borderColor: dsColorEmerald600,
               onPressed: () async {
                 final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/documents/${doc.id}');
+                    '$portalUrl/portal/documents/${doc.id}');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri,
                       mode: LaunchMode.externalApplication);
@@ -673,7 +674,7 @@ class _DocumentDetailDialogState
               borderColor: dsBorderLight,
               onPressed: () async {
                 final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/documents/${doc.id}?tab=audit');
+                    '$portalUrl/portal/documents/${doc.id}?tab=audit');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri,
                       mode: LaunchMode.externalApplication);

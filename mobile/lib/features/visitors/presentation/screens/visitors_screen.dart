@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/design/ds_animations.dart';
 import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
@@ -327,7 +328,7 @@ class _LogsTabState extends ConsumerState<_LogsTab>
                 icon: Icons.download_outlined,
                 onTap: () async {
                   final uri = Uri.parse(
-                      'https://portal.utamacs.org/portal/visitors?tab=logs&export=csv');
+                      '$portalUrl/portal/visitors?tab=logs&export=csv');
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
@@ -416,7 +417,7 @@ class _DeliveriesTabState extends ConsumerState<_DeliveriesTab>
     return DSScalePress(
       onTap: () async {
         final uri = Uri.parse(
-            'https://portal.utamacs.org/portal/visitors?tab=deliveries');
+            '$portalUrl/portal/visitors?tab=deliveries');
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         }

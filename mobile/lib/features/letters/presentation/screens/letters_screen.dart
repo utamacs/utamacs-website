@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/design/ds_animations.dart';
 import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
@@ -15,7 +16,7 @@ class LettersScreen extends ConsumerWidget {
   const LettersScreen({super.key});
 
   static Future<void> _openPortal(String path) async {
-    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    final uri = Uri.parse('$portalUrl/portal/$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -473,7 +474,7 @@ class _LetterDetailSheet extends ConsumerWidget {
                 TextButton(
                   onPressed: () => launchUrl(
                     Uri.parse(
-                        'https://portal.utamacs.org/portal/letters/${letter.id}'),
+                        '$portalUrl/portal/letters/${letter.id}'),
                     mode: LaunchMode.externalApplication,
                   ),
                   style: TextButton.styleFrom(
@@ -515,7 +516,7 @@ class _LetterDetailSheet extends ConsumerWidget {
                     label: const Text('Sign-off'),
                     onPressed: () async {
                       final uri = Uri.parse(
-                          'https://portal.utamacs.org/portal/letters/${letter.id}');
+                          '$portalUrl/portal/letters/${letter.id}');
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri,
                             mode: LaunchMode.externalApplication);
@@ -543,7 +544,7 @@ class _LetterDetailSheet extends ConsumerWidget {
                     label: const Text('Link Module'),
                     onPressed: () async {
                       final uri = Uri.parse(
-                          'https://portal.utamacs.org/portal/letters/${letter.id}');
+                          '$portalUrl/portal/letters/${letter.id}');
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri,
                             mode: LaunchMode.externalApplication);

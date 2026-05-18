@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../auth/domain/auth_notifier.dart';
@@ -172,7 +173,7 @@ class NoticeDetailScreen extends ConsumerWidget {
                 label: const Text('View Attachment'),
                 onPressed: () async {
                   final uri = Uri.parse(
-                      'https://portal.utamacs.org/portal/notices/${notice.id}');
+                      '$portalUrl/portal/notices/${notice.id}');
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri,
                         mode: LaunchMode.externalApplication);

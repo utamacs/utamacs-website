@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/input_validators.dart';
 import '../../data/community_repository.dart';
@@ -137,7 +138,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               GestureDetector(
                 onTap: () async {
                   final uri = Uri.parse(
-                      'https://portal.utamacs.org/portal/community');
+                      '$portalUrl/portal/community');
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }

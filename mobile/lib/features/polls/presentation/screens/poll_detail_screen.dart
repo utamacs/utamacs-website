@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/status_badge.dart';
@@ -76,7 +77,7 @@ class _PollDetailScreenState extends ConsumerState<PollDetailScreen> {
               tooltip: 'Export PDF Results',
               onPressed: () async {
                 final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/polls/${widget.pollId}?export=pdf');
+                    '$portalUrl/portal/polls/${widget.pollId}?export=pdf');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri,
                       mode: LaunchMode.externalApplication);

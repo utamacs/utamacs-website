@@ -1,0 +1,297 @@
+---
+export const prerender = false;
+import PortalLayout from '@portal/PortalLayout.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/portal/login');
+if (!user.isPlatformAdmin) return new Response('Forbidden — platform admin access required', { status: 403 });
+---
+
+<PortalLayout title="Society Management" user={user} activeModule="platform_admin">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-primary-600 font-poppins">Society Management</h1>
+      <p class="text-text-secondary text-sm mt-1">Provision and manage all societies on this platform.</p>
+    </div>
+    <button id="btn-new-society"
+      class="btn-primary flex items-center gap-2">
+      <i class="fas fa-plus" aria-hidden="true"></i> New Society
+    </button>
+  </div>
+
+  <!-- Platform admin notice -->
+  <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-800">
+    <i class="fas fa-shield-alt mr-1.5"></i>
+    <strong>Platform Admin</strong> — Changes here affect the entire platform. Each society gets an isolated
+    dataset. After creating a society, use <strong>Invite Admin</strong> to onboard their first administrator.
+  </div>
+
+  <!-- Societies list -->
+  <div id="societies-list" class="space-y-3">
+    <div class="text-center py-12 text-text-secondary">
+      <i class="fas fa-spinner fa-spin text-2xl mb-3"></i>
+      <p>Loading societies…</p>
+    </div>
+  </div>
+</PortalLayout>
+
+<!-- ── Create Society Modal ─────────────────────────────────────────────────── -->
+<div id="modal-create" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 p-4">
+  <div class="bg-white rounded-2xl shadow-large w-full max-w-lg">
+    <div class="flex items-center justify-between p-5 border-b border-border-light">
+      <h2 class="text-lg font-semibold text-primary-600">Create New Society</h2>
+      <button id="modal-create-close" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <form id="form-create" class="p-5 space-y-4">
+      <div>
+        <label class="form-label">Society Name <span class="text-red-500">*</span></label>
+        <input name="name" required minlength="3" maxlength="200" class="form-input"
+          placeholder="e.g. Green Valley Apartment MACS Ltd" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label">Registration No.</label>
+          <input name="registration_no" maxlength="100" class="form-input" placeholder="TSMACS-2024-XXX" />
+        </div>
+        <div>
+          <label class="form-label">Total Units</label>
+          <input name="total_units" type="number" min="1" max="10000" class="form-input" placeholder="120" />
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Address</label>
+        <input name="address" maxlength="300" class="form-input" placeholder="Survey No, Village, Mandal" />
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="form-label">City</label>
+          <input name="city" maxlength="100" class="form-input" placeholder="Hyderabad" />
+        </div>
+        <div>
+          <label class="form-label">State</label>
+          <input name="state" maxlength="100" class="form-input" value="Telangana" />
+        </div>
+        <div>
+          <label class="form-label">Pincode</label>
+          <input name="pincode" maxlength="10" class="form-input" placeholder="500086" />
+        </div>
+      </div>
+      <div id="create-error" class="form-error hidden"></div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" id="modal-create-cancel" class="btn-ghost">Cancel</button>
+        <button type="submit" id="btn-create-submit" class="btn-primary">
+          <span id="create-label">Create Society</span>
+          <i id="create-spinner" class="fas fa-spinner fa-spin hidden ml-2"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Invite Admin Modal ───────────────────────────────────────────────────── -->
+<div id="modal-invite" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 p-4">
+  <div class="bg-white rounded-2xl shadow-large w-full max-w-md">
+    <div class="flex items-center justify-between p-5 border-b border-border-light">
+      <h2 class="text-lg font-semibold text-primary-600">Invite Society Admin</h2>
+      <button id="modal-invite-close" class="text-text-secondary hover:text-text-primary" aria-label="Close">
+        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <form id="form-invite" class="p-5 space-y-4">
+      <input type="hidden" id="invite-society-id" name="society_id" />
+      <p class="text-sm text-text-secondary" id="invite-society-name"></p>
+      <div>
+        <label class="form-label">Admin Email <span class="text-red-500">*</span></label>
+        <input id="invite-email" name="admin_email" type="email" required class="form-input"
+          placeholder="admin@theirsociety.org" />
+        <p class="text-xs text-text-secondary mt-1">An invitation email will be sent. They must set up their account before logging in.</p>
+      </div>
+      <div id="invite-error" class="form-error hidden"></div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" id="modal-invite-cancel" class="btn-ghost">Cancel</button>
+        <button type="submit" id="btn-invite-submit" class="btn-primary">
+          <span id="invite-label">Send Invite</span>
+          <i id="invite-spinner" class="fas fa-spinner fa-spin hidden ml-2"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const API = '/api/v1/admin/societies';
+
+// ── Render helpers ──────────────────────────────────────────────────────────
+function badge(text, colorCls) {
+  return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorCls}">${text}</span>`;
+}
+
+function renderSociety(s) {
+  const isUTAMACS = s.id === '00000000-0000-0000-0000-000000000001';
+  return `
+    <div class="card-premium p-5 flex items-start justify-between gap-4 flex-wrap">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
+          <h3 class="text-base font-semibold text-text-primary truncate">${s.name}</h3>
+          ${isUTAMACS ? badge('Seed Society', 'bg-primary-100 text-primary-600') : badge('Active', 'bg-secondary-100 text-secondary-700')}
+        </div>
+        <div class="text-xs text-text-secondary space-y-0.5">
+          ${s.registration_no ? `<div><i class="fas fa-hashtag w-3 mr-1"></i>${s.registration_no}</div>` : ''}
+          ${s.address ? `<div><i class="fas fa-map-marker-alt w-3 mr-1"></i>${s.address}${s.city ? ', ' + s.city : ''}${s.pincode ? ' – ' + s.pincode : ''}</div>` : ''}
+          ${s.total_units ? `<div><i class="fas fa-door-open w-3 mr-1"></i>${s.total_units} units</div>` : ''}
+          <div class="mt-1 font-mono text-primary-400 select-all">${s.id}</div>
+        </div>
+      </div>
+      <div class="flex flex-col gap-2 shrink-0">
+        ${!isUTAMACS ? `
+          <button onclick="openInvite('${s.id}', '${s.name.replace(/'/g, "\\'")}')"
+            class="btn-outline text-xs px-3 py-1.5 flex items-center gap-1.5">
+            <i class="fas fa-envelope"></i> Invite Admin
+          </button>
+        ` : ''}
+        <button onclick="copyId('${s.id}')"
+          class="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5">
+          <i class="fas fa-copy"></i> Copy ID
+        </button>
+      </div>
+    </div>`;
+}
+
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  const color = type === 'success' ? 'bg-secondary-500' : 'bg-red-500';
+  toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-large text-sm font-medium text-white transform translate-y-4 opacity-0 transition-all duration-300 ${color}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.remove('translate-y-4', 'opacity-0'));
+  setTimeout(() => {
+    toast.classList.add('translate-y-4', 'opacity-0');
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ── Load societies ──────────────────────────────────────────────────────────
+async function loadSocieties() {
+  const list = document.getElementById('societies-list');
+  try {
+    const res = await fetch(API);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message ?? 'Failed to load');
+    list.innerHTML = data.length === 0
+      ? `<div class="text-center py-16 text-text-secondary"><i class="fas fa-building text-4xl mb-3"></i><p>No societies yet.</p></div>`
+      : data.map(renderSociety).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-circle text-2xl mb-2"></i><p>${e.message}</p></div>`;
+  }
+}
+loadSocieties();
+
+// ── Create society ──────────────────────────────────────────────────────────
+const modalCreate = document.getElementById('modal-create');
+const formCreate = document.getElementById('form-create');
+const createError = document.getElementById('create-error');
+
+document.getElementById('btn-new-society').addEventListener('click', () => {
+  formCreate.reset();
+  createError.classList.add('hidden');
+  modalCreate.classList.remove('hidden');
+});
+['modal-create-close', 'modal-create-cancel'].forEach(id =>
+  document.getElementById(id).addEventListener('click', () => modalCreate.classList.add('hidden'))
+);
+
+formCreate.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btn-create-submit');
+  const spinner = document.getElementById('create-spinner');
+  const label = document.getElementById('create-label');
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  label.textContent = 'Creating…';
+  createError.classList.add('hidden');
+
+  const fd = new FormData(formCreate);
+  const body = Object.fromEntries(fd.entries());
+
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message ?? 'Failed to create');
+    modalCreate.classList.add('hidden');
+    showToast(`Society created — ${data.flagsSeeded} flags and ${data.rulesSeeded} rules seeded.`);
+    loadSocieties();
+  } catch (err) {
+    createError.textContent = err.message;
+    createError.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+    label.textContent = 'Create Society';
+  }
+});
+
+// ── Invite admin ────────────────────────────────────────────────────────────
+const modalInvite = document.getElementById('modal-invite');
+const formInvite = document.getElementById('form-invite');
+const inviteError = document.getElementById('invite-error');
+
+function openInvite(societyId, name) {
+  document.getElementById('invite-society-id').value = societyId;
+  document.getElementById('invite-society-name').textContent = `Society: ${name}`;
+  document.getElementById('invite-email').value = '';
+  inviteError.classList.add('hidden');
+  modalInvite.classList.remove('hidden');
+}
+
+['modal-invite-close', 'modal-invite-cancel'].forEach(id =>
+  document.getElementById(id).addEventListener('click', () => modalInvite.classList.add('hidden'))
+);
+
+formInvite.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btn-invite-submit');
+  const spinner = document.getElementById('invite-spinner');
+  const label = document.getElementById('invite-label');
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  label.textContent = 'Sending…';
+  inviteError.classList.add('hidden');
+
+  const fd = new FormData(formInvite);
+  const body = Object.fromEntries(fd.entries());
+
+  try {
+    const res = await fetch(API, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message ?? 'Invite failed');
+    modalInvite.classList.add('hidden');
+    showToast(`Invite sent to ${body.admin_email}`);
+  } catch (err) {
+    inviteError.textContent = err.message;
+    inviteError.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+    label.textContent = 'Send Invite';
+  }
+});
+
+// ── Utility ─────────────────────────────────────────────────────────────────
+function copyId(id) {
+  navigator.clipboard.writeText(id).then(() => showToast('Society ID copied to clipboard'));
+}
+
+window.openInvite = openInvite;
+window.copyId = copyId;
+</script>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../data/visitor_repository.dart';
@@ -132,7 +133,7 @@ class VisitorPassScreen extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () async {
                   final uri = Uri.parse(
-                      'https://portal.utamacs.org/portal/visitors?tab=passes&id=${approval.id}');
+                      '$portalUrl/portal/visitors?tab=passes&id=${approval.id}');
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri,
                         mode: LaunchMode.externalApplication);

@@ -288,3 +288,27 @@ if (!isPrivileged) return Astro.redirect('/portal');
     });
   </script>
 </PortalLayout>
+
+{user.isPlatformAdmin && (
+  <div class="mt-8 border-t border-border-light pt-6">
+    <div class="flex items-center gap-2 mb-4">
+      <i class="fas fa-globe text-primary-600" aria-hidden="true"></i>
+      <h2 class="text-lg font-semibold text-primary-600">Platform Administration</h2>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-600 ml-1">Super Admin</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-white rounded-xl border-2 border-primary-200 p-5">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+            <i class="fas fa-city text-primary-600" aria-hidden="true"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-text-primary">Society Management</h3>
+            <p class="text-xs text-text-secondary">Provision societies, seed flags & rules, invite admins</p>
+          </div>
+        </div>
+        <a href="/portal/admin/societies" class="btn-primary text-sm w-full text-center block">Manage Societies</a>
+      </div>
+    </div>
+  </div>
+)}

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/design/ds_animations.dart';
 import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
@@ -66,7 +67,7 @@ class WaterTankersScreen extends ConsumerWidget {
             icon: Icons.download_outlined,
             onTap: () async {
               final uri = Uri.parse(
-                  'https://portal.utamacs.org/portal/water-tankers?export=csv');
+                  '$portalUrl/portal/water-tankers?export=csv');
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri,
                     mode: LaunchMode.externalApplication);

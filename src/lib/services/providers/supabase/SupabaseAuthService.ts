@@ -1,7 +1,7 @@
 import { getSupabaseAnonClient, getSupabaseServiceClient } from './SupabaseDB';
 import type { IAuthService, AuthSession, UserClaims, MFASetup } from '../../interfaces/IAuthService';
 
-function sessionFromSupabase(session: { access_token: string; refresh_token: string; expires_at?: number }, user: { id: string; email?: string; user_metadata?: { role?: string; society_id?: string } }, profile?: { portal_role?: string; committee_title?: string | null; is_admin?: boolean }): AuthSession {
+function sessionFromSupabase(session: { access_token: string; refresh_token: string; expires_at?: number }, user: { id: string; email?: string; user_metadata?: { role?: string; society_id?: string } }, profile?: { portal_role?: string; committee_title?: string | null; is_admin?: boolean; is_platform_admin?: boolean }): AuthSession {
   return {
     accessToken: session.access_token,
     refreshToken: session.refresh_token,
@@ -13,6 +13,7 @@ function sessionFromSupabase(session: { access_token: string; refresh_token: str
       portalRole: profile?.portal_role ?? 'member',
       committeeTitle: profile?.committee_title ?? null,
       isAdmin: profile?.is_admin ?? false,
+      isPlatformAdmin: profile?.is_platform_admin ?? false,
       societyId: user.user_metadata?.society_id ?? '',
     },
   };
@@ -28,12 +29,12 @@ export class SupabaseAuthService implements IAuthService {
     }
     let role = 'member';
     let societyId = '';
-    let profile: { portal_role?: string; committee_title?: string | null; is_admin?: boolean } = {};
+    let profile: { portal_role?: string; committee_title?: string | null; is_admin?: boolean; is_platform_admin?: boolean } = {};
     try {
       const serviceClient = getSupabaseServiceClient();
       const [roleResult, profileResult] = await Promise.all([
         serviceClient.from('user_roles').select('role, society_id').eq('user_id', data.user.id).single(),
-        serviceClient.from('profiles').select('portal_role, committee_title, is_admin').eq('id', data.user.id).single(),
+        serviceClient.from('profiles').select('portal_role, committee_title, is_admin, is_platform_admin').eq('id', data.user.id).single(),
       ]);
       if (roleResult.data) {
         role = roleResult.data.role ?? 'member';
@@ -71,11 +72,12 @@ export class SupabaseAuthService implements IAuthService {
     let portalRole = 'member';
     let committeeTitle: string | null = null;
     let isAdmin = false;
+    let isPlatformAdmin = false;
     try {
       const svc = getSupabaseServiceClient();
       const [roleResult, profileResult] = await Promise.all([
         svc.from('user_roles').select('role, society_id').eq('user_id', data.user.id).single(),
-        svc.from('profiles').select('portal_role, committee_title, is_admin, society_id').eq('id', data.user.id).single(),
+        svc.from('profiles').select('portal_role, committee_title, is_admin, is_platform_admin, society_id').eq('id', data.user.id).single(),
       ]);
       if (roleResult.data) {
         role = roleResult.data.role ?? 'member';
@@ -85,6 +87,7 @@ export class SupabaseAuthService implements IAuthService {
         portalRole = profileResult.data.portal_role ?? 'member';
         committeeTitle = profileResult.data.committee_title ?? null;
         isAdmin = (profileResult.data.is_admin ?? false) || role === 'admin';
+        isPlatformAdmin = profileResult.data.is_platform_admin ?? false;
         if (!societyId) societyId = profileResult.data.society_id ?? '';
       }
     } catch {
@@ -98,6 +101,7 @@ export class SupabaseAuthService implements IAuthService {
       portalRole,
       committeeTitle,
       isAdmin,
+      isPlatformAdmin,
       societyId,
     };
   }
