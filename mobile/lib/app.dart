@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/design/ds_animations.dart';
@@ -65,6 +67,7 @@ import 'features/visitors/presentation/screens/visitor_pass_screen.dart';
 import 'features/visitors/presentation/screens/visitors_screen.dart';
 import 'features/water_tankers/presentation/screens/water_tankers_screen.dart';
 import 'core/utils/device_security.dart';
+import 'core/utils/responsive.dart';
 
 // ─── Router refresh notifier ──────────────────────────────────────────────────
 
@@ -388,6 +391,13 @@ class _UtamacsAppState extends ConsumerState<UtamacsApp>
         themeMode:  themeMode,
         routerConfig: _router,
         debugShowCheckedModeBanner: false,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) {
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(
@@ -429,6 +439,16 @@ class _AppShell extends ConsumerWidget {
     final idx    = _currentIndex;
     final isDark = ref.watch(isDarkModeProvider);
 
+    if (context.useSideNav) {
+      return _TabletShell(
+        currentIndex: idx,
+        onTap: (i) => context.go(_tabs[i].path),
+        tabs: _tabs,
+        isDark: isDark,
+        child: child,
+      );
+    }
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       extendBody: true,
@@ -438,6 +458,98 @@ class _AppShell extends ConsumerWidget {
         onTap: (i) => context.go(_tabs[i].path),
         tabs: _tabs,
         isDark: isDark,
+      ),
+    );
+  }
+}
+
+// ─── Tablet / desktop shell with NavigationRail ───────────────────────────────
+
+class _TabletShell extends StatelessWidget {
+  final Widget child;
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final List<_TabDef> tabs;
+  final bool isDark;
+
+  const _TabletShell({
+    required this.child,
+    required this.currentIndex,
+    required this.onTap,
+    required this.tabs,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final surface        = isDark ? dsDarkSurface : dsSurface;
+    final activeColor    = dsColorIndigo600;
+    final inactiveColor  = isDark ? dsDarkTextSecondary : dsTextSecondary;
+    final bg             = isDark ? const Color(0xFF1A1B2E) : const Color(0xFFF5F5FF);
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: currentIndex,
+            onDestinationSelected: onTap,
+            backgroundColor: surface,
+            indicatorColor: isDark
+                ? dsColorIndigo600.withValues(alpha: 0.18)
+                : dsColorIndigo50,
+            selectedIconTheme: IconThemeData(color: activeColor),
+            unselectedIconTheme: IconThemeData(color: inactiveColor),
+            selectedLabelTextStyle: TextStyle(
+              color: activeColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              fontFamily: 'Inter',
+            ),
+            unselectedLabelTextStyle: TextStyle(
+              color: inactiveColor,
+              fontWeight: FontWeight.w400,
+              fontSize: 12,
+              fontFamily: 'Inter',
+            ),
+            labelType: context.isDesktop
+                ? NavigationRailLabelType.selected
+                : NavigationRailLabelType.all,
+            extended: context.isDesktop,
+            leading: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: context.isDesktop ? 120 : 36,
+                errorBuilder: (_, __, ___) => Icon(
+                  DSIcons.home,
+                  color: activeColor,
+                  size: 28,
+                ),
+              ),
+            ),
+            destinations: tabs
+                .map((t) => NavigationRailDestination(
+                      icon: Icon(t.icon),
+                      selectedIcon: Icon(t.activeIcon),
+                      label: Text(t.label),
+                    ))
+                .toList(),
+          ),
+          VerticalDivider(
+            width: 1,
+            thickness: 1,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.06),
+          ),
+          Expanded(
+            child: ColoredBox(
+              color: bg,
+              child: child,
+            ),
+          ),
+        ],
       ),
     );
   }

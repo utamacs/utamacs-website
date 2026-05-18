@@ -8,6 +8,7 @@ import '../../../../core/design/ds_animations.dart';
 import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/local_db/database_provider.dart';
 import '../../../../core/preferences/app_preferences.dart';
 import '../../../../core/utils/input_validators.dart';
 import '../../../../shared/models/profile.dart';
@@ -428,9 +429,12 @@ class _AppearanceCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surface     = isDark ? dsDarkSurface : dsSurface;
-    final borderColor = isDark ? dsDarkBorderLight : dsBorderSubtle;
+    final surface      = isDark ? dsDarkSurface : dsSurface;
+    final borderColor  = isDark ? dsDarkBorderLight : dsBorderSubtle;
     final currentScale = ref.watch(textScaleProvider);
+    final isOffline    = ref.watch(offlineModeProvider);
+    final profile      = ref.watch(authNotifierProvider).profile;
+    final isPrivileged = profile?.isExec == true || profile?.isAdmin == true;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: dsSpace4),
@@ -635,6 +639,154 @@ class _AppearanceCard extends ConsumerWidget {
                 ],
               ),
             ),
+
+            Divider(height: 1, color: borderColor),
+
+            // ── Offline / Cache mode ──────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  dsSpace4, dsSpace3, dsSpace4, dsSpace3),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? dsColorIndigo600.withValues(alpha: 0.12)
+                          : dsColorIndigo50,
+                      borderRadius: BorderRadius.circular(dsRadiusSm),
+                    ),
+                    child: Icon(
+                      isOffline
+                          ? Icons.cloud_off_rounded
+                          : Icons.cloud_done_outlined,
+                      size: context.si(18),
+                      color: isDark ? dsColorIndigo300 : dsColorIndigo600,
+                    ),
+                  ),
+                  const SizedBox(width: dsSpace3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Offline Mode',
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(14),
+                            fontWeight: FontWeight.w600,
+                            color:
+                                isDark ? dsDarkTextPrimary : dsTextPrimary,
+                          ),
+                        ),
+                        Text(
+                          isOffline
+                              ? 'Showing cached data — refreshes in background'
+                              : 'Always fetches latest data from server',
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(11),
+                            color: isDark
+                                ? dsDarkTextSecondary
+                                : dsTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: isOffline,
+                    activeThumbColor: dsColorIndigo600,
+                    onChanged: (v) => ref
+                        .read(appPreferencesProvider.notifier)
+                        .setOfflineMode(v),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Admin: Clear cached data ──────────────────────────────────────
+            if (isPrivileged) ...[
+              Divider(height: 1, color: borderColor),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    dsSpace4, dsSpace3, dsSpace4, dsSpace3),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? dsColorAmber500.withValues(alpha: 0.12)
+                            : const Color(0xFFFFF8E1),
+                        borderRadius: BorderRadius.circular(dsRadiusSm),
+                      ),
+                      child: Icon(
+                        Icons.delete_sweep_outlined,
+                        size: context.si(18),
+                        color: isDark ? dsColorAmber300 : dsColorAmber700,
+                      ),
+                    ),
+                    const SizedBox(width: dsSpace3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Clear Offline Cache',
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(14),
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? dsDarkTextPrimary
+                                  : dsTextPrimary,
+                            ),
+                          ),
+                          Text(
+                            'Force fresh data on next sync',
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(11),
+                              color: isDark
+                                  ? dsDarkTextSecondary
+                                  : dsTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final db = ref.read(appDatabaseProvider);
+                        final sid = profile!.societyId ?? '';
+                        await db.clearNotices(sid);
+                        await db.clearComplaints(sid);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Cache cleared',
+                                style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w500),
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: dsColorAmber700,
+                            ),
+                          );
+                        }
+                      },
+                      child: Text(
+                        'Clear',
+                        style: GoogleFonts.inter(
+                          fontSize: context.sp(13),
+                          fontWeight: FontWeight.w600,
+                          color: dsColorAmber700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

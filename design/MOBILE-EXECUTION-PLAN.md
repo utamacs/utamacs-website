@@ -110,13 +110,13 @@
 
 | # | Item | Audit Ref | Status | Notes |
 |---|---|---|---|---|
-| L-1 | Offline-first architecture with Drift (SQLite) | G-11, P4 | ⬜ PENDING | 3-4 weeks; cache notices, complaints, dues, visitor passes |
-| L-2 | Native file upload (replace browser-based via `url_launcher`) | P4 | ⬜ PENDING | 2 weeks; needs MIME validation + GitHub commit via portal API |
-| L-3 | Telugu + English localization | G-20 | ⬜ PENDING | `flutter_localizations` + ARB files; 1 week infra + 3 days/language |
+| L-1 | Offline-first architecture with Drift (SQLite) | G-11, P4 | ✅ DONE | Drift 2.21 + SQLite; `AppDatabase` schema for notices/complaints/dues/visitor passes; `OfflineCacheService` stale-while-revalidate; offline toggle in Profile settings |
+| L-2 | Native file upload (replace browser-based via `url_launcher`) | P4 | ✅ DONE | `image_picker` + `file_picker`; `MobileFileUploadService` POSTs multipart to portal API; wired into `SubmitComplaintScreen` with gallery/camera/PDF picker UI |
+| L-3 | Telugu + English localization | G-20 | ✅ DONE | `flutter_localizations` + `l10n.yaml`; ARB files for English, Telugu, and Hindi; `AppLocalizations.delegate` in `MaterialApp.router` |
 | L-4 | Biometric re-auth on sensitive operations | G-23 | ✅ DONE | `BiometricGate` widget + `authenticateWithBiometrics()` in `device_security.dart`; applied to `TenantKycScreen` and `FinanceScreen`; Android + iOS permissions added |
-| L-5 | Certificate pinning (Supabase HTTP client) | Security | ⬜ PENDING | Prevents MITM; 3 days effort |
+| L-5 | Certificate pinning (Supabase HTTP client) | Security | ✅ DONE | SPKI-SHA256 via `HttpOverrides.global` in `certificate_pinning.dart`; `installCertificatePinning()` called in `main()` before HTTP; skipped in debug; pins injected via `--dart-define=SUPABASE_CERT_PIN_1/2` |
 | L-6 | Root/jailbreak detection | Security | ✅ DONE | `warnIfCompromisedDevice()` in `device_security.dart`; wired into `app.dart` `initState()` via `addPostFrameCallback`; non-blocking warning dialog |
-| L-7 | Tablet / foldable adaptive layout | UX | ⬜ PENDING | 2 weeks; responsive breakpoints for large screens |
+| L-7 | Tablet / foldable adaptive layout | UX | ✅ DONE | `ResponsiveContext` extension with 600dp/1200dp breakpoints; `_TabletShell` with `NavigationRail` for ≥600dp; `_AppShell` switches between bottom nav and rail |
 | L-8 | Accessibility — `Semantics` labels on all `IconButton` widgets | A11y | ✅ DONE | 20 `tooltip:` labels added across 20 files (batch 42) |
 | L-9 | Accessibility — color-only status indicators | A11y | ✅ DONE | `Semantics(label: ...)` on notification bell (dashboard) and unread dot (notifications list); all other status indicators already had text+icon |
 | L-10 | Accessibility — `FocusTraversalGroup` on forms | A11y | ✅ DONE | `FocusTraversalGroup(policy: ReadingOrderTraversalPolicy())` added to login, submit complaint, and register forms |
