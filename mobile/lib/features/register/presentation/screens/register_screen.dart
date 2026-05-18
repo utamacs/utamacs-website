@@ -562,7 +562,9 @@ class _ApplicationForm extends StatelessWidget {
             boxShadow: isDark ? [] : dsShadowSm,
             border: isDark ? Border.all(color: dsDarkBorderSubtle) : null,
           ),
-          child: Form(
+          child: FocusTraversalGroup(
+            policy: ReadingOrderTraversalPolicy(),
+            child: Form(
             key: formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -694,6 +696,7 @@ class _ApplicationForm extends StatelessWidget {
               ],
             ),
           ),
+          ),   // FocusTraversalGroup
         ),
         SizedBox(height: 80 + MediaQuery.paddingOf(context).bottom),
       ],

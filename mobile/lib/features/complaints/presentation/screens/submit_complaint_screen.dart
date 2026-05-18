@@ -103,7 +103,9 @@ class _SubmitComplaintScreenState
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
       ),
-      body: Form(
+      body: FocusTraversalGroup(
+        policy: ReadingOrderTraversalPolicy(),
+        child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(20),
@@ -279,7 +281,8 @@ class _SubmitComplaintScreenState
             ),
           ],
         ),
-      ),
+        ),   // Form
+      ),   // FocusTraversalGroup
     );
   }
 
