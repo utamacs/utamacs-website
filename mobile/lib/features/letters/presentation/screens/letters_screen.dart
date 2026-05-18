@@ -24,7 +24,7 @@ class LettersScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final lettersAsync = ref.watch(lettersProvider);
@@ -182,7 +182,7 @@ class _LetterCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
 
     return DSScalePress(
       onTap: () => showModalBottomSheet(
@@ -320,7 +320,7 @@ class _LetterDetailSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
     final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
     final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;

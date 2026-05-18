@@ -88,7 +88,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final membershipAsync = ref.watch(myMembershipProvider);
 
     return DsScreenShell(

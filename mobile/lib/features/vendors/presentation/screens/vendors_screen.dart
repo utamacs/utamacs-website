@@ -26,7 +26,7 @@ class VendorsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
@@ -173,7 +173,7 @@ class _VendorsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final vendorsAsync = ref.watch(vendorsProvider);
 
     return vendorsAsync.when(
@@ -454,7 +454,7 @@ class _WorkOrdersTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final workOrdersAsync = ref.watch(workOrdersProvider);
     final vendorsAsync = ref.watch(vendorsProvider);
 
@@ -1075,7 +1075,7 @@ class _RateVendorSheetState
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
     final borderColor =
         isDark ? dsDarkBorderLight : dsBorderLight;
@@ -1278,7 +1278,7 @@ class _VendorDetailSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
     final borderColor =
         isDark ? dsDarkBorderLight : dsBorderLight;
@@ -1533,7 +1533,7 @@ class _CreateWorkOrderSheetState
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
     final borderColor =
         isDark ? dsDarkBorderLight : dsBorderLight;

@@ -30,7 +30,7 @@ class _PollsScreenState extends ConsumerState<PollsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final pollsAsync = ref.watch(pollsProvider);
     final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
@@ -564,7 +564,7 @@ class _CreatePollModalState
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final bg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
     final fmt = DateFormat('EEE, d MMM yyyy • h:mm a');
     final borderColor =

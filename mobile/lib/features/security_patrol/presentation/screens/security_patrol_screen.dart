@@ -17,7 +17,7 @@ class SecurityPatrolScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final incidentCount =
         ref.watch(incidentLogsProvider).valueOrNull?.length ?? 0;
@@ -161,7 +161,7 @@ class _PatrolLogsContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final logsAsync = ref.watch(patrolLogsProvider);
 
     return logsAsync.when(
@@ -236,7 +236,7 @@ class _PatrolLogsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final logsAsync = ref.watch(patrolLogsProvider);
 
     return logsAsync.when(
@@ -317,7 +317,7 @@ class _IncidentsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final incidentsAsync = ref.watch(incidentLogsProvider);
 
     return incidentsAsync.when(
@@ -386,7 +386,7 @@ class _GuardsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final summariesAsync = ref.watch(guardSummariesProvider);
 
     return summariesAsync.when(
@@ -462,7 +462,7 @@ class _ScheduleTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final schedulesAsync = ref.watch(patrolSchedulesProvider);
 
     return Scaffold(
@@ -1483,7 +1483,7 @@ class _AddScheduleSheetState
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
     final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
 

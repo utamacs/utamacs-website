@@ -47,7 +47,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final membersAsync = ref.watch(membersProvider);
 
@@ -323,7 +323,7 @@ class _MemberCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final initial = member.fullName.isNotEmpty
         ? member.fullName[0].toUpperCase()
         : '?';

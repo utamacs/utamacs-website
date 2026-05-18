@@ -101,6 +101,16 @@ final isDarkModeProvider = Provider<bool>((ref) {
   return ref.watch(appPreferencesProvider).value?.darkMode ?? false;
 });
 
+/// Effective dark mode — respects skin's [forcedBrightness] over user preference.
+/// Use this everywhere instead of [isDarkModeProvider] when skin-aware dark mode is needed.
+final effectiveDarkProvider = Provider<bool>((ref) {
+  final skin = ref.watch(activeSkinProvider);
+  if (skin.forcedBrightness != null) {
+    return skin.forcedBrightness == Brightness.dark;
+  }
+  return ref.watch(appPreferencesProvider).value?.darkMode ?? false;
+});
+
 final textScaleProvider = Provider<DsTextScale>((ref) {
   return ref.watch(appPreferencesProvider).value?.textScale ?? DsTextScale.medium;
 });

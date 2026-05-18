@@ -32,7 +32,7 @@ class _ParkingScreenState extends ConsumerState<ParkingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 

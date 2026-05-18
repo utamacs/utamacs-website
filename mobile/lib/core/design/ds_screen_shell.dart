@@ -5,6 +5,7 @@ import '../preferences/app_preferences.dart';
 import 'ds_animations.dart';
 import 'ds_tokens.dart';
 import 'ds_typography_scale.dart';
+import 'skins/skin_context.dart';
 
 // ============================================================================
 // UTAMACS Design System — Premium Screen Shell
@@ -63,12 +64,13 @@ class DsScreenShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final skin      = context.skin;
+    final isDark    = ref.watch(effectiveDarkProvider);
 
-    final bgColor = isDark ? dsDarkBackground : dsBackground;
-    final surfaceColor = isDark ? dsDarkSurface : dsSurface;
-    final titleColor = isDark ? dsDarkTextPrimary : dsTextPrimary;
-    final subtitleColor = isDark ? dsDarkTextSecondary : dsTextSecondary;
+    final bgColor      = skin.background;
+    final surfaceColor = skin.surface;
+    final titleColor   = skin.textPrimary;
+    final subtitleColor = skin.textSecondary;
 
     Widget appBar = _buildSliverAppBar(
       context,
@@ -76,6 +78,7 @@ class DsScreenShell extends ConsumerWidget {
       surfaceColor: surfaceColor,
       titleColor: titleColor,
       subtitleColor: subtitleColor,
+      skin: skin,
     );
 
     final bottomPad = 80 + MediaQuery.paddingOf(context).bottom + extraBottomPadding;
@@ -97,7 +100,7 @@ class DsScreenShell extends ConsumerWidget {
     if (onRefresh != null) {
       body = RefreshIndicator(
         onRefresh: onRefresh!,
-        color: dsColorIndigo600,
+        color: skin.accent,
         backgroundColor: surfaceColor,
         child: scrollView,
       );
@@ -118,6 +121,7 @@ class DsScreenShell extends ConsumerWidget {
     required Color surfaceColor,
     required Color titleColor,
     required Color subtitleColor,
+    required dynamic skin,
   }) {
     if (headerStyle == DsHeaderStyle.gradient) {
       return _GradientSliverAppBar(
@@ -129,6 +133,7 @@ class DsScreenShell extends ConsumerWidget {
         flexibleBackground: flexibleBackground,
         bottom: bottom,
         isDark: isDark,
+        accentColor: skin.accent as Color,
       );
     }
 
@@ -144,7 +149,7 @@ class DsScreenShell extends ConsumerWidget {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: isDark ? 0.5 : 1,
-      shadowColor: isDark ? dsDarkBorderLight : dsBorderLight,
+      shadowColor: skin.border as Color,
       automaticallyImplyLeading: false,
       titleSpacing: 0,
       leading: leading,
@@ -185,10 +190,12 @@ class _GradientSliverAppBar extends StatelessWidget {
   final Widget? flexibleBackground;
   final PreferredSizeWidget? bottom;
   final bool isDark;
+  final Color accentColor;
 
   const _GradientSliverAppBar({
     required this.title,
     required this.isDark,
+    this.accentColor = dsColorIndigo600,
     this.subtitle,
     this.actions,
     this.leading,
@@ -203,7 +210,7 @@ class _GradientSliverAppBar extends StatelessWidget {
       pinned: true,
       floating: false,
       expandedHeight: expandedHeight > 0 ? expandedHeight : null,
-      backgroundColor: dsColorIndigo600,
+      backgroundColor: accentColor,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -321,8 +328,7 @@ class DsActionButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
-    final iconColor = color ?? (isDark ? dsDarkTextPrimary : dsTextPrimary);
+    final iconColor = color ?? context.skin.textPrimary;
 
     return GestureDetector(
       onTap: onTap,
@@ -372,6 +378,7 @@ class DsSliverSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final skin = context.skin;
     return Padding(
       padding: padding,
       child: Row(
@@ -382,7 +389,7 @@ class DsSliverSection extends StatelessWidget {
               style: GoogleFonts.poppins(
                 fontSize: context.sp(14),
                 fontWeight: FontWeight.w700,
-                color: dsTextPrimary,
+                color: skin.textPrimary,
                 letterSpacing: -0.1,
               ),
             ),
@@ -395,7 +402,7 @@ class DsSliverSection extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: context.sp(12),
                   fontWeight: FontWeight.w600,
-                  color: dsColorIndigo600,
+                  color: skin.accent,
                 ),
               ),
             ),
@@ -430,7 +437,7 @@ class DsListItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
 
     return Material(
@@ -531,7 +538,6 @@ class DsStatsRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: dsSpace4),
       child: Row(
@@ -544,7 +550,7 @@ class DsStatsRow extends ConsumerWidget {
                 left: i == 0 ? 0 : dsSpace2,
                 right: i == stats.length - 1 ? 0 : dsSpace2,
               ),
-              child: _StatCard(stat: stat, isDark: isDark),
+              child: _StatCard(stat: stat),
             ),
           );
         }).toList(),
@@ -569,21 +575,21 @@ class DsStatItem {
 
 class _StatCard extends StatelessWidget {
   final DsStatItem stat;
-  final bool isDark;
 
-  const _StatCard({required this.stat, required this.isDark});
+  const _StatCard({required this.stat});
 
   @override
   Widget build(BuildContext context) {
+    final skin = context.skin;
     return DSFadeSlide(
       child: Container(
         padding: const EdgeInsets.all(dsSpace3),
         decoration: BoxDecoration(
-          color: isDark ? dsDarkSurface : dsSurface,
+          color: skin.surface,
           borderRadius: BorderRadius.circular(dsRadiusCard),
-          boxShadow: isDark ? [] : dsShadowSm,
-          border: isDark
-              ? Border.all(color: dsDarkBorderSubtle, width: 1)
+          boxShadow: skin.isDark ? [] : dsShadowSm,
+          border: skin.isDark
+              ? Border.all(color: skin.borderSoft, width: 1)
               : null,
         ),
         child: Column(
@@ -604,7 +610,7 @@ class _StatCard extends StatelessWidget {
               style: GoogleFonts.poppins(
                 fontSize: context.sp(18),
                 fontWeight: FontWeight.w800,
-                color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+                color: skin.textPrimary,
                 height: 1,
               ),
             ),
@@ -613,7 +619,7 @@ class _StatCard extends StatelessWidget {
               stat.label,
               style: GoogleFonts.inter(
                 fontSize: context.sp(10),
-                color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+                color: skin.textSecondary,
                 height: 1.2,
               ),
               maxLines: 1,
@@ -658,6 +664,7 @@ class DsFilterRow extends StatelessWidget {
           final label = items[i];
           final value = (includeAll && i == 0) ? null : label;
           final isSelected = value == selected;
+          final skin = ctx.skin;
           return Padding(
             padding: const EdgeInsets.only(right: dsSpace2),
             child: GestureDetector(
@@ -666,18 +673,18 @@ class DsFilterRow extends StatelessWidget {
                 duration: dsDurationFast,
                 padding: const EdgeInsets.symmetric(horizontal: dsSpace3, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isSelected ? dsColorIndigo600 : Colors.transparent,
+                  color: isSelected ? skin.accent : Colors.transparent,
                   borderRadius: BorderRadius.circular(dsRadiusFull),
                   border: Border.all(
-                    color: isSelected ? dsColorIndigo600 : dsBorderLight,
+                    color: isSelected ? skin.accent : skin.border,
                   ),
                 ),
                 child: Text(
                   label,
                   style: GoogleFonts.inter(
-                    fontSize: context.sp(12),
+                    fontSize: ctx.sp(12),
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? Colors.white : dsTextSecondary,
+                    color: isSelected ? skin.accentText : skin.textSecondary,
                     height: 1,
                   ),
                 ),
@@ -710,7 +717,7 @@ class DsEmptyPlaceholder extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final skin = context.skin;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: dsSpace16, horizontal: dsSpace8),
       child: Column(
@@ -720,15 +727,13 @@ class DsEmptyPlaceholder extends ConsumerWidget {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: isDark
-                  ? dsColorIndigo600.withValues(alpha: 0.15)
-                  : dsColorIndigo50,
+              color: skin.accentSoft,
               borderRadius: BorderRadius.circular(dsRadiusXl),
             ),
             child: Icon(
               icon,
               size: context.si(32),
-              color: isDark ? dsColorIndigo400 : dsColorIndigo300,
+              color: skin.accent.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: dsSpace4),
@@ -737,7 +742,7 @@ class DsEmptyPlaceholder extends ConsumerWidget {
             style: GoogleFonts.poppins(
               fontSize: context.sp(16),
               fontWeight: FontWeight.w700,
-              color: isDark ? dsDarkTextPrimary : dsTextPrimary,
+              color: skin.textPrimary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -746,7 +751,7 @@ class DsEmptyPlaceholder extends ConsumerWidget {
             message,
             style: GoogleFonts.inter(
               fontSize: context.sp(13),
-              color: isDark ? dsDarkTextSecondary : dsTextSecondary,
+              color: skin.textSecondary,
               height: 1.5,
             ),
             textAlign: TextAlign.center,
@@ -761,7 +766,7 @@ class DsEmptyPlaceholder extends ConsumerWidget {
                   vertical: dsSpace3,
                 ),
                 decoration: BoxDecoration(
-                  color: dsColorIndigo600,
+                  color: skin.accent,
                   borderRadius: BorderRadius.circular(dsRadiusButton),
                   boxShadow: dsShadowBrand,
                 ),
@@ -770,7 +775,7 @@ class DsEmptyPlaceholder extends ConsumerWidget {
                   style: GoogleFonts.inter(
                     fontSize: context.sp(14),
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: skin.accentText,
                   ),
                 ),
               ),

@@ -7,7 +7,7 @@ class _GuardVisitorsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final bgColor = isDark ? dsDarkBackground : dsBackground;
 
     return DefaultTabController(
