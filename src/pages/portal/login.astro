@@ -56,7 +56,7 @@ if (errorCode) {
           </button>
           <button id="tab-otp" onclick="switchTab('otp')"
             class="flex-1 py-2 text-sm font-medium bg-white text-text-secondary hover:bg-gray-50 transition-colors">
-            Mobile OTP
+            Email OTP
           </button>
         </div>
 
@@ -89,24 +89,21 @@ if (errorCode) {
           </form>
         </div>
 
-        <!-- Mobile OTP panel -->
+        <!-- Email OTP panel -->
         <div id="panel-otp" class="hidden">
           <div id="otp-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
 
-          <!-- Step 1: phone -->
-          <div id="otp-step-phone" class="space-y-4">
+          <!-- Step 1: email -->
+          <div id="otp-step-email" class="space-y-4">
             <div>
-              <label for="otp-phone" class="block text-sm font-medium text-text-primary mb-1.5">Mobile Number</label>
-              <div class="flex gap-2">
-                <span class="px-3 py-2.5 bg-gray-50 border border-border-light rounded-xl text-sm text-text-secondary">+91</span>
-                <input type="tel" id="otp-phone" pattern="[6-9][0-9]{9}" maxlength="10"
-                  placeholder="10-digit mobile"
-                  class="flex-1 px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent" />
-              </div>
+              <label for="otp-email" class="block text-sm font-medium text-text-primary mb-1.5">Email Address</label>
+              <input type="email" id="otp-email" autocomplete="email" maxlength="255"
+                placeholder="you@example.com"
+                class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent" />
             </div>
             <button id="send-otp-btn" onclick="sendOtp()"
               class="btn-primary w-full flex items-center justify-center gap-2">
-              <span id="send-otp-text">Send OTP</span>
+              <span id="send-otp-text">Send Sign-in Code</span>
               <span id="send-otp-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
             </button>
           </div>
@@ -115,9 +112,9 @@ if (errorCode) {
           <div id="otp-step-token" class="hidden space-y-4">
             <p id="otp-sent-msg" class="text-sm text-secondary-500 text-center"></p>
             <div>
-              <label for="otp-token" class="block text-sm font-medium text-text-primary mb-1.5">Enter OTP</label>
-              <input type="text" id="otp-token" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-                placeholder="6-digit code"
+              <label for="otp-token" class="block text-sm font-medium text-text-primary mb-1.5">Sign-in Code</label>
+              <input type="text" id="otp-token" inputmode="numeric" pattern="[0-9]{8}" maxlength="8"
+                placeholder="8-digit code"
                 class="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent" />
             </div>
             <button id="verify-otp-btn" onclick="verifyOtp()"
@@ -126,7 +123,7 @@ if (errorCode) {
               <span id="verify-otp-spinner" class="hidden"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
             </button>
             <button onclick="resetOtp()" class="btn-ghost w-full text-sm text-text-secondary">
-              <i class="fas fa-arrow-left mr-1" aria-hidden="true"></i> Use a different number
+              <i class="fas fa-arrow-left mr-1" aria-hidden="true"></i> Use a different email
             </button>
           </div>
         </div>
@@ -141,7 +138,7 @@ if (errorCode) {
 
 <script>
   const redirectTo = new URLSearchParams(window.location.search).get('next') ?? '/portal';
-  let otpPhone = '';
+  let otpEmail = '';
 
   function switchTab(tab: string) {
     const isOtp = tab === 'otp';
@@ -160,16 +157,16 @@ if (errorCode) {
   }
 
   async function sendOtp() {
-    const phoneEl  = document.getElementById('otp-phone') as HTMLInputElement;
+    const emailEl  = document.getElementById('otp-email') as HTMLInputElement;
     const errorEl  = document.getElementById('otp-error')!;
     const textEl   = document.getElementById('send-otp-text')!;
     const spinEl   = document.getElementById('send-otp-spinner')!;
     const btn      = document.getElementById('send-otp-btn') as HTMLButtonElement;
 
     errorEl.classList.add('hidden');
-    const phone = phoneEl.value.trim();
-    if (!/^[6-9][0-9]{9}$/.test(phone)) {
-      errorEl.textContent = 'Enter a valid 10-digit Indian mobile number.';
+    const email = emailEl.value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errorEl.textContent = 'Enter a valid email address.';
       errorEl.classList.remove('hidden');
       return;
     }
@@ -182,17 +179,17 @@ if (errorCode) {
       const res  = await fetch('/api/v1/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ email }),
       });
       const data = await res.json();
       if (res.ok) {
-        otpPhone = phone;
-        document.getElementById('otp-step-phone')!.classList.add('hidden');
+        otpEmail = email;
+        document.getElementById('otp-step-email')!.classList.add('hidden');
         document.getElementById('otp-step-token')!.classList.remove('hidden');
-        document.getElementById('otp-sent-msg')!.textContent = `OTP sent to +91 ${phone}`;
+        document.getElementById('otp-sent-msg')!.textContent = `Sign-in code sent to ${email}`;
         document.getElementById('otp-token')?.focus();
       } else {
-        errorEl.textContent = data.message ?? 'Failed to send OTP. Please try again.';
+        errorEl.textContent = data.message ?? 'Failed to send code. Make sure your email is registered.';
         errorEl.classList.remove('hidden');
       }
     } catch {
@@ -214,8 +211,8 @@ if (errorCode) {
 
     errorEl.classList.add('hidden');
     const token = tokenEl.value.trim();
-    if (!/^[0-9]{6}$/.test(token)) {
-      errorEl.textContent = 'Enter the 6-digit OTP from your SMS.';
+    if (!/^[0-9]{8}$/.test(token)) {
+      errorEl.textContent = 'Enter the 8-digit sign-in code from your email.';
       errorEl.classList.remove('hidden');
       return;
     }
@@ -229,13 +226,13 @@ if (errorCode) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ phone: otpPhone, token }),
+        body: JSON.stringify({ email: otpEmail, token }),
       });
       const data = await res.json();
       if (res.ok) {
         window.location.href = data.next ?? redirectTo;
       } else {
-        errorEl.textContent = data.message ?? 'Invalid or expired OTP. Please try again.';
+        errorEl.textContent = data.message ?? 'Invalid or expired code. Please try again.';
         errorEl.classList.remove('hidden');
       }
     } catch {
@@ -249,10 +246,10 @@ if (errorCode) {
   }
 
   function resetOtp() {
-    otpPhone = '';
-    (document.getElementById('otp-phone') as HTMLInputElement).value = '';
+    otpEmail = '';
+    (document.getElementById('otp-email') as HTMLInputElement).value = '';
     (document.getElementById('otp-token') as HTMLInputElement).value = '';
-    document.getElementById('otp-step-phone')!.classList.remove('hidden');
+    document.getElementById('otp-step-email')!.classList.remove('hidden');
     document.getElementById('otp-step-token')!.classList.add('hidden');
     document.getElementById('otp-error')!.classList.add('hidden');
   }

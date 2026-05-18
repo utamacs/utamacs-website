@@ -41,7 +41,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _verifyCode() async {
     final email = _emailCtrl.text.trim();
     final token = _otpCtrl.text.trim();
-    if (token.length < 6) return;
+    if (token.length < 8) return;
     setState(() => _loading = true);
     try {
       await ref.read(authNotifierProvider.notifier).verifyEmailOtp(email, token);
@@ -122,7 +122,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       : const Text('Send sign-in code'),
                 ),
               ] else ...[
-                Text('Enter the 6-digit code',
+                Text('Enter the 8-digit code',
                     style: Theme.of(context).textTheme.titleLarge),
                 Text('Sent to ${_emailCtrl.text}',
                     style: Theme.of(context)
@@ -133,7 +133,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextFormField(
                   controller: _otpCtrl,
                   keyboardType: TextInputType.number,
-                  maxLength: 6,
+                  maxLength: 8,
                   decoration: const InputDecoration(
                     hintText: 'Enter code',
                     labelText: 'Sign-in code',
