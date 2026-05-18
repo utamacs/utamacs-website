@@ -552,9 +552,10 @@ class _DocumentDetailDialogState
     if (confirm != true || !mounted) return;
     setState(() => _archiving = true);
     try {
+      final profile = ref.read(authNotifierProvider).profile!;
       await ref
           .read(documentRepositoryProvider)
-          .archiveDocument(widget.doc.id);
+          .archiveDocument(widget.doc.id, profile);
       widget.onArchived();
     } catch (e) {
       if (mounted) {
