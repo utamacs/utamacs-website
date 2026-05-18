@@ -115,7 +115,7 @@ export const POST: APIRoute = async ({ request }) => {
       resourceType: 'society',
       resourceId: newSocietyId,
       newValues: { name, registration_no: registrationNo },
-      ipAddress: extractClientIP(request),
+      ip: extractClientIP(request),
     });
 
     return Response.json({
@@ -170,7 +170,7 @@ export const PATCH: APIRoute = async ({ request }) => {
       resourceType: 'society_admin',
       resourceId: inviteData.user.id,
       newValues: { email: adminEmail, society_id: societyId },
-      ipAddress: extractClientIP(request),
+      ip: extractClientIP(request),
     });
 
     return Response.json({ message: `Invite sent to ${adminEmail}`, userId: inviteData.user.id });
