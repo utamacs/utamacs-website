@@ -12,22 +12,22 @@ function setCookieHeader(name: string, value: string, maxAge: number, path: stri
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const body = await request.json() as { phone?: string; token?: string };
-    const phone = body.phone?.trim() ?? '';
+    const body = await request.json() as { email?: string; token?: string };
+    const email = body.email?.trim().toLowerCase() ?? '';
     const token = body.token?.trim() ?? '';
 
-    if (!/^[6-9][0-9]{9}$/.test(phone)) {
-      return Response.json({ error: 'VALIDATION', message: 'Invalid phone number.' }, { status: 400 });
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return Response.json({ error: 'VALIDATION', message: 'Enter a valid email address.' }, { status: 400 });
     }
-    if (!/^[0-9]{6}$/.test(token)) {
-      return Response.json({ error: 'VALIDATION', message: 'OTP must be 6 digits.' }, { status: 400 });
+    if (!/^[0-9]{8}$/.test(token)) {
+      return Response.json({ error: 'VALIDATION', message: 'Sign-in code must be 8 digits.' }, { status: 400 });
     }
 
     const sb = getSupabaseServiceClient();
     const { data, error } = await sb.auth.verifyOtp({
-      phone: `+91${phone}`,
+      email,
       token,
-      type: 'sms',
+      type: 'email',
     });
 
     if (error || !data.session) {

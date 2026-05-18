@@ -5,22 +5,22 @@ import { getSupabaseServiceClient } from '@lib/services/providers/supabase/Supab
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const body = await request.json() as { phone?: string };
-    const phone = body.phone?.trim() ?? '';
+    const body = await request.json() as { email?: string };
+    const email = body.email?.trim().toLowerCase() ?? '';
 
-    if (!/^[6-9][0-9]{9}$/.test(phone)) {
-      return Response.json({ error: 'VALIDATION', message: 'Enter a valid 10-digit Indian mobile number.' }, { status: 400 });
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return Response.json({ error: 'VALIDATION', message: 'Enter a valid email address.' }, { status: 400 });
     }
 
     const sb = getSupabaseServiceClient();
     const { error } = await sb.auth.signInWithOtp({
-      phone: `+91${phone}`,
-      options: { channel: 'sms' },
+      email,
+      options: { shouldCreateUser: false },
     });
 
     if (error) {
       console.error('[send-otp]', error.message);
-      return Response.json({ error: 'OTP_SEND_FAILED', message: 'Could not send OTP. Please try again.' }, { status: 502 });
+      return Response.json({ error: 'OTP_SEND_FAILED', message: 'Could not send sign-in code. Make sure your email is registered.' }, { status: 502 });
     }
 
     return Response.json({ sent: true }, { status: 200 });

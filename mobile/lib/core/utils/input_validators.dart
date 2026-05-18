@@ -59,7 +59,7 @@ class InputValidators {
   static String? otp(String? value) {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return 'Enter the OTP';
-    if (!RegExp(r'^\d{6}$').hasMatch(v)) return 'OTP must be 6 digits';
+    if (!RegExp(r'^\d{8}$').hasMatch(v)) return 'OTP must be 8 digits';
     return null;
   }
 }
