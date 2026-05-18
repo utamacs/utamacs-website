@@ -310,7 +310,12 @@ class _HeroHeader extends StatelessWidget {
               ),
 
               // Notification bell
-              GestureDetector(
+              Semantics(
+                label: noticeCount > 0
+                    ? 'Notifications, $noticeCount unread'
+                    : 'Notifications',
+                button: true,
+                child: GestureDetector(
                 onTap: onBellTap,
                 child: Container(
                   width: 42,
@@ -354,6 +359,7 @@ class _HeroHeader extends StatelessWidget {
                   ),
                 ),
               ),
+              ),   // Semantics
             ],
           ),
         ),

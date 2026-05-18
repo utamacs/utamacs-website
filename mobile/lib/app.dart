@@ -64,6 +64,7 @@ import 'features/visitors/presentation/screens/pre_approve_screen.dart';
 import 'features/visitors/presentation/screens/visitor_pass_screen.dart';
 import 'features/visitors/presentation/screens/visitors_screen.dart';
 import 'features/water_tankers/presentation/screens/water_tankers_screen.dart';
+import 'core/utils/device_security.dart';
 
 // ─── Router refresh notifier ──────────────────────────────────────────────────
 
@@ -323,6 +324,9 @@ class _UtamacsAppState extends ConsumerState<UtamacsApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _router = _buildRouter(_routerRefresh);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) warnIfCompromisedDevice(context);
+    });
   }
 
   @override

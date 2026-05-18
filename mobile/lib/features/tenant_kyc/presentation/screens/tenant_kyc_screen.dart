@@ -7,6 +7,7 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/device_security.dart';
 import '../../../../core/utils/secure_screen.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/tenant_kyc_repository.dart';
@@ -36,6 +37,8 @@ class TenantKycScreen extends ConsumerWidget {
     );
 
     return SecureScreenWrapper(
+      child: BiometricGate(
+      reason: 'Verify your identity to access Tenant KYC records.',
       child: DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -88,6 +91,7 @@ class TenantKycScreen extends ConsumerWidget {
         ),
       ),
     ),   // DefaultTabController
+    ),   // BiometricGate
     );   // SecureScreenWrapper
   }
 }
