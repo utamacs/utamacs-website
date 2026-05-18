@@ -11,22 +11,32 @@ import '../design/ds_typography_scale.dart';
 const _storage = FlutterSecureStorage(
   aOptions: AndroidOptions(encryptedSharedPreferences: true),
 );
-const _kDarkMode   = 'pref_dark_mode';
-const _kTextScale  = 'pref_text_scale';
+const _kDarkMode     = 'pref_dark_mode';
+const _kTextScale    = 'pref_text_scale';
+const _kOfflineMode  = 'pref_offline_mode';
 
 class AppPreferences {
   final bool darkMode;
   final DsTextScale textScale;
+  /// When true, data is served from the local Drift cache first, then refreshed
+  /// from Supabase in the background (stale-while-revalidate). Off by default.
+  final bool offlineMode;
 
   const AppPreferences({
-    this.darkMode  = false,
-    this.textScale = DsTextScale.medium,
+    this.darkMode   = false,
+    this.textScale  = DsTextScale.medium,
+    this.offlineMode = false,
   });
 
-  AppPreferences copyWith({bool? darkMode, DsTextScale? textScale}) =>
+  AppPreferences copyWith({
+    bool? darkMode,
+    DsTextScale? textScale,
+    bool? offlineMode,
+  }) =>
       AppPreferences(
-        darkMode:  darkMode  ?? this.darkMode,
-        textScale: textScale ?? this.textScale,
+        darkMode:    darkMode    ?? this.darkMode,
+        textScale:   textScale   ?? this.textScale,
+        offlineMode: offlineMode ?? this.offlineMode,
       );
 
   ThemeMode get themeMode => darkMode ? ThemeMode.dark : ThemeMode.light;
@@ -35,11 +45,13 @@ class AppPreferences {
 class AppPreferencesNotifier extends AsyncNotifier<AppPreferences> {
   @override
   Future<AppPreferences> build() async {
-    final dark  = await _storage.read(key: _kDarkMode);
-    final scale = await _storage.read(key: _kTextScale);
+    final dark    = await _storage.read(key: _kDarkMode);
+    final scale   = await _storage.read(key: _kTextScale);
+    final offline = await _storage.read(key: _kOfflineMode);
     return AppPreferences(
-      darkMode:  dark == 'true',
-      textScale: DsTextScaleX.fromIndex(int.tryParse(scale ?? '1') ?? 1),
+      darkMode:    dark == 'true',
+      textScale:   DsTextScaleX.fromIndex(int.tryParse(scale ?? '1') ?? 1),
+      offlineMode: offline == 'true',
     );
   }
 
@@ -51,6 +63,11 @@ class AppPreferencesNotifier extends AsyncNotifier<AppPreferences> {
   Future<void> setTextScale(DsTextScale scale) async {
     await _storage.write(key: _kTextScale, value: scale.storageIndex.toString());
     state = AsyncData(state.value!.copyWith(textScale: scale));
+  }
+
+  Future<void> setOfflineMode(bool value) async {
+    await _storage.write(key: _kOfflineMode, value: value.toString());
+    state = AsyncData(state.value!.copyWith(offlineMode: value));
   }
 }
 
@@ -72,4 +89,8 @@ final textScaleProvider = Provider<DsTextScale>((ref) {
 final themeModeProvider = Provider<ThemeMode>((ref) {
   final dark = ref.watch(isDarkModeProvider);
   return dark ? ThemeMode.dark : ThemeMode.light;
+});
+
+final offlineModeProvider = Provider<bool>((ref) {
+  return ref.watch(appPreferencesProvider).value?.offlineMode ?? false;
 });

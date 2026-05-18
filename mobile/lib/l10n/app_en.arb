@@ -1,0 +1,348 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "UTA MACS",
+  "@appTitle": { "description": "Application name" },
+
+  "navHome": "Home",
+  "@navHome": { "description": "Bottom nav: Home tab" },
+
+  "navNotices": "Notices",
+  "@navNotices": { "description": "Bottom nav: Notices tab" },
+
+  "navVisitors": "Visitors",
+  "@navVisitors": { "description": "Bottom nav: Visitors tab" },
+
+  "navServices": "Services",
+  "@navServices": { "description": "Bottom nav: Services tab" },
+
+  "navProfile": "Profile",
+  "@navProfile": { "description": "Bottom nav: Profile tab" },
+
+  "actionSave": "Save",
+  "@actionSave": { "description": "Generic save button" },
+
+  "actionCancel": "Cancel",
+  "@actionCancel": { "description": "Generic cancel button" },
+
+  "actionSubmit": "Submit",
+  "@actionSubmit": { "description": "Generic submit button" },
+
+  "actionEdit": "Edit",
+  "@actionEdit": { "description": "Generic edit button" },
+
+  "actionDelete": "Delete",
+  "@actionDelete": { "description": "Generic delete button" },
+
+  "actionConfirm": "Confirm",
+  "@actionConfirm": { "description": "Generic confirm button" },
+
+  "actionClose": "Close",
+  "@actionClose": { "description": "Generic close button" },
+
+  "actionBack": "Back",
+  "@actionBack": { "description": "Generic back button" },
+
+  "actionRetry": "Retry",
+  "@actionRetry": { "description": "Retry after error" },
+
+  "actionSearch": "Search",
+  "@actionSearch": { "description": "Search action / hint" },
+
+  "actionFilter": "Filter",
+  "@actionFilter": { "description": "Filter action" },
+
+  "actionUpload": "Upload",
+  "@actionUpload": { "description": "Upload file action" },
+
+  "actionDownload": "Download",
+  "@actionDownload": { "description": "Download file action" },
+
+  "actionShare": "Share",
+  "@actionShare": { "description": "Share action" },
+
+  "actionApprove": "Approve",
+  "@actionApprove": { "description": "Approve action" },
+
+  "actionReject": "Reject",
+  "@actionReject": { "description": "Reject action" },
+
+  "actionViewAll": "View All",
+  "@actionViewAll": { "description": "View all items link" },
+
+  "stateLoading": "Loading…",
+  "@stateLoading": { "description": "Generic loading indicator label" },
+
+  "stateEmpty": "No items yet",
+  "@stateEmpty": { "description": "Empty list state" },
+
+  "stateError": "Something went wrong",
+  "@stateError": { "description": "Generic error state" },
+
+  "stateNoResults": "No results found",
+  "@stateNoResults": { "description": "Search / filter empty state" },
+
+  "stateOffline": "You're offline",
+  "@stateOffline": { "description": "No internet connection message" },
+
+  "labelRequired": "Required",
+  "@labelRequired": { "description": "Field required label" },
+
+  "labelOptional": "Optional",
+  "@labelOptional": { "description": "Field optional label" },
+
+  "labelAll": "All",
+  "@labelAll": { "description": "Filter: All option" },
+
+  "labelYes": "Yes",
+  "@labelYes": { "description": "Yes / affirmative" },
+
+  "labelNo": "No",
+  "@labelNo": { "description": "No / negative" },
+
+  "labelStatus": "Status",
+  "@labelStatus": { "description": "Status label" },
+
+  "labelDate": "Date",
+  "@labelDate": { "description": "Date label" },
+
+  "labelDescription": "Description",
+  "@labelDescription": { "description": "Description field label" },
+
+  "labelAmount": "Amount",
+  "@labelAmount": { "description": "Amount / money label" },
+
+  "labelUnit": "Unit",
+  "@labelUnit": { "description": "Flat / unit number label" },
+
+  "labelName": "Name",
+  "@labelName": { "description": "Name field label" },
+
+  "labelPhone": "Phone",
+  "@labelPhone": { "description": "Phone number label" },
+
+  "labelEmail": "Email",
+  "@labelEmail": { "description": "Email address label" },
+
+  "labelCategory": "Category",
+  "@labelCategory": { "description": "Category field label" },
+
+  "labelPriority": "Priority",
+  "@labelPriority": { "description": "Priority label" },
+
+  "labelAttachments": "Attachments",
+  "@labelAttachments": { "description": "Attachments label" },
+
+  "moduleComplaints": "Complaints",
+  "@moduleComplaints": { "description": "Module name: Complaints" },
+
+  "moduleFinance": "Finance",
+  "@moduleFinance": { "description": "Module name: Finance & Dues" },
+
+  "moduleEvents": "Events",
+  "@moduleEvents": { "description": "Module name: Events" },
+
+  "modulePolls": "Polls",
+  "@modulePolls": { "description": "Module name: Polls & Voting" },
+
+  "moduleCommunity": "Community",
+  "@moduleCommunity": { "description": "Module name: Community Board" },
+
+  "moduleDocuments": "Documents",
+  "@moduleDocuments": { "description": "Module name: Documents" },
+
+  "moduleFacilities": "Facilities",
+  "@moduleFacilities": { "description": "Module name: Facility Booking" },
+
+  "moduleParking": "Parking",
+  "@moduleParking": { "description": "Module name: Parking" },
+
+  "moduleMaids": "Domestic Help",
+  "@moduleMaids": { "description": "Module name: Maids registry" },
+
+  "moduleMembers": "Members",
+  "@moduleMembers": { "description": "Module name: Member Directory" },
+
+  "moduleGallery": "Gallery",
+  "@moduleGallery": { "description": "Module name: Photo Gallery" },
+
+  "moduleWaterTankers": "Water Tankers",
+  "@moduleWaterTankers": { "description": "Module name: Water Tanker orders" },
+
+  "moduleFeedback": "Feedback",
+  "@moduleFeedback": { "description": "Module name: Feedback" },
+
+  "moduleSnags": "Snags",
+  "@moduleSnags": { "description": "Module name: Snag / defect list" },
+
+  "moduleSecurityPatrol": "Security Patrol",
+  "@moduleSecurityPatrol": { "description": "Module name: Security Patrol Log" },
+
+  "modulePolicies": "Policies",
+  "@modulePolicies": { "description": "Module name: Policies & Compliance" },
+
+  "moduleRegister": "Membership",
+  "@moduleRegister": { "description": "Module name: Society membership application" },
+
+  "moduleAgm": "AGM",
+  "@moduleAgm": { "description": "Module name: Annual General Meeting" },
+
+  "moduleTenantKyc": "Tenant KYC",
+  "@moduleTenantKyc": { "description": "Module name: Tenant KYC verification" },
+
+  "moduleHoto": "HOTO",
+  "@moduleHoto": { "description": "Module name: Handover-Takeover tracker" },
+
+  "moduleLetters": "Letters",
+  "@moduleLetters": { "description": "Module name: Official Letters" },
+
+  "moduleAnalytics": "Analytics",
+  "@moduleAnalytics": { "description": "Module name: Analytics & Reports" },
+
+  "moduleStaff": "Staff",
+  "@moduleStaff": { "description": "Module name: Staff management" },
+
+  "moduleVendors": "Vendors",
+  "@moduleVendors": { "description": "Module name: Vendors & Work Orders" },
+
+  "loginTitle": "Welcome back",
+  "@loginTitle": { "description": "Login screen heading" },
+
+  "loginSubtitle": "Sign in to your UTA MACS account",
+  "@loginSubtitle": { "description": "Login screen subheading" },
+
+  "loginEmailHint": "Enter your registered email",
+  "@loginEmailHint": { "description": "Login email field hint" },
+
+  "loginSendOtp": "Send OTP",
+  "@loginSendOtp": { "description": "Send OTP button" },
+
+  "loginVerifyOtp": "Verify OTP",
+  "@loginVerifyOtp": { "description": "Verify OTP button" },
+
+  "loginOtpHint": "Enter the 6-digit code",
+  "@loginOtpHint": { "description": "OTP input hint" },
+
+  "loginResendOtp": "Resend OTP",
+  "@loginResendOtp": { "description": "Resend OTP link" },
+
+  "loginSignOut": "Sign Out",
+  "@loginSignOut": { "description": "Sign out button" },
+
+  "dashboardGreetingMorning": "Good morning",
+  "@dashboardGreetingMorning": { "description": "Morning greeting on dashboard" },
+
+  "dashboardGreetingAfternoon": "Good afternoon",
+  "@dashboardGreetingAfternoon": { "description": "Afternoon greeting on dashboard" },
+
+  "dashboardGreetingEvening": "Good evening",
+  "@dashboardGreetingEvening": { "description": "Evening greeting on dashboard" },
+
+  "dashboardQuickActions": "Quick Actions",
+  "@dashboardQuickActions": { "description": "Dashboard section: Quick Actions" },
+
+  "dashboardRecentActivity": "Recent Activity",
+  "@dashboardRecentActivity": { "description": "Dashboard section: Recent Activity" },
+
+  "complaintNew": "New Complaint",
+  "@complaintNew": { "description": "New complaint button" },
+
+  "complaintStatus_open": "Open",
+  "@complaintStatus_open": { "description": "Complaint status: open" },
+
+  "complaintStatus_inProgress": "In Progress",
+  "@complaintStatus_inProgress": { "description": "Complaint status: in progress" },
+
+  "complaintStatus_resolved": "Resolved",
+  "@complaintStatus_resolved": { "description": "Complaint status: resolved" },
+
+  "complaintStatus_closed": "Closed",
+  "@complaintStatus_closed": { "description": "Complaint status: closed" },
+
+  "visitorPreApprove": "Pre-Approve Visitor",
+  "@visitorPreApprove": { "description": "Pre-approve visitor button" },
+
+  "visitorAdmit": "Admit",
+  "@visitorAdmit": { "description": "Admit visitor button (guard view)" },
+
+  "visitorExit": "Mark Exit",
+  "@visitorExit": { "description": "Mark visitor exit button" },
+
+  "visitorScanQr": "Scan QR",
+  "@visitorScanQr": { "description": "Scan QR code button" },
+
+  "financeMyDues": "My Dues",
+  "@financeMyDues": { "description": "Finance tab: My Dues" },
+
+  "financePaymentHistory": "Payment History",
+  "@financePaymentHistory": { "description": "Finance tab: Payment History" },
+
+  "financePayNow": "Pay Now",
+  "@financePayNow": { "description": "Pay Now button" },
+
+  "financeOutstanding": "Outstanding Balance",
+  "@financeOutstanding": { "description": "Outstanding balance label" },
+
+  "noticePin": "Pin",
+  "@noticePin": { "description": "Pin notice action" },
+
+  "noticeArchive": "Archive",
+  "@noticeArchive": { "description": "Archive notice action" },
+
+  "pollVote": "Vote",
+  "@pollVote": { "description": "Vote action in polls" },
+
+  "pollResults": "Results",
+  "@pollResults": { "description": "Poll results label" },
+
+  "pollEnds": "Ends {date}",
+  "@pollEnds": {
+    "description": "Poll end date",
+    "placeholders": { "date": { "type": "String" } }
+  },
+
+  "facilityBook": "Book Facility",
+  "@facilityBook": { "description": "Book facility button" },
+
+  "facilityAvailable": "Available",
+  "@facilityAvailable": { "description": "Facility availability: available" },
+
+  "facilityBooked": "Booked",
+  "@facilityBooked": { "description": "Facility availability: booked" },
+
+  "profileSettings": "Settings",
+  "@profileSettings": { "description": "Profile settings section" },
+
+  "profileDarkMode": "Dark Mode",
+  "@profileDarkMode": { "description": "Dark mode toggle label" },
+
+  "profileTextSize": "Text Size",
+  "@profileTextSize": { "description": "Text size preference label" },
+
+  "profileLanguage": "Language",
+  "@profileLanguage": { "description": "Language preference label" },
+
+  "errorNetwork": "Network error. Please check your connection.",
+  "@errorNetwork": { "description": "Network error message" },
+
+  "errorUnauthorized": "You don't have permission to do that.",
+  "@errorUnauthorized": { "description": "Authorization error message" },
+
+  "errorGeneric": "An unexpected error occurred. Please try again.",
+  "@errorGeneric": { "description": "Generic error fallback message" },
+
+  "errorFieldRequired": "This field is required.",
+  "@errorFieldRequired": { "description": "Form validation: field required" },
+
+  "securityDeviceCompromised": "Security Warning",
+  "@securityDeviceCompromised": { "description": "Security warning dialog title" },
+
+  "securityDeviceCompromisedBody": "This device appears to be rooted or jailbroken. For your security, some features may be restricted.",
+  "@securityDeviceCompromisedBody": { "description": "Security warning dialog body" },
+
+  "securityBiometricReason": "Verify your identity to continue",
+  "@securityBiometricReason": { "description": "Default biometric prompt reason" },
+
+  "securityBiometricRetry": "Verify Identity",
+  "@securityBiometricRetry": { "description": "Retry biometric button" }
+}

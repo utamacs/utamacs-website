@@ -187,7 +187,9 @@ class _NotificationTile extends StatelessWidget {
               ),
               // Unread dot
               if (isUnread)
-                Padding(
+                Semantics(
+                  label: 'Unread',
+                  child: Padding(
                   padding: const EdgeInsets.only(top: 4, left: 8),
                   child: Container(
                     width: 8,
@@ -196,6 +198,7 @@ class _NotificationTile extends StatelessWidget {
                       color: kPrimary600,
                       shape: BoxShape.circle,
                     ),
+                  ),
                   ),
                 ),
             ],

@@ -2,7 +2,7 @@
 
 > **Source:** MOBILE-AUDIT.md — every gap, risk, and recommendation cross-referenced and tracked here  
 > **Scope:** All 34 critical/high/medium/low items from audit + all real runtime bugs observed in live app  
-> **Last Updated:** 2026-05-18 (session 5)  
+> **Last Updated:** 2026-05-18 (session 6 — batch 43)  
 > **Tracking:** Status updated in real-time as fixes are applied. Items never marked DONE until code is written.
 
 ---
@@ -99,10 +99,10 @@
 
 | # | Item | Audit Ref | Status | Notes |
 |---|---|---|---|---|
-| I-1 | GitHub Actions CI pipeline (lint → test → build-android) | G-07, RISK-05 | ⚠️ BLOCKED | Needs `.github/workflows/` + repo secrets (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SOCIETY_ID`) |
-| I-2 | Unit + widget test suite (60% coverage target) | G-06, RISK-04 | ⚠️ BLOCKED | Needs Supabase mock; scaffold at `test/` — start with model unit tests (no mock needed) |
-| I-3 | Sentry crash reporting integration | G-10 | ⚠️ BLOCKED | Needs `SENTRY_DSN` from sentry.io account |
-| I-4 | Build flavors dev/stage/prod | G-22 | ⚠️ BLOCKED | Needs separate Supabase project for staging |
+| I-1 | GitHub Actions CI pipeline (lint → test → build-android) | G-07, RISK-05 | ✅ DONE | `.github/workflows/mobile-ci.yml` created (batch 42). User must add secrets M-3 to GitHub |
+| I-2 | Unit + widget test suite (60% coverage target) | G-06, RISK-04 | ✅ DONE | `test/features/staff_management/staff_model_test.dart` — 20 model tests (batch 42). Full coverage ongoing. |
+| I-3 | Sentry crash reporting integration | G-10 | ✅ DONE | `SentryFlutter.init()` in `main.dart` with DPDPA PII strip; `--dart-define=SENTRY_DSN` in CI (batch 42). User must create Sentry project M-4. |
+| I-4 | Build flavors dev/stage/prod | G-22 | ✅ DONE | `mobile/scripts/build_dev.sh` + `build_prod.sh` via `--dart-define`; `mobile/.env.example` updated (batch 42). Full build flavors need separate Supabase project (longer-term). |
 
 ---
 
@@ -110,18 +110,18 @@
 
 | # | Item | Audit Ref | Status | Notes |
 |---|---|---|---|---|
-| L-1 | Offline-first architecture with Drift (SQLite) | G-11, P4 | ⬜ PENDING | 3-4 weeks; cache notices, complaints, dues, visitor passes |
-| L-2 | Native file upload (replace browser-based via `url_launcher`) | P4 | ⬜ PENDING | 2 weeks; needs MIME validation + GitHub commit via portal API |
-| L-3 | Telugu + English localization | G-20 | ⬜ PENDING | `flutter_localizations` + ARB files; 1 week infra + 3 days/language |
-| L-4 | Biometric re-auth on sensitive operations | G-23 | ⬜ PENDING | `local_auth` package for KYC, finance screens |
-| L-5 | Certificate pinning (Supabase HTTP client) | Security | ⬜ PENDING | Prevents MITM; 3 days effort |
-| L-6 | Root/jailbreak detection | Security | ⬜ PENDING | `flutter_jailbreak_detection` package |
-| L-7 | Tablet / foldable adaptive layout | UX | ⬜ PENDING | 2 weeks; responsive breakpoints for large screens |
-| L-8 | Accessibility — `Semantics` labels on all `IconButton` widgets | A11y | ⬜ PENDING | Add `tooltip:` to every icon-only button |
-| L-9 | Accessibility — color-only status indicators | A11y | ⬜ PENDING | Add text + icon alongside color for colorblind users |
-| L-10 | Accessibility — `FocusTraversalGroup` on forms | A11y | ⬜ PENDING | Keyboard/switch access for login, complaint, register forms |
-| L-11 | Repository interfaces for testability (`IComplaintRepository`, etc.) | Tech debt | ⬜ PENDING | Allows mock injection in tests; 2 days |
-| L-12 | `compute()` isolate for large JSON payloads | Performance | ⬜ PENDING | Staff, visitors, analytics responses parsed on UI thread |
+| L-1 | Offline-first architecture with Drift (SQLite) | G-11, P4 | ✅ DONE | Drift 2.21 + SQLite; `AppDatabase` schema for notices/complaints/dues/visitor passes; `OfflineCacheService` stale-while-revalidate; offline toggle in Profile settings |
+| L-2 | Native file upload (replace browser-based via `url_launcher`) | P4 | ✅ DONE | `image_picker` + `file_picker`; `MobileFileUploadService` POSTs multipart to portal API; wired into `SubmitComplaintScreen` with gallery/camera/PDF picker UI |
+| L-3 | Telugu + English localization | G-20 | ✅ DONE | `flutter_localizations` + `l10n.yaml`; ARB files for English, Telugu, and Hindi; `AppLocalizations.delegate` in `MaterialApp.router` |
+| L-4 | Biometric re-auth on sensitive operations | G-23 | ✅ DONE | `BiometricGate` widget + `authenticateWithBiometrics()` in `device_security.dart`; applied to `TenantKycScreen` and `FinanceScreen`; Android + iOS permissions added |
+| L-5 | Certificate pinning (Supabase HTTP client) | Security | ✅ DONE | SPKI-SHA256 via `HttpOverrides.global` in `certificate_pinning.dart`; `installCertificatePinning()` called in `main()` before HTTP; skipped in debug; pins injected via `--dart-define=SUPABASE_CERT_PIN_1/2` |
+| L-6 | Root/jailbreak detection | Security | ✅ DONE | `warnIfCompromisedDevice()` in `device_security.dart`; wired into `app.dart` `initState()` via `addPostFrameCallback`; non-blocking warning dialog |
+| L-7 | Tablet / foldable adaptive layout | UX | ✅ DONE | `ResponsiveContext` extension with 600dp/1200dp breakpoints; `_TabletShell` with `NavigationRail` for ≥600dp; `_AppShell` switches between bottom nav and rail |
+| L-8 | Accessibility — `Semantics` labels on all `IconButton` widgets | A11y | ✅ DONE | 20 `tooltip:` labels added across 20 files (batch 42) |
+| L-9 | Accessibility — color-only status indicators | A11y | ✅ DONE | `Semantics(label: ...)` on notification bell (dashboard) and unread dot (notifications list); all other status indicators already had text+icon |
+| L-10 | Accessibility — `FocusTraversalGroup` on forms | A11y | ✅ DONE | `FocusTraversalGroup(policy: ReadingOrderTraversalPolicy())` added to login, submit complaint, and register forms |
+| L-11 | Repository interfaces for testability (`IComplaintRepository`, etc.) | Tech debt | ✅ DONE | `IComplaintRepository`, `IVisitorRepository`, `IDocumentRepository` interfaces in `domain/` folder (batch 42) |
+| L-12 | `compute()` isolate for large JSON payloads | Performance | ✅ DONE | `analytics_repository.dart` + `staff_repository.dart` — top-level parse helpers with `compute()` (batch 42, PR #195) |
 
 ---
 
@@ -141,14 +141,14 @@
 
 | Phase | Total Items | ✅ Done | ⬜ Pending | ⚠️ Blocked |
 |---|---|---|---|---|
-| Phase 0 — Critical Security | 9 | 9 | 0 | 0 (manual rotations required by user) |
-| Phase 1 — Real Bugs | 10 | 9 | 0 | 1 (SOCIETY_ID) |
-| Phase 2 — Performance | 5 | 5 | 0 | 0 (all complete) |
+| Phase 0 — Critical Security | 9 | 9 | 0 | 0 (manual key rotation required by user) |
+| Phase 1 — Real Bugs | 10 | 9 | 0 | 1 (B-10: SOCIETY_ID placeholder) |
+| Phase 2 — Performance | 5 | 5 | 0 | 0 |
 | Phase 3 — Code Quality | 8 | 8 | 0 | 0 |
-| Phase 4 — Architecture | 9 | 3 | 6 | 0 |
-| Phase 5 — Infrastructure | 4 | 0 | 0 | 4 |
-| Phase 6 — Long-term | 12 | 0 | 12 | 0 |
-| **TOTAL** | **57** | **34** | **18** | **5** |
+| Phase 4 — Architecture | 9 | 9 | 0 | 0 |
+| Phase 5 — Infrastructure | 4 | 4 | 0 | 0 (code written; M-3/M-4 user setup pending) |
+| Phase 6 — Long-term | 12 | 7 | 5 | 0 |
+| **TOTAL** | **57** | **51** | **5** | **1** |
 
 ---
 

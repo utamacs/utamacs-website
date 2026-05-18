@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/file_upload_service.dart';
 import '../../../../core/utils/input_validators.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/complaint_repository.dart';
@@ -24,6 +25,8 @@ class _SubmitComplaintScreenState
   String _category = 'maintenance';
   String _priority = 'medium';
   bool _submitting = false;
+  final List<MobilePickedFile> _attachments = [];
+  static const _maxAttachments = 5;
 
   static const _categories = [
     'maintenance',
@@ -41,6 +44,39 @@ class _SubmitComplaintScreenState
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFromGallery() async {
+    final remaining = _maxAttachments - _attachments.length;
+    if (remaining <= 0) return;
+    final picked = await MobileFileUploadService.pickImages(maxCount: remaining);
+    if (mounted && picked.isNotEmpty) {
+      setState(() => _attachments.addAll(picked));
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
+    if (_attachments.length >= _maxAttachments) return;
+    final picked = await MobileFileUploadService.pickImages(
+      maxCount: 1,
+      source: ImageSource.camera,
+    );
+    if (mounted && picked.isNotEmpty) {
+      setState(() => _attachments.addAll(picked));
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    final remaining = _maxAttachments - _attachments.length;
+    if (remaining <= 0) return;
+    final picked = await MobileFileUploadService.pickDocuments(maxCount: remaining);
+    if (mounted && picked.isNotEmpty) {
+      setState(() => _attachments.addAll(picked));
+    }
+  }
+
+  void _removeAttachment(int index) {
+    setState(() => _attachments.removeAt(index));
   }
 
   Future<void> _submit() async {
@@ -103,7 +139,9 @@ class _SubmitComplaintScreenState
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
       ),
-      body: Form(
+      body: FocusTraversalGroup(
+        policy: ReadingOrderTraversalPolicy(),
+        child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(20),
@@ -222,45 +260,84 @@ class _SubmitComplaintScreenState
               validator: (v) => InputValidators.optionalText(v, max: 2000),
             ),
             const SizedBox(height: 20),
-            // Attachment upload — opens portal
-            GestureDetector(
-              onTap: () async {
-                final uri = Uri.parse(
-                    'https://portal.utamacs.org/portal/complaints/new');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: kPrimary50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kPrimary100),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.attach_file_outlined,
-                        color: kPrimary600, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Add Photos / Documents (up to 5) — tap to open portal',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: kPrimary600,
-                          fontWeight: FontWeight.w500,
+            // Attachments — native file picker
+            _SectionLabel('Photos / Documents (up to $_maxAttachments)'),
+            const SizedBox(height: 8),
+            if (_attachments.isNotEmpty) ...[
+              SizedBox(
+                height: 80,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _attachments.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final f = _attachments[i];
+                    return Stack(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: kPrimary50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: kPrimary100),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: f.isImage
+                                ? Image.file(f.file, fit: BoxFit.cover)
+                                : const Center(
+                                    child: Icon(Icons.picture_as_pdf,
+                                        size: 36, color: kPrimary600),
+                                  ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const Icon(Icons.open_in_new,
-                        color: kPrimary600, size: 14),
-                  ],
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () => _removeAttachment(i),
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: const BoxDecoration(
+                                color: kRed600,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close,
+                                  size: 12, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
-            ),
+              const SizedBox(height: 8),
+            ],
+            if (_attachments.length < _maxAttachments)
+              Row(
+                children: [
+                  _AttachButton(
+                    icon: Icons.photo_library_outlined,
+                    label: 'Gallery',
+                    onTap: _pickFromGallery,
+                  ),
+                  const SizedBox(width: 8),
+                  _AttachButton(
+                    icon: Icons.camera_alt_outlined,
+                    label: 'Camera',
+                    onTap: _pickFromCamera,
+                  ),
+                  const SizedBox(width: 8),
+                  _AttachButton(
+                    icon: Icons.picture_as_pdf_outlined,
+                    label: 'PDF',
+                    onTap: _pickDocument,
+                  ),
+                ],
+              ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _submitting ? null : _submit,
@@ -279,7 +356,8 @@ class _SubmitComplaintScreenState
             ),
           ],
         ),
-      ),
+        ),   // Form
+      ),   // FocusTraversalGroup
     );
   }
 
@@ -313,6 +391,50 @@ class _SectionLabel extends StatelessWidget {
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: kTextSecondary,
+      ),
+    );
+  }
+}
+
+class _AttachButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _AttachButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: kPrimary50,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kPrimary100),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 22, color: kPrimary600),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: kPrimary600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

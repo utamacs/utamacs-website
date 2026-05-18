@@ -8,6 +8,7 @@ import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
 import '../../../../core/preferences/app_preferences.dart';
+import '../../../../core/utils/device_security.dart';
 import '../../../../core/utils/secure_screen.dart';
 import '../../../auth/domain/auth_notifier.dart';
 import '../../data/finance_repository.dart';
@@ -45,6 +46,8 @@ class FinanceScreen extends ConsumerWidget {
     final bgColor = isDark ? dsDarkBackground : dsBackground;
 
     return SecureScreenWrapper(
+      child: BiometricGate(
+      reason: 'Verify your identity to access finance and dues information.',
       child: DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -136,6 +139,8 @@ class FinanceScreen extends ConsumerWidget {
           ),
         ),
       ),
+      ),   // DefaultTabController
+      ),   // BiometricGate
     );
   }
 }
@@ -794,8 +799,7 @@ class _PaymentCard extends StatelessWidget {
           ),
         ],
       ),
-    ),   // DefaultTabController
-    );   // SecureScreenWrapper
+    );
   }
 
   static String _modeLabel(String mode) => switch (mode) {
