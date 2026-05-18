@@ -9,8 +9,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/design/ds_animations.dart';
 import 'core/design/ds_icons.dart';
 import 'core/design/ds_tokens.dart';
-import 'core/design/ds_theme.dart';
 import 'core/design/ds_typography_scale.dart';
+import 'core/design/skins/skin_context.dart';
+import 'core/design/skins/skin_factory.dart';
 import 'core/feature_flags/feature_flags_provider.dart';
 import 'core/preferences/app_preferences.dart';
 import 'features/auth/domain/auth_notifier.dart';
@@ -366,9 +367,23 @@ class _UtamacsAppState extends ConsumerState<UtamacsApp>
     ref.listen(authNotifierProvider, (_, __) => _routerRefresh.notify());
 
     final prefsAsync = ref.watch(appPreferencesProvider);
-    final themeMode  = ref.watch(themeModeProvider);
+    final userDark   = ref.watch(isDarkModeProvider);
     final scale      = ref.watch(textScaleProvider);
-    final isDark     = ref.watch(isDarkModeProvider);
+    final activeSkin = ref.watch(activeSkinProvider);
+
+    // Resolve effective brightness — forced skins ignore userDark preference
+    final effectiveBrightness = activeSkin.effectiveBrightness(userDark);
+    final isDark = effectiveBrightness == Brightness.dark;
+
+    // Build skin tokens and themes from the active skin
+    final skinTokens  = SkinFactory.tokens(activeSkin, effectiveBrightness);
+    final lightTheme  = SkinFactory.theme(SkinFactory.tokens(activeSkin, Brightness.light));
+    final darkTheme   = SkinFactory.theme(SkinFactory.tokens(activeSkin, Brightness.dark));
+    final themeMode   = activeSkin.forcedBrightness == Brightness.dark
+        ? ThemeMode.dark
+        : activeSkin.forcedBrightness == Brightness.light
+            ? ThemeMode.light
+            : (userDark ? ThemeMode.dark : ThemeMode.light);
 
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -376,36 +391,38 @@ class _UtamacsAppState extends ConsumerState<UtamacsApp>
           isDark ? Brightness.light : Brightness.dark,
       statusBarBrightness:
           isDark ? Brightness.dark : Brightness.light,
-      systemNavigationBarColor:
-          isDark ? dsDarkSurface : dsSurface,
+      systemNavigationBarColor: skinTokens.surface,
       systemNavigationBarIconBrightness:
           isDark ? Brightness.light : Brightness.dark,
     ));
 
     return DsScaleScope(
       scale: prefsAsync.value?.textScale ?? DsTextScale.medium,
-      child: MaterialApp.router(
-        title: 'UTA MACS',
-        theme:      dsLightTheme,
-        darkTheme:  dsDarkTheme,
-        themeMode:  themeMode,
-        routerConfig: _router,
-        debugShowCheckedModeBanner: false,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, child) {
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: dsTextScaler(scale),
-            ),
-            child: child ?? const SizedBox.shrink(),
-          );
-        },
+      child: SkinContext(
+        tokens: skinTokens,
+        child: MaterialApp.router(
+          title: 'UTA MACS',
+          theme:      lightTheme,
+          darkTheme:  darkTheme,
+          themeMode:  themeMode,
+          routerConfig: _router,
+          debugShowCheckedModeBanner: false,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) {
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: dsTextScaler(scale),
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+        ),
       ),
     );
   }

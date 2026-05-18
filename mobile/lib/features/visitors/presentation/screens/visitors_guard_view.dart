@@ -211,7 +211,7 @@ class _ActiveVisitorCard extends StatelessWidget {
           GestureDetector(
             onTap: () async {
               try {
-                await ref.read(visitorRepositoryProvider).logExit(log.id);
+                await ref.read(visitorRepositoryProvider).logExit(log.id, ref.read(authNotifierProvider).profile!);
                 ref.invalidate(activeVisitorsProvider);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -482,7 +482,7 @@ class _ExpectedPassCard extends StatelessWidget {
     );
     if (gate == null) return;
     try {
-      await ref.read(visitorRepositoryProvider).admitByPassId(pass.id, gate);
+      await ref.read(visitorRepositoryProvider).admitByPassId(pass.id, gate, ref.read(authNotifierProvider).profile!);
       ref.invalidate(activeVisitorsProvider);
       ref.invalidate(expectedTodayProvider);
       if (context.mounted) {
@@ -559,7 +559,7 @@ class _GuardOtpTabState extends ConsumerState<_GuardOtpTab>
     );
     if (gate == null) return;
     try {
-      await ref.read(visitorRepositoryProvider).admitByPassId(_found!.id, gate);
+      await ref.read(visitorRepositoryProvider).admitByPassId(_found!.id, gate, ref.read(authNotifierProvider).profile!);
       ref.invalidate(activeVisitorsProvider);
       ref.invalidate(expectedTodayProvider);
       setState(() { _found = null; _otpCtrl.clear(); });
@@ -823,7 +823,7 @@ class _GuardOtpTabState extends ConsumerState<_GuardOtpTab>
     setState(() { _loading = true; _error = null; _found = null; });
     try {
       final repo  = ref.read(visitorRepositoryProvider);
-      await repo.admitByPassId(passId, 'main');
+      await repo.admitByPassId(passId, 'main', ref.read(authNotifierProvider).profile!);
       final passes = await repo.fetchExpectedToday();
       final match  = passes.where((p) => p.id == passId).firstOrNull;
       setState(() {
@@ -889,6 +889,7 @@ class _GuardWalkInTabState extends ConsumerState<_GuardWalkInTab>
             visitorType: _visitorType,
             hostUnitId: _selectedUnitId!,
             gate: _gate,
+            profile: ref.read(authNotifierProvider).profile!,
             vehicleNumber: _vehicleCtrl.text.trim().isEmpty
                 ? null
                 : _vehicleCtrl.text.trim(),

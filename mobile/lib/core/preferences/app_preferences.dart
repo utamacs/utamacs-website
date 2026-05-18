@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../design/ds_typography_scale.dart';
+import '../design/skins/app_skin.dart';
 
 // ============================================================================
 // App Preferences — persisted with flutter_secure_storage
-// Manages: dark mode, text scale (A / A+ / A++)
+// Manages: dark mode, text scale (A / A+ / A++), active skin
 // ============================================================================
 
 const _storage = FlutterSecureStorage(
@@ -14,6 +15,7 @@ const _storage = FlutterSecureStorage(
 const _kDarkMode     = 'pref_dark_mode';
 const _kTextScale    = 'pref_text_scale';
 const _kOfflineMode  = 'pref_offline_mode';
+const _kSkin         = 'pref_skin';
 
 class AppPreferences {
   final bool darkMode;
@@ -21,22 +23,27 @@ class AppPreferences {
   /// When true, data is served from the local Drift cache first, then refreshed
   /// from Supabase in the background (stale-while-revalidate). Off by default.
   final bool offlineMode;
+  /// Active skin — defaults to Classic (original UTAMACS design).
+  final AppSkin skin;
 
   const AppPreferences({
-    this.darkMode   = false,
-    this.textScale  = DsTextScale.medium,
+    this.darkMode    = false,
+    this.textScale   = DsTextScale.medium,
     this.offlineMode = false,
+    this.skin        = AppSkin.classic,
   });
 
   AppPreferences copyWith({
     bool? darkMode,
     DsTextScale? textScale,
     bool? offlineMode,
+    AppSkin? skin,
   }) =>
       AppPreferences(
         darkMode:    darkMode    ?? this.darkMode,
         textScale:   textScale   ?? this.textScale,
         offlineMode: offlineMode ?? this.offlineMode,
+        skin:        skin        ?? this.skin,
       );
 
   ThemeMode get themeMode => darkMode ? ThemeMode.dark : ThemeMode.light;
@@ -48,10 +55,12 @@ class AppPreferencesNotifier extends AsyncNotifier<AppPreferences> {
     final dark    = await _storage.read(key: _kDarkMode);
     final scale   = await _storage.read(key: _kTextScale);
     final offline = await _storage.read(key: _kOfflineMode);
+    final skinId  = await _storage.read(key: _kSkin);
     return AppPreferences(
       darkMode:    dark == 'true',
       textScale:   DsTextScaleX.fromIndex(int.tryParse(scale ?? '1') ?? 1),
       offlineMode: offline == 'true',
+      skin:        AppSkin.fromId(skinId ?? 'classic'),
     );
   }
 
@@ -68,6 +77,11 @@ class AppPreferencesNotifier extends AsyncNotifier<AppPreferences> {
   Future<void> setOfflineMode(bool value) async {
     await _storage.write(key: _kOfflineMode, value: value.toString());
     state = AsyncData(state.value!.copyWith(offlineMode: value));
+  }
+
+  Future<void> setSkin(AppSkin skin) async {
+    await _storage.write(key: _kSkin, value: skin.id);
+    state = AsyncData(state.value!.copyWith(skin: skin));
   }
 }
 
@@ -93,4 +107,8 @@ final themeModeProvider = Provider<ThemeMode>((ref) {
 
 final offlineModeProvider = Provider<bool>((ref) {
   return ref.watch(appPreferencesProvider).value?.offlineMode ?? false;
+});
+
+final activeSkinProvider = Provider<AppSkin>((ref) {
+  return ref.watch(appPreferencesProvider).value?.skin ?? AppSkin.classic;
 });

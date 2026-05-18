@@ -840,10 +840,12 @@ class _StatusUpdateModalState extends ConsumerState<_StatusUpdateModal> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
+      final profile = ref.read(authNotifierProvider).profile!;
       await ref.read(complaintRepositoryProvider).updateComplaintStatus(
             complaintId: widget.complaint.id,
             newStatus: _newStatus,
             note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+            profile: profile,
           );
       ref.invalidate(complaintHistoryProvider(widget.complaint.id));
       ref.invalidate(myComplaintsProvider);
