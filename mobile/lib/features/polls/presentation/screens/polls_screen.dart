@@ -611,6 +611,7 @@ class _CreatePollModalState
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
                     color: textSecondary,
@@ -717,6 +718,7 @@ class _CreatePollModalState
                               if (_optionCtrls.length > 2) ...[
                                 const SizedBox(width: 8),
                                 IconButton(
+                                  tooltip: 'Remove option',
                                   icon: const Icon(
                                       Icons
                                           .remove_circle_outline,
@@ -768,6 +770,7 @@ class _CreatePollModalState
                                 )),
                             const Spacer(),
                             IconButton(
+                              tooltip: 'Decrease max choices',
                               icon: const Icon(
                                   Icons.remove_circle_outline,
                                   size: 20),
@@ -785,6 +788,7 @@ class _CreatePollModalState
                               ),
                             ),
                             IconButton(
+                              tooltip: 'Increase max choices',
                               icon: const Icon(
                                   Icons.add_circle_outline,
                                   size: 20),
@@ -835,6 +839,7 @@ class _CreatePollModalState
                               size: 18),
                           suffixIcon: _endsAt != null
                               ? IconButton(
+                                  tooltip: 'Clear end date',
                                   icon: const Icon(
                                       Icons.close, size: 18),
                                   onPressed: () => setState(

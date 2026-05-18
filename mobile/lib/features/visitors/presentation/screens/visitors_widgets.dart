@@ -517,6 +517,7 @@ class _QrScanScreenState extends State<_QrScanScreen> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
+            tooltip: 'Toggle torch',
             icon: const Icon(Icons.flash_on_rounded),
             onPressed: () => _controller.toggleTorch(),
           ),

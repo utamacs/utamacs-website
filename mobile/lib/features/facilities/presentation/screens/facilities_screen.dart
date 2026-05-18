@@ -66,6 +66,7 @@ class FacilitiesScreen extends ConsumerWidget {
               ),
               actions: [
                 IconButton(
+                  tooltip: 'Refresh',
                   icon: Icon(
                     Icons.refresh_rounded,
                     size: context.si(22),

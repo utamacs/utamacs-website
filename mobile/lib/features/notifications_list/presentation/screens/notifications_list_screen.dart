@@ -40,6 +40,7 @@ class NotificationsListScreen extends ConsumerWidget {
             },
           ),
           IconButton(
+            tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(notificationsProvider),
           ),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/supabase.dart' as env;
@@ -21,7 +22,7 @@ class StaffRepository {
         .order('name', ascending: true)
         .limit(100);
 
-    return (data as List).map((e) => StaffMember.fromJson(e)).toList();
+    return compute(_parseStaffMembers, data as List);
   }
 
   Future<List<StaffTask>> fetchTasks({int limit = 50}) async {
@@ -33,7 +34,7 @@ class StaffRepository {
         .order('due_date', ascending: true)
         .order('priority', ascending: false)
         .limit(limit);
-    return (data as List).map((e) => StaffTask.fromJson(e)).toList();
+    return compute(_parseStaffTasks, data as List);
   }
 
   Future<StaffTask> createTask({
@@ -69,7 +70,7 @@ class StaffRepository {
         .eq('society_id', env.societyId)
         .eq('date', today)
         .order('created_at', ascending: true);
-    return (data as List).map((e) => StaffAttendance.fromJson(e)).toList();
+    return compute(_parseStaffAttendance, data as List);
   }
 
   Future<void> logCheckIn(String staffId) async {
@@ -174,3 +175,18 @@ final staffAgenciesProvider =
     FutureProvider.autoDispose<List<StaffAgency>>((ref) {
   return ref.read(staffRepositoryProvider).fetchAgencies();
 });
+
+// ---------------------------------------------------------------------------
+// Isolate parse helpers — must be top-level for compute()
+// ---------------------------------------------------------------------------
+
+List<StaffMember> _parseStaffMembers(List<dynamic> json) =>
+    json.map((e) => StaffMember.fromJson(e as Map<String, dynamic>)).toList();
+
+List<StaffTask> _parseStaffTasks(List<dynamic> json) =>
+    json.map((e) => StaffTask.fromJson(e as Map<String, dynamic>)).toList();
+
+List<StaffAttendance> _parseStaffAttendance(List<dynamic> json) =>
+    json
+        .map((e) => StaffAttendance.fromJson(e as Map<String, dynamic>))
+        .toList();

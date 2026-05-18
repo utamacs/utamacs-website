@@ -254,6 +254,7 @@ class _AcknowledgementStatsCard extends ConsumerWidget {
               ),
               const Spacer(),
               IconButton(
+                tooltip: 'Refresh acknowledgements',
                 icon: const Icon(Icons.refresh, size: 18, color: kPrimary600),
                 onPressed: () =>
                     ref.invalidate(noticeAcknowledgementCountProvider),

@@ -486,6 +486,7 @@ class _AttendeesSection extends ConsumerWidget {
             ),
             const Spacer(),
             IconButton(
+              tooltip: 'Refresh attendees',
               icon: const Icon(Icons.refresh, size: 18, color: kTextSecondary),
               onPressed: () => ref.invalidate(eventAttendeesProvider(eventId)),
               padding: EdgeInsets.zero,
