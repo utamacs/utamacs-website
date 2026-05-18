@@ -5,7 +5,7 @@ import 'skin_tokens.dart';
 // =============================================================================
 // Vellum — Editorial precision × warm humanism
 // Warm vellum canvas, deep cobalt-indigo accent, terracotta warm signal.
-// Fonts: Instrument Serif (display) + Geist (body) + JetBrains Mono
+// Fonts: Instrument Serif (display) + Plus Jakarta Sans (body) + JetBrains Mono
 // Supports both light and dark.
 // =============================================================================
 
@@ -52,7 +52,7 @@ class VellumTokens implements SkinTokens {
 
   // Typography
   @override String get fontDisplay      => 'Instrument Serif';
-  @override String get fontBody         => 'Geist';
+  @override String get fontBody         => 'Plus Jakarta Sans';
   @override String get fontMono         => 'JetBrains Mono';
   @override bool   get isSerifDisplay   => true;
 

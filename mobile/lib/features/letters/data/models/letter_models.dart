@@ -7,10 +7,10 @@ class GeneratedLetter {
   final String? recipient;
   final String createdBy;
   final DateTime createdAt;
-  final String? referenceNumber;
-  final String? letterType;
-  final String? status;
-  final DateTime? letterDate;
+  final String? templateId;
+  final String? gitPathPdf;
+  final String? gitPathDocx;
+  final int downloadCount;
 
   const GeneratedLetter({
     required this.id,
@@ -19,10 +19,10 @@ class GeneratedLetter {
     this.recipient,
     required this.createdBy,
     required this.createdAt,
-    this.referenceNumber,
-    this.letterType,
-    this.status,
-    this.letterDate,
+    this.templateId,
+    this.gitPathPdf,
+    this.gitPathDocx,
+    this.downloadCount = 0,
   });
 
   factory GeneratedLetter.fromJson(Map<String, dynamic> j) => GeneratedLetter(
@@ -32,11 +32,11 @@ class GeneratedLetter {
         recipient: j['recipient'] as String?,
         createdBy: j['created_by'] as String,
         createdAt: DateTime.parse(j['created_at'] as String),
-        referenceNumber: j['reference_number'] as String?,
-        letterType: j['letter_type'] as String?,
-        status: j['status'] as String?,
-        letterDate: j['letter_date'] != null
-            ? DateTime.tryParse(j['letter_date'] as String)
-            : null,
+        templateId: j['template_id'] as String?,
+        gitPathPdf: j['git_path_pdf'] as String?,
+        gitPathDocx: j['git_path_docx'] as String?,
+        downloadCount: (j['download_count'] as int?) ?? 0,
       );
+
+  bool get hasPdf => gitPathPdf != null && gitPathPdf!.isNotEmpty;
 }
