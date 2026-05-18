@@ -393,28 +393,6 @@ class _LetterDetailSheet extends ConsumerWidget {
           ),
           const SizedBox(height: dsSpace4),
 
-          if (letter.referenceNumber != null)
-            _DetailRow(
-                icon: Icons.tag_rounded,
-                label: 'Ref. No.',
-                value: letter.referenceNumber!,
-                textSecondary: textSecondary,
-                textPrimary: textPrimary),
-          if (letter.letterType != null)
-            _DetailRow(
-                icon: Icons.category_outlined,
-                label: 'Type',
-                value: letter.letterType!.replaceAll('_', ' '),
-                textSecondary: textSecondary,
-                textPrimary: textPrimary),
-          if (letter.status != null)
-            _DetailRow(
-                icon: Icons.info_outline_rounded,
-                label: 'Status',
-                value: letter.status![0].toUpperCase() +
-                    letter.status!.substring(1),
-                textSecondary: textSecondary,
-                textPrimary: textPrimary),
           if (letter.recipient != null)
             _DetailRow(
                 icon: Icons.person_outline_rounded,
@@ -432,10 +410,16 @@ class _LetterDetailSheet extends ConsumerWidget {
           _DetailRow(
               icon: Icons.calendar_today_outlined,
               label: 'Created',
-              value: dateFormat
-                  .format(letter.letterDate ?? letter.createdAt),
+              value: dateFormat.format(letter.createdAt),
               textSecondary: textSecondary,
               textPrimary: textPrimary),
+          if (letter.downloadCount > 0)
+            _DetailRow(
+                icon: Icons.download_outlined,
+                label: 'Downloads',
+                value: letter.downloadCount.toString(),
+                textSecondary: textSecondary,
+                textPrimary: textPrimary),
           const SizedBox(height: dsSpace3),
           Divider(height: 1, color: borderColor),
           const SizedBox(height: dsSpace3),

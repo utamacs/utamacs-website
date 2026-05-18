@@ -14,7 +14,7 @@ class LetterRepository {
   Future<List<GeneratedLetter>> fetchLetters({int limit = 30}) async {
     final data = await _client
         .from('generated_letters')
-        .select('id, title, subject, recipient, created_by, created_at, reference_number, letter_type, status, letter_date')
+        .select('id, title, subject, recipient, created_by, created_at, template_id, git_path_pdf, git_path_docx, download_count')
         .eq('society_id', env.societyId)
         .order('created_at', ascending: false)
         .limit(limit);
