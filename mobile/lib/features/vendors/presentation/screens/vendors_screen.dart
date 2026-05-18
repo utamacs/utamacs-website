@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/design/ds_animations.dart';
 import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
@@ -17,7 +18,7 @@ class VendorsScreen extends ConsumerWidget {
 
   static Future<void> _openPortal(String path) async {
     final uri =
-        Uri.parse('https://portal.utamacs.org/portal/$path');
+        Uri.parse('$portalUrl/portal/$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -542,7 +543,7 @@ class _WorkOrderCardState extends ConsumerState<_WorkOrderCard> {
 
   static Future<void> _openPortal(String path) async {
     final uri =
-        Uri.parse('https://portal.utamacs.org/portal/$path');
+        Uri.parse('$portalUrl/portal/$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

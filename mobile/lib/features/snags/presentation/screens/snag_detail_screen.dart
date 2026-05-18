@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/input_validators.dart';
 import '../../../../shared/widgets/status_badge.dart';
@@ -15,7 +16,7 @@ class SnagDetailScreen extends ConsumerWidget {
   const SnagDetailScreen({super.key, required this.snag});
 
   static Future<void> _openPortal(String path) async {
-    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    final uri = Uri.parse('$portalUrl/portal/$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

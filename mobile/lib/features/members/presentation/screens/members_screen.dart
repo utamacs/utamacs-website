@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/design/ds_animations.dart';
 import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
@@ -59,7 +60,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
             icon: Icons.download_outlined,
             onTap: () async {
               final uri = Uri.parse(
-                  'https://portal.utamacs.org/portal/members?export=csv');
+                  '$portalUrl/portal/members?export=csv');
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
               }
@@ -314,7 +315,7 @@ class _MemberCard extends ConsumerWidget {
   const _MemberCard({required this.member});
 
   static Future<void> _openPortal(String path) async {
-    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    final uri = Uri.parse('$portalUrl/portal/$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

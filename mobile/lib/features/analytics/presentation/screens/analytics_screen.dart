@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/design/ds_animations.dart';
 import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
@@ -27,7 +28,7 @@ class _AnalyticsScreenState
 
   static Future<void> _openPortal(String path) async {
     final uri =
-        Uri.parse('https://portal.utamacs.org/portal/$path');
+        Uri.parse('$portalUrl/portal/$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -982,7 +983,7 @@ class _ReportCard extends StatelessWidget {
     return DSScalePress(
       onTap: () async {
         final uri = Uri.parse(
-            'https://portal.utamacs.org/portal/${report.path}');
+            '$portalUrl/portal/${report.path}');
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri,
               mode: LaunchMode.externalApplication);

@@ -12,6 +12,7 @@ export interface UserClaims {
   portalRole: string;    // new: from profiles.portal_role (HOTO platform)
   committeeTitle: string | null;
   isAdmin: boolean;
+  isPlatformAdmin: boolean;
   societyId: string;
 }
 

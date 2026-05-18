@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../auth/domain/auth_notifier.dart';
@@ -15,7 +16,7 @@ class AlbumDetailScreen extends ConsumerWidget {
   const AlbumDetailScreen({super.key, required this.album});
 
   static Future<void> _openPortal(String path) async {
-    final uri = Uri.parse('https://portal.utamacs.org/portal/$path');
+    final uri = Uri.parse('$portalUrl/portal/$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -101,7 +102,7 @@ class AlbumDetailScreen extends ConsumerWidget {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Full-resolution photos are available in the portal at portal.utamacs.org',
+                                'Full-resolution photos are available in the resident portal.',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
