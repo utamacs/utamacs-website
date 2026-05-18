@@ -17,7 +17,7 @@ class FacilitiesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
     final bg = isDark ? dsDarkBackground : dsBackground;
 

@@ -40,7 +40,7 @@ class _HotoScreenState extends ConsumerState<HotoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final summaryAsync = ref.watch(hotoSummaryProvider);

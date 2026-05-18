@@ -50,7 +50,7 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final eventsAsync = ref.watch(eventsProvider);
     final regsAsync = ref.watch(myEventRegistrationsProvider);
     final isExec = ref.watch(authNotifierProvider).profile?.isExec ?? false;
@@ -714,7 +714,7 @@ class _CreateEventModalState
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final bg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
     final fmt = DateFormat('EEE, d MMM yyyy • h:mm a');
 

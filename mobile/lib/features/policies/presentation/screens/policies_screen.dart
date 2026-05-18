@@ -17,7 +17,7 @@ class PoliciesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final policiesAsync = ref.watch(activePoliciesProvider);
     final acksAsync = ref.watch(myAcknowledgementsProvider);
     final isExec =
@@ -643,7 +643,7 @@ class _EditPolicySheetState extends ConsumerState<_EditPolicySheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
     final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
     final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;

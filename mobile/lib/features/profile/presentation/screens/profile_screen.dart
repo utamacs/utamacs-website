@@ -31,7 +31,7 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark    = ref.watch(isDarkModeProvider);
+    final isDark    = ref.watch(effectiveDarkProvider);
     final authState = ref.watch(authNotifierProvider);
     final profile   = authState.profile;
 
@@ -1565,7 +1565,7 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final sheetBg = isDark ? dsDarkSurface : dsSurface;
 
     return DraggableScrollableSheet(

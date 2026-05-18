@@ -373,7 +373,7 @@ class _UtamacsAppState extends ConsumerState<UtamacsApp>
     ref.listen(authNotifierProvider, (_, __) => _routerRefresh.notify());
 
     final prefsAsync = ref.watch(appPreferencesProvider);
-    final userDark   = ref.watch(isDarkModeProvider);
+    final userDark   = ref.watch(effectiveDarkProvider);
     final scale      = ref.watch(textScaleProvider);
     final activeSkin = ref.watch(activeSkinProvider);
 
@@ -459,15 +459,13 @@ class _AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final idx    = _currentIndex;
-    final isDark = ref.watch(isDarkModeProvider);
+    final idx = _currentIndex;
 
     if (context.useSideNav) {
       return _TabletShell(
         currentIndex: idx,
         onTap: (i) => context.go(_tabs[i].path),
         tabs: _tabs,
-        isDark: isDark,
         child: child,
       );
     }
@@ -480,7 +478,6 @@ class _AppShell extends ConsumerWidget {
         currentIndex: idx,
         onTap: (i) => context.go(_tabs[i].path),
         tabs: _tabs,
-        isDark: isDark,
       ),
     );
   }
@@ -493,22 +490,21 @@ class _TabletShell extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   final List<_TabDef> tabs;
-  final bool isDark;
 
   const _TabletShell({
     required this.child,
     required this.currentIndex,
     required this.onTap,
     required this.tabs,
-    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final surface        = isDark ? dsDarkSurface : dsSurface;
-    final activeColor    = dsColorIndigo600;
-    final inactiveColor  = isDark ? dsDarkTextSecondary : dsTextSecondary;
-    final bg             = isDark ? const Color(0xFF1A1B2E) : const Color(0xFFF5F5FF);
+    final skin          = context.skin;
+    final surface       = skin.surface;
+    final activeColor   = skin.accent;
+    final inactiveColor = skin.textSecondary;
+    final bg            = skin.backgroundAlt;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -518,9 +514,7 @@ class _TabletShell extends StatelessWidget {
             selectedIndex: currentIndex,
             onDestinationSelected: onTap,
             backgroundColor: surface,
-            indicatorColor: isDark
-                ? dsColorIndigo600.withValues(alpha: 0.18)
-                : dsColorIndigo50,
+            indicatorColor: skin.accentSoft,
             selectedIconTheme: IconThemeData(color: activeColor),
             unselectedIconTheme: IconThemeData(color: inactiveColor),
             selectedLabelTextStyle: TextStyle(
@@ -562,9 +556,7 @@ class _TabletShell extends StatelessWidget {
           VerticalDivider(
             width: 1,
             thickness: 1,
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.06),
+            color: skin.border,
           ),
           Expanded(
             child: ColoredBox(
@@ -584,18 +576,16 @@ class _FloatingNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   final List<_TabDef> tabs;
-  final bool isDark;
 
   const _FloatingNavBar({
     required this.currentIndex,
     required this.onTap,
     required this.tabs,
-    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final surface = isDark ? dsDarkSurface : dsSurface;
+    final skin = context.skin;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         dsSpace5, 0, dsSpace5,
@@ -604,16 +594,16 @@ class _FloatingNavBar extends StatelessWidget {
       child: Container(
         height: 64,
         decoration: BoxDecoration(
-          color: surface,
+          color: skin.surface,
           borderRadius: BorderRadius.circular(dsRadiusXxl),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF000000).withValues(alpha: isDark ? 0.40 : 0.10),
+              color: const Color(0xFF000000).withValues(alpha: skin.isDark ? 0.40 : 0.10),
               blurRadius: 24,
               offset: const Offset(0, 8),
             ),
             BoxShadow(
-              color: dsColorIndigo600.withValues(alpha: isDark ? 0.14 : 0.06),
+              color: skin.accent.withValues(alpha: skin.isDark ? 0.14 : 0.06),
               blurRadius: 12,
               offset: const Offset(0, 2),
             ),
@@ -626,7 +616,6 @@ class _FloatingNavBar extends StatelessWidget {
               tab: tabs[i],
               isSelected: i == currentIndex,
               onTap: () => onTap(i),
-              isDark: isDark,
             );
           }),
         ),
@@ -639,22 +628,19 @@ class _NavItem extends StatelessWidget {
   final _TabDef tab;
   final bool isSelected;
   final VoidCallback onTap;
-  final bool isDark;
 
   const _NavItem({
     required this.tab,
     required this.isSelected,
     required this.onTap,
-    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final activeColor   = dsColorIndigo600;
-    final inactiveColor = isDark ? dsDarkTextSecondary : dsTextSecondary;
-    final activeBg      = isDark
-        ? dsColorIndigo600.withValues(alpha: 0.18)
-        : dsColorIndigo50;
+    final skin          = context.skin;
+    final activeColor   = skin.accent;
+    final inactiveColor = skin.textSecondary;
+    final activeBg      = skin.accentSoft;
 
     return GestureDetector(
       onTap: onTap,

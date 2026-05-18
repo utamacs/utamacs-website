@@ -49,7 +49,7 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = ref.watch(isDarkModeProvider);
+    final isDark  = ref.watch(effectiveDarkProvider);
     final isExec  = ref.watch(authNotifierProvider).profile?.isExec ?? false;
     final surface = isDark ? dsDarkSurface : dsSurface;
     final bgColor = isDark ? dsDarkBackground : dsBackground;
@@ -211,7 +211,7 @@ class _PublishedNoticesTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final noticesAsync = ref.watch(noticesPagedProvider);
     final notifier = ref.read(noticesPagedProvider.notifier);
     final bottomPad = 80 + MediaQuery.paddingOf(context).bottom;
@@ -294,7 +294,7 @@ class _ScheduledNoticesTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final scheduledAsync = ref.watch(scheduledNoticesProvider);
     final bottomPad = 80 + MediaQuery.paddingOf(context).bottom;
 
@@ -776,7 +776,7 @@ class _CreateNoticeModalState
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = ref.watch(isDarkModeProvider);
+    final isDark  = ref.watch(effectiveDarkProvider);
     final sheetBg = isDark ? dsDarkSurface : dsSurface;
     final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
     final fillColor   = isDark ? dsDarkSurfaceMuted : dsBackground;

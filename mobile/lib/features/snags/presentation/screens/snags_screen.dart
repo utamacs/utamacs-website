@@ -18,7 +18,7 @@ class SnagsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
 
@@ -323,7 +323,7 @@ class _SnagCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final strip = _severityStrip(snag.severity);
     final (statusBg, statusText) = _statusColors(snag.status);
 

@@ -352,7 +352,7 @@ class _CreateShiftSheetState
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
     final borderColor =
         isDark ? dsDarkBorderLight : dsBorderLight;

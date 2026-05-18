@@ -110,7 +110,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final feedbackAsync = ref.watch(myFeedbackProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
@@ -615,7 +615,7 @@ class _FeedbackItemCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final catColor = _categoryColor(item.category);
     final catBg = isDark
         ? catColor.withValues(alpha: 0.15)

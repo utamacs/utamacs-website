@@ -26,7 +26,7 @@ class _ComplaintsScreenState extends ConsumerState<ComplaintsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final complaintsAsync = ref.watch(myComplaintsPagedProvider);
     final notifier = ref.read(myComplaintsPagedProvider.notifier);
 

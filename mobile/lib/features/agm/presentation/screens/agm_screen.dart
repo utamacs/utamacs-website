@@ -17,7 +17,7 @@ class AgmScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final sessionsAsync = ref.watch(agmSessionsProvider);
     final isExec =
         ref.watch(authNotifierProvider).profile?.isExec ?? false;
@@ -221,7 +221,7 @@ class _SessionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final isUpcoming =
         session.status == 'scheduled' && session.isUpcoming;
     final dateStr =
@@ -550,7 +550,7 @@ class _CreateSessionModalState
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(isDarkModeProvider);
+    final isDark = ref.watch(effectiveDarkProvider);
     final surface = isDark ? dsDarkSurface : dsSurface;
     final borderColor = isDark ? dsDarkBorderLight : dsBorderLight;
     final textPrimary = isDark ? dsDarkTextPrimary : dsTextPrimary;
