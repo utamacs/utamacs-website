@@ -9,10 +9,12 @@ import '../../../../core/design/ds_animations.dart';
 import '../../../../core/design/ds_screen_shell.dart';
 import '../../../../core/design/ds_tokens.dart';
 import '../../../../core/design/ds_typography_scale.dart';
+import '../../../../core/design/skins/app_skin.dart';
 import '../../../../core/local_db/database_provider.dart';
 import '../../../../core/preferences/app_preferences.dart';
 import '../../../../core/utils/input_validators.dart';
 import '../../../../shared/models/profile.dart';
+import '../../../admin/presentation/screens/admin_screen.dart';
 import '../../../auth/domain/auth_notifier.dart';
 
 // ─── Profile Screen ───────────────────────────────────────────────────────────
@@ -194,6 +196,19 @@ class ProfileScreen extends ConsumerWidget {
               contact: profile!.emergencyContact!,
               isDark: isDark,
             ),
+          ),
+        ],
+
+        // ── Admin Panel (exec / admin only) ──────────────────────────────
+        if (profile?.isExec == true || profile?.isAdmin == true) ...[
+          const SizedBox(height: dsSpace4),
+          DSFadeSlide(
+            delay: const Duration(milliseconds: 445),
+            child: _SectionLabel(label: 'ADMIN PANEL', isDark: isDark),
+          ),
+          DSFadeSlide(
+            delay: const Duration(milliseconds: 455),
+            child: _AdminEntryCard(isDark: isDark),
           ),
         ],
 
@@ -434,6 +449,7 @@ class _AppearanceCard extends ConsumerWidget {
     final borderColor  = isDark ? dsDarkBorderLight : dsBorderSubtle;
     final currentScale = ref.watch(textScaleProvider);
     final isOffline    = ref.watch(offlineModeProvider);
+    final activeSkin   = ref.watch(activeSkinProvider);
     final profile      = ref.watch(authNotifierProvider).profile;
     final isPrivileged = profile?.isExec == true || profile?.isAdmin == true;
 
@@ -705,6 +721,122 @@ class _AppearanceCard extends ConsumerWidget {
               ),
             ),
 
+            Divider(height: 1, color: borderColor),
+
+            // ── Theme Skin picker ─────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(dsSpace4, dsSpace3, dsSpace4, dsSpace4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(
+                          color: isDark ? dsColorIndigo600.withValues(alpha: 0.12) : dsColorIndigo50,
+                          borderRadius: BorderRadius.circular(dsRadiusSm),
+                        ),
+                        child: Icon(Icons.palette_outlined, size: context.si(18),
+                            color: isDark ? dsColorIndigo300 : dsColorIndigo600),
+                      ),
+                      const SizedBox(width: dsSpace3),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Theme',
+                                style: GoogleFonts.inter(fontSize: context.sp(14),
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? dsDarkTextPrimary : dsTextPrimary)),
+                            Text(activeSkin.label,
+                                style: GoogleFonts.inter(fontSize: context.sp(11),
+                                    color: isDark ? dsDarkTextSecondary : dsTextSecondary)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: dsSpace3),
+                  Row(
+                    children: AppSkin.values.map((skin) {
+                      final isSelected = skin == activeSkin;
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                              right: skin == AppSkin.values.last ? 0 : 6),
+                          child: GestureDetector(
+                            onTap: () => ref
+                                .read(appPreferencesProvider.notifier)
+                                .setSkin(skin),
+                            child: AnimatedContainer(
+                              duration: dsDurationNormal,
+                              curve: dsEaseStandard,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: skin.previewBg,
+                                borderRadius: BorderRadius.circular(dsRadiusMd),
+                                border: Border.all(
+                                  color: isSelected ? dsColorIndigo600 : borderColor,
+                                  width: isSelected ? 2.5 : 1,
+                                ),
+                                boxShadow: isSelected ? dsShadowBrand : [],
+                              ),
+                              child: Stack(
+                                children: [
+                                  Positioned(
+                                    right: 5, bottom: 5,
+                                    child: Container(
+                                      width: 10, height: 10,
+                                      decoration: BoxDecoration(
+                                        color: skin.previewAccent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Center(
+                                      child: Container(
+                                        width: 20, height: 20,
+                                        decoration: BoxDecoration(
+                                          color: dsColorIndigo600.withValues(alpha: 0.85),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.check,
+                                            size: 13, color: Colors.white),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: AppSkin.values.map((skin) {
+                      final isSelected = skin == activeSkin;
+                      return Expanded(
+                        child: Text(
+                          skin.label,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 9,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                            color: isSelected
+                                ? (isDark ? dsColorIndigo300 : dsColorIndigo700)
+                                : (isDark ? dsDarkTextTertiary : dsTextTertiary),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+
             // ── Admin: Clear cached data ──────────────────────────────────────
             if (isPrivileged) ...[
               Divider(height: 1, color: borderColor),
@@ -793,6 +925,96 @@ class _AppearanceCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+// ─── Admin Entry Card ─────────────────────────────────────────────────────────
+
+class _AdminEntryCard extends StatelessWidget {
+  final bool isDark;
+  const _AdminEntryCard({required this.isDark});
+
+  static const _entries = [
+    _AdminEntry(Icons.toggle_on_outlined,           'Feature Flags',    'Enable or disable modules'),
+    _AdminEntry(Icons.tune_outlined,                'Configuration',    'Rules & configurable values'),
+    _AdminEntry(Icons.open_in_browser_outlined,     'Portal Admin',     'Open portal admin pages'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final surface     = isDark ? dsDarkSurface : dsSurface;
+    final borderColor = isDark ? dsDarkBorderLight : dsBorderSubtle;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: dsSpace4),
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const AdminScreen()),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(dsRadiusCard),
+            boxShadow: isDark ? [] : dsShadowSm,
+            border: isDark ? Border.all(color: dsDarkBorderLight, width: 1) : null,
+          ),
+          child: Column(
+            children: _entries.asMap().entries.map((e) {
+              final i = e.key;
+              final entry = e.value;
+              return Column(
+                children: [
+                  if (i > 0) Divider(height: 1, color: borderColor, indent: 56),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: dsSpace4, vertical: dsSpace3),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? dsColorIndigo600.withValues(alpha: 0.12)
+                                : dsColorIndigo50,
+                            borderRadius: BorderRadius.circular(dsRadiusSm),
+                          ),
+                          child: Icon(entry.icon, size: 18,
+                              color: isDark ? dsColorIndigo400 : dsColorIndigo600),
+                        ),
+                        const SizedBox(width: dsSpace3),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(entry.label,
+                                  style: GoogleFonts.inter(fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? dsDarkTextPrimary : dsTextPrimary)),
+                              Text(entry.subtitle,
+                                  style: GoogleFonts.inter(fontSize: 11,
+                                      color: isDark ? dsDarkTextSecondary : dsTextSecondary)),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded,
+                            color: isDark ? dsDarkTextTertiary : dsTextTertiary),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminEntry {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  const _AdminEntry(this.icon, this.label, this.subtitle);
 }
 
 // ─── Info Card (generic rows) ─────────────────────────────────────────────────

@@ -51,6 +51,7 @@ import 'features/parking/presentation/screens/parking_screen.dart';
 import 'features/policies/presentation/screens/policies_screen.dart';
 import 'features/polls/presentation/screens/poll_detail_screen.dart';
 import 'features/polls/presentation/screens/polls_screen.dart';
+import 'features/admin/presentation/screens/admin_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/register/presentation/screens/register_screen.dart';
 import 'features/security_patrol/presentation/screens/security_patrol_screen.dart';
@@ -160,6 +161,11 @@ GoRouter _buildRouter(Listenable refreshListenable) {
           ),
           GoRoute(path: '/services',            builder: (ctx, _) => const ServicesScreen()),
           GoRoute(path: '/profile',             builder: (ctx, _) => const ProfileScreen()),
+          GoRoute(
+            path: '/admin',
+            redirect: _requireExec,
+            builder: (ctx, _) => const AdminScreen(),
+          ),
           // Resident services
           GoRoute(
             path: '/complaints',
