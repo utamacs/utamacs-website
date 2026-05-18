@@ -52,35 +52,40 @@ class AppPreferences {
 class AppPreferencesNotifier extends AsyncNotifier<AppPreferences> {
   @override
   Future<AppPreferences> build() async {
-    final dark    = await _storage.read(key: _kDarkMode);
-    final scale   = await _storage.read(key: _kTextScale);
-    final offline = await _storage.read(key: _kOfflineMode);
-    final skinId  = await _storage.read(key: _kSkin);
-    return AppPreferences(
-      darkMode:    dark == 'true',
-      textScale:   DsTextScaleX.fromIndex(int.tryParse(scale ?? '1') ?? 1),
-      offlineMode: offline == 'true',
-      skin:        AppSkin.fromId(skinId ?? 'classic'),
-    );
+    try {
+      final dark    = await _storage.read(key: _kDarkMode);
+      final scale   = await _storage.read(key: _kTextScale);
+      final offline = await _storage.read(key: _kOfflineMode);
+      final skinId  = await _storage.read(key: _kSkin);
+      return AppPreferences(
+        darkMode:    dark == 'true',
+        textScale:   DsTextScaleX.fromIndex(int.tryParse(scale ?? '1') ?? 1),
+        offlineMode: offline == 'true',
+        skin:        AppSkin.fromId(skinId ?? 'classic'),
+      );
+    } catch (_) {
+      // Keychain unavailable (e.g. simulator without code signing) — use defaults.
+      return const AppPreferences();
+    }
   }
 
   Future<void> setDarkMode(bool value) async {
-    await _storage.write(key: _kDarkMode, value: value.toString());
+    try { await _storage.write(key: _kDarkMode, value: value.toString()); } catch (_) {}
     state = AsyncData(state.value!.copyWith(darkMode: value));
   }
 
   Future<void> setTextScale(DsTextScale scale) async {
-    await _storage.write(key: _kTextScale, value: scale.storageIndex.toString());
+    try { await _storage.write(key: _kTextScale, value: scale.storageIndex.toString()); } catch (_) {}
     state = AsyncData(state.value!.copyWith(textScale: scale));
   }
 
   Future<void> setOfflineMode(bool value) async {
-    await _storage.write(key: _kOfflineMode, value: value.toString());
+    try { await _storage.write(key: _kOfflineMode, value: value.toString()); } catch (_) {}
     state = AsyncData(state.value!.copyWith(offlineMode: value));
   }
 
   Future<void> setSkin(AppSkin skin) async {
-    await _storage.write(key: _kSkin, value: skin.id);
+    try { await _storage.write(key: _kSkin, value: skin.id); } catch (_) {}
     state = AsyncData(state.value!.copyWith(skin: skin));
   }
 }
