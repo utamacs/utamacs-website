@@ -43,6 +43,7 @@ class _AgmDetailScreenState extends ConsumerState<AgmDetailScreen> {
         surfaceTintColor: Colors.white,
         actions: [
           IconButton(
+            tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
             onPressed: () =>
                 ref.invalidate(agmResolutionsProvider(session.id)),

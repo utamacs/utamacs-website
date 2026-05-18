@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/supabase.dart' as env;
@@ -116,13 +117,7 @@ class AnalyticsRepository {
         .eq('society_id', env.societyId)
         .order('unit_number', ascending: true)
         .limit(200);
-    return (data as List)
-        .map((r) => UnitOccupancyItem(
-              unitNumber: r['unit_number'] as String,
-              occupancyStatus:
-                  (r['occupancy_status'] as String?) ?? 'vacant',
-            ))
-        .toList();
+    return compute(_parseUnitOccupancy, data as List);
   }
 }
 
@@ -153,3 +148,16 @@ final unitOccupancyProvider =
     FutureProvider.autoDispose<List<UnitOccupancyItem>>((ref) {
   return ref.read(analyticsRepositoryProvider).fetchUnitOccupancy();
 });
+
+// ---------------------------------------------------------------------------
+// Isolate parse helpers — must be top-level for compute()
+// ---------------------------------------------------------------------------
+
+List<UnitOccupancyItem> _parseUnitOccupancy(List<dynamic> json) =>
+    json
+        .map((r) => UnitOccupancyItem(
+              unitNumber: r['unit_number'] as String,
+              occupancyStatus:
+                  (r['occupancy_status'] as String?) ?? 'vacant',
+            ))
+        .toList();

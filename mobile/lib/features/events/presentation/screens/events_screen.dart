@@ -759,6 +759,7 @@ class _CreateEventModalState
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
                     color: isDark
@@ -842,6 +843,7 @@ class _CreateEventModalState
                               size: 18),
                           suffixIcon: _endsAt != null
                               ? IconButton(
+                                  tooltip: 'Clear end date',
                                   icon: const Icon(Icons.close, size: 18),
                                   onPressed: () =>
                                       setState(() => _endsAt = null),

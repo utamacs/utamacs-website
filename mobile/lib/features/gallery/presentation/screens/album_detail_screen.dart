@@ -53,6 +53,7 @@ class AlbumDetailScreen extends ConsumerWidget {
                   'gallery/${album.id}?action=upload-photos'),
             ),
           IconButton(
+            tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(albumPhotosProvider(album.id)),
           ),

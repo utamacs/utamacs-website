@@ -369,6 +369,7 @@ class _LetterDetailSheet extends ConsumerWidget {
               ),
               const Spacer(),
               IconButton(
+                tooltip: 'Close',
                 icon: Icon(Icons.close_rounded,
                     size: context.si(20)),
                 onPressed: () => Navigator.pop(context),

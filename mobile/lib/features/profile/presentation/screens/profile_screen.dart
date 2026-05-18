@@ -1235,6 +1235,7 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'Close',
                     icon: Icon(Icons.close,
                         color: isDark
                             ? dsDarkTextSecondary

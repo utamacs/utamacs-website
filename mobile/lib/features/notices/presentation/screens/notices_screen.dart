@@ -821,6 +821,7 @@ class _CreateNoticeModalState
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'Close',
                     icon: Icon(
                       Icons.close,
                       color: isDark ? dsDarkTextSecondary : dsTextSecondary,

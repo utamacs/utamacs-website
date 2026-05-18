@@ -225,6 +225,7 @@ class _SearchBar extends StatelessWidget {
           ),
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
+                  tooltip: 'Clear search',
                   icon: Icon(Icons.close_rounded,
                       size: context.si(18),
                       color:

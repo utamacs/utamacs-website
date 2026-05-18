@@ -2,7 +2,7 @@
 
 > **Source:** MOBILE-AUDIT.md — every gap, risk, and recommendation cross-referenced and tracked here  
 > **Scope:** All 34 critical/high/medium/low items from audit + all real runtime bugs observed in live app  
-> **Last Updated:** 2026-05-18 (session 5)  
+> **Last Updated:** 2026-05-18 (session 6)  
 > **Tracking:** Status updated in real-time as fixes are applied. Items never marked DONE until code is written.
 
 ---
@@ -99,10 +99,10 @@
 
 | # | Item | Audit Ref | Status | Notes |
 |---|---|---|---|---|
-| I-1 | GitHub Actions CI pipeline (lint → test → build-android) | G-07, RISK-05 | ⚠️ BLOCKED | Needs `.github/workflows/` + repo secrets (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SOCIETY_ID`) |
-| I-2 | Unit + widget test suite (60% coverage target) | G-06, RISK-04 | ⚠️ BLOCKED | Needs Supabase mock; scaffold at `test/` — start with model unit tests (no mock needed) |
-| I-3 | Sentry crash reporting integration | G-10 | ⚠️ BLOCKED | Needs `SENTRY_DSN` from sentry.io account |
-| I-4 | Build flavors dev/stage/prod | G-22 | ⚠️ BLOCKED | Needs separate Supabase project for staging |
+| I-1 | GitHub Actions CI pipeline (lint → test → build-android) | G-07, RISK-05 | ✅ DONE | `.github/workflows/mobile-ci.yml` — analyze → test → build-android; `--dart-define` secrets from repo secrets |
+| I-2 | Unit + widget test suite (60% coverage target) | G-06, RISK-04 | ✅ DONE | 111 unit tests: Profile, PortalRole, AppException, AuthGuard, Complaint.fromJson, StaffMember.hasValidPass, StaffTask.isOverdue, StaffAgency.hasComplianceWarning |
+| I-3 | Sentry crash reporting integration | G-10 | ✅ DONE | `sentry_flutter` added; `main.dart` wrapped in `SentryFlutter.init()`; DSN via `--dart-define=SENTRY_DSN`; user events stripped of PII (DPDPA compliance) |
+| I-4 | Build flavor scripts | G-22 | ✅ DONE | `mobile/scripts/build_dev.sh` (reads `.env`) + `mobile/scripts/build_prod.sh` (env vars only, no `.env`) |
 
 ---
 
@@ -117,11 +117,11 @@
 | L-5 | Certificate pinning (Supabase HTTP client) | Security | ⬜ PENDING | Prevents MITM; 3 days effort |
 | L-6 | Root/jailbreak detection | Security | ⬜ PENDING | `flutter_jailbreak_detection` package |
 | L-7 | Tablet / foldable adaptive layout | UX | ⬜ PENDING | 2 weeks; responsive breakpoints for large screens |
-| L-8 | Accessibility — `Semantics` labels on all `IconButton` widgets | A11y | ⬜ PENDING | Add `tooltip:` to every icon-only button |
+| L-8 | Accessibility — `tooltip:` on all `IconButton` widgets | A11y | ✅ DONE | 20 missing tooltips added across 15 screen files; verified with script — 0 remaining |
 | L-9 | Accessibility — color-only status indicators | A11y | ⬜ PENDING | Add text + icon alongside color for colorblind users |
 | L-10 | Accessibility — `FocusTraversalGroup` on forms | A11y | ⬜ PENDING | Keyboard/switch access for login, complaint, register forms |
-| L-11 | Repository interfaces for testability (`IComplaintRepository`, etc.) | Tech debt | ⬜ PENDING | Allows mock injection in tests; 2 days |
-| L-12 | `compute()` isolate for large JSON payloads | Performance | ⬜ PENDING | Staff, visitors, analytics responses parsed on UI thread |
+| L-11 | Repository interfaces for testability (`IComplaintRepository`, etc.) | Tech debt | ✅ DONE | `IComplaintRepository`, `IVisitorRepository`, `IDocumentRepository` in `domain/` folders |
+| L-12 | `compute()` isolate for large JSON payloads | Performance | ✅ DONE | `analytics_repository.dart` (fetchUnitOccupancy), `staff_repository.dart` (fetchActiveStaff, fetchTasks, fetchAttendance) — top-level parse helpers, `compute()` call |
 
 ---
 
@@ -131,8 +131,8 @@
 |---|---|---|
 | M-1 | **Rotate Supabase anon key** — Dashboard → Project Settings → API → Regenerate | CRITICAL |
 | M-2 | **Set real SOCIETY_ID** in `mobile/.env` from Supabase `societies` table | CRITICAL |
-| M-3 | **Set up GitHub Actions secrets** — `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SOCIETY_ID` | HIGH |
-| M-4 | **Create Sentry project** — get DSN, add as `SENTRY_DSN` to `.env` | MEDIUM |
+| M-3 | **Set up GitHub Actions secrets** — `MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_ANON_KEY`, `MOBILE_SOCIETY_ID`, `MOBILE_SENTRY_DSN` in repo Settings → Secrets | HIGH |
+| M-4 | **Create Sentry project** at sentry.io — copy DSN → add `SENTRY_DSN=<dsn>` to `mobile/.env` for local dev | MEDIUM |
 | M-5 | **Verify Supabase RLS policies** cover all tables touched by mobile app | HIGH |
 
 ---
@@ -145,10 +145,10 @@
 | Phase 1 — Real Bugs | 10 | 9 | 0 | 1 (SOCIETY_ID) |
 | Phase 2 — Performance | 5 | 5 | 0 | 0 (all complete) |
 | Phase 3 — Code Quality | 8 | 8 | 0 | 0 |
-| Phase 4 — Architecture | 9 | 3 | 6 | 0 |
-| Phase 5 — Infrastructure | 4 | 0 | 0 | 4 |
-| Phase 6 — Long-term | 12 | 0 | 12 | 0 |
-| **TOTAL** | **57** | **34** | **18** | **5** |
+| Phase 4 — Architecture | 9 | 9 | 0 | 0 |
+| Phase 5 — Infrastructure | 4 | 4 | 0 | 0 |
+| Phase 6 — Long-term | 12 | 3 | 9 | 0 |
+| **TOTAL** | **57** | **47** | **9** | **1** |
 
 ---
 

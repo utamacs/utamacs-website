@@ -223,6 +223,7 @@ class _PreApproveScreenState extends ConsumerState<PreApproveScreen> {
                 onTap: () => _pickDate(isExpiry: true),
                 trailing: _expiresAt != null
                     ? IconButton(
+                        tooltip: 'Clear expiry date',
                         icon: const Icon(Icons.clear, size: 18),
                         onPressed: () => setState(() => _expiresAt = null),
                       )

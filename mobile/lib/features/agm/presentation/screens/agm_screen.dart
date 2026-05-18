@@ -599,6 +599,7 @@ class _CreateSessionModalState
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'Close',
                     icon: Icon(Icons.close_rounded,
                         size: context.si(22)),
                     onPressed: () => Navigator.pop(context),

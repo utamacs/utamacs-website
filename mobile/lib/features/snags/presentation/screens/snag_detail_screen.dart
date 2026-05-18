@@ -595,6 +595,7 @@ class _CommentsSectionState extends ConsumerState<_CommentsSection> {
                           strokeWidth: 2, color: kPrimary600),
                     )
                   : IconButton(
+                      tooltip: 'Post comment',
                       icon: const Icon(Icons.send_rounded,
                           color: kPrimary600),
                       onPressed: _postComment,

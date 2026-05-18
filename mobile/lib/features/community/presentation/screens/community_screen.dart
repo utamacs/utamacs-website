@@ -95,6 +95,7 @@ class CommunityScreen extends ConsumerWidget {
                     ),
                   ),
                 IconButton(
+                  tooltip: 'Refresh',
                   icon: Icon(
                     Icons.refresh_rounded,
                     size: context.si(22),
@@ -1014,6 +1015,7 @@ class _EditPostModalState
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
                     color: widget.isDark
@@ -1202,6 +1204,7 @@ class _ReportPostModalState
                 ),
                 const Spacer(),
                 IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () => Navigator.pop(context),
                   color: widget.isDark
@@ -1338,6 +1341,7 @@ class _ModerationSheet extends ConsumerWidget {
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
                     color: isDark
